@@ -241,7 +241,7 @@ import{j as a,r as l,a as e,i as r,R as n,b as g,P as u,c as b,d as f}from"../ch
     <li><a href="#">هوش مصنوعی جهش</a></li>
     <li><a href="#">اخبار</a></li>
     <li><a href="#">درباره انجمن</a></li>
-    <li><a href="https://jahesh-website.vercel.app/abzar-jahesh">داشبورد تکنولوژی جهش</a></li>
+    <li><a href="#">توسعه‌دهندگان</a></li>
     <li><a href="#" class="active">فروشگاه</a></li>
   </ul>
   <button class="nav-btn">عضویت در انجمن</button>
