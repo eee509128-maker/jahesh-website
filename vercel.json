@@ -1,0 +1,11 @@
+{
+  "routes": [
+    {
+      "src": "/47887509.txt",
+      "dest": "/47887509.txt",
+      "headers": {
+        "content-type": "text/plain; charset=utf-8"
+      }
+    }
+  ]
+}
