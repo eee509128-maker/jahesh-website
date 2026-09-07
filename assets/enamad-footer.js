@@ -10,7 +10,8 @@
     var style = document.createElement("style");
     style.id = styleId;
     style.textContent = [
-      ".enamad-logo-badge-group { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 12px; }",
+      ".enamad-logo-badge-group { display: flex !important; flex: 0 0 auto; flex-direction: row !important; align-items: center; gap: 12px; width: max-content; }",
+      ".enamad-logo-badge-group > a { display: block; flex: 0 0 auto; }",
       ".enamad-footer-badge { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; margin: 0; box-sizing: border-box; }",
       ".enamad-footer-badge a { display: inline-flex; align-items: center; justify-content: center; min-width: 76px; min-height: 76px; padding: 5px; border-radius: 10px; background: rgba(255, 255, 255, 0.96); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14); }",
       ".enamad-footer-badge img { display: block; width: 84px; max-width: 100%; height: auto; }",

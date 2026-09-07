@@ -119,7 +119,7 @@ to{height:0}}[data-ani='expand'],[data-ani='expand'][data-state='open'],[data-an
       rafId = requestAnimationFrame(() => updateGradient(e));
     };
 
-    document.addEventListener('mousemove', onMove, { passive: true });
+    // حرکت پس‌زمینه با ماوس غیرفعال است تا پس‌زمینه ثابت بماند.
 
     // اگر صفحه عوض شد (مهم برای Webstudio و SPA)
     const observer = new MutationObserver(() => {
@@ -128,10 +128,7 @@ to{height:0}}[data-ani='expand'],[data-ani='expand'][data-state='open'],[data-an
       }
     });
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    // observer.observe(document.body, { childList: true, subtree: true });
 
     // تمیز کردن (اختیاری)
     window.addEventListener('beforeunload', () => {
