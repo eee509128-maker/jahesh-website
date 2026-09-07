@@ -1,11 +1,8 @@
 {
-  "routes": [
+  "rewrites": [
     {
-      "src": "/47887509.txt",
-      "dest": "/47887509.txt",
-      "headers": {
-        "content-type": "text/plain; charset=utf-8"
-      }
+      "source": "/47887509.txt",
+      "destination": "/assets/47887509.txt"
     }
   ]
 }
