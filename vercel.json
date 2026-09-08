@@ -7,16 +7,8 @@
       "destination": "/assets/47887509.txt"
     },
     {
-      "source": "/jaheshkala/assets/:match*",
-      "destination": "/jaheshkala/dist/assets/:match*"
-    },
-    {
       "source": "/jaheshkala/:match*",
-      "destination": "/jaheshkala/dist/index.html"
-    },
-    {
-      "source": "/jaheshkala",
-      "destination": "/jaheshkala/dist/index.html"
+      "destination": "/jaheshkala/index.html"
     }
   ]
 }

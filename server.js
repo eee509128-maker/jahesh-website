@@ -107,13 +107,13 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Serve jaheshkala static files & SPA entry
-const jaheshkalaDist = path.join(__dirname, 'jaheshkala', 'dist');
-app.use('/jaheshkala', express.static(jaheshkalaDist));
+const jaheshkalaDir = path.join(__dirname, 'jaheshkala');
+app.use('/jaheshkala', express.static(jaheshkalaDir));
 app.get(['/jaheshkala', '/jaheshkala/*'], (req, res, next) => {
   if (path.extname(req.path)) {
     return next();
   }
-  const indexFile = path.join(jaheshkalaDist, 'index.html');
+  const indexFile = path.join(jaheshkalaDir, 'index.html');
   if (fs.existsSync(indexFile)) {
     return res.sendFile(indexFile);
   }
