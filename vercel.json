@@ -1,0 +1,10 @@
+{
+  "outputDirectory": ".",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/47887509.txt",
+      "destination": "/assets/47887509.txt"
+    }
+  ]
+}
