@@ -1,4 +1,4 @@
-﻿export interface ZibalRequestParams {
+export interface ZibalRequestParams {
   amountInTomans: number;
   orderId: string;
   customerName?: string;

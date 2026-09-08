@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Trash2, ShoppingBag, Globe, ShieldCheck, ArrowLeft, AlertCircle, Sparkles, FileText, Ticket, CheckCircle2, Percent, Plus, Minus } from 'lucide-react';
 import { CartItem, User, Coupon } from '../types';
 
@@ -35,6 +35,18 @@ export const CartModal: React.FC<CartModalProps> = ({
   onProceedToPayment,
   coupons = [],
 }) => {
+  // Handle Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const [couponInput, setCouponInput] = useState('');
@@ -156,7 +168,14 @@ export const CartModal: React.FC<CartModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in cursor-default"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="relative w-full max-w-2xl bg-[#110b27] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-6 max-h-[92vh] flex flex-col">
         
         {/* Header */}
@@ -172,7 +191,8 @@ export const CartModal: React.FC<CartModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-300 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="بستن سبد خرید"
           >
             <X className="w-4 h-4" />
           </button>
@@ -500,10 +520,12 @@ export const CartModal: React.FC<CartModalProps> = ({
 
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <button
+                type="button"
                 onClick={onClose}
-                className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-purple-950/60 transition-colors w-1/3 sm:w-auto text-center"
+                className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-purple-950/80 hover:bg-purple-900 border border-purple-800/50 transition-colors w-1/3 sm:w-auto text-center cursor-pointer"
+                title="بستن سبد خرید و بازگشت به فروشگاه"
               >
-                ادامه خرید
+                بستن و ادامه خرید
               </button>
               <button
                 id="proceed-payment-btn"

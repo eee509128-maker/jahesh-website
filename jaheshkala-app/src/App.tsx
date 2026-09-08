@@ -315,7 +315,14 @@ export default function App() {
         const cloudProducts = await fetchProductsFromDb();
         if (!isMounted) return;
         if (cloudProducts && cloudProducts.length > 0) {
-          setProducts(cloudProducts);
+          const hasGolden = cloudProducts.some((p) => p.id === 'pkg-golden-jahesh' || p.isGolden || p.title.includes('طلایی'));
+          if (!hasGolden) {
+            setProducts([...INITIAL_PRODUCTS, ...cloudProducts]);
+          } else {
+            setProducts(cloudProducts);
+          }
+        } else {
+          setProducts(INITIAL_PRODUCTS);
         }
 
         const cloudOrders = await fetchOrdersFromDb();
@@ -867,6 +874,10 @@ export default function App() {
       <PaymentGatewayModal
         isOpen={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
+        onCloseAll={() => {
+          setPaymentModalOpen(false);
+          setCartModalOpen(false);
+        }}
         cartItems={cartItems}
         currentUser={currentUser}
         onPaymentSuccess={handlePaymentSuccess}
