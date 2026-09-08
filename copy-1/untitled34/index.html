@@ -1,0 +1,717 @@
+<!DOCTYPE html><html lang="en" data-ws-project="20054408-82a5-46d1-9e0f-5805331af217" data-ws-version="7620" data-ws-last-published="2026-08-25T16:19:10.032Z"><head><link rel="stylesheet" type="text/css" href="/assets/static/app_generated_index-6937cd5a.DkFRIJEN.css"><meta charSet="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><link rel="icon" href="/assets/94c366ff-340e-4766-ac1b-ee884eadf859-md_KC00oqQO2FVhMn5gq1Af4.jpeg"/><link rel="preload" href="/assets/Inter-VariableFont_opsz_wght_5pWJ31-T_iPEwHdXmYt6P.ttf" as="font" crossorigin="anonymous"/><meta property="og:url" content="https://url/copy-1/untitled34"/><meta property="og:title" content="Untitled"/><meta property="og:type" content="website"/><meta property="og:site_name" content="jahesh"/><meta name="robots" content="noindex, nofollow"/><meta property="twitter:card" content="summary_large_image"/><title>Untitled</title><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "jahesh"
+}</script></head><body class="w-element"><div class="w-html-embed">
+
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jahesh 1.8 – نسل بعدی هوش مصنوعی ۲۰۲۶</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    /* فونت فارسی وزیرمتن */
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #030014;
+      --bg-secondary: #0A0A1F;
+      --glass-bg: rgba(10, 10, 31, 0.85);
+      --glass-border: rgba(0, 255, 255, 0.3);
+      --accent-1: #00ffff;
+      --accent-2: #ff00ff;
+      --accent-3: #ffff00;
+      --text-primary: #ffffff;
+      --text-secondary: #b8b8ff;
+      --user-msg: linear-gradient(135deg, #2b5876 0%, #4e4376 100%);
+      --ai-msg: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      --success: #00ff88;
+      --btn-bg: rgba(255, 255, 255, 0.05);
+      --btn-hover: rgba(0, 255, 255, 0.15);
+    }
+
+    body {
+      font-family: 'Vazirmatn', 'Tahoma', system-ui, sans-serif;
+      background: radial-gradient(circle at 50% 50%, #1a0b2e 0%, #030014 100%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 1rem;
+      position: relative;
+      overflow-x: hidden;
+      direction: rtl;
+    }
+
+    /* انیمیشن پس زمینه */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: 
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 255, 0.03) 3px),
+        repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255, 0, 255, 0.03) 3px);
+      pointer-events: none;
+      animation: quantumShift 20s linear infinite;
+      z-index: -2;
+    }
+
+    @keyframes quantumShift {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(20px, 20px); }
+    }
+
+    .particle {
+      position: fixed; width: 2px; height: 2px;
+      background: var(--accent-1); border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-1);
+      animation: float 10s infinite; z-index: -1;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) translateX(0); opacity: 0.5; }
+      50% { transform: translateY(-20px) translateX(20px); opacity: 1; }
+    }
+
+    /* هدر */
+    .header {
+      background: var(--glass-bg); backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border); border-radius: 2rem;
+      padding: 0.8rem 1.5rem; margin-bottom: 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 1rem;
+      box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+    }
+
+    .logo { display: flex; align-items: center; gap: 1rem; }
+    .logo-icon {
+      font-size: 2.2rem;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      animation: pulseLogo 3s infinite alternate;
+    }
+    @keyframes pulseLogo { from { transform: scale(1); } to { transform: scale(1.1); } }
+    .logo-text h1 { font-size: 1.5rem; margin-bottom: 0.1rem; color: #fff; }
+    .logo-text p { color: var(--text-secondary); font-size: 0.8rem; }
+
+    .toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .tool-btn {
+      background: var(--btn-bg); border: 1px solid rgba(0, 255, 255, 0.2);
+      color: var(--text-primary); padding: 0.6rem 1rem;
+      border-radius: 2rem; cursor: pointer; transition: all 0.3s;
+      font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;
+      font-family: 'Vazirmatn', sans-serif;
+    }
+    .tool-btn i { color: var(--accent-1); }
+    .tool-btn:hover {
+      background: var(--btn-hover); border-color: var(--accent-1);
+      transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 255, 255, 0.2);
+    }
+
+    /* استایل دکمه در حال ضبط صدا */
+    .recording {
+      background: rgba(255, 0, 0, 0.2) !important;
+      border-color: red !important;
+      animation: pulseRecord 1s infinite;
+    }
+    .recording i { color: red !important; }
+    @keyframes pulseRecord { 0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.5); } 100% { box-shadow: 0 0 0 10px rgba(255,0,0,0); } }
+
+    .status-bar {
+      display: flex; align-items: center; gap: 0.8rem; font-size: 0.8rem;
+      color: var(--text-secondary); background: rgba(0,0,0,0.3);
+      padding: 0.4rem 1rem; border-radius: 2rem; border: 1px solid rgba(0,255,255,0.2);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--success); animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* بدنه چت */
+    .chat-wrapper {
+      max-width: 1400px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 300px; gap: 1.2rem;
+      height: calc(100vh - 140px);
+    }
+
+    .chat-container {
+      background: var(--glass-bg); backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border); border-radius: 2rem;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    .messages {
+      flex: 1; padding: 1.5rem; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 1.5rem;
+    }
+
+    .message {
+      max-width: 85%; padding: 1rem 1.2rem; border-radius: 1.2rem;
+      position: relative; animation: messageAppear 0.3s ease;
+      line-height: 1.8; font-size: 0.95rem; word-break: break-word;
+    }
+    @keyframes messageAppear { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .message.user {
+      background: var(--user-msg); align-self: flex-start;
+      border-bottom-right-radius: 0.3rem; border-bottom-left-radius: 1.2rem;
+    }
+    .message.ai {
+      background: var(--ai-msg); align-self: flex-end;
+      border-bottom-left-radius: 0.3rem; border-bottom-right-radius: 1.2rem;
+      border: 1px solid rgba(0, 255, 255, 0.2);
+    }
+
+    /* استایل کدهای تولید شده */
+    .code-block-wrapper {
+      position: relative; margin: 1rem 0; border-radius: 8px;
+      overflow: hidden; direction: ltr; text-align: left;
+    }
+    .code-block-header {
+      background: #1f2428; padding: 0.5rem 1rem; font-family: sans-serif;
+      font-size: 0.8rem; color: #8b949e; display: flex; justify-content: space-between;
+      border-bottom: 1px solid #333;
+    }
+    .copy-btn {
+      background: none; border: none; color: #8b949e; cursor: pointer;
+      font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem;
+    }
+    .copy-btn:hover { color: #fff; }
+    .message pre {
+      background: #0d1117; padding: 1rem; margin: 0;
+      overflow-x: auto; font-size: 0.85rem; font-family: 'Consolas', monospace;
+    }
+    .message p code {
+      background: rgba(0,0,0,0.5); padding: 0.2rem 0.4rem;
+      border-radius: 4px; font-family: 'Consolas', monospace; direction: ltr; display: inline-block; color: #00ffff;
+    }
+
+    /* نوار ورود متن */
+    .input-container { padding: 1rem; border-top: 1px solid rgba(0,255,255,0.2); background: rgba(0,0,0,0.3); }
+    .input-tools { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; flex-wrap: wrap; }
+    .input-tool-btn {
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(0,255,255,0.15);
+      color: var(--text-secondary); width: 40px; height: 40px; border-radius: 50%;
+      cursor: pointer; transition: all 0.3s; font-size: 1.1rem;
+    }
+    .input-tool-btn:hover { background: rgba(0,255,255,0.15); color: var(--accent-1); transform: scale(1.1); }
+    
+    .input-area { display: flex; gap: 0.8rem; align-items: flex-end; }
+    textarea {
+      flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(0,255,255,0.2);
+      border-radius: 1.2rem; padding: 1rem; color: #fff; font-size: 1rem;
+      resize: none; min-height: 55px; max-height: 150px; font-family: 'Vazirmatn';
+    }
+    textarea:focus { outline: none; border-color: var(--accent-1); box-shadow: 0 0 15px rgba(0,255,255,0.1); }
+    
+    .send-btn {
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      border: none; color: #000; width: 55px; height: 55px; border-radius: 50%;
+      cursor: pointer; transition: all 0.3s; font-size: 1.4rem; display: flex; align-items: center; justify-content: center;
+    }
+    .send-btn:hover { transform: scale(1.1) rotate(-10deg); box-shadow: 0 0 20px rgba(0,255,255,0.4); }
+
+    /* پنل کناری */
+    .sidebar {
+      background: var(--glass-bg); backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border); border-radius: 1.5rem;
+      padding: 1.5rem; overflow-y: auto;
+    }
+    .sidebar-section { margin-bottom: 1.8rem; }
+    .sidebar-title {
+      font-size: 1rem; margin-bottom: 1rem; color: var(--accent-1);
+      display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid rgba(0,255,255,0.2); padding-bottom: 0.5rem;
+    }
+    
+    .model-selector { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .model-badge {
+      background: rgba(0,255,255,0.05); padding: 0.5rem 0.8rem; border-radius: 2rem;
+      font-size: 0.8rem; border: 1px solid rgba(0,255,255,0.2); cursor: pointer; transition: all 0.3s;
+    }
+    .model-badge.active { background: linear-gradient(135deg, var(--accent-1), var(--accent-2)); color: #000; border-color: transparent; font-weight: bold; }
+    
+    .gen-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .gen-tool-card {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,255,0.1);
+      border-radius: 1rem; padding: 1rem 0.5rem; text-align: center; cursor: pointer; transition: all 0.3s;
+    }
+    .gen-tool-card i { font-size: 1.5rem; color: var(--accent-1); margin-bottom: 0.5rem; display: block; }
+    .gen-tool-card span { font-size: 0.75rem; }
+    .gen-tool-card:hover { border-color: var(--accent-1); background: rgba(0,255,255,0.05); transform: translateY(-3px); }
+    
+    .action-btn {
+      width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      color: #fff; padding: 0.8rem; border-radius: 0.8rem; margin-bottom: 0.5rem;
+      cursor: pointer; transition: 0.3s; text-align: right; font-family: 'Vazirmatn';
+    }
+    .action-btn:hover { background: rgba(0,255,255,0.1); border-color: var(--accent-1); }
+    .action-btn i { color: var(--accent-2); margin-left: 0.5rem; width: 20px; text-align: center; }
+
+    /* مودال */
+    .modal {
+      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
+      z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal.active { display: flex; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    
+    .modal-content {
+      background: var(--bg-secondary); border: 1px solid var(--accent-1);
+      border-radius: 1.5rem; padding: 2rem; width: 90%; max-width: 500px;
+      box-shadow: 0 0 50px rgba(0,255,255,0.2); text-align: right;
+    }
+    .modal-content h2 { color: var(--accent-1); margin-bottom: 1.5rem; font-size: 1.4rem; }
+    .modal-content input, .modal-content textarea, .modal-content select {
+      width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(0,255,255,0.3);
+      color: #fff; padding: 0.8rem; border-radius: 0.8rem; font-family: 'Vazirmatn'; margin-bottom: 1rem;
+    }
+    
+    .loading-spinner {
+      display: inline-block; width: 20px; height: 20px;
+      border: 3px solid rgba(255,255,255,0.3); border-radius: 50%;
+      border-top-color: var(--accent-1); animation: spin 1s ease-in-out infinite; margin-right: 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+    ::-webkit-scrollbar-thumb { background: var(--accent-1); border-radius: 3px; }
+  </style>
+
+
+
+  <div id="particles"></div>
+
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon"><i class="fas fa-robot"></i></div>
+      <div class="logo-text">
+        <h1>Jahesh 1.8 PRO</h1>
+        <p>موتور هوش مصنوعی فوق پیشرفته | بدون باگ</p>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button class="tool-btn" id="voiceBtn" onclick="toggleVoice()">
+        <i class="fas fa-microphone"></i> <span id="voiceText">تایپ صوتی</span>
+      </button>
+      <div class="status-bar">
+        <div class="status-dot"></div><span>متصل و آماده</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-wrapper">
+    <div class="chat-container">
+      <div class="messages" id="messages">
+        <div class="message ai">
+          <div class="message-content">
+            سلام! من <b>نسخه اصلاح شده و بدون باگ Jahesh 1.8</b> هستم. 🚀<br><br>
+            حالا دکمه‌های کناری واقعاً کار می‌کنند. می‌تونی از من بخوای کد بنویسم، عکس‌های واقعی خلق کنم، یا متون رو ترجمه و خلاصه کنم. در خدمتم!
+          </div>
+        </div>
+      </div>
+
+      <div class="input-container">
+        <div class="input-tools">
+          <button class="input-tool-btn" onclick="openModal('imageModal')" title="تولید تصویر واقعی"><i class="fas fa-image"></i></button>
+          <button class="input-tool-btn" onclick="openModal('codeModal')" title="تولید کد حرفه ای"><i class="fas fa-code"></i></button>
+          <button class="input-tool-btn" onclick="alert('قابلیت ضبط ویدیو/صدا نیازمند سرور اختصاصی است.')" title="تولید ویدیو"><i class="fas fa-film"></i></button>
+        </div>
+        <div class="input-area">
+          <textarea id="prompt" placeholder="پیام خود را بنویسید... (Enter برای ارسال، Shift+Enter برای خط جدید)"></textarea>
+          <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title"><i class="fas fa-microchip"></i> مدل‌های زبانی</div>
+        <div class="model-selector">
+          <div class="model-badge active" onclick="selectModel(event, 'openai/gpt-4o-mini')">Jahesh GPT-4o</div>
+          <div class="model-badge" onclick="selectModel(event, 'anthropic/claude-3-haiku')">Jahesh Claude</div>
+          <div class="model-badge" onclick="selectModel(event, 'meta-llama/llama-3-8b-instruct:free')">Jahesh Llama-3</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title"><i class="fas fa-magic"></i> ساخت و خلق</div>
+        <div class="gen-tools">
+          <div class="gen-tool-card" onclick="openModal('imageModal')">
+            <i class="fas fa-image"></i><span>ساخت عکس (واقعی)</span>
+          </div>
+          <div class="gen-tool-card" onclick="openModal('codeModal')">
+            <i class="fas fa-code"></i><span>ساخت کد (برنامه‌نویسی)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title"><i class="fas fa-tools"></i> ابزارهای روی پیام آخر</div>
+        <div>
+          <button class="action-btn" onclick="processLastMessage('translate')"><i class="fas fa-language"></i> ترجمه پیام آخر</button>
+          <button class="action-btn" onclick="processLastMessage('summarize')"><i class="fas fa-compress-alt"></i> خلاصه کردن پیام آخر</button>
+          <button class="action-btn" onclick="processLastMessage('explain')"><i class="fas fa-chalkboard-teacher"></i> توضیح بیشتر پیام آخر</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال تصویر -->
+  <div class="modal" id="imageModal">
+    <div class="modal-content">
+      <h2>ساخت تصویر با هوش مصنوعی</h2>
+      <p style="font-size: 0.85rem; margin-bottom: 1rem; color: #aaa;">هر چیزی که تصور میکنید را بنویسید (انگلیسی دقیق تر است اما فارسی هم پشتیبانی میشود).</p>
+      <textarea id="imagePrompt" rows="3" placeholder="مثال: یک گربه فضانورد در حال قدم زدن روی کره مریخ..."></textarea>
+      <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+        <button class="tool-btn" style="flex:1; justify-content:center; background: #00ffff; color: #000; font-weight:bold;" onclick="generateRealImage()">تولید عکس</button>
+        <button class="tool-btn" style="flex:1; justify-content:center; background: rgba(255,0,0,0.2);" onclick="closeModal('imageModal')">انصراف</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال برنامه‌نویسی -->
+  <div class="modal" id="codeModal">
+    <div class="modal-content">
+      <h2><i class="fas fa-code"></i> دستیار برنامه‌نویسی</h2>
+      <p style="font-size: 0.85rem; margin-bottom: 1rem; color: #aaa;">درخواست خود را بنویسید. هوش مصنوعی بهترین و بهینه‌ترین کد را برای شما خواهد نوشت.</p>
+      <input type="text" id="codeLanguage" placeholder="زبان برنامه‌نویسی (مثلا Python, HTML, JS, C++)">
+      <textarea id="codePrompt" rows="4" placeholder="مثال: یک فرم لاگین زیبا با HTML و CSS بنویس..."></textarea>
+      <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+        <button class="tool-btn" style="flex:1; justify-content:center; background: #ff00ff; color: #fff; font-weight:bold;" onclick="generateCode()">نوشتن کد</button>
+        <button class="tool-btn" style="flex:1; justify-content:center; background: rgba(255,0,0,0.2);" onclick="closeModal('codeModal')">انصراف</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== تنظیمات اصلی ====================
+    const API_KEY = "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";
+    const API_URL = "https://openrouter.ai/api/v1/chat/completions";
+    let currentModel = "openai/gpt-4o-mini";
+    let isWaitingForResponse = false;
+
+    // ذرات پس زمینه
+    function createParticles() {
+      const pDiv = document.getElementById('particles');
+      for (let i = 0; i < 15; i++) {
+        let p = document.createElement('div');
+        p.className = 'particle';
+        p.style.right = Math.random() * 100 + '%';
+        p.style.top = Math.random() * 100 + '%';
+        p.style.animationDelay = Math.random() * 5 + 's';
+        pDiv.appendChild(p);
+      }
+    }
+    createParticles();
+
+    // ==================== هندل کردن فرمت پیام‌ها (Code & Markdown) ====================
+    function formatMessageText(text) {
+      if (!text) return "";
+      
+      // اصلاح حروف فارسی
+      text = text.replace(/ي/g, 'ی').replace(/ك/g, 'ک');
+      
+      // تبدیل بلوک‌های کد (تبدیل به ساختار زیبای کپی دار)
+      const codeBlockRegex = /```([\w-]*)\n([\s\S]*?)```/g;
+      text = text.replace(codeBlockRegex, function(match, lang, code) {
+        const uniqueId = 'code-' + Math.random().toString(36).substr(2, 9);
+        return `
+          <div class="code-block-wrapper">
+            <div class="code-block-header">
+              <span>${lang || 'Code'}</span>
+              <button class="copy-btn" onclick="copyCode('${uniqueId}')">
+                <i class="far fa-copy"></i> کپی
+              </button>
+            </div>
+            <pre><code id="${uniqueId}">${escapeHTML(code.trim())}</code></pre>
+          </div>
+        `;
+      });
+
+      // تبدیل کدهای یک خطی (اینلاین)
+      text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+      
+      // تبدیل خط جدید به <br> به جز داخل بلاک های کد
+      text = text.replace(/\n/g, '<br>');
+
+      return text;
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[tag] || tag));
+    }
+
+    // کپی کردن کد در کلیپ بورد
+    function copyCode(elementId) {
+      const codeElement = document.getElementById(elementId);
+      if(codeElement) {
+        navigator.clipboard.writeText(codeElement.innerText).then(() => {
+          alert('✅ کد کپی شد!');
+        });
+      }
+    }
+
+    // ==================== سیستم چت ====================
+    const messagesDiv = document.getElementById('messages');
+    const promptInput = document.getElementById('prompt');
+
+    // ارسال با Enter بدون Shift
+    promptInput.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    function addMessageToUI(content, role) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `message ${role}`;
+      msgDiv.innerHTML = `<div class="message-content">${formatMessageText(content)}</div>`;
+      
+      // چپ چین کردن انگلیسی اگر کل متن انگلیسی باشد
+      if(/^[a-zA-Z0-9\s.,!?'"()\-=_+\[\]{}|\\;:@#\$%^&*`~]+$/.test(content.replace(/<[^>]*>?/gm, ''))) {
+          msgDiv.style.direction = 'ltr';
+          msgDiv.style.textAlign = 'left';
+      }
+
+      messagesDiv.appendChild(msgDiv);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      return msgDiv; // برای آپدیت‌های بعدی مثل لودینگ
+    }
+
+    async function sendToAI(userText, systemPrompt = "شما یک دستیار هوش مصنوعی فارسی زبان، مهربان و بسیار باهوش هستید. همیشه پاسخ‌های ساختاریافته و تمیز بدهید.") {
+      if (isWaitingForResponse) return;
+      isWaitingForResponse = true;
+
+      // اضافه کردن لودینگ
+      const loadingMsg = document.createElement('div');
+      loadingMsg.className = 'message ai';
+      loadingMsg.innerHTML = `<div class="message-content"><div class="loading-spinner"></div> در حال تفکر...</div>`;
+      messagesDiv.appendChild(loadingMsg);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'HTTP-Referer': 'https://jahesh-ai.com',
+            'X-Title': 'Jahesh 1.8',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: currentModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userText }
+            ]
+          })
+        });
+
+        if (!response.ok) throw new Error("خطا در ارتباط با سرور. لطفا فیلترشکن خود را بررسی کنید.");
+        
+        const data = await response.json();
+        const reply = data.choices[0].message.content;
+        
+        // حذف پیام لودینگ و اضافه کردن جواب اصلی
+        messagesDiv.removeChild(loadingMsg);
+        addMessageToUI(reply, 'ai');
+
+      } catch (error) {
+        messagesDiv.removeChild(loadingMsg);
+        addMessageToUI(`❌ خطا: ${error.message}`, 'ai');
+      } finally {
+        isWaitingForResponse = false;
+      }
+    }
+
+    function sendMessage() {
+      const text = promptInput.value.trim();
+      if (!text) return;
+      
+      promptInput.value = '';
+      promptInput.style.height = 'auto'; // ریست کردن ارتفاع کادر
+      
+      addMessageToUI(text, 'user');
+      sendToAI(text);
+    }
+
+    // ==================== ابزارهای تولید تصویر و کد ====================
+
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    // تولید تصویر واقعی با استفاده از API رایگان Pollinations
+    function generateRealImage() {
+      const promptText = document.getElementById('imagePrompt').value.trim();
+      if(!promptText) return alert('لطفاً توضیح عکس را بنویسید.');
+      closeModal('imageModal');
+      
+      addMessageToUI(`🎨 دستور ساخت تصویر: ${promptText}`, 'user');
+      
+      // ساخت یک پیام لودینگ مخصوص تصویر
+      const imgMsg = document.createElement('div');
+      imgMsg.className = 'message ai';
+      imgMsg.innerHTML = `<div class="message-content"><div class="loading-spinner"></div> در حال خلق تصویر... (ممکن است چند ثانیه طول بکشد)</div>`;
+      messagesDiv.appendChild(imgMsg);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      // آدرس API تولید عکس
+      const encodedPrompt = encodeURIComponent(promptText + " , high quality, masterpiece");
+      const randomSeed = Math.floor(Math.random() * 100000);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${randomSeed}&width=800&height=600&nologo=true`;
+
+      // لود کردن عکس در پس زمینه تا وقتی آماده شد نمایش دهیم
+      const img = new Image();
+      img.onload = function() {
+        imgMsg.innerHTML = `<div class="message-content">
+          🖼️ <b>تصویر شما آماده است:</b><br><br>
+          <img src="${imageUrl}" style="max-width: 100%; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,255,255,0.2);">
+          <br><a href="${imageUrl}" target="_blank" style="color: cyan; font-size: 0.8rem; display: inline-block; margin-top:10px;">لینک مستقیم عکس</a>
+        </div>`;
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      };
+      img.onerror = function() {
+        imgMsg.innerHTML = `<div class="message-content">❌ خطا در تولید تصویر. لطفاً پرامپت ساده‌تری را به انگلیسی امتحان کنید.</div>`;
+      }
+      img.src = imageUrl;
+    }
+
+    // دستیار برنامه‌نویس
+    function generateCode() {
+      const lang = document.getElementById('codeLanguage').value.trim();
+      const promptText = document.getElementById('codePrompt').value.trim();
+      if(!promptText) return alert('لطفاً درخواست خود را بنویسید.');
+      
+      closeModal('codeModal');
+      
+      const userMessage = `لطفا کد زیر را به زبان ${lang || 'پیش‌فرض'} بنویس: ${promptText}`;
+      addMessageToUI(userMessage, 'user');
+
+      const systemPrompt = "شما یک برنامه‌نویس Senior و حرفه‌ای هستید. پاسخ‌های شما باید مستقیماً شامل کدهای بهینه و تمیز با فرمت Markdown (```) باشد. در صورت نیاز توضیحات کوتاه فارسی در مورد نحوه کارکرد کد ارائه دهید.";
+      sendToAI(promptText + (lang ? ` (به زبان ${lang})` : ''), systemPrompt);
+    }
+
+    // ==================== ابزارهای ویژه روی پیام آخر ====================
+    function processLastMessage(action) {
+      // پیدا کردن آخرین پیام ارسال شده توسط کاربر یا هوش مصنوعی
+      const messageElements = document.querySelectorAll('.message-content');
+      if (messageElements.length <= 1) return alert("پیامی برای بررسی وجود ندارد.");
+      
+      // گرفتن متن آخرین پیامی که لودینگ نیست
+      let lastText = "";
+      for(let i = messageElements.length - 1; i >= 0; i--) {
+        const text = messageElements[i].innerText;
+        if(!text.includes("در حال تفکر") && !text.includes("در حال خلق")) {
+          lastText = text;
+          break;
+        }
+      }
+      
+      if(!lastText) return;
+
+      let prompt = "";
+      let title = "";
+
+      if(action === 'translate') {
+        title = "🔤 درخواست ترجمه پیام قبل";
+        prompt = `لطفاً متن زیر را بررسی کن. اگر فارسی است به انگلیسی روان، و اگر انگلیسی است به فارسی روان ترجمه کن:\n\n"${lastText}"`;
+      } else if(action === 'summarize') {
+        title = "✂️ درخواست خلاصه سازی";
+        prompt = `لطفاً متن زیر را در ۱ تا ۳ جمله کوتاه و مفید خلاصه کن:\n\n"${lastText}"`;
+      } else if(action === 'explain') {
+        title = "💡 درخواست توضیح بیشتر";
+        prompt = `مفهوم متن زیر را با جزئیات بیشتر و ذکر یک مثال ساده برای من توضیح بده:\n\n"${lastText}"`;
+      }
+
+      addMessageToUI(title, 'user');
+      sendToAI(prompt);
+    }
+
+    // ==================== ضبط صدا (اصلاح شده با Toggle واقعی) ====================
+    let recognition;
+    let isRecording = false;
+
+    function toggleVoice() {
+      const btn = document.getElementById('voiceBtn');
+      const textSpan = document.getElementById('voiceText');
+
+      if (!('webkitSpeechRecognition' in window)) {
+        alert('متأسفانه مرورگر شما از قابلیت تبدیل صدا به متن پشتیبانی نمی‌کند. (ترجیحا از Chrome استفاده کنید)');
+        return;
+      }
+
+      if (!recognition) {
+        recognition = new webkitSpeechRecognition();
+        recognition.lang = 'fa-IR';
+        recognition.continuous = false; // وقتی حرف زدن تمام شد خودش قطع میشود
+        recognition.interimResults = true; // نمایش همزمان حروف
+
+        recognition.onstart = () => {
+          isRecording = true;
+          btn.classList.add('recording');
+          textSpan.innerText = 'در حال شنیدن...';
+          promptInput.placeholder = "لطفا صحبت کنید...";
+        };
+
+        recognition.onresult = (event) => {
+          let interimTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              promptInput.value += event.results[i][0].transcript + ' ';
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+        };
+
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error', event.error);
+          stopVoiceUI();
+        };
+
+        recognition.onend = () => {
+          stopVoiceUI();
+        };
+      }
+
+      if (isRecording) {
+        recognition.stop();
+      } else {
+        recognition.start();
+      }
+    }
+
+    function stopVoiceUI() {
+      isRecording = false;
+      const btn = document.getElementById('voiceBtn');
+      const textSpan = document.getElementById('voiceText');
+      btn.classList.remove('recording');
+      textSpan.innerText = 'تایپ صوتی';
+      promptInput.placeholder = "پیام خود را بنویسید... (Enter برای ارسال)";
+    }
+
+    // ==================== انتخاب مدل ====================
+    function selectModel(e, modelName) {
+      currentModel = modelName;
+      document.querySelectorAll('.model-badge').forEach(b => b.classList.remove('active'));
+      if(e && e.target) e.target.classList.add('active');
+    }
+
+  </script>
+
+</div><script id="vike_pageContext" type="application/json">{"_urlRewrite":null,"pageId":"/pages/copy-1/untitled34","routeParams":{},"data":{"url":"https://url/copy-1/untitled34","system":{"params":{},"search":{},"origin":"https://url","pathname":"/copy-1/untitled34"},"resources":{},"pageMeta":{"title":"Untitled","description":"","excludePageFromSearch":true,"language":"","socialImageAssetName":"!undefined","socialImageUrl":"","status":"!undefined","redirect":"","content":"","custom":[]}}}</script><script id="vike_globalContext" type="application/json">{}</script><script src="/assets/entries/entry-server-routing.BOO9J2wb.js" type="module" async></script><link rel="modulepreload" href="/assets/entries/pages_copy-1_untitled34.CGVTmb_5.js" as="script" type="text/javascript"><link rel="modulepreload" href="/assets/chunks/chunk-_4i898Gl.js" as="script" type="text/javascript"><link rel="modulepreload" href="/assets/chunks/chunk-BTtE8iXS.js" as="script" type="text/javascript"><link rel="modulepreload" href="/assets/chunks/chunk-ckwbz45p.js" as="script" type="text/javascript"></body></html>

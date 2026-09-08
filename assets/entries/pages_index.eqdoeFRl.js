@@ -1,0 +1,142 @@
+import{j as c,r as v,a as x,i as u,R as z,b as q,P as k,c as N,d as _,enamad as EnamadBadge}from"../chunks/chunk-_4i898Gl.js";import{l,m as r,C as O,P,A as h,$ as S}from"../chunks/chunk-CJTZdOzc.js";import{U as s}from"../chunks/chunk-BTtE8iXS.js";import{f as M}from"../chunks/chunk-C4Qe1Kax.js";import{n as e}from"../chunks/chunk-CRUfvgxf.js";import{n as m}from"../chunks/chunk-RvLaVuUh.js";import{d as p}from"../chunks/chunk-DMe6ghIO.js";import{g as a}from"../chunks/chunk-BKjYWtT8.js";import{n as I}from"../chunks/chunk-Bx5-62GJ.js";import{d as o}from"../chunks/chunk-ClMSjCia.js";import{d as b,i}from"../chunks/chunk-DWuKyx5h.js";import{O as $,x as F,M as R,R as T,$ as L}from"../chunks/chunk-Bp3SeOo3.js";/* empty css                      */import"../chunks/chunk-C8mXcq4L.js";const w="jahesh",A=[{id:"jAWQK3_7D18H_5v0pK0z4"},{id:"mONS0so-VrF1uS9rPlVcF",maxWidth:991},{id:"zGIdqUzdPde7sHmF0aRQP",maxWidth:767},{id:"wP-rcJFENR2yn86VzREAn",maxWidth:479}],D="94c366ff-340e-4766-ac1b-ee884eadf859-md_KC00oqQO2FVhMn5gq1Af4.jpeg",E=["Inter-VariableFont_opsz_wght_5pWJ31-T_iPEwHdXmYt6P.ttf"],H=["Group_1_3Lze2enBpFNP3rVOtd0Yp.svg"],U=t=>c.jsxs(M,{className:"w-body c1pzicie",children:[c.jsxs(e,{className:"w-box",children:[c.jsx(l,{children:c.jsxs(r,{children:[c.jsx(s,{code:`<style>
+  /* So we don't need to add a token to every paragraph to remove margin. */
+  p {
+    margin: 0;
+  }
+
+  /* * {
+    /* Make links scroll to their sections smoothly. */
+    scroll-behavior: smooth;
+  } */
+</style>`,className:"w-html-embed"}),c.jsx(s,{code:`<style>
+:root {
+  --ani-duration: var(--duration-default, .2s);
+  --ani-delay: 0s;
+  --ani-slide-offset: 20%;
+  --ani-zoom-in-scale: 1;
+  --ani-zoom-out-scale: .85;
+  --ani-flip-rotate: 30deg;
+  --ani-easing: var(--easing-default, ease);
+  --ani-fill-mode: forwards;
+}
+[data-ani]:not([data-ani-children]),[data-ani-children]:not([data-ani-progress])>*{animation-duration:var(--ani-duration);animation-delay:var(--ani-delay);animation-timing-function:var(--ani-easing);animation-fill-mode:var(--ani-fill-mode);opacity:0}[data-ani-progress]:not([data-ani-children]),[data-ani-children]:not([data-ani])>*{transition-property:opacity,transform;transition-duration:var(--ani-duration);transition-timing-function:var(--ani-easing);opacity:0}
+@keyframes fadeIn{from{opacity:0}
+to{opacity:1}}
+@keyframes fadeOut{from{opacity:1}
+to{opacity:0}}[data-ani-children][data-ani='fade']>.in,[data-ani='fade']:where(.in:not([data-state]),[data-state$='open'],[data-state='active']){animation-name:fadeIn}[data-ani-children][data-ani='fade']>.out,[data-ani='fade']:where(.out:not([data-state]),[data-state='closed'],[data-state='inactive']){animation-name:fadeOut}
+@keyframes slideIn{from{opacity:0;translate:var(--ani-slide-transform)}
+to{opacity:1;translate:none}}
+@keyframes slideOut{from{opacity:1;translate:none}
+to{opacity:0;translate:var(--ani-slide-transform)}}[data-ani-children][data-ani|='slide']>.in,[data-ani|='slide']:where(.in:not([data-state]),[data-state$='open'],[data-state='active']){animation-name:slideIn}[data-ani-children][data-ani|='slide']>.out,[data-ani|='slide']:where(.out:not([data-state]),[data-state='closed'],[data-state='inactive']){animation-name:slideOut}[data-ani='slide-up']{--ani-slide-transform:0 var(--ani-slide-offset)}[data-ani='slide-down']{--ani-slide-transform:0 calc(-1*var(--ani-slide-offset))}[data-ani='slide-left']{--ani-slide-transform:var(--ani-slide-offset)}[data-ani='slide-right']{--ani-slide-transform:calc(-1*var(--ani-slide-offset))}
+@keyframes zoomIn{from{opacity:0;scale:var(--ani-zoom-out-scale)}
+to{opacity:1;scale:1}}
+@keyframes zoomOut{from{opacity:1;scale:1}
+to{opacity:0;scale:var(--ani-zoom-in-scale)}}[data-ani-children][data-ani='zoom']>.in,[data-ani|='zoom']:where(.in:not([data-state]),[data-state$='open'],[data-state='active']){animation-name:zoomIn}[data-ani-children][data-ani='zoom']>.out,[data-ani|='zoom']:where(.out:not([data-state]),[data-state='closed'],[data-state='inactive']){animation-name:zoomOut}[data-ani-children][data-ani-progress='zoom']>*,[data-ani-progress='zoom']:not([data-ani-children]){transform:scale(var(--ani-zoom-out-scale))}
+@keyframes flipInY{from{rotate:y var(--ani-flip-rotate);perspective:2000px;opacity:0}
+to{rotate:y 0;opacity:1}}
+@keyframes flipOutY{from{rotate:y 0;opacity:1}
+to{perspective:2000px;rotate:y var(--ani-flip-rotate);opacity:0}}
+@keyframes flipInX{from{perspective:2000px;rotate:x var(--ani-flip-rotate);opacity:0}
+to{rotate:x 0;opacity:1}}
+@keyframes flipOutX{from{rotate:x 0;opacity:1}
+to{perspective:2000px;rotate:x var(--ani-flip-rotate);opacity:0}}[data-ani-children][data-ani='flip-y']>.in,[data-ani='flip-y']:where(.in:not([data-state]),[data-state$='open'],[data-state='active']){animation-name:flipInY}[data-ani-children][data-ani='flip-x']>.in,[data-ani='flip-x']:where(.in:not([data-state]),[data-state$='open'],[data-state='active']){animation-name:flipInX}[data-ani-children][data-ani='flip-y']>.out,[data-ani='flip-y']:where(.out:not([data-state]),[data-state='closed'],[data-state='inactive']){animation-name:flipOutY}[data-ani-children][data-ani='flip-x']>.out,[data-ani='flip-x']:where(.out:not([data-state]),[data-state='closed'],[data-state='inactive']){animation-name:flipOutX}
+@keyframes expandDown{from{height:0}
+to{height:var(--newHeight)}}
+@keyframes expandUp{from{height:var(--newHeight)}
+to{height:0}}[data-ani='expand'],[data-ani='expand'][data-state='open'],[data-ani='expand'].in{--newHeight:var(--custom-height,var(--radix-accordion-content-height,var(--radix-collapsible-content-height,100%)));overflow:hidden;opacity:1}[data-ani-children][data-ani='expand']>.in,[data-ani='expand']:where(.in:not([data-state]),[data-state$='open'],[data-state='active']){animation:expandDown var(--ani-duration)var(--ani-easing)}[data-ani-children][data-ani='expand']>.out,[data-ani='expand']:where(.out:not([data-state]),[data-state='closed'],[data-state='inactive']){animation:expandUp var(--ani-duration)var(--ani-easing)}
+@media(prefers-reduced-motion:reduce){[data-ani]:not([data-ani-children]),[data-ani-progress]:not([data-ani-children]),[data-ani-children]>*{opacity:1;transform:none;animation:none;rotate:none;scale:none;translate:none}}
+</style>`,className:"w-html-embed"}),c.jsx(e,{tag:"header",className:"w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lxiyww c1qyy4dh ct02u4h c1z0l37u c1ml0hr7 c1fd0kk1 c11gzs80 c1sche0c c1l2989r cjqo3r0 c1cvcmzo c3xzas1 c1n6cdq4 c1a5jpyh c18j5d8w c1fysxfs",children:c.jsxs(e,{className:"w-box czr2pxy copqmak ct8c5y2 c10zkoym cignq8x cavd3zn c1tbut6b c1tzxl2z c16n19h8 cwqojdn c7klx50 c1qrxaqp cjkeggx c8pi8fa cow6lkx c1oxjrsz csud216 c1xiy5b1 cq7d8me c1ycnvnd",children:[c.jsx(l,{children:c.jsx(r,{children:c.jsx(a,{"aria-label":"Home",href:"/",className:"w-link ceaxqcs cld4m44 c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p cl60rel czukzo6 cho8smv",children:c.jsx(o,{loading:"eager",src:"/assets/Layer_0_aDhmtOhUccIugxMgRqVRF.png",width:458,height:427,alt:"",className:"w-image coe1sx2 cybwsdi"})})})}),c.jsx(e,{tag:"nav","aria-label":"main",className:"w-box c1mcu1jn cry9bxc c1qyy4dh ct02u4h c1lfjoq7 cgtnddv c1le23sj c40yjke c1kzn7na c17q2jvf ct49a6u c102r6kr c4sllhu clmbo8f cc3dq2t",children:c.jsx(l,{children:c.jsx(r,{children:c.jsx(O,{className:"w-navigation-menu c1cqu2xh cry9bxc cvblku1 c1xuq60h c1p217py c193ydh7 crglsme c14ip164 c1bkqfhr c1qyy4dh ct02u4h c13ldpkq c1gw84sn cjq768y c1le23sj c40yjke c1kzn7na c17q2jvf",children:c.jsxs(P,{className:"w-menu-list cry9bxc c1fhkm63 cqeb86t c1admj5d c34dwh1 c1qyy4dh ct02u4h cdq89vd c1tcoltv c3qzgd0 c1y6imu0 c1n13r54 c1le23sj c40yjke c1kzn7na c17q2jvf c1gw84sn cjq768y",children:[c.jsx(h,{"data-ws-index":"0",className:"w-menu-item",children:c.jsx(a,{type:"button",href:"/frwshgah",className:"w-link c1llqm3g csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cl60rel czukzo6 c1170qfo c12mjb61",children:c.jsx(m,{className:"w-text",children:"فروشگاه"})})}),c.jsx(h,{"data-ws-index":"1",className:"w-menu-item",children:c.jsx(a,{href:"/abzar-jahesh",className:"w-link c1llqm3g csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 c10psnxv cl7jefz c150vpwe c22g687 cx84glk cl60rel czukzo6 c1170qfo c12mjb61",children:"داشبورد تکنولوژی جهش"})}),c.jsx(h,{"data-ws-index":"2",className:"w-menu-item",children:c.jsx(S,{children:c.jsx(a,{type:"button",href:"/drbarh-anjmn",className:"w-link c12j9tyh csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cl60rel czukzo6 c1170qfo c12mjb61",children:c.jsx(m,{className:"w-text c1llqm3g",children:"درباره انجمن"})})})}),c.jsx(h,{"data-ws-index":"3",className:"w-menu-item",children:c.jsx(a,{href:"/akhbar",className:"w-link c1llqm3g csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cl60rel czukzo6 c1170qfo c12mjb61",children:"اخبار"})}),c.jsx(h,{"data-ws-index":"4",className:"w-menu-item",children:c.jsx(a,{href:"/hwsh-msnway",className:"w-link c1llqm3g csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cl60rel czukzo6 c1170qfo c12mjb61",children:"هوش مصنوعی جهش"})})]})})})})}),c.jsxs(e,{className:"w-box cry9bxc c1qyy4dh ct02u4h cn6056e c1117wcl",children:[c.jsx(e,{className:"w-box",children:c.jsx(e,{className:"w-box c76ugon c1va7jp0 c18xibj9 ccn5ruk c5ehae6 cax3zcx c1le23sj c40yjke c1kzn7na c17q2jvf csugexd cciu1th co2lzyj cghs7z1 c18xchlu ckqzz7r",children:c.jsx(a,{href:"https://t.me/+7eeuF5ZMpFRmYzg8",className:"w-link c1umvwl9 c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 cnf3mc6 cbm6zv4 ce8zlua c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx czr2pxy c3pidkv c1kol985 cy8zwmn cl60rel czukzo6 c1muywj1",children:"عضویت در انجمن"})})}),c.jsx(l,{children:c.jsx(r,{children:c.jsxs($,{children:[c.jsx(F,{children:c.jsx(I,{"aria-label":"Open mobile menu",type:"button",className:"w-button c1umvwl9 ccfzz03 cub2gss cgcvr98 c1xjllne c135vpv5 cwvpjlf c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 cnf3mc6 cbm6zv4 ce8zlua c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx c1xty5yn c1g1x4wk cy8zwmn c9x99qz cl60rel czukzo6 c1muywj1 c891fy0 c1k6tqmo c1bxqinn ckrlbpk c1oxjrsz csud216 c1xiy5b1 cq7d8me c149s0mc c1ycnvnd",children:c.jsx(s,{code:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22" fill="currentColor" width="100%" height="100%" style="display: block;"><path fill-rule="evenodd" d="M2 5.998a.75.75 0 0 1 .75-.75h16.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Zm0 5.5a.75.75 0 0 1 .75-.75h16.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Zm0 5.5a.75.75 0 0 1 .75-.75h16.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg>',className:"w-html-embed"})})}),c.jsx(R,{className:"w-dialog-overlay c1lfjoq7 c1n4ph0l c12ysg9e c12suyxz cfk9cie c1o373d6 c1eb27oh c1dnch4g cnbxdw5 cx6c9kw c174sw29 c1d5jdd9",children:c.jsxs(T,{className:"w-dialog-content c1fhkm63 cx6c9kw ctopzly colc7hu c174sw29 cmaksb1 c1i9o1yp cktaign chyzecn ctgnupg c1i7z02k c5hqtns c4a9xim coam49y c15xw1g2",children:[c.jsxs(e,{className:"w-box cx6c9kw c1nd8hlk",children:[c.jsx(l,{children:c.jsx(r,{children:c.jsx(a,{"aria-label":"Home",href:"/",className:"w-link ceaxqcs cld4m44 c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p cl60rel czukzo6 cho8smv",children:c.jsx(o,{loading:"eager",src:"/assets/Layer_0_aDhmtOhUccIugxMgRqVRF.png",width:458,height:427,alt:"",className:"w-image coe1sx2 cybwsdi"})})})}),c.jsx(L,{"aria-label":"Close mobile menu",className:"w-close-button c1umvwl9 ccfzz03 cub2gss cgcvr98 c1xjllne c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 cnf3mc6 cbm6zv4 ce8zlua c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx c1xty5yn c1g1x4wk cy8zwmn c9x99qz cl60rel czukzo6 c1muywj1 c4rd7b9 c1k6tqmo c1bxqinn ckrlbpk c1oxjrsz csud216 c1xiy5b1 cq7d8me c1ycnvnd",children:c.jsx(s,{code:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" width="100%" height="100%" style="display: block;"><path fill-rule="evenodd" d="M13.566 2.434a.8.8 0 0 1 0 1.132L9.13 8l4.435 4.434a.8.8 0 0 1-1.132 1.132L8 9.13l-4.434 4.435a.8.8 0 0 1-1.132-1.132L6.87 8 2.434 3.566a.8.8 0 0 1 1.132-1.132L8 6.87l4.434-4.435a.8.8 0 0 1 1.132 0Z" clip-rule="evenodd"/></svg>',className:"w-html-embed"})})]}),c.jsx(e,{tag:"nav","aria-label":"Main mobile",className:"w-box cx6c9kw c1rstvfo c1bulmrh c12f3mdq c2ogfof",children:c.jsxs(b,{className:"w-list c34dwh1 c1y6imu0 c1cn3fw9 cry9bxc c1z0l37u c1ml0hr7 c1lfjoq7 coxb4hz",children:[c.jsx(i,{className:"w-list-item",children:c.jsx(a,{href:"/frwshgah",className:"w-link c12j9tyh csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cl60rel czukzo6 c1170qfo c12mjb61",children:"فروشگاه"})}),c.jsx(i,{className:"w-list-item",children:c.jsx(a,{href:"/abzar-jahesh",className:"w-link c12j9tyh csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cl60rel czukzo6 c1170qfo c12mjb61",children:"داشبورد تکنولوژی جهش"})}),c.jsx(i,{className:"w-list-item",children:c.jsx(a,{href:"/drbarh-anjmn",className:"w-link c12j9tyh csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cl60rel czukzo6 c1170qfo c12mjb61",children:"درباره انجمن"})}),c.jsx(i,{className:"w-list-item",children:c.jsx(a,{href:"/akhbar",className:"w-link c12j9tyh csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cl60rel czukzo6 c1170qfo c12mjb61",children:"اخبار"})}),c.jsx(i,{className:"w-list-item",children:c.jsx(a,{href:"/hwsh-msnway",className:"w-link c12j9tyh csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cl60rel czukzo6 c1170qfo c12mjb61",children:"هوش مصنوعی"})})]})}),c.jsx(a,{href:"/download-app",className:"w-link c1umvwl9 c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 cnf3mc6 cbm6zv4 ce8zlua c12sm2j2 c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx czr2pxy cy8zwmn cl60rel czukzo6 c1muywj1",children:"DOWNLOAD APP"})]})})]})})})]})]})})]})}),c.jsxs(e,{tag:"main",className:"w-box",children:[c.jsx(e,{tag:"section",className:"w-box ch3bbj5 c1mzb2kd c1dz3al c1cl2zap c8qdjaz c1uc2zh c1l8rbde cq8dnu3 cth1c7d",children:c.jsx(e,{className:"w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lfjoq7 c1778y6x c1wt8a7g ceu66s9 c12ae6v5 c1fd0kk1 c11gzs80 c16h1mmi",children:c.jsxs(e,{className:"w-box cry9bxc c1lfjoq7 ct8c5y2 c10zkoym c1qyy4dh c1wt8a7g",children:[c.jsxs(a,{className:"w-link ceaxqcs csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p c1md20bl c1e892th c1qyy4dh ct02u4h cxk6kow conc6us c108v1a0 c81fpui c1fce3gj c1nj04wn c1nitjp7 c195lvp6 c1hr6a6t c12sm2j2 c135vpv5 c1wayd1n cl60rel czukzo6 cho8smv",children:[c.jsx(m,{className:"w-text cl7jefz c341xsy c11dowh9 c1nj04wn c1nitjp7 c195lvp6 c1hr6a6t c7vx2dq c1mgacbo cff1ay0 c14z73t1 c1hyd7qt c1clnlkm ckmcr2z",children:"New"}),c.jsx(m,{className:"w-text",children:"فعالیت‌های علمی و پژوهشی"})]}),c.jsx(p,{tag:"h1",className:"w-heading c11nr3ex cy1haag c32myit cwrra4i c4rpps8 c1d23h5a cnu4kgu c1yb3n9o cbrrmm8 cuo9dm5 c40zsbj c13cx24t c1my01bv c8itdy4 c74kosi c1qom380 c1357293 c9jnjeu c1dhz37v c1xzir7e",children:c.jsxs(a,{href:"https://www.um.ac.ir/#",className:"w-element c135vpv5 c1b1clqm c8itdy4 c1qom380",children:["انجمن علمی جهش","",c.jsx("br",{}),""]})}),c.jsxs(p,{tag:"h2",className:"w-heading cmy06ei cy1haag c32myit cwrra4i c12y6bqh c1mpwk4w c1cqu2xh c1qom380 c1357293 c9jnjeu cqpp1f9 cg4v2lj c1n926lt c1st924m c4omex0 c1dhz37v",children:["انجمن علمی جهش، بستری برای رشد، یادگیری و فعالیت‌های علمی دانشجویان.","",c.jsx("br",{}),""]}),c.jsx(e,{className:"w-box c76ugon c1va7jp0 c18xibj9 ccn5ruk c1fizh2u c5ehae6 cax3zcx c1le23sj c40yjke c1kzn7na c17q2jvf csugexd cciu1th co2lzyj cghs7z1 c18xchlu ckqzz7r c1gxc3mp",children:c.jsx(a,{href:"/abzar-jahesh",className:"w-link c1b1clqm c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 c1yajs6b cdcs8wy c1m1praz c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx cblpe2z c1f4gqnf c6k8nt0 cy8zwmn cl60rel czukzo6 c1qvfg2v c1170qfo",children:"داشبورد تکنولوژی جهش"})}),c.jsx(e,{className:"w-box c76ugon c1va7jp0 c18xibj9 ccn5ruk cauqehp cd7bvzr c5ehae6 cax3zcx c1le23sj c40yjke c1kzn7na c17q2jvf csugexd cciu1th co2lzyj cghs7z1 c18xchlu ckqzz7r cdjp5jd",children:c.jsx(a,{href:"https://jahesh-moshkel.vercel.app/",className:"w-link c1b1clqm c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 c1yajs6b cdcs8wy c1m1praz c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx cblpe2z c1f4gqnf c6k8nt0 cy8zwmn cl60rel czukzo6 c1qvfg2v c1170qfo",children:" حل مشکلات توسط جهش"})})]})})}),c.jsx(e,{tag:"section",className:"w-box cna0hdz c1mzb2kd cztu8ya c1nfu27o cf9av01",children:c.jsxs(e,{className:"w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lfjoq7 c1778y6x c1wt8a7g c1s46o9r cdczzub c1fd0kk1 c11gzs80",children:[c.jsxs(e,{className:"w-box copqmak c10zkoym ct8c5y2 cori9ti cstj0zg c1vrexag cwho2c5 cl5hb04 c174sw29 cas7ks9 c155h8oe cw7dtlx czsotsp",children:[c.jsx(a,{href:"https://www.um.ac.ir/#",className:"w-link cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c11xl3nf c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c27i6a7 c1xgpbbr",children:c.jsx(o,{src:"/assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png",width:1343,height:1640,alt:"",className:"w-image coejy3h c1fhiulb ckf5uvt c1av00hf cji8cjn"})}),c.jsx(a,{href:"https://t.me/+7eeuF5ZMpFRmYzg8",className:"w-link cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1qom380 cw6350v c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c19ltm5q",children:c.jsx(o,{src:"/assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png",width:1343,height:1640,alt:"",className:"w-image c58g4rx c1fhiulb c1syou84 cwdvs8x ccre34y c1av00hf cji8cjn"})}),c.jsx(a,{href:"https://vet.um.ac.ir/index.php/fa/",className:"w-link cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1cn3fw9 cshakd0 c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c6knbyk cbole29 c11qs19r c1mtgfjh",children:c.jsx(o,{src:"/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png",width:334,height:500,alt:"",className:"w-image coejy3h c1fhiulb c1qom380 c1av00hf cji8cjn cvu031e ctfghqu cfihc2m"})})]}),c.jsx("div",{className:"w-element cjqyi6z c6pxsvg",children:c.jsx(s,{code:`<div style="position:relative;border-radius:1rem;background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.1);padding:24px;overflow:hidden;direction: rtl;">
+  <div style="position:absolute;top:-80px;left:-80px;width:256px;height:256px;background:rgba(139,92,246,0.2);border-radius:9999px;filter:blur(80px);"></div>
+  <div style="position:relative;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+    <div style="flex-shrink:0;height:64px;width:64px;display:flex;align-items:center;justify-content:center;border-radius:1rem;background:linear-gradient(135deg,#8b5cf6,#d946ef);box-shadow:0 10px 25px rgba(139,92,246,0.5);font-size:32px;">
+      ⚡
+    </div>
+    <div style="flex:1;min-width:200px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="background:linear-gradient(to left,#fbbf24,#f97316);padding:2px 8px;font-size:10px;font-weight:900;color:#000;letter-spacing:2px;border-radius:4px;">NEW</span>
+        <span style="font-size:12px;color:#c4b5fd;">آخرین خبر</span>
+      </div>
+      <h3 style="font-size:20px;font-weight:900;color:#fff;margin:0 0 4px 0;">
+        هوش مصنوعی «جهش 2» ساخته شد!
+      </h3>
+      <p style="font-size:14px;color:rgba(216,180,254,0.8);margin:0;">
+        نسخه جدید هوش مصنوعی با قابلیت‌های پیشرفته در دسترس قرار گرفت
+      </p>
+    </div>
+    <a href="https://jahesh-2.vercel.app/" target="_blank" rel="noopener noreferrer"
+       style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(to left,#7c3aed,#d946ef);padding:12px 24px;border-radius:12px;color:#fff;font-weight:bold;text-decoration:none;box-shadow:0 10px 25px rgba(139,92,246,0.5);">
+      استفاده از هوش مصنوعی جهش 2 ←
+    </a>
+  </div>
+</div>`,className:"w-html-embed"})})]})})]}),c.jsx(l,{children:c.jsx(r,{children:c.jsx(e,{tag:"footer",className:"w-box c128r2zr cwmfdmi c1jsg78k c10d16hw c1oo3gam",children:c.jsxs(e,{className:"w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lfjoq7 c1778y6x c1wt8a7g c1s46o9r cdczzub c1fd0kk1 c11gzs80 c1y2xgno",children:[c.jsxs(e,{className:"w-box cry9bxc c18v2pa2 c174sw29 cmaksb1 c1i9o1yp c1oo3gam czjxq8p",children:[c.jsxs(e,{className:"w-box cry9bxc footer-brand-group",children:[c.jsx(a,{href:"/",className:"w-link ceaxqcs cld4m44 c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p c1x4yn0w cl60rel czukzo6 cho8smv",children:c.jsx(o,{alt:"",src:"/assets/Layer_0_aDhmtOhUccIugxMgRqVRF.png",width:458,height:427,className:"w-image c1uamlc5 c11qs19r c1oo3gam cnq7vy0"})}),c.jsx(EnamadBadge,{})]}),c.jsx(e,{className:"w-box cry9bxc c1lxiyww c1s46o9r cdczzub c1jjfh4b c1x8tjwt",children:c.jsxs(e,{tag:"nav","aria-labelledby":"menu4Title",className:"w-box cry9bxc c1z0l37u c1ml0hr7 c1lfjoq7",children:[c.jsx(p,{tag:"h2",id:"menu4Title",className:"w-heading cu3kim0 c11dowh9 c32myit cwrra4i c12y6bqh cmodf44 c82xiwu c10r58nh c1xbli5y",children:"ارتباط با ما"}),c.jsxs(b,{className:"w-list c34dwh1 c1y6imu0 c1cn3fw9 cry9bxc c1z0l37u c1ml0hr7 c1lfjoq7",children:[c.jsx(i,{className:"w-list-item cyvw1ra",children:c.jsx(a,{href:"tel:+989152331974",className:"w-link c1b1clqm csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h cie9ffo c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cg4v2lj cigo8cm czzlsyi cpull2p c10psnxv c6k8nt0 c1f4gqnf cl60rel czukzo6 c1170qfo c12mjb61",children:"تماس"})}),c.jsx(i,{className:"w-list-item",children:c.jsx(a,{href:"https://t.me/emainsupport",className:"w-link c1b1clqm csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cphdlt5 cpull2p c1f4gqnf cl60rel czukzo6 c1170qfo c12mjb61",children:"تلگرام"})}),c.jsx(i,{className:"w-list-item c1i3809r c1f4gqnf",children:c.jsx(a,{href:"https://www.youtube.com/@erfanTeman",className:"w-link c1b1clqm csru8nn c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p ch11gwv c1md20bl c1e892th c1qyy4dh ct02u4h c1e7helk c1l0vha7 csyy8v5 c1bc2i7x c17r8x7j c13b531o c1my01bv c135vpv5 c1y6imu0 c3qzgd0 cbcxcgu cpull2p cl60rel czukzo6 c1170qfo c12mjb61",children:"یوتیوب"})})]})]})})]}),c.jsx(e,{className:"w-box cry9bxc ct02u4h c1lfjoq7 c16xs6ny",children:c.jsx(e,{className:"w-box cry9bxc c1qyy4dh c1wt8a7g c1md20bl c1e892th c1y4fwd4",children:c.jsx(m,{className:"w-text cx84glk c10vhufq",children:"© 2024 jahesh, Inc."})})})]})})})})]}),c.jsx(s,{code:`
+    <script src="https://cdn.botpress.cloud/webchat/v3.6/inject.js"><\/script>
+<script src="https://files.bpcontent.cloud/2026/02/14/17/20260214173206-L2B0FP66.js" defer><\/script>
+    `,executeScriptOnCanvas:!0,clientOnly:!0,className:"w-html-embed c1hi70x2"}),c.jsx(s,{code:`<div id="mouse-bg"></div>
+
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow-x: hidden;
+  }
+
+  #mouse-bg {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(140, 0, 255, 0.30),
+      #0a0a0a 65%
+    );
+    transition: background 0.12s ease;
+  }
+</style>
+
+<script>
+  (function() {
+    const bg = document.getElementById('mouse-bg');
+    if (!bg) return;
+
+    function updateGradient(e) {
+      if (!bg) return;
+      const x = e ? (e.clientX / window.innerWidth) * 100 : 50;
+      const y = e ? (e.clientY / window.innerHeight) * 100 : 50;
+      
+      bg.style.background = \`radial-gradient(circle at \${x}% \${y}%, rgba(140, 0, 255, 0.38), #0a0a0a 65%)\`;
+    }
+
+    // شروع اولیه
+    updateGradient();
+
+    // حرکت ماوس
+    let rafId;
+    const onMove = (e) => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => updateGradient(e));
+    };
+
+    document.addEventListener('mousemove', onMove, { passive: true });
+
+    // اگر صفحه عوض شد (مهم برای Webstudio و SPA)
+    const observer = new MutationObserver(() => {
+      if (document.getElementById('mouse-bg')) {
+        updateGradient();
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // تمیز کردن (اختیاری)
+    window.addEventListener('beforeunload', () => {
+      document.removeEventListener('mousemove', onMove);
+      observer.disconnect();
+    });
+  })();
+<\/script>`,clientOnly:!0,className:"w-html-embed"})]}),C=t=>{const{origin:n,pathname:y,search:d}=new URL(t);return`${n}${y}${d}`},V=v.memo(({pageKey:t,system:n})=>c.jsx(U,{system:n},t),(t,n)=>t.pageKey===n.pageKey),W=({data:t})=>{const{system:n,resources:y,url:d,pageMeta:f}=t,j=C(d),g=v.useMemo(()=>({imageLoader:u,assetBaseUrl:x,resources:y,breakpoints:A,onError:console.error}),[y]);return c.jsxs(z.Provider,{value:g,children:[c.jsx(q.Provider,{value:d,children:c.jsx(V,{pageKey:j,system:n})}),c.jsx(k,{url:d,pageMeta:f,siteName:w,imageLoader:u,assetBaseUrl:x}),c.jsx(N,{children:f.title})]})},B=Object.freeze(Object.defineProperty({__proto__:null,default:W},Symbol.toStringTag,{value:"Module"})),K=({})=>{const t={"@context":"https://schema.org","@type":"WebSite",name:w};return c.jsxs(c.Fragment,{children:[c.jsx("script",{type:"application/ld+json",dangerouslySetInnerHTML:{__html:JSON.stringify(t,null,2)}}),c.jsx("link",{rel:"icon",href:u({src:`${x}${D}`})}),E.map(n=>c.jsx("link",{rel:"preload",href:`${x}${n}`,as:"font",crossOrigin:"anonymous"},n)),H.map(n=>c.jsx("link",{rel:"preload",href:`${x}${n}`,as:"image"},n))]})},Y=Object.freeze(Object.defineProperty({__proto__:null,Head:K},Symbol.toStringTag,{value:"Module"})),oc={isClientRuntimeLoaded:{type:"computed",definedAtData:null,valueSerialized:{type:"js-serialized",value:!0}},onBeforeRenderEnv:{type:"computed",definedAtData:null,valueSerialized:{type:"js-serialized",value:null}},dataEnv:{type:"computed",definedAtData:null,valueSerialized:{type:"js-serialized",value:{server:!0}}},onRenderClient:{type:"standard",definedAtData:{filePathToShowToUser:"/renderer/+onRenderClient.tsx",fileExportPathToShowToUser:[]},valueSerialized:{type:"plus-file",exportValues:_}},Page:{type:"standard",definedAtData:{filePathToShowToUser:"/pages/index/+Page.tsx",fileExportPathToShowToUser:[]},valueSerialized:{type:"plus-file",exportValues:B}},Head:{type:"standard",definedAtData:{filePathToShowToUser:"/pages/index/+Head.tsx",fileExportPathToShowToUser:[]},valueSerialized:{type:"plus-file",exportValues:Y}}};export{oc as configValuesSerialized};
