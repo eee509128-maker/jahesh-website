@@ -543,8 +543,7 @@
         <footer class="w-box c128r2zr cwmfdmi c1jsg78k c10d16hw c1oo3gam">
           <div
             class="w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lfjoq7 c1778y6x c1wt8a7g c1s46o9r cdczzub c1fd0kk1 c11gzs80 c1y2xgno">
-            <div class="w-box cry9bxc c18v2pa2 c174sw29 cmaksb1 c1i9o1yp c1oo3gam czjxq8p">
-              <div class="footer-brand-enamad" style="display:inline-flex;align-items:center;gap:18px;flex-wrap:wrap;"><a aria-current="page"
+            <div class="w-box cry9bxc c18v2pa2 c174sw29 cmaksb1 c1i9o1yp c1oo3gam czjxq8p"><a aria-current="page"
                 class="w-link ceaxqcs cld4m44 c1e9wxra c1c9nyn co9inq6 c18nx7en c13zjl4p c1x4yn0w cl60rel czukzo6 cho8smv active"
                 href="/"><img class="w-image c1uamlc5 c11qs19r c1oo3gam cnq7vy0" alt="" width="458" height="427"
                   sizes="100vw"
@@ -555,7 +554,6 @@
                     referrerpolicy='origin'
                     src='https://trustseal.enamad.ir/logo.aspx?id=7660079&Code=4IXhqn15ERsZtL5TKetkEb1ggQTnmRjU' alt=''
                     style='cursor:pointer' code='4IXhqn15ERsZtL5TKetkEb1ggQTnmRjU'></a></div>
-              </div>
               <div class="w-box cry9bxc c1lxiyww c1s46o9r cdczzub c1jjfh4b c1x8tjwt">
                 <nav aria-labelledby="menu4Title" class="w-box cry9bxc c1z0l37u c1ml0hr7 c1lfjoq7">
                   <h2 id="menu4Title"
@@ -604,47 +602,6 @@
   <link rel="modulepreload" href="/assets/chunks/chunk-DWuKyx5h.js" as="script" type="text/javascript">
   <link rel="modulepreload" href="/assets/chunks/chunk-Bp3SeOo3.js" as="script" type="text/javascript">
   <link rel="modulepreload" href="/assets/chunks/chunk-ckwbz45p.js" as="script" type="text/javascript">
-  <script>
-    (function () {
-      function checkAndPlace() {
-        var logo = document.querySelector("footer img[src*='Layer_0_']");
-        if (!logo) return;
-        var logoLink = logo.closest("a");
-        if (!logoLink || !logoLink.parentElement) return;
-
-        var enamad = document.querySelector(".enamad-wrapper");
-        if (enamad && enamad.parentElement === logoLink.parentElement) {
-          return;
-        }
-
-        if (!enamad) {
-          enamad = document.createElement("div");
-          enamad.className = "enamad-wrapper";
-          enamad.innerHTML = "<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7660079&Code=4IXhqn15ERsZtL5TKetkEb1ggQTnmRjU'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7660079&Code=4IXhqn15ERsZtL5TKetkEb1ggQTnmRjU' alt='' style='cursor:pointer' code='4IXhqn15ERsZtL5TKetkEb1ggQTnmRjU'></a>";
-        }
-
-        var parent = logoLink.parentElement;
-        if (!parent.classList.contains("footer-brand-enamad")) {
-          var wrapper = document.createElement("div");
-          wrapper.className = "footer-brand-enamad";
-          wrapper.style.cssText = "display:inline-flex;align-items:center;gap:18px;flex-wrap:wrap;";
-          parent.insertBefore(wrapper, logoLink);
-          wrapper.appendChild(logoLink);
-          wrapper.appendChild(enamad);
-        } else {
-          parent.appendChild(enamad);
-        }
-      }
-
-      checkAndPlace();
-      window.addEventListener("DOMContentLoaded", checkAndPlace);
-      window.addEventListener("load", checkAndPlace);
-      new MutationObserver(checkAndPlace).observe(document.body || document.documentElement, {
-        childList: true,
-        subtree: true
-      });
-    })();
-  </script>
 </body>
 
 </html>
