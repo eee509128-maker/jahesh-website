@@ -405,6 +405,16 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
               <span>پشتیبانی تلفنی (09152331974)</span>
             </button>
 
+            <a
+              id="back-to-main-site-btn"
+              href="/"
+              className="ms-auto flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-900/40 hover:bg-purple-800/60 border border-purple-700/50 text-purple-200 hover:text-white transition-all text-[11px] sm:text-xs font-semibold shrink-0"
+              title="بازگشت به صفحه اصلی جهش"
+            >
+              <span className="text-amber-400">←</span>
+              <span>سایت اصلی جهش</span>
+            </a>
+
           </div>
 
         </div>
