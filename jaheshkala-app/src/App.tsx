@@ -191,27 +191,8 @@ export default function App() {
     }
   }, [theme]);
 
-  // Ensure first product (golden package) price is 7,900,000 Tomans
+  // Ensure secret coupon jahesh1395 is active and present
   useEffect(() => {
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === 'pkg-golden-jahesh'
-          ? { ...p, price: 7900000, originalPrice: 11500000, discountPercent: 31 }
-          : p
-      )
-    );
-    setCartItems((prev) =>
-      prev.map((it) =>
-        it.product.id === 'pkg-golden-jahesh'
-          ? {
-              ...it,
-              product: { ...it.product, price: 7900000, originalPrice: 11500000, discountPercent: 31 }
-            }
-          : it
-      )
-    );
-
-    // Ensure secret coupon jahesh1395 is active and present
     setCoupons((prev) => {
       if (prev.some((c) => c.code.toLowerCase() === 'jahesh1395')) return prev;
       const secretCoupon: Coupon = {
@@ -351,15 +332,8 @@ export default function App() {
 
         const cloudOrders = await fetchOrdersFromDb();
         if (!isMounted) return;
-        if (cloudOrders && cloudOrders.length > 0) {
-          setOrders((prev) => {
-            const map = new Map<string, Order>();
-            cloudOrders.forEach((o) => map.set(o.id, o));
-            prev.forEach((o) => {
-              if (!map.has(o.id)) map.set(o.id, o);
-            });
-            return Array.from(map.values());
-          });
+        if (cloudOrders) {
+          setOrders(cloudOrders);
         }
 
         const cloudCoupons = await fetchCouponsFromDb();
@@ -445,15 +419,8 @@ export default function App() {
 
         // Periodic orders sync
         const freshOrders = await fetchOrdersFromDb();
-        if (isMounted && freshOrders && freshOrders.length > 0) {
-          setOrders((prev) => {
-            const map = new Map<string, Order>();
-            freshOrders.forEach((o) => map.set(o.id, o));
-            prev.forEach((o) => {
-              if (!map.has(o.id)) map.set(o.id, o);
-            });
-            return Array.from(map.values());
-          });
+        if (isMounted && freshOrders) {
+          setOrders(freshOrders);
         }
       } catch (err) {
         // silent
@@ -759,6 +726,21 @@ export default function App() {
     return true;
   });
 
+  // Dynamically resolve product details (e.g. edited price, title, image) inside the cart
+  const resolvedCartItems = cartItems.map((item) => {
+    const latestProd = products.find((p) => p.id === item.product?.id);
+    if (latestProd) {
+      return {
+        ...item,
+        product: {
+          ...item.product,
+          ...latestProd, // override with the latest details including updated price
+        },
+      };
+    }
+    return item;
+  });
+
   return (
     <div className={`min-h-screen flex flex-col font-['Vazirmatn',sans-serif] transition-colors duration-200 ${theme === 'light' ? 'theme-light bg-[#fbf9ff] text-slate-800' : 'theme-dark bg-[#0b0819] text-slate-100'}`}>
       
@@ -773,7 +755,7 @@ export default function App() {
       {/* 1. DIGIKALA TOP & SUB HEADER */}
       <DigikalaHeader
         currentUser={currentUser}
-        cartItems={cartItems}
+        cartItems={resolvedCartItems}
         products={products}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -904,7 +886,7 @@ export default function App() {
       <CartModal
         isOpen={cartModalOpen}
         onClose={() => setCartModalOpen(false)}
-        cartItems={cartItems}
+        cartItems={resolvedCartItems}
         currentUser={currentUser}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveFromCart}
@@ -937,7 +919,7 @@ export default function App() {
           setPaymentModalOpen(false);
           setCartModalOpen(false);
         }}
-        cartItems={cartItems}
+        cartItems={resolvedCartItems}
         currentUser={currentUser}
         onPaymentSuccess={handlePaymentSuccess}
         appliedCoupon={appliedCheckoutCoupon}

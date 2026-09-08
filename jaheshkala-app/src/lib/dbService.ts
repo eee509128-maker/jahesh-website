@@ -193,7 +193,7 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
       console.warn('Supabase fetch orders notice (using local store):', error.message);
       return localOrders;
     }
-    if (data && data.length > 0) {
+    if (data) {
       const cloudOrders: Order[] = data.map((item) => {
         let parsedItems = item.items;
         if (typeof item.items === 'string') {
@@ -224,20 +224,9 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
         };
       });
 
-      // Merge cloud orders and local orders to ensure no order is ever lost
-      const mergedMap = new Map<string, Order>();
-      // First insert cloud orders
-      cloudOrders.forEach((o) => mergedMap.set(o.id, o));
-      // Then merge local orders if any are missing from cloud
-      localOrders.forEach((o) => {
-        if (!mergedMap.has(o.id)) {
-          mergedMap.set(o.id, o);
-        }
-      });
-
-      const mergedList = Array.from(mergedMap.values());
-      saveLocalOrdersStore(mergedList);
-      return mergedList;
+      // Synchronize local cache to exactly match cloud DB (empty array if no orders)
+      saveLocalOrdersStore(cloudOrders);
+      return cloudOrders;
     }
     return localOrders;
   } catch (err) {
