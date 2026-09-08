@@ -19,6 +19,13 @@ import {
   deleteCouponFromDb,
   INITIAL_COUPONS,
 } from './lib/dbService';
+import {
+  verifyZibalPayment,
+  getPendingOrder,
+  clearPendingOrder,
+  ZIBAL_DEFAULT_MERCHANT,
+} from './lib/zibalService';
+import confetti from 'canvas-confetti';
 
 // Digikala-styled Components
 import { DigikalaHeader } from './components/DigikalaHeader';
@@ -108,8 +115,19 @@ export default function App() {
 
   // 6. Zibal merchant
   const [zibalMerchant, setZibalMerchant] = useState<string>(() => {
-    return localStorage.getItem('jahesh_zibal_merchant') || 'zibal-jahesh-gateway';
+    const saved = localStorage.getItem('jahesh_zibal_merchant');
+    if (!saved || saved === 'zibal-jahesh-gateway') {
+      return ZIBAL_DEFAULT_MERCHANT;
+    }
+    return saved;
   });
+
+  // State for showing the completed order receipt after returning from Zibal
+  const [completedOrderReceipt, setCompletedOrderReceipt] = useState<{
+    order: Order;
+    refNumber?: string;
+    trackId?: string;
+  } | null>(null);
 
   // Modals & UI states
   const [searchQuery, setSearchQuery] = useState('');
@@ -194,6 +212,94 @@ export default function App() {
       return [secretCoupon, ...prev];
     });
   }, []);
+
+  // Handle return from Zibal Payment Gateway
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const trackId = urlParams.get('trackId');
+    const success = urlParams.get('success');
+    const status = urlParams.get('status');
+
+    if (!trackId) return;
+
+    // Clean up URL parameters immediately to prevent duplicate calls on refresh
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    if (success === '1' || status === '2') {
+      const handleVerifyPayment = async () => {
+        showToast('در حال اعتبارسنجی پرداخت با درگاه شاپرک زیبال...');
+        const pendingOrder = getPendingOrder();
+
+        const verifyRes = await verifyZibalPayment(trackId, zibalMerchant);
+
+        if (verifyRes.success) {
+          try {
+            confetti({
+              particleCount: 150,
+              spread: 80,
+              origin: { y: 0.6 },
+            });
+          } catch (e) {}
+
+          const refNum = String(verifyRes.refNumber || trackId);
+          const finalOrder: Order = pendingOrder
+            ? {
+                ...pendingOrder,
+                trackingCode: String(trackId),
+                paymentRefId: refNum,
+                status: 'در حال بررسی',
+                totalAmount: verifyRes.amountInTomans || pendingOrder.totalAmount,
+              }
+            : {
+                id: 'JAHESH-' + Math.floor(10000 + Math.random() * 90000).toString(),
+                trackingCode: String(trackId),
+                paymentRefId: refNum,
+                userId: currentUser?.id || 'guest',
+                customerName: currentUser?.fullName || 'مشتری گرامی',
+                customerPhone: currentUser?.phone || '',
+                customerEmail: currentUser?.email || '',
+                items: [],
+                totalAmount: verifyRes.amountInTomans || 0,
+                status: 'در حال بررسی',
+                paymentGateway: 'زیبال (Zibal)',
+                acceptedTerms: true,
+                date: new Date().toLocaleDateString('fa-IR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+              };
+
+          setOrders((prev) => [finalOrder, ...prev]);
+          await saveOrderToDb(finalOrder);
+
+          setCartItems([]);
+          localStorage.removeItem('jahesh_cart');
+          clearPendingOrder();
+
+          setCompletedOrderReceipt({
+            order: finalOrder,
+            refNumber: refNum,
+            trackId: String(trackId),
+          });
+
+          showToast('پرداخت با موفقیت انجام شد و سفارش در دیتابیس ثبت گردید.');
+        } else {
+          showToast(verifyRes.message || 'خطا در تأیید تراکنش بانکی زیبال.');
+        }
+      };
+
+      handleVerifyPayment();
+    } else if (success === '0') {
+      clearPendingOrder();
+      showToast('پرداخت در درگاه بانکی زیبال لغو شد یا با خطا مواجه گردید.');
+    }
+  }, [zibalMerchant, currentUser]);
 
   const handleOpenFooterTopic = (topicId: string) => {
     setActiveFooterTopic(topicId);
@@ -765,7 +871,65 @@ export default function App() {
         currentUser={currentUser}
         onPaymentSuccess={handlePaymentSuccess}
         appliedCoupon={appliedCheckoutCoupon}
+        zibalMerchant={zibalMerchant}
       />
+
+      {/* Real Bank Payment Success Modal (Zibal / Shaparak) */}
+      {completedOrderReceipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+          <div className="relative w-full max-w-md bg-[#100a26] border border-emerald-500/80 rounded-3xl shadow-2xl p-6 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center mx-auto text-emerald-400">
+              <CheckCircle2 className="w-9 h-9" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-black text-white">پرداخت با موفقیت انجام شد!</h3>
+              <p className="text-xs text-slate-300">سفارش شما در سامانه جهش کالا و درگاه شاپرک ثبت شد.</p>
+            </div>
+
+            <div className="bg-[#170e38] rounded-2xl p-4 text-xs space-y-2.5 text-right border border-purple-900/50">
+              <div className="flex justify-between items-center text-slate-300">
+                <span>شماره سفارش:</span>
+                <span className="font-mono text-white font-bold">{completedOrderReceipt.order.id}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-300">
+                <span>کد پیگیری شاپرک (زیبال):</span>
+                <span className="font-mono text-emerald-400 font-bold">{completedOrderReceipt.trackId}</span>
+              </div>
+              {completedOrderReceipt.refNumber && (
+                <div className="flex justify-between items-center text-slate-300">
+                  <span>شماره مرجع بانکی:</span>
+                  <span className="font-mono text-purple-300 font-bold">{completedOrderReceipt.refNumber}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center text-slate-300 pt-2 border-t border-purple-900/40">
+                <span>مبلغ پرداخت‌شده:</span>
+                <span className="text-emerald-400 font-black text-sm">
+                  {completedOrderReceipt.order.totalAmount.toLocaleString('fa-IR')} تومان
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                onClick={() => {
+                  setCompletedOrderReceipt(null);
+                  setUserOrdersModalOpen(true);
+                }}
+                className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg transition-colors cursor-pointer"
+              >
+                مشاهده پیگیری سفارشات
+              </button>
+              <button
+                onClick={() => setCompletedOrderReceipt(null)}
+                className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                بستن
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* User Auth (Login / Register) - Enters Admin when jahesh / jahesh1395 is used */}
       <AuthModal

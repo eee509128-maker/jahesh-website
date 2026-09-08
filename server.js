@@ -106,6 +106,112 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'jahesh-kala-api' });
 });
 
+// Zibal Payment Request Endpoint
+app.post('/api/zibal-request', async (req, res) => {
+  try {
+    const { amount, amountInTomans, callbackUrl, description, orderId, mobile, merchant } = req.body || {};
+    const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
+
+    let amountInRials = 0;
+    if (amountInTomans) {
+      amountInRials = Math.round(Number(amountInTomans) * 10);
+    } else if (amount) {
+      amountInRials = Math.round(Number(amount));
+    }
+
+    if (!amountInRials || isNaN(amountInRials) || amountInRials < 10000) {
+      return res.status(400).json({
+        error: 'مبلغ تراکنش نامعتبر است. حداقل مبلغ پرداخت ۱,۰۰۰ تومان (۱۰,۰۰۰ ریال) است.',
+        result: -1
+      });
+    }
+
+    const finalCallbackUrl = callbackUrl || 'http://localhost:3000/jaheshkala';
+    const finalDescription = description || `سفارش شماره ${orderId || 'جهش کالا'}`;
+
+    const zibalRes = await fetch('https://gateway.zibal.ir/v1/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        merchant: ZIBAL_MERCHANT,
+        amount: amountInRials,
+        callbackUrl: finalCallbackUrl,
+        description: finalDescription,
+        orderId: orderId ? String(orderId) : undefined,
+        mobile: mobile ? String(mobile) : undefined
+      })
+    });
+
+    const data = await zibalRes.json();
+    if (data.result === 100) {
+      return res.json({
+        success: true,
+        result: data.result,
+        trackId: data.trackId,
+        message: data.message || 'success',
+        paymentUrl: `https://gateway.zibal.ir/start/${data.trackId}`
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        result: data.result,
+        message: data.message || 'خطا در ارتباط با درگاه زیبال',
+        details: data
+      });
+    }
+  } catch (err) {
+    console.error('Error in /api/zibal-request:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Internal Server Error' });
+  }
+});
+
+// Zibal Payment Verify Endpoint
+app.post('/api/zibal-verify', async (req, res) => {
+  try {
+    const { trackId, merchant } = req.body || {};
+    if (!trackId) {
+      return res.status(400).json({ success: false, error: 'کد پیگیری تراکنش (trackId) ارسال نشده است.' });
+    }
+
+    const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
+
+    const zibalRes = await fetch('https://gateway.zibal.ir/v1/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        merchant: ZIBAL_MERCHANT,
+        trackId: Number(trackId)
+      })
+    });
+
+    const data = await zibalRes.json();
+    if (data.result === 100 || data.result === 201) {
+      return res.json({
+        success: true,
+        result: data.result,
+        status: data.status,
+        refNumber: data.refNumber ? String(data.refNumber) : '',
+        amountInRials: data.amount,
+        amountInTomans: data.amount ? Math.round(data.amount / 10) : 0,
+        paidAt: data.paidAt,
+        cardNumber: data.cardNumber || '',
+        orderId: data.orderId || '',
+        message: data.message || 'پرداخت با موفقیت تأیید شد.'
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        result: data.result,
+        message: data.message || 'تأیید تراکنش با خطا مواجه شد.',
+        details: data
+      });
+    }
+  } catch (err) {
+    console.error('Error in /api/zibal-verify:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Internal Server Error' });
+  }
+});
+
 // Serve jaheshkala static files & SPA entry
 const jaheshkalaDir = path.join(__dirname, 'jaheshkala');
 app.use('/jaheshkala', express.static(jaheshkalaDir));

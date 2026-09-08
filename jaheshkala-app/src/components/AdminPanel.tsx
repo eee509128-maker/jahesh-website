@@ -1635,9 +1635,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     type="text"
                     dir="ltr"
                     value={zibalMerchant}
+                    placeholder="6a9db4410df8756c31ea5d00"
                     onChange={(e) => onUpdateZibalMerchant(e.target.value)}
                     className="flex-1 bg-black/60 border border-emerald-500/50 rounded-xl px-3 py-2 text-xs text-emerald-300 font-mono focus:outline-none"
                   />
+                  <button
+                    type="button"
+                    onClick={() => onUpdateZibalMerchant('6a9db4410df8756c31ea5d00')}
+                    className="px-3 py-1.5 bg-emerald-950 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs hover:bg-emerald-900 transition-colors"
+                    title="بازنشانی به مرچنت پیش‌فرض رسمی جهش"
+                  >
+                    پیش‌فرض
+                  </button>
                 </div>
               </div>
 
