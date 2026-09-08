@@ -1,0 +1,8 @@
+{
+  "name": "انجمن علمی جهش",
+  "description": "انجمن علمی جهش، بستری برای رشد، یادگیری و فعالیت‌های علمی دانشجویان.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

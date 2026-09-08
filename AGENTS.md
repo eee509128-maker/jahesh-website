@@ -1,12 +1,12 @@
 # AGENTS.md - jahesh-website
 
 ## Overview
-This is a static website built with Vike.js (client-side routing framework). The site consists of multiple page templates (untitled1–untitled37) sharing common assets in assets/.
+This is a static website built with Vike.js (client-side routing framework). The site consists of multiple page templates (untitled1ï¿½untitled37) sharing common assets in assets/.
 
 ## Key Facts
 - Framework: Vike.js (server-side and client-side routing)
 - Build: None - pure static site, no bundling/deployment step
-- Pages: 37 page templates (untitled1–untitled37) in jahesh-website/untitledN/
+- Pages: 37 page templates (untitled1ï¿½untitled37) in jahesh-website/untitledN/
 - Shared Assets: assets/ contains CSS, fonts, images, and chunked JS
 - Entry Point: assets/entries/entry-server-routing.BOO9J2wb.js (Vike router)
 - Package Manager: No package.json - empty lockfile only
