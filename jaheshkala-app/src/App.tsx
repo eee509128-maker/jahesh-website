@@ -237,81 +237,92 @@ export default function App() {
 
     if (!trackId) return;
 
-    // Clean up URL parameters immediately to prevent duplicate calls on refresh
+    // Clean up URL parameters from browser address bar immediately
     const cleanUrl = window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
 
-    if (success === '1' || status === '2') {
-      const handleVerifyPayment = async () => {
-        showToast('در حال اعتبارسنجی پرداخت با درگاه شاپرک زیبال...');
-        const pendingOrder = getPendingOrder();
+    const handleVerifyPayment = async () => {
+      showToast('در حال اعتبارسنجی پرداخت با درگاه شاپرک زیبال...');
+      const pendingOrder = getPendingOrder();
 
-        const verifyRes = await verifyZibalPayment(trackId, zibalMerchant);
+      const rawUser = localStorage.getItem('jahesh_current_user');
+      const activeUser: User | null = currentUser || (rawUser ? JSON.parse(rawUser) : null);
 
-        if (verifyRes.success) {
-          try {
-            confetti({
-              particleCount: 150,
-              spread: 80,
-              origin: { y: 0.6 },
-            });
-          } catch (e) {}
+      const verifyRes = await verifyZibalPayment(trackId, zibalMerchant);
 
-          const refNum = String(verifyRes.refNumber || trackId);
-          const finalOrder: Order = pendingOrder
-            ? {
-                ...pendingOrder,
-                trackingCode: String(trackId),
-                paymentRefId: refNum,
-                status: 'در حال بررسی',
-                totalAmount: verifyRes.amountInTomans || pendingOrder.totalAmount,
-              }
-            : {
-                id: 'JAHESH-' + Math.floor(10000 + Math.random() * 90000).toString(),
-                trackingCode: String(trackId),
-                paymentRefId: refNum,
-                userId: currentUser?.id || 'guest',
-                customerName: currentUser?.fullName || 'مشتری گرامی',
-                customerPhone: currentUser?.phone || '',
-                customerEmail: currentUser?.email || '',
-                items: [],
-                totalAmount: verifyRes.amountInTomans || 0,
-                status: 'در حال بررسی',
-                paymentGateway: 'زیبال (Zibal)',
-                acceptedTerms: true,
-                date: new Date().toLocaleDateString('fa-IR', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                }),
-              };
-
-          setOrders((prev) => [finalOrder, ...prev]);
-          await saveOrderToDb(finalOrder);
-
-          setCartItems([]);
-          localStorage.removeItem('jahesh_cart');
-          clearPendingOrder();
-
-          setCompletedOrderReceipt({
-            order: finalOrder,
-            refNumber: refNum,
-            trackId: String(trackId),
+      if (verifyRes.success || (verifyRes as any).result === 100 || (verifyRes as any).result === 201) {
+        try {
+          confetti({
+            particleCount: 150,
+            spread: 80,
+            origin: { y: 0.6 },
           });
+        } catch (e) {}
 
-          showToast('پرداخت با موفقیت انجام شد و سفارش در دیتابیس ثبت گردید.');
+        const refNum = String(verifyRes.refNumber || trackId);
+        const finalOrder: Order = pendingOrder
+          ? {
+              ...pendingOrder,
+              trackingCode: String(trackId),
+              paymentRefId: refNum,
+              status: 'در حال بررسی',
+              totalAmount: verifyRes.amountInTomans || pendingOrder.totalAmount,
+            }
+          : {
+              id: 'JAHESH-' + Math.floor(10000 + Math.random() * 90000).toString(),
+              trackingCode: String(trackId),
+              paymentRefId: refNum,
+              userId: activeUser?.id || 'guest',
+              customerName: activeUser?.fullName || 'مشتری گرامی',
+              customerPhone: activeUser?.phone || '',
+              customerEmail: activeUser?.email || '',
+              items: [],
+              totalAmount: verifyRes.amountInTomans || 0,
+              status: 'در حال بررسی',
+              paymentGateway: 'زیبال (Zibal)',
+              acceptedTerms: true,
+              date: new Date().toLocaleDateString('fa-IR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+            };
+
+        // 1. Save to DB and local storage
+        await saveOrderToDb(finalOrder);
+
+        // 2. Update React state immediately
+        setOrders((prev) => {
+          const filtered = prev.filter((o) => o.id !== finalOrder.id && o.trackingCode !== finalOrder.trackingCode);
+          return [finalOrder, ...filtered];
+        });
+
+        // 3. Clear cart & pending order
+        setCartItems([]);
+        localStorage.removeItem('jahesh_cart');
+        clearPendingOrder();
+
+        // 4. Show receipt modal to user
+        setCompletedOrderReceipt({
+          order: finalOrder,
+          refNumber: refNum,
+          trackId: String(trackId),
+        });
+
+        showToast('پرداخت با موفقیت انجام شد و سفارش شما با موفقیت ثبت گردید.');
+      } else {
+        if (success === '0') {
+          clearPendingOrder();
+          showToast('پرداخت در درگاه بانکی زیبال لغو شد یا با خطا مواجه گردید.');
         } else {
           showToast(verifyRes.message || 'خطا در تأیید تراکنش بانکی زیبال.');
         }
-      };
+      }
+    };
 
-      handleVerifyPayment();
-    } else if (success === '0') {
-      clearPendingOrder();
-      showToast('پرداخت در درگاه بانکی زیبال لغو شد یا با خطا مواجه گردید.');
-    }
+    handleVerifyPayment();
   }, [zibalMerchant, currentUser]);
 
   const handleOpenFooterTopic = (topicId: string) => {
@@ -341,7 +352,14 @@ export default function App() {
         const cloudOrders = await fetchOrdersFromDb();
         if (!isMounted) return;
         if (cloudOrders && cloudOrders.length > 0) {
-          setOrders(cloudOrders);
+          setOrders((prev) => {
+            const map = new Map<string, Order>();
+            cloudOrders.forEach((o) => map.set(o.id, o));
+            prev.forEach((o) => {
+              if (!map.has(o.id)) map.set(o.id, o);
+            });
+            return Array.from(map.values());
+          });
         }
 
         const cloudCoupons = await fetchCouponsFromDb();
@@ -392,36 +410,60 @@ export default function App() {
     };
     window.addEventListener('jahesh-user-updated', handleUserUpdatedEvent);
 
-    // Periodic check to pull fresh role if promoted from another device (e.g. PC -> Mobile)
+    // Listen for real-time orders updates
+    const handleOrdersUpdatedEvent = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setOrders(e.detail);
+      }
+    };
+    window.addEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
+
+    // Periodic check to pull fresh role and orders (e.g. PC -> Mobile)
     const syncInterval = setInterval(async () => {
       try {
         const rawStored = localStorage.getItem('jahesh_current_user');
-        if (!rawStored) return;
-        const activeUser: User = JSON.parse(rawStored);
-        const { fetchAllUsersFromDb } = await import('./lib/dbService');
-        const all = await fetchAllUsersFromDb();
-        if (!isMounted || !all) return;
-        const cleanUName = activeUser.username?.trim().toLowerCase();
-        const cleanPhone = activeUser.phone?.trim();
-        const found = all.find(
-          (u) =>
-            u.id === activeUser.id ||
-            (cleanUName && u.username?.trim().toLowerCase() === cleanUName) ||
-            (cleanPhone && u.phone?.trim() === cleanPhone)
-        );
-        if (found && found.role && found.role !== activeUser.role) {
-          const updated = { ...activeUser, ...found, role: found.role };
-          setCurrentUser(updated);
-          localStorage.setItem('jahesh_current_user', JSON.stringify(updated));
+        if (rawStored) {
+          const activeUser: User = JSON.parse(rawStored);
+          const { fetchAllUsersFromDb } = await import('./lib/dbService');
+          const all = await fetchAllUsersFromDb();
+          if (isMounted && all) {
+            const cleanUName = activeUser.username?.trim().toLowerCase();
+            const cleanPhone = activeUser.phone?.trim();
+            const found = all.find(
+              (u) =>
+                u.id === activeUser.id ||
+                (cleanUName && u.username?.trim().toLowerCase() === cleanUName) ||
+                (cleanPhone && u.phone?.trim() === cleanPhone)
+            );
+            if (found && found.role && found.role !== activeUser.role) {
+              const updated = { ...activeUser, ...found, role: found.role };
+              setCurrentUser(updated);
+              localStorage.setItem('jahesh_current_user', JSON.stringify(updated));
+            }
+          }
+        }
+
+        // Periodic orders sync
+        const freshOrders = await fetchOrdersFromDb();
+        if (isMounted && freshOrders && freshOrders.length > 0) {
+          setOrders((prev) => {
+            const map = new Map<string, Order>();
+            freshOrders.forEach((o) => map.set(o.id, o));
+            prev.forEach((o) => {
+              if (!map.has(o.id)) map.set(o.id, o);
+            });
+            return Array.from(map.values());
+          });
         }
       } catch (err) {
         // silent
       }
-    }, 7000);
+    }, 6000);
 
     return () => {
       isMounted = false;
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
+      window.removeEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
       clearInterval(syncInterval);
     };
   }, []);

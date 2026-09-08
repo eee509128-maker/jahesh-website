@@ -36,8 +36,12 @@ export const ZIBAL_DEFAULT_MERCHANT = '6a9db4410df8756c31ea5d00';
  * Sends payment request to our backend API which forwards to Zibal
  */
 export async function requestZibalPayment(params: ZibalRequestParams): Promise<ZibalRequestResponse> {
-  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://jaheshit.ir';
-  const callbackUrl = params.callbackUrl || `${currentOrigin}/jaheshkala`;
+  let defaultCallback = 'https://jaheshit.ir/jaheshkala';
+  if (typeof window !== 'undefined') {
+    const cleanPath = window.location.pathname.replace(/\/+$/, '');
+    defaultCallback = `${window.location.origin}${cleanPath || '/jaheshkala'}`;
+  }
+  const callbackUrl = params.callbackUrl || defaultCallback;
 
   const payload = {
     amountInTomans: params.amountInTomans,

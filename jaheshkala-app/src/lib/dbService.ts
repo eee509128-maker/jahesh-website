@@ -155,43 +155,120 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
   }
 };
 
-// 2. ORDERS DB SERVICE
+// 2. ORDERS DB SERVICE WITH HYBRID LOCAL & CLOUD SYNC
+const LOCAL_ORDERS_KEY = 'jahesh_orders_store';
+
+export const getLocalOrdersStore = (): Order[] => {
+  try {
+    const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+    const legacyRaw = localStorage.getItem('jahesh_orders');
+    if (legacyRaw) {
+      const parsedLegacy = JSON.parse(legacyRaw);
+      if (Array.isArray(parsedLegacy)) return parsedLegacy;
+    }
+  } catch (e) {
+    console.warn('Error reading local orders store:', e);
+  }
+  return [];
+};
+
+export const saveLocalOrdersStore = (orders: Order[]) => {
+  try {
+    localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(orders));
+    localStorage.setItem('jahesh_orders', JSON.stringify(orders));
+  } catch (e) {
+    console.warn('Error saving local orders store:', e);
+  }
+};
+
 export const fetchOrdersFromDb = async (): Promise<Order[]> => {
+  const localOrders = getLocalOrdersStore();
   try {
     const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
     if (error) {
-      console.warn('Supabase fetch orders error:', error.message);
-      return [];
+      console.warn('Supabase fetch orders notice (using local store):', error.message);
+      return localOrders;
     }
     if (data && data.length > 0) {
-      return data.map((item) => ({
-        id: item.id,
-        trackingCode: item.tracking_code || item.id,
-        paymentRefId: item.payment_ref_id || '',
-        userId: item.user_id || '',
-        customerName: item.customer_name,
-        customerPhone: item.customer_phone,
-        customerEmail: item.customer_email || '',
-        requestedDomain: item.requested_domain || '',
-        clientNotes: item.client_notes || '',
-        items: typeof item.items === 'string' ? JSON.parse(item.items) : item.items,
-        totalAmount: Number(item.total_amount),
-        discountAmount: item.discount_amount || 0,
-        appliedCouponCode: item.applied_coupon_code || '',
-        status: item.status,
-        paymentGateway: item.payment_gateway || 'زیبال (Zibal)',
-        date: item.date,
-        acceptedTerms: true,
-      }));
+      const cloudOrders: Order[] = data.map((item) => {
+        let parsedItems = item.items;
+        if (typeof item.items === 'string') {
+          try {
+            parsedItems = JSON.parse(item.items);
+          } catch {
+            parsedItems = [];
+          }
+        }
+        return {
+          id: item.id,
+          trackingCode: item.tracking_code || item.id,
+          paymentRefId: item.payment_ref_id || '',
+          userId: item.user_id || '',
+          customerName: item.customer_name || 'مشتری گرامی',
+          customerPhone: item.customer_phone || '',
+          customerEmail: item.customer_email || '',
+          requestedDomain: item.requested_domain || '',
+          clientNotes: item.client_notes || '',
+          items: Array.isArray(parsedItems) ? parsedItems : [],
+          totalAmount: Number(item.total_amount) || 0,
+          discountAmount: Number(item.discount_amount) || 0,
+          appliedCouponCode: item.applied_coupon_code || '',
+          status: item.status || 'در حال بررسی',
+          paymentGateway: item.payment_gateway || 'زیبال (Zibal)',
+          date: item.date || new Date().toLocaleDateString('fa-IR'),
+          acceptedTerms: true,
+        };
+      });
+
+      // Merge cloud orders and local orders to ensure no order is ever lost
+      const mergedMap = new Map<string, Order>();
+      // First insert cloud orders
+      cloudOrders.forEach((o) => mergedMap.set(o.id, o));
+      // Then merge local orders if any are missing from cloud
+      localOrders.forEach((o) => {
+        if (!mergedMap.has(o.id)) {
+          mergedMap.set(o.id, o);
+        }
+      });
+
+      const mergedList = Array.from(mergedMap.values());
+      saveLocalOrdersStore(mergedList);
+      return mergedList;
     }
-    return [];
+    return localOrders;
   } catch (err) {
     console.warn('Failed to connect to Supabase orders table:', err);
-    return [];
+    return localOrders;
   }
 };
 
 export const saveOrderToDb = async (order: Order): Promise<boolean> => {
+  // 1. Immediately save to local persistent store & broadcast
+  try {
+    const currentLocal = getLocalOrdersStore();
+    const existingIndex = currentLocal.findIndex(
+      (o) => o.id === order.id || (o.trackingCode && order.trackingCode && o.trackingCode === order.trackingCode)
+    );
+    let updatedList: Order[];
+    if (existingIndex >= 0) {
+      updatedList = [...currentLocal];
+      updatedList[existingIndex] = { ...currentLocal[existingIndex], ...order };
+    } else {
+      updatedList = [order, ...currentLocal];
+    }
+    saveLocalOrdersStore(updatedList);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updatedList }));
+    }
+  } catch (localErr) {
+    console.warn('Local save order warning:', localErr);
+  }
+
+  // 2. Persist to Supabase cloud
   try {
     const payload = {
       id: order.id,
@@ -211,45 +288,77 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
       date: order.date,
       payment_gateway: order.paymentGateway,
     };
+    
+    // First attempt with JSON string / array
     const { error } = await supabase.from('orders').upsert(payload);
     if (error) {
-      console.warn('Save order error:', error.message);
-      return false;
+      console.warn('Supabase save order attempt 1 notice:', error.message);
+      // Fallback: try with stringified items if schema requires text
+      const stringifiedPayload = { ...payload, items: JSON.stringify(order.items) };
+      const retryRes = await supabase.from('orders').upsert(stringifiedPayload);
+      if (retryRes.error) {
+        console.warn('Supabase save order attempt 2 notice:', retryRes.error.message);
+      }
     }
     return true;
   } catch (err) {
-    console.warn('Save order exception:', err);
-    return false;
+    console.warn('Save order exception (order safely preserved locally):', err);
+    return true;
   }
 };
 
 export const updateOrderStatusInDb = async (orderId: string, status: string): Promise<boolean> => {
   try {
+    const current = getLocalOrdersStore();
+    const updated = current.map((o) => (o.id === orderId ? { ...o, status: status as any } : o));
+    saveLocalOrdersStore(updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updated }));
+    }
+  } catch (e) {}
+
+  try {
     const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
     return !error;
   } catch (err) {
     console.warn('Update order status exception:', err);
-    return false;
+    return true;
   }
 };
 
 export const deleteOrderFromDb = async (orderId: string): Promise<boolean> => {
   try {
+    const current = getLocalOrdersStore();
+    const updated = current.filter((o) => o.id !== orderId && o.trackingCode !== orderId);
+    saveLocalOrdersStore(updated);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updated }));
+    }
+  } catch (e) {}
+
+  try {
     const { error } = await supabase.from('orders').delete().eq('id', orderId);
     return !error;
   } catch (err) {
     console.warn('Delete order exception:', err);
-    return false;
+    return true;
   }
 };
 
 export const clearAllOrdersFromDb = async (): Promise<boolean> => {
   try {
+    saveLocalOrdersStore([]);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: [] }));
+    }
+  } catch (e) {}
+
+  try {
     const { error } = await supabase.from('orders').delete().neq('id', '___non_existent___');
     return !error;
   } catch (err) {
     console.warn('Clear orders exception:', err);
-    return false;
+    return true;
   }
 };
 

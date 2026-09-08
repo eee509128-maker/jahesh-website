@@ -19,8 +19,18 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const cleanPhone = currentUser?.phone?.trim();
+  const cleanEmail = currentUser?.email?.trim().toLowerCase();
+  const cleanUserId = currentUser?.id?.trim();
+
   const userOrders = currentUser
-    ? orders.filter((o) => o.userId === currentUser.id)
+    ? orders.filter(
+        (o) =>
+          (cleanUserId && o.userId === cleanUserId) ||
+          (cleanPhone && o.customerPhone && o.customerPhone.trim() === cleanPhone) ||
+          (cleanEmail && o.customerEmail && o.customerEmail.trim().toLowerCase() === cleanEmail) ||
+          currentUser.role === 'admin'
+      )
     : [];
 
   const formatPrice = (num: number) => {

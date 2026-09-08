@@ -8,7 +8,7 @@ import {
   ChevronRight, ChevronLeft
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat } from '../types';
-import { fetchChatsFromDb, saveChatToDb } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb } from '../lib/dbService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 
 interface AdminPanelProps {
@@ -670,14 +670,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     کلیه تراکنش‌ها و سفارشات ثبت‌شده از طریق درگاه پرداخت در این بخش نمایش داده می‌شوند.
                   </p>
                 </div>
-                {orders.length > 0 && onClearAllOrders && (
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={onClearAllOrders}
-                    className="px-3 py-1.5 rounded-xl bg-rose-950/60 border border-rose-600/40 text-rose-300 hover:bg-rose-900/80 text-xs font-bold transition-colors"
+                    onClick={async () => {
+                      try {
+                        const fresh = await fetchOrdersFromDb();
+                        if (fresh && typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: fresh }));
+                        }
+                      } catch (e) {}
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-xs font-bold transition-all cursor-pointer"
+                    title="به‌روزرسانی و دریافت لیست جدید سفارشات"
                   >
-                    پاکسازی تمام سفارشات
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>به‌روزرسانی سفارشات</span>
                   </button>
-                )}
+                  {orders.length > 0 && onClearAllOrders && (
+                    <button
+                      onClick={onClearAllOrders}
+                      className="px-3 py-1.5 rounded-xl bg-rose-950/60 border border-rose-600/40 text-rose-300 hover:bg-rose-900/80 text-xs font-bold transition-colors"
+                    >
+                      پاکسازی تمام سفارشات
+                    </button>
+                  )}
+                </div>
               </div>
 
               {orders.length === 0 ? (
