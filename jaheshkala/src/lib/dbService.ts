@@ -1,0 +1,652 @@
+import { supabase } from './supabase';
+import { Product, Order, User, Coupon } from '../types';
+import { INITIAL_PRODUCTS } from '../data/initialData';
+
+export const INITIAL_COUPONS: Coupon[] = [
+  {
+    id: 'c-jahesh1395',
+    code: 'jahesh1395',
+    discountPercent: 68,
+    targetFinalPrice: 2500000,
+    description: 'کد تخفیف سرّی مدیریت: اعمال قیمت ویژه ۲,۵۰۰,۰۰۰ تومان روی پکیج طراحی سایت',
+    isActive: true,
+  },
+  {
+    id: 'c-jahesh20',
+    code: 'JAHESH20',
+    discountPercent: 20,
+    description: 'تخفیف ویژه ۲۰ درصدی افتتاحیه جهش‌کالا',
+    isActive: true,
+  },
+  {
+    id: 'c-golden10',
+    code: 'GOLDEN10',
+    discountPercent: 10,
+    description: 'تخفیف ۱۰ درصدی پکیج‌های طلایی',
+    isActive: true,
+  },
+  {
+    id: 'c-vip30',
+    code: 'VIP30',
+    discountPercent: 30,
+    description: 'تخفیف ۳۰ درصدی مشتریان ویژه',
+    isActive: true,
+  },
+];
+
+// 1. PRODUCTS DB SERVICE
+export const fetchProductsFromDb = async (): Promise<Product[]> => {
+  try {
+    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.warn('Supabase fetch products error:', error.message);
+      return [];
+    }
+    if (data && data.length > 0) {
+      return data.map((item) => ({
+        id: item.id,
+        title: item.title,
+        category: item.category,
+        brand: item.brand || '',
+        price: Number(item.price),
+        originalPrice: item.original_price ? Number(item.original_price) : undefined,
+        discountPercent: item.discount_percent || 0,
+        badge: item.badge || '',
+        isPopular: !!item.is_popular,
+        isGolden: !!item.is_golden,
+        rating: item.rating ? Number(item.rating) : 5.0,
+        reviewsCount: item.reviews_count || 0,
+        deliveryDays: item.delivery_days || '',
+        warranty: item.warranty || '',
+        shortDescription: item.short_description || '',
+        fullDescription: item.full_description || '',
+        features: item.features || [],
+        image: item.image || '',
+        gallery: item.gallery || [],
+        couponCode: item.coupon_code || undefined,
+        couponDiscountPercent: item.coupon_discount_percent ? Number(item.coupon_discount_percent) : undefined,
+      }));
+    }
+    return [];
+  } catch (err) {
+    console.warn('Failed to connect to Supabase products table:', err);
+    return [];
+  }
+};
+
+export const saveProductToDb = async (product: Product): Promise<boolean> => {
+  try {
+    const payloadWithGallery: Record<string, any> = {
+      id: product.id,
+      title: product.title,
+      category: product.category,
+      brand: product.brand,
+      price: product.price,
+      original_price: product.originalPrice,
+      discount_percent: product.discountPercent,
+      badge: product.badge,
+      is_popular: product.isPopular,
+      is_golden: product.isGolden,
+      rating: product.rating,
+      reviews_count: product.reviewsCount,
+      delivery_days: product.deliveryDays,
+      warranty: product.warranty,
+      short_description: product.shortDescription,
+      full_description: product.fullDescription,
+      features: product.features,
+      image: product.image,
+      gallery: product.gallery || [],
+      coupon_code: product.couponCode,
+      coupon_discount_percent: product.couponDiscountPercent,
+    };
+    
+    // First attempt with gallery field
+    const { error } = await supabase.from('products').upsert(payloadWithGallery);
+    if (error) {
+      // If error is about gallery column not existing in older table schemas, retry without it
+      if (error.message && error.message.includes('gallery')) {
+        const { gallery, ...fallbackPayload } = payloadWithGallery;
+        const retryResult = await supabase.from('products').upsert(fallbackPayload);
+        if (retryResult.error) {
+          console.warn('Save product error (fallback):', retryResult.error.message);
+          return false;
+        }
+        return true;
+      }
+      console.warn('Save product error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Save product exception:', err);
+    return false;
+  }
+};
+
+export const deleteProductFromDb = async (productId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    return !error;
+  } catch (err) {
+    console.warn('Delete product exception:', err);
+    return false;
+  }
+};
+
+// 2. ORDERS DB SERVICE
+export const fetchOrdersFromDb = async (): Promise<Order[]> => {
+  try {
+    const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.warn('Supabase fetch orders error:', error.message);
+      return [];
+    }
+    if (data && data.length > 0) {
+      return data.map((item) => ({
+        id: item.id,
+        trackingCode: item.tracking_code || item.id,
+        paymentRefId: item.payment_ref_id || '',
+        userId: item.user_id || '',
+        customerName: item.customer_name,
+        customerPhone: item.customer_phone,
+        customerEmail: item.customer_email || '',
+        requestedDomain: item.requested_domain || '',
+        clientNotes: item.client_notes || '',
+        items: typeof item.items === 'string' ? JSON.parse(item.items) : item.items,
+        totalAmount: Number(item.total_amount),
+        discountAmount: item.discount_amount || 0,
+        appliedCouponCode: item.applied_coupon_code || '',
+        status: item.status,
+        paymentGateway: item.payment_gateway || 'زیبال (Zibal)',
+        date: item.date,
+        acceptedTerms: true,
+      }));
+    }
+    return [];
+  } catch (err) {
+    console.warn('Failed to connect to Supabase orders table:', err);
+    return [];
+  }
+};
+
+export const saveOrderToDb = async (order: Order): Promise<boolean> => {
+  try {
+    const payload = {
+      id: order.id,
+      tracking_code: order.trackingCode,
+      payment_ref_id: order.paymentRefId,
+      user_id: order.userId,
+      customer_name: order.customerName,
+      customer_phone: order.customerPhone,
+      customer_email: order.customerEmail,
+      requested_domain: order.requestedDomain,
+      client_notes: order.clientNotes,
+      total_amount: order.totalAmount,
+      discount_amount: order.discountAmount || 0,
+      applied_coupon_code: order.appliedCouponCode || '',
+      status: order.status,
+      items: order.items,
+      date: order.date,
+      payment_gateway: order.paymentGateway,
+    };
+    const { error } = await supabase.from('orders').upsert(payload);
+    if (error) {
+      console.warn('Save order error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Save order exception:', err);
+    return false;
+  }
+};
+
+export const updateOrderStatusInDb = async (orderId: string, status: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
+    return !error;
+  } catch (err) {
+    console.warn('Update order status exception:', err);
+    return false;
+  }
+};
+
+export const deleteOrderFromDb = async (orderId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('orders').delete().eq('id', orderId);
+    return !error;
+  } catch (err) {
+    console.warn('Delete order exception:', err);
+    return false;
+  }
+};
+
+export const clearAllOrdersFromDb = async (): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('orders').delete().neq('id', '___non_existent___');
+    return !error;
+  } catch (err) {
+    console.warn('Clear orders exception:', err);
+    return false;
+  }
+};
+
+// 3. USERS DB SERVICE WITH HYBRID LOCAL & CLOUD SYNC
+const LOCAL_USERS_KEY = 'jahesh_users_store';
+
+const getLocalUsersStore = (): Array<User & { password?: string }> => {
+  try {
+    const raw = localStorage.getItem(LOCAL_USERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveLocalUsersStore = (users: Array<User & { password?: string }>) => {
+  try {
+    localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+  } catch (err) {
+    console.warn('Could not save users to local store:', err);
+  }
+};
+
+export const registerUserInDb = async (user: User, passwordHash: string): Promise<boolean> => {
+  try {
+    // 1. Save to local persistent cache
+    const existingUsers = getLocalUsersStore();
+    const userIndex = existingUsers.findIndex(
+      (u) => u.id === user.id || (user.username && u.username === user.username) || (user.phone && u.phone === user.phone)
+    );
+    const userWithPass = { ...user, password: passwordHash };
+    if (userIndex >= 0) {
+      existingUsers[userIndex] = userWithPass;
+    } else {
+      existingUsers.unshift(userWithPass);
+    }
+    saveLocalUsersStore(existingUsers);
+
+    // 2. Persist to Supabase
+    const payload = {
+      id: user.id,
+      full_name: user.fullName,
+      phone: user.phone,
+      email: user.email || '',
+      username: user.username,
+      password: passwordHash,
+      role: user.role || 'user',
+      created_at: user.createdAt || new Date().toISOString(),
+    };
+    const { error } = await supabase.from('users').upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.warn('Supabase register user warning:', error.message);
+    }
+    return true;
+  } catch (err) {
+    console.warn('Register user exception:', err);
+    return true; // Local cache is saved
+  }
+};
+
+export const findUserInDb = async (usernameOrPhone: string, passwordAttempt: string): Promise<User | null> => {
+  const cleanId = usernameOrPhone.trim().toLowerCase();
+  const cleanPass = passwordAttempt.trim();
+
+  // 1. Check Master Admin Credentials
+  if (
+    (cleanId === 'jahesh' || cleanId === 'jahesh_admin' || cleanId === '09152331974' || cleanId === '09152221454') &&
+    cleanPass === 'jahesh1395'
+  ) {
+    return {
+      id: 'usr-jahesh-master',
+      fullName: 'مدیر کل جهش‌کالا',
+      phone: '09152331974',
+      email: 'admin@jaheshkala.ir',
+      username: 'jahesh_admin',
+      role: 'admin',
+      createdAt: '۱۴۰۵/۶/۱',
+    };
+  }
+
+  let matchedUser: User | null = null;
+  let userPassword = '';
+
+  // 2. Try Supabase first
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .or(`username.ilike.${cleanId},phone.eq.${cleanId},email.ilike.${cleanId}`);
+
+    if (!error && data && data.length > 0) {
+      const dbMatch = data.find((u) => u.password === cleanPass || u.password === passwordAttempt);
+      if (dbMatch) {
+        matchedUser = {
+          id: dbMatch.id,
+          fullName: dbMatch.full_name,
+          phone: dbMatch.phone,
+          email: dbMatch.email || '',
+          username: dbMatch.username,
+          role: (dbMatch.role as 'admin' | 'user') || 'user',
+          createdAt: dbMatch.created_at,
+        };
+        userPassword = dbMatch.password;
+      }
+    }
+  } catch (err) {
+    console.warn('Supabase find user warning:', err);
+  }
+
+  // 3. Check Local Store
+  const localUsers = getLocalUsersStore();
+  const localMatch = localUsers.find(
+    (u) =>
+      (u.username?.toLowerCase() === cleanId || u.phone === cleanId || u.email?.toLowerCase() === cleanId) &&
+      (u.password === cleanPass || u.password === passwordAttempt)
+  );
+
+  if (localMatch) {
+    // If local match exists, its role might be freshly updated by Admin
+    if (!matchedUser) {
+      matchedUser = {
+        id: localMatch.id,
+        fullName: localMatch.fullName,
+        phone: localMatch.phone,
+        email: localMatch.email || '',
+        username: localMatch.username,
+        role: localMatch.role || 'user',
+        createdAt: localMatch.createdAt,
+      };
+    } else {
+      // Merge: if local role has admin, prefer it
+      if (localMatch.role === 'admin') {
+        matchedUser.role = 'admin';
+      }
+    }
+  }
+
+  // 4. Update Current User cache in localStorage if matched
+  if (matchedUser) {
+    try {
+      localStorage.setItem('jahesh_current_user', JSON.stringify(matchedUser));
+    } catch {
+      // ignore
+    }
+  }
+
+  return matchedUser;
+};
+
+export const deleteUserFromDb = async (userId: string): Promise<boolean> => {
+  try {
+    // Remove from local store
+    const localUsers = getLocalUsersStore().filter((u) => u.id !== userId);
+    saveLocalUsersStore(localUsers);
+
+    // Remove from Supabase
+    const { error } = await supabase.from('users').delete().eq('id', userId);
+    return !error;
+  } catch (err) {
+    console.warn('Delete user exception:', err);
+    return false;
+  }
+};
+
+export const updateUserInDb = async (user: User): Promise<boolean> => {
+  try {
+    // 1. Update in local users store
+    const localUsers = getLocalUsersStore();
+    const userIndex = localUsers.findIndex((u) => u.id === user.id || u.username === user.username || u.phone === user.phone);
+    if (userIndex >= 0) {
+      localUsers[userIndex] = {
+        ...localUsers[userIndex],
+        ...user,
+        role: user.role, // Explicitly ensure role is updated
+      };
+    } else {
+      localUsers.unshift(user);
+    }
+    saveLocalUsersStore(localUsers);
+
+    // 2. If this user is currently logged in on the browser, update current session immediately
+    try {
+      const rawCurrent = localStorage.getItem('jahesh_current_user');
+      if (rawCurrent) {
+        const currentParsed: User = JSON.parse(rawCurrent);
+        if (currentParsed.id === user.id || currentParsed.username === user.username || currentParsed.phone === user.phone) {
+          const updatedCurrent = {
+            ...currentParsed,
+            ...user,
+            role: user.role,
+          };
+          localStorage.setItem('jahesh_current_user', JSON.stringify(updatedCurrent));
+          window.dispatchEvent(new CustomEvent('jahesh-user-updated', { detail: updatedCurrent }));
+        }
+      }
+    } catch (err) {
+      console.warn('Error updating current user session:', err);
+    }
+
+    // 3. Update in Supabase with multi-key fallback and upsert
+    const payload = {
+      full_name: user.fullName,
+      phone: user.phone || '',
+      email: user.email || '',
+      username: user.username,
+      role: user.role,
+    };
+
+    let hasUpdated = false;
+    if (user.id) {
+      const { error: idErr, data: idData } = await supabase
+        .from('users')
+        .update(payload)
+        .eq('id', user.id)
+        .select();
+      if (!idErr && idData && idData.length > 0) hasUpdated = true;
+    }
+
+    if (!hasUpdated && user.username) {
+      const { error: userErr, data: userData } = await supabase
+        .from('users')
+        .update(payload)
+        .eq('username', user.username)
+        .select();
+      if (!userErr && userData && userData.length > 0) hasUpdated = true;
+    }
+
+    if (!hasUpdated && user.phone) {
+      const { error: phoneErr, data: phoneData } = await supabase
+        .from('users')
+        .update(payload)
+        .eq('phone', user.phone)
+        .select();
+      if (!phoneErr && phoneData && phoneData.length > 0) hasUpdated = true;
+    }
+
+    // If row did not exist or wasn't updated yet in Supabase, create it with upsert!
+    if (!hasUpdated) {
+      await supabase.from('users').upsert(
+        {
+          id: user.id || `usr-${Date.now()}`,
+          full_name: user.fullName,
+          phone: user.phone || '',
+          email: user.email || '',
+          username: user.username,
+          role: user.role,
+          created_at: user.createdAt || new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      );
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('Update user exception:', err);
+    return true; // Local store was updated
+  }
+};
+
+export const fetchAllUsersFromDb = async (): Promise<User[]> => {
+  const usersMap = new Map<string, User>();
+
+  // 1. Load from local cache first
+  const localUsers = getLocalUsersStore();
+  for (const lu of localUsers) {
+    usersMap.set(lu.id || lu.username || lu.phone, {
+      id: lu.id,
+      fullName: lu.fullName,
+      phone: lu.phone,
+      email: lu.email || '',
+      username: lu.username,
+      role: lu.role || 'user',
+      createdAt: lu.createdAt,
+    });
+  }
+
+  // 2. Load from Supabase and merge
+  try {
+    const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+    if (!error && data && Array.isArray(data)) {
+      for (const matched of data) {
+        const key = matched.id || matched.username || matched.phone;
+        const existingLocal = usersMap.get(key);
+        // If local had a newer role change, merge properly
+        usersMap.set(key, {
+          id: matched.id,
+          fullName: matched.full_name || existingLocal?.fullName || 'کاربر',
+          phone: matched.phone || existingLocal?.phone || '',
+          email: matched.email || existingLocal?.email || '',
+          username: matched.username || existingLocal?.username || '',
+          role: existingLocal?.role === 'admin' ? 'admin' : ((matched.role as 'admin' | 'user') || 'user'),
+          createdAt: matched.created_at || existingLocal?.createdAt,
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Fetch all users exception:', err);
+  }
+
+  return Array.from(usersMap.values());
+};
+
+// 4. COUPONS & DISCOUNT DB SERVICE
+export const fetchCouponsFromDb = async (): Promise<Coupon[]> => {
+  try {
+    const { data, error } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
+    if (error || !data || data.length === 0) {
+      return INITIAL_COUPONS;
+    }
+    return data.map((item) => ({
+      id: item.id,
+      code: item.code,
+      discountPercent: Number(item.discount_percent),
+      maxDiscountAmount: item.max_discount_amount ? Number(item.max_discount_amount) : undefined,
+      minOrderAmount: item.min_order_amount ? Number(item.min_order_amount) : undefined,
+      description: item.description || '',
+      isActive: item.is_active !== undefined ? !!item.is_active : true,
+    }));
+  } catch (err) {
+    console.warn('Fetch coupons exception:', err);
+    return INITIAL_COUPONS;
+  }
+};
+
+export const saveCouponToDb = async (coupon: Coupon): Promise<boolean> => {
+  try {
+    const payload = {
+      id: coupon.id,
+      code: coupon.code.toUpperCase().trim(),
+      discount_percent: coupon.discountPercent,
+      max_discount_amount: coupon.maxDiscountAmount,
+      min_order_amount: coupon.minOrderAmount,
+      description: coupon.description,
+      is_active: coupon.isActive,
+    };
+    const { error } = await supabase.from('coupons').upsert(payload);
+    return !error;
+  } catch (err) {
+    console.warn('Save coupon exception:', err);
+    return false;
+  }
+};
+
+export const deleteCouponFromDb = async (couponId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('coupons').delete().eq('id', couponId);
+    return !error;
+  } catch (err) {
+    console.warn('Delete coupon exception:', err);
+    return false;
+  }
+};
+
+// 5. CHATS DB SERVICE
+export const fetchChatsFromDb = async (): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase.from('chats').select('*').order('last_updated', { ascending: false });
+    if (error || !data) {
+      console.warn('Fetch chats error:', error?.message);
+      return [];
+    }
+    return data.map(item => ({
+      userId: item.user_id,
+      userName: item.user_name || 'کاربر ناشناس',
+      messages: typeof item.messages === 'string' ? JSON.parse(item.messages) : (item.messages || []),
+      lastUpdated: item.last_updated || '',
+      isReadByAdmin: !!item.is_read_by_admin,
+    }));
+  } catch (err) {
+    console.warn('Fetch chats exception:', err);
+    return [];
+  }
+};
+
+export const saveChatToDb = async (chat: any): Promise<boolean> => {
+  try {
+    const payload = {
+      user_id: chat.userId,
+      user_name: chat.userName,
+      messages: chat.messages,
+      last_updated: chat.lastUpdated,
+      is_read_by_admin: chat.isReadByAdmin,
+    };
+    const { error } = await supabase.from('chats').upsert(payload);
+    if (error) {
+       console.warn('Save chat error:', error.message);
+       return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Save chat exception:', err);
+    return false;
+  }
+};
+
+export const findUserByEmailInDb = async (email: string): Promise<User | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .limit(1);
+
+    if (error || !data || data.length === 0) {
+      return null;
+    }
+
+    const matched = data[0];
+    return {
+      id: matched.id,
+      fullName: matched.full_name,
+      phone: matched.phone,
+      email: matched.email || '',
+      username: matched.username,
+      role: matched.role || 'user',
+      createdAt: matched.created_at,
+    };
+  } catch (err) {
+    console.warn('Find user by email exception:', err);
+    return null;
+  }
+};
