@@ -39,17 +39,29 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Close on Escape key press
+  // Close on Escape key press and handle pageshow BF cache
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isProcessing) {
+      if (e.key === 'Escape') {
+        setIsProcessing(false);
         onClose();
       }
     };
+
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        setIsProcessing(false);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, isProcessing]);
+    window.addEventListener('pageshow', handlePageShow);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -149,7 +161,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
   };
 
   const handleCloseEntirely = () => {
-    if (isProcessing) return;
+    setIsProcessing(false);
     if (onCloseAll) {
       onCloseAll();
     } else {
@@ -157,12 +169,17 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
     }
   };
 
+  const handleCloseBack = () => {
+    setIsProcessing(false);
+    onClose();
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in cursor-default"
       onClick={(e) => {
-        if (e.target === e.currentTarget && !isProcessing) {
-          onClose();
+        if (e.target === e.currentTarget) {
+          handleCloseBack();
         }
       }}
     >
@@ -187,20 +204,18 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
               </p>
             </div>
           </div>
-
+ 
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleCloseEntirely}
-              disabled={isProcessing}
-              className="text-xs text-slate-300 hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-white/10 transition-colors disabled:opacity-50 cursor-pointer"
+              className="text-xs text-slate-300 hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
               title="انصراف و بستن کامل"
             >
               انصراف
             </button>
             <button
-              onClick={onClose}
-              disabled={isProcessing}
-              className="w-8 h-8 rounded-full bg-purple-950/80 hover:bg-purple-900 text-slate-300 hover:text-white flex items-center justify-center transition-colors disabled:opacity-50 cursor-pointer"
+              onClick={handleCloseBack}
+              className="w-8 h-8 rounded-full bg-purple-950/80 hover:bg-purple-900 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
               title="بستن پنجره پرداخت"
             >
               <X className="w-4 h-4" />
@@ -309,9 +324,8 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
-              onClick={onClose}
-              disabled={isProcessing}
-              className="px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-purple-950/80 hover:bg-purple-900 border border-purple-800/50 transition-colors flex-1 sm:flex-none text-center disabled:opacity-50 cursor-pointer"
+              onClick={handleCloseBack}
+              className="px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-purple-950/80 hover:bg-purple-900 border border-purple-800/50 transition-colors flex-1 sm:flex-none text-center cursor-pointer"
               title="بازگشت به سبد خرید"
             >
               بازگشت به سبد
@@ -319,8 +333,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
             <button
               type="button"
               onClick={handleCloseEntirely}
-              disabled={isProcessing}
-              className="px-3.5 py-3 rounded-xl text-xs font-semibold text-rose-300 hover:text-rose-200 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/40 transition-colors flex-1 sm:flex-none text-center disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
+              className="px-3.5 py-3 rounded-xl text-xs font-semibold text-rose-300 hover:text-rose-200 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/40 transition-colors flex-1 sm:flex-none text-center cursor-pointer flex items-center justify-center gap-1"
               title="بستن کامل و بازگشت به صفحه فروشگاه"
             >
               <Store className="w-3.5 h-3.5" />
