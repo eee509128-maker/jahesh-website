@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Trash2, ShoppingBag, Globe, ShieldCheck, ArrowLeft, AlertCircle, Sparkles, FileText, Ticket, CheckCircle2, Percent, Plus, Minus } from 'lucide-react';
 import { CartItem, User, Coupon } from '../types';
 
@@ -35,27 +35,45 @@ export const CartModal: React.FC<CartModalProps> = ({
   onProceedToPayment,
   coupons = [],
 }) => {
-  if (!isOpen) return null;
-
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPercent: number; discountAmount: number } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
 
-  const rawTotalAmount = cartItems.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
+  // Handle Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  // Defensively filter and validate cart items to prevent any runtime crash
+  const safeCartItems = Array.isArray(cartItems)
+    ? cartItems.filter((item) => item && item.product && typeof item.product === 'object' && item.product.id)
+    : [];
+
+  const rawTotalAmount = safeCartItems.reduce(
+    (sum, item) => sum + (Number(item.product.price) || 0) * (Number(item.quantity) || 1),
     0
   );
 
   const discountAmount = appliedCoupon
     ? (appliedCoupon.discountAmount !== undefined
         ? appliedCoupon.discountAmount
-        : Math.round((rawTotalAmount * appliedCoupon.discountPercent) / 100))
+        : Math.round((rawTotalAmount * (appliedCoupon.discountPercent || 0)) / 100))
     : 0;
 
   const finalPayableAmount = Math.max(0, rawTotalAmount - discountAmount);
 
-  const formatPrice = (num: number) => {
+  const formatPrice = (num?: number) => {
+    if (typeof num !== 'number' || isNaN(num)) return '۰ تومان';
     return num.toLocaleString('fa-IR') + ' تومان';
   };
 
@@ -72,12 +90,14 @@ export const CartModal: React.FC<CartModalProps> = ({
 
     // Special Secret Admin Coupon: jahesh1395 -> Sets golden package price to exactly 2,500,000 Tomans
     if (codeClean === 'JAHESH1395') {
-      const packageItem = cartItems.find(
-        (it) => it.product.id === 'pkg-golden-jahesh' || it.product.title.includes('پکیج')
+      const packageItem = safeCartItems.find(
+        (it) => it.product?.id === 'pkg-golden-jahesh' || (it.product?.title && it.product.title.includes('پکیج'))
       );
       let calcDiscount = 0;
       if (packageItem) {
-        calcDiscount = Math.max(0, packageItem.product.price * packageItem.quantity - (2500000 * packageItem.quantity));
+        const itemPrice = Number(packageItem.product?.price) || 0;
+        const itemQty = Number(packageItem.quantity) || 1;
+        calcDiscount = Math.max(0, itemPrice * itemQty - (2500000 * itemQty));
       } else if (rawTotalAmount > 2500000) {
         calcDiscount = rawTotalAmount - 2500000;
       } else {
@@ -94,13 +114,13 @@ export const CartModal: React.FC<CartModalProps> = ({
     }
 
     // 1. First check if any item in the cart has this exact product-specific couponCode
-    const matchedProductItem = cartItems.find(
-      (item) => item.product.couponCode && item.product.couponCode.toUpperCase() === codeClean
+    const matchedProductItem = safeCartItems.find(
+      (item) => item.product?.couponCode && item.product.couponCode.toUpperCase() === codeClean
     );
 
     if (matchedProductItem && matchedProductItem.product.couponCode) {
       const discountPercent = matchedProductItem.product.couponDiscountPercent || 15;
-      const productSubtotal = matchedProductItem.product.price * matchedProductItem.quantity;
+      const productSubtotal = (Number(matchedProductItem.product.price) || 0) * (Number(matchedProductItem.quantity) || 1);
       const calcDiscount = Math.round((productSubtotal * discountPercent) / 100);
 
       setAppliedCoupon({
@@ -115,17 +135,17 @@ export const CartModal: React.FC<CartModalProps> = ({
     }
 
     // 2. Second, check general site-wide coupons
-    const foundGeneral = coupons.find((c) => c.code.toUpperCase() === codeClean && c.isActive);
+    const foundGeneral = coupons.find((c) => c && c.code && c.code.toUpperCase() === codeClean && c.isActive);
     if (foundGeneral) {
       let calcDiscount = 0;
       if (foundGeneral.targetFinalPrice && rawTotalAmount > foundGeneral.targetFinalPrice) {
         calcDiscount = rawTotalAmount - foundGeneral.targetFinalPrice;
       } else {
-        calcDiscount = Math.round((rawTotalAmount * foundGeneral.discountPercent) / 100);
+        calcDiscount = Math.round((rawTotalAmount * (foundGeneral.discountPercent || 0)) / 100);
       }
       setAppliedCoupon({
         code: foundGeneral.code,
-        discountPercent: foundGeneral.discountPercent,
+        discountPercent: foundGeneral.discountPercent || 0,
         discountAmount: calcDiscount,
       });
       setCouponSuccess(`کد تخفیف «${foundGeneral.code}» با موفقیت اعمال شد!`);
@@ -156,7 +176,14 @@ export const CartModal: React.FC<CartModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in cursor-default"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="relative w-full max-w-2xl bg-[#110b27] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-6 max-h-[92vh] flex flex-col">
         
         {/* Header */}
@@ -172,7 +199,8 @@ export const CartModal: React.FC<CartModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-300 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="بستن سبد خرید"
           >
             <X className="w-4 h-4" />
           </button>
@@ -180,173 +208,182 @@ export const CartModal: React.FC<CartModalProps> = ({
 
         {/* Content Body */}
         <div className="p-3.5 sm:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-5">
-          {cartItems.length === 0 ? (
+          {safeCartItems.length === 0 ? (
             <div className="text-center py-12 space-y-4">
               <div className="w-16 h-16 rounded-full bg-purple-950/60 border border-purple-800/40 flex items-center justify-center mx-auto text-purple-400">
                 <ShoppingBag className="w-8 h-8" />
               </div>
               <h4 className="text-base font-bold text-white">سبد خرید شما فعلاً خالی است</h4>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                می‌توانید از بخش فروشگاه، پکیج طلایی طراحی سایت یا سایر خدمات را به سبد خرید اضافه نمایید.
+                می‌توانید از بخش فروشگاه، پکیج طلایی طراحی سایت یا سایر خدمات و کالاها را به سبد خرید اضافه نمایید.
               </p>
               <button
                 onClick={onClose}
-                className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg"
+                className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg cursor-pointer"
               >
-                مشاهده و انتخاب پکیج‌ها
+                مشاهده و انتخاب کالاها
               </button>
             </div>
           ) : (
             <div className="space-y-4">
-              {cartItems.map((item) => (
-                <div
-                  key={item.product.id}
-                  className="bg-[#160e33] border border-purple-800/50 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg transition-all"
-                >
-                  {/* Item Header: Image, Info & Delete button */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3.5">
-                      <img
-                        src={item.product.image}
-                        alt={item.product.title}
-                        className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl object-cover border border-purple-700/60 shrink-0 bg-black/40"
-                      />
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-xs sm:text-sm font-black text-white leading-snug">
-                            {item.product.title}
-                          </h4>
-                          {item.product.isGolden && (
-                            <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-md shadow-sm">
-                              VIP
-                            </span>
-                          )}
+              {safeCartItems.map((item) => {
+                const prod = item.product || ({} as any);
+                const itemPrice = Number(prod.price) || 0;
+                const itemQuantity = Number(item.quantity) || 1;
+
+                return (
+                  <div
+                    key={prod.id || Math.random()}
+                    className="bg-[#160e33] border border-purple-800/50 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg transition-all"
+                  >
+                    {/* Item Header: Image, Info & Delete button */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3.5">
+                        <img
+                          src={prod.image || 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=300&q=80'}
+                          alt={prod.title || 'محصول'}
+                          className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl object-cover border border-purple-700/60 shrink-0 bg-black/40"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=300&q=80';
+                          }}
+                        />
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-xs sm:text-sm font-black text-white leading-snug">
+                              {prod.title || 'محصول بدون عنوان'}
+                            </h4>
+                            {prod.isGolden && (
+                              <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-md shadow-sm">
+                                VIP
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs sm:text-sm font-black text-amber-300">
+                            {formatPrice(itemPrice)}
+                          </p>
                         </div>
-                        <p className="text-xs sm:text-sm font-black text-amber-300">
-                          {formatPrice(item.product.price)}
+                      </div>
+
+                      <button
+                        onClick={() => onRemoveItem(prod.id)}
+                        className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+                        title="حذف کامل از سبد خرید"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Digikala Style Quantity Stepper & Subtotal Row */}
+                    <div className="flex items-center justify-between gap-3 bg-black/40 border border-purple-900/60 rounded-xl px-3.5 py-2.5 shadow-inner">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[11px] sm:text-xs text-slate-300 font-bold">تعداد:</span>
+                        
+                        {/* Digikala Counter Box */}
+                        <div className="inline-flex items-center bg-[#0d0722] border border-purple-700/80 rounded-xl p-0.5 shadow-md">
+                          {/* Plus button */}
+                          <button
+                            type="button"
+                            onClick={() => onUpdateQuantity(prod.id, itemQuantity + 1)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-purple-200 hover:text-white hover:bg-purple-700/70 active:scale-90 transition-all cursor-pointer"
+                            title="افزایش تعداد سفارش"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Quantity Number */}
+                          <span className="w-8 text-center text-xs font-black text-white font-mono select-none">
+                            {itemQuantity.toLocaleString('fa-IR')}
+                          </span>
+
+                          {/* Minus or Trash button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (itemQuantity > 1) {
+                                onUpdateQuantity(prod.id, itemQuantity - 1);
+                              } else {
+                                onRemoveItem(prod.id);
+                              }
+                            }}
+                            className={`w-7 h-7 flex items-center justify-center rounded-lg active:scale-90 transition-all cursor-pointer ${
+                              itemQuantity === 1
+                                ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-950/60'
+                                : 'text-purple-200 hover:text-white hover:bg-purple-700/70'
+                            }`}
+                            title={itemQuantity === 1 ? 'حذف محصول از سبد' : 'کاهش تعداد'}
+                          >
+                            {itemQuantity === 1 ? (
+                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            ) : (
+                              <Minus className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+
+                        {itemQuantity > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveItem(prod.id)}
+                            className="text-[11px] text-rose-400/80 hover:text-rose-300 flex items-center gap-1 transition-colors pr-1.5 cursor-pointer"
+                            title="حذف کل این کالا"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>حذف کالا</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Subtotal */}
+                      <div className="flex items-center gap-2 text-left">
+                        <span className="text-[11px] text-slate-400">جمع جزء:</span>
+                        <span className="text-xs sm:text-sm font-black text-amber-300">
+                          {formatPrice(itemPrice * itemQuantity)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Free Domain Field (if included) */}
+                    {prod.domainIncluded && (
+                      <div className="bg-[#120a2a] p-3.5 rounded-xl border border-amber-500/30 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                            <Globe className="w-3.5 h-3.5 text-amber-400" />
+                            نام دامنه دلخواه رایگان شما (.ir یا ...):
+                          </label>
+                          <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                            هدیه ۱۰۰٪ رایگان
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          placeholder="نام انتخابی شما مثل: mycompany.ir"
+                          value={item.requestedDomain || ''}
+                          onChange={(e) => onUpdateDomain(prod.id, e.target.value)}
+                          className="w-full bg-black/60 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+                        />
+                        <p className="text-[10px] text-slate-400">
+                          * این دامنه پس از پرداخت توسط تیم جهش با مالکیت رسمی شما ثبت خواهد شد.
                         </p>
                       </div>
-                    </div>
+                    )}
 
-                    <button
-                      onClick={() => onRemoveItem(item.product.id)}
-                      className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors"
-                      title="حذف کامل از سبد خرید"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Digikala Style Quantity Stepper & Subtotal Row */}
-                  <div className="flex items-center justify-between gap-3 bg-black/40 border border-purple-900/60 rounded-xl px-3.5 py-2.5 shadow-inner">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-[11px] sm:text-xs text-slate-300 font-bold">تعداد:</span>
-                      
-                      {/* Digikala Counter Box */}
-                      <div className="inline-flex items-center bg-[#0d0722] border border-purple-700/80 rounded-xl p-0.5 shadow-md">
-                        {/* Plus button */}
-                        <button
-                          type="button"
-                          onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg text-purple-200 hover:text-white hover:bg-purple-700/70 active:scale-90 transition-all cursor-pointer"
-                          title="افزایش تعداد سفارش"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Quantity Number */}
-                        <span className="w-8 text-center text-xs font-black text-white font-mono select-none">
-                          {item.quantity.toLocaleString('fa-IR')}
-                        </span>
-
-                        {/* Minus or Trash button */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (item.quantity > 1) {
-                              onUpdateQuantity(item.product.id, item.quantity - 1);
-                            } else {
-                              onRemoveItem(item.product.id);
-                            }
-                          }}
-                          className={`w-7 h-7 flex items-center justify-center rounded-lg active:scale-90 transition-all cursor-pointer ${
-                            item.quantity === 1
-                              ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-950/60'
-                              : 'text-purple-200 hover:text-white hover:bg-purple-700/70'
-                          }`}
-                          title={item.quantity === 1 ? 'حذف محصول از سبد' : 'کاهش تعداد'}
-                        >
-                          {item.quantity === 1 ? (
-                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                          ) : (
-                            <Minus className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-
-                      {item.quantity > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => onRemoveItem(item.product.id)}
-                          className="text-[11px] text-rose-400/80 hover:text-rose-300 flex items-center gap-1 transition-colors pr-1.5"
-                          title="حذف کل این کالا"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          <span>حذف کالا</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Subtotal */}
-                    <div className="flex items-center gap-2 text-left">
-                      <span className="text-[11px] text-slate-400">جمع جزء:</span>
-                      <span className="text-xs sm:text-sm font-black text-amber-300">
-                        {formatPrice(item.product.price * item.quantity)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Free Domain Field (if included) */}
-                  {item.product.domainIncluded && (
-                    <div className="bg-[#120a2a] p-3.5 rounded-xl border border-amber-500/30 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5 text-amber-400" />
-                          نام دامنه دلخواه رایگان شما (.ir یا ...):
-                        </label>
-                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
-                          هدیه ۱۰۰٪ رایگان
-                        </span>
-                      </div>
+                    {/* Additional notes / requirements */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-medium text-slate-300 block">
+                        توضیحات تکمیلی یا رنگ‌بندی و امکانات خاص (اختیاری):
+                      </label>
                       <input
                         type="text"
-                        dir="ltr"
-                        placeholder="نام انتخابی شما مثل: mycompany.ir"
-                        value={item.requestedDomain || ''}
-                        onChange={(e) => onUpdateDomain(item.product.id, e.target.value)}
-                        className="w-full bg-black/60 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+                        placeholder="امکانات خاص مدنظرتان یا رنگ و طرح دلخواه را اینجا بنویسید..."
+                        value={item.clientNotes || ''}
+                        onChange={(e) => onUpdateNotes(prod.id, e.target.value)}
+                        className="w-full bg-black/40 border border-purple-900/60 hover:border-purple-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none transition-colors"
                       />
-                      <p className="text-[10px] text-slate-400">
-                        * این دامنه پس از پرداخت توسط تیم جهش با مالکیت رسمی شما ثبت خواهد شد.
-                      </p>
                     </div>
-                  )}
-
-                  {/* Additional notes / requirements */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-slate-300 block">
-                      توضیحات تکمیلی یا رنگ‌بندی و امکانات خاص (اختیاری):
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="امکانات خاص مدنظرتان یا رنگ و طرح دلخواه را اینجا بنویسید..."
-                      value={item.clientNotes || ''}
-                      onChange={(e) => onUpdateNotes(item.product.id, e.target.value)}
-                      className="w-full bg-black/40 border border-purple-900/60 hover:border-purple-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none transition-colors"
-                    />
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* User Authentication Warning if not logged in */}
               {!currentUser && (
@@ -469,7 +506,7 @@ export const CartModal: React.FC<CartModalProps> = ({
         </div>
 
         {/* Footer Summary & Checkout Button */}
-        {cartItems.length > 0 && (
+        {safeCartItems.length > 0 && (
           <div className="px-6 py-4 bg-[#140d30] border-t border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-right w-full sm:w-auto space-y-0.5">
               {appliedCoupon ? (
@@ -500,10 +537,12 @@ export const CartModal: React.FC<CartModalProps> = ({
 
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <button
+                type="button"
                 onClick={onClose}
-                className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-purple-950/60 transition-colors w-1/3 sm:w-auto text-center"
+                className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-purple-950/80 hover:bg-purple-900 border border-purple-800/50 transition-colors w-1/3 sm:w-auto text-center cursor-pointer"
+                title="بستن سبد خرید و بازگشت به فروشگاه"
               >
-                ادامه خرید
+                بستن و ادامه خرید
               </button>
               <button
                 id="proceed-payment-btn"

@@ -109,7 +109,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <span className="truncate">{product.warranty}</span>
             </div>
           )}
-          {product.features.slice(0, product.warranty ? 2 : 3).map((feat, idx) => (
+          {(product.features || []).slice(0, product.warranty ? 2 : 3).map((feat, idx) => (
             <div key={idx} className="flex items-center gap-1.5 text-slate-300">
               <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span className="truncate">{feat}</span>

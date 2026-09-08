@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, ShieldCheck, Check, AlertCircle, FileText } from 'lucide-react';
 import { JAHESH_TERMS } from '../data/termsData';
 
@@ -15,10 +15,28 @@ export const TermsModal: React.FC<TermsModalProps> = ({
   isAccepted,
   onToggleAccept,
 }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in cursor-default"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="relative w-full max-w-3xl bg-[#120c29] border border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-8 max-h-[88vh] flex flex-col">
         
         {/* Header */}
@@ -34,7 +52,8 @@ export const TermsModal: React.FC<TermsModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-300 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            title="بستن پنجره قوانین"
           >
             <X className="w-4 h-4" />
           </button>
