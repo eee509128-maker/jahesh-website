@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "build": "cd jaheshkala && npx vite build && cd .. && node -e \"console.log('Build complete')\"",
+    "build": "cd jaheshkala && npm install && npx vite build",
     "lint": "node --check server.js",
     "start": "node server.js"
   },
