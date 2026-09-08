@@ -30,17 +30,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
   }, [product]);
 
-  useEffect(() => {
-    if (!product) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [product, onClose]);
-
   if (!product) return null;
 
   const allImages = [product.image, ...(product.gallery || [])].filter((url, idx, arr) => url && arr.indexOf(url) === idx);
@@ -55,14 +44,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-in fade-in cursor-default"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto bg-black/80 backdrop-blur-md animate-in fade-in">
       <div className="relative w-full max-w-4xl bg-[#110b28] border border-purple-800/70 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-8 max-h-[92vh] flex flex-col">
         
         {/* Modal Top Header */}
@@ -266,7 +248,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   مشخصات فنی و ویژگی‌های محصول:
                 </h3>
                 <div className="grid grid-cols-1 gap-2.5">
-                  {(product.features || []).map((feat, idx) => (
+                  {product.features.map((feat, idx) => (
                     <div
                       key={idx}
                       className="flex items-start gap-2.5 text-xs text-slate-300 p-2.5 rounded-xl bg-purple-950/20 border border-purple-900/20"

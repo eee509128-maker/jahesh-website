@@ -40,10 +40,10 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
     if (error) {
       console.warn('Supabase fetch products error:', error.message);
-      return INITIAL_PRODUCTS;
+      return [];
     }
     if (data && data.length > 0) {
-      const fetched: Product[] = data.map((item) => ({
+      return data.map((item) => ({
         id: item.id,
         title: item.title,
         category: item.category,
@@ -60,39 +60,17 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
         warranty: item.warranty || '',
         shortDescription: item.short_description || '',
         fullDescription: item.full_description || '',
-        features: Array.isArray(item.features)
-          ? item.features
-          : (typeof item.features === 'string' ? item.features.split('\n').filter(Boolean) : []),
+        features: item.features || [],
         image: item.image || '',
-        gallery: Array.isArray(item.gallery) ? item.gallery : [],
+        gallery: item.gallery || [],
         couponCode: item.coupon_code || undefined,
         couponDiscountPercent: item.coupon_discount_percent ? Number(item.coupon_discount_percent) : undefined,
       }));
-
-      // Ensure INITIAL_PRODUCTS (specifically pkg-golden-jahesh) is never missing
-      const hasGolden = fetched.some(
-        (p) => p.id === 'pkg-golden-jahesh' || p.title.includes('طلایی') || p.isGolden
-      );
-
-      if (!hasGolden) {
-        // Auto-persist INITIAL_PRODUCTS to Supabase so it's permanently stored in the DB
-        INITIAL_PRODUCTS.forEach((p) => {
-          saveProductToDb(p).catch(() => {});
-        });
-        return [...INITIAL_PRODUCTS, ...fetched];
-      }
-
-      return fetched;
     }
-
-    // If DB is empty, persist INITIAL_PRODUCTS to DB and return them
-    INITIAL_PRODUCTS.forEach((p) => {
-      saveProductToDb(p).catch(() => {});
-    });
-    return INITIAL_PRODUCTS;
+    return [];
   } catch (err) {
     console.warn('Failed to connect to Supabase products table:', err);
-    return INITIAL_PRODUCTS;
+    return [];
   }
 };
 

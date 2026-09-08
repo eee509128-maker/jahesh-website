@@ -315,14 +315,18 @@ export default function App() {
         const cloudProducts = await fetchProductsFromDb();
         if (!isMounted) return;
         if (cloudProducts && cloudProducts.length > 0) {
-          const hasGolden = cloudProducts.some((p) => p.id === 'pkg-golden-jahesh' || p.isGolden || p.title.includes('طلایی'));
-          if (!hasGolden) {
-            setProducts([...INITIAL_PRODUCTS, ...cloudProducts]);
-          } else {
-            setProducts(cloudProducts);
-          }
-        } else {
-          setProducts(INITIAL_PRODUCTS);
+          // Merge: start with INITIAL_PRODUCTS, then override/append cloud products
+          setProducts((prev) => {
+            const initialIds = new Set(INITIAL_PRODUCTS.map((p) => p.id));
+            const cloudIds = new Set(cloudProducts.map((p) => p.id));
+            // Keep initial products that are not in cloud (unchanged), override ones that are
+            const mergedInitial = INITIAL_PRODUCTS.map((p) =>
+              cloudIds.has(p.id) ? (cloudProducts.find((cp) => cp.id === p.id) || p) : p
+            );
+            // Add cloud products that are NOT initial products (admin-added)
+            const extraCloud = cloudProducts.filter((p) => !initialIds.has(p.id));
+            return [...mergedInitial, ...extraCloud];
+          });
         }
 
         const cloudOrders = await fetchOrdersFromDb();
@@ -436,6 +440,23 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('jahesh_coupons', JSON.stringify(coupons));
   }, [coupons]);
+
+  // Payment modal: push browser history entry so back button closes the modal
+  useEffect(() => {
+    if (paymentModalOpen) {
+      window.history.pushState({ paymentModalOpen: true }, '');
+    }
+    const handlePopState = (e: PopStateEvent) => {
+      if (paymentModalOpen) {
+        setPaymentModalOpen(false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [paymentModalOpen]);
+
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -874,10 +895,6 @@ export default function App() {
       <PaymentGatewayModal
         isOpen={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
-        onCloseAll={() => {
-          setPaymentModalOpen(false);
-          setCartModalOpen(false);
-        }}
         cartItems={cartItems}
         currentUser={currentUser}
         onPaymentSuccess={handlePaymentSuccess}
