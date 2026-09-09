@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, PackageCheck, Clock, CheckCircle2, Globe, ShieldCheck, FileText, ShoppingBag, ArrowLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, PackageCheck, Clock, CheckCircle2, Globe, ShieldCheck, FileText, ShoppingBag, ArrowLeft, Search } from 'lucide-react';
 import { Order, User } from '../types';
 
 interface UserOrdersModalProps {
@@ -17,21 +17,50 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   currentUser,
   onOpenShop,
 }) => {
+  const [manualPhoneSearch, setManualPhoneSearch] = useState('');
+
   if (!isOpen) return null;
 
-  const cleanPhone = currentUser?.phone?.trim();
+  const normalizeDigits = (str?: string) => {
+    if (!str) return '';
+    const persianNumbers = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+    const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    let res = str.toString();
+    for (let i = 0; i < 10; i++) {
+      res = res.replace(new RegExp(persianNumbers[i], 'g'), i.toString());
+      res = res.replace(new RegExp(arabicNumbers[i], 'g'), i.toString());
+    }
+    return res.replace(/\D/g, '').replace(/^(\+?98|0)/, '');
+  };
+
+  const cleanPhone = normalizeDigits(currentUser?.phone);
   const cleanEmail = currentUser?.email?.trim().toLowerCase();
   const cleanUserId = currentUser?.id?.trim();
+  const searchPhone = normalizeDigits(manualPhoneSearch);
 
-  const userOrders = currentUser
-    ? orders.filter(
-        (o) =>
-          (cleanUserId && o.userId === cleanUserId) ||
-          (cleanPhone && o.customerPhone && o.customerPhone.trim() === cleanPhone) ||
-          (cleanEmail && o.customerEmail && o.customerEmail.trim().toLowerCase() === cleanEmail) ||
-          currentUser.role === 'admin'
-      )
-    : [];
+  const userOrders = orders.filter((o) => {
+    if (currentUser?.role === 'admin') return true;
+
+    const orderPhone = normalizeDigits(o.customerPhone);
+    const orderEmail = o.customerEmail?.trim().toLowerCase();
+    const orderUserId = o.userId?.trim();
+
+    // If manual phone search entered
+    if (searchPhone) {
+      return (
+        orderPhone.includes(searchPhone) ||
+        o.trackingCode.includes(manualPhoneSearch.trim()) ||
+        o.id.toLowerCase().includes(manualPhoneSearch.trim().toLowerCase())
+      );
+    }
+
+    // Default logged in user match
+    if (cleanUserId && orderUserId === cleanUserId) return true;
+    if (cleanPhone && orderPhone && orderPhone === cleanPhone) return true;
+    if (cleanEmail && orderEmail && orderEmail === cleanEmail) return true;
+
+    return false;
+  });
 
   const formatPrice = (num: number) => {
     return num.toLocaleString('fa-IR') + ' تومان';
@@ -97,6 +126,26 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Quick Search Bar */}
+        <div className="px-6 py-2.5 bg-[#140b2e] border-b border-purple-900/30 flex items-center gap-2">
+          <Search className="w-4 h-4 text-purple-400 shrink-0" />
+          <input
+            type="text"
+            value={manualPhoneSearch}
+            onChange={(e) => setManualPhoneSearch(e.target.value)}
+            placeholder="جستجوی سریع سفارش با شماره موبایل یا کد رهگیری (مثلاً 09881234345)..."
+            className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+          />
+          {manualPhoneSearch && (
+            <button
+              onClick={() => setManualPhoneSearch('')}
+              className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded bg-purple-900/40"
+            >
+              پاک کردن
+            </button>
+          )}
         </div>
 
         {/* Orders List Content */}

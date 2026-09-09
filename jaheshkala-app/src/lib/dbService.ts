@@ -224,9 +224,12 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
         };
       });
 
-      // Synchronize local cache to exactly match cloud DB (empty array if no orders)
-      saveLocalOrdersStore(cloudOrders);
-      return cloudOrders;
+      // Synchronize local cache to include cloud DB plus any unsynced local orders
+      const cloudIds = new Set(cloudOrders.map((o) => o.id));
+      const localUnsynced = localOrders.filter((o) => !cloudIds.has(o.id));
+      const mergedOrders = [...cloudOrders, ...localUnsynced];
+      saveLocalOrdersStore(mergedOrders);
+      return mergedOrders;
     }
     return localOrders;
   } catch (err) {

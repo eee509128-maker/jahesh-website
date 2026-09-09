@@ -52,6 +52,15 @@ export default async function handler(req, res) {
         orderId: data.orderId || '',
         message: data.message || 'پرداخت با موفقیت تأیید شد.'
       });
+    } else if (data.result === 115) {
+      return res.status(200).json({
+        success: false,
+        result: 115,
+        invalidIp: true,
+        ip: data.message,
+        message: 'محدودیت IP در پنل زیبال فعال است. لطفاً در تنظیمات درگاه زیبال، گزینه محدودیت IP را غیرفعال کنید.',
+        details: data
+      });
     } else {
       return res.status(400).json({
         success: false,

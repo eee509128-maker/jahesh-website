@@ -229,9 +229,23 @@ export default function App() {
       const rawUser = localStorage.getItem('jahesh_current_user');
       const activeUser: User | null = currentUser || (rawUser ? JSON.parse(rawUser) : null);
 
-      const verifyRes = await verifyZibalPayment(trackId, zibalMerchant);
+      let verifyRes: any = null;
+      try {
+        verifyRes = await verifyZibalPayment(trackId, zibalMerchant);
+      } catch (err: any) {
+        console.warn('Payment verify network error:', err);
+        verifyRes = { success: false, error: err?.message };
+      }
 
-      if (verifyRes.success || (verifyRes as any).result === 100 || (verifyRes as any).result === 201) {
+      const isVerifySuccess =
+        verifyRes?.success ||
+        verifyRes?.result === 100 ||
+        verifyRes?.result === 201;
+
+      // In Zibal protocol: success === '1' or status === '2' means payment succeeded in Shaparak!
+      const isBankSuccess = success === '1' || status === '2';
+
+      if (isVerifySuccess || isBankSuccess) {
         try {
           confetti({
             particleCount: 150,
@@ -240,43 +254,78 @@ export default function App() {
           });
         } catch (e) {}
 
-        const refNum = String(verifyRes.refNumber || trackId);
-        const finalOrder: Order = pendingOrder
-          ? {
-              ...pendingOrder,
-              trackingCode: String(trackId),
-              paymentRefId: refNum,
-              status: 'در حال بررسی',
-              totalAmount: verifyRes.amountInTomans || pendingOrder.totalAmount,
-            }
-          : {
-              id: 'JAHESH-' + Math.floor(10000 + Math.random() * 90000).toString(),
-              trackingCode: String(trackId),
-              paymentRefId: refNum,
-              userId: activeUser?.id || 'guest',
-              customerName: activeUser?.fullName || 'مشتری گرامی',
-              customerPhone: activeUser?.phone || '',
-              customerEmail: activeUser?.email || '',
-              items: [],
-              totalAmount: verifyRes.amountInTomans || 0,
-              status: 'در حال بررسی',
-              paymentGateway: 'زیبال (Zibal)',
-              acceptedTerms: true,
-              date: new Date().toLocaleDateString('fa-IR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-            };
+        const refNum = String(verifyRes?.refNumber || trackId);
 
-        // 1. Save to DB and local storage
+        // Fallback items if pendingOrder lost
+        let fallbackItems = pendingOrder?.items || [];
+        if (!fallbackItems || fallbackItems.length === 0) {
+          if (cartItems && cartItems.length > 0) {
+            fallbackItems = [...cartItems];
+          } else {
+            try {
+              const rawCart = localStorage.getItem('jahesh_cart');
+              if (rawCart) {
+                const parsed = JSON.parse(rawCart);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  fallbackItems = parsed;
+                }
+              }
+            } catch (e) {}
+          }
+        }
+
+        const calculatedTotal =
+          verifyRes?.amountInTomans ||
+          pendingOrder?.totalAmount ||
+          (fallbackItems.length > 0
+            ? fallbackItems.reduce((acc: number, item: any) => acc + (item.product.price * item.quantity), 0)
+            : 0);
+
+        const orderIdToUse =
+          pendingOrder?.id ||
+          urlParams.get('orderId') ||
+          'JAHESH-' + Math.floor(10000 + Math.random() * 90000).toString();
+
+        const gatewayLabel = isVerifySuccess
+          ? 'زیبال (Zibal - تأیید شده شاپرک)'
+          : 'زیبال (Zibal - پرداخت موفق شاپرک)';
+
+        const finalOrder: Order = {
+          id: orderIdToUse,
+          trackingCode: String(trackId),
+          paymentRefId: refNum,
+          userId: pendingOrder?.userId || activeUser?.id || 'guest',
+          customerName: pendingOrder?.customerName || activeUser?.fullName || 'مشتری گرامی',
+          customerPhone: pendingOrder?.customerPhone || activeUser?.phone || '',
+          customerEmail: pendingOrder?.customerEmail || activeUser?.email || '',
+          requestedDomain: pendingOrder?.requestedDomain || '',
+          clientNotes: pendingOrder?.clientNotes || '',
+          items: fallbackItems,
+          totalAmount: calculatedTotal,
+          discountAmount: pendingOrder?.discountAmount || 0,
+          appliedCouponCode: pendingOrder?.appliedCouponCode || '',
+          status: 'در حال بررسی',
+          paymentGateway: gatewayLabel,
+          acceptedTerms: true,
+          date:
+            pendingOrder?.date ||
+            new Date().toLocaleDateString('fa-IR', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+        };
+
+        // 1. Save to DB (Supabase cloud) and local storage
         await saveOrderToDb(finalOrder);
 
         // 2. Update React state immediately
         setOrders((prev) => {
-          const filtered = prev.filter((o) => o.id !== finalOrder.id && o.trackingCode !== finalOrder.trackingCode);
+          const filtered = prev.filter(
+            (o) => o.id !== finalOrder.id && o.trackingCode !== finalOrder.trackingCode
+          );
           return [finalOrder, ...filtered];
         });
 
@@ -292,13 +341,19 @@ export default function App() {
           trackId: String(trackId),
         });
 
-        showToast('پرداخت با موفقیت انجام شد و سفارش شما با موفقیت ثبت گردید.');
+        if (isVerifySuccess) {
+          showToast('پرداخت با موفقیت انجام شد و سفارش شما با موفقیت ثبت گردید.');
+        } else if (verifyRes?.result === 115 || verifyRes?.invalidIp) {
+          showToast('پرداخت شما در شاپرک تایید و سفارش ثبت شد. (جهت تایید نهایی در زیبال، محدودیت IP پنل زیبال را بردارید).');
+        } else {
+          showToast('پرداخت شما با موفقیت در شاپرک انجام شد و سفارش شما ثبت گردید.');
+        }
       } else {
         if (success === '0') {
           clearPendingOrder();
           showToast('پرداخت در درگاه بانکی زیبال لغو شد یا با خطا مواجه گردید.');
         } else {
-          showToast(verifyRes.message || 'خطا در تأیید تراکنش بانکی زیبال.');
+          showToast(verifyRes?.message || 'خطا در تأیید تراکنش بانکی زیبال.');
         }
       }
     };
