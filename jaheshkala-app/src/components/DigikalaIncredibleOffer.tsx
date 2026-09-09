@@ -4,6 +4,7 @@ import {
   Percent, ShieldCheck, Truck, Star
 } from 'lucide-react';
 import { Product } from '../types';
+import { getFallbackProductImage } from '../lib/imageUtils';
 
 interface DigikalaIncredibleOfferProps {
   products: Product[];
@@ -140,6 +141,9 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
               <img
                 src={activeProduct.image}
                 alt={activeProduct.title}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = getFallbackProductImage(activeProduct.title, activeProduct.category);
+                }}
                 className="w-full h-full object-cover"
               />
               {activeProduct.discountPercent && (

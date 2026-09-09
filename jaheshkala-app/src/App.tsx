@@ -66,15 +66,7 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out dummy test items
-          const dummyIds = new Set([
-            'prod-s24-ultra', 'prod-macbook-pro', 'prod-sony-headphone',
-            'prod-watch-series9', 'prod-nike-shoes', 'prod-coffee-maker',
-            'prod-iphone-16-pro-max', 'prod-poco-x6-pro', 'prod-airpods-pro-2',
-            'prod-soundcore-liberty-4', 'prod-macbook-air-m3', 'prod-galaxy-watch-6'
-          ]);
-          const userOnlyProds = parsed.filter((p: Product) => !dummyIds.has(p.id) && p.id !== 'pkg-golden-jahesh');
-          return [...INITIAL_PRODUCTS, ...userOnlyProds];
+          return parsed;
         }
       }
       return INITIAL_PRODUCTS;
@@ -381,14 +373,10 @@ export default function App() {
         const cloudProducts = await fetchProductsFromDb();
         if (!isMounted) return;
         if (cloudProducts && cloudProducts.length > 0) {
-          const hasGolden = cloudProducts.some((p) => p.id === 'pkg-golden-jahesh' || p.isGolden || p.title.includes('طلایی'));
-          if (!hasGolden) {
-            setProducts([...INITIAL_PRODUCTS, ...cloudProducts]);
-          } else {
-            setProducts(cloudProducts);
-          }
-        } else {
-          setProducts(INITIAL_PRODUCTS);
+          setProducts(cloudProducts);
+          try {
+            localStorage.setItem('jahesh_products', JSON.stringify(cloudProducts));
+          } catch {}
         }
 
         const cloudOrders = await fetchOrdersFromDb();
@@ -445,6 +433,17 @@ export default function App() {
     };
     window.addEventListener('jahesh-user-updated', handleUserUpdatedEvent);
 
+    // Listen for real-time products updates via local/broadcast events
+    const handleProductsUpdatedEvent = (e: any) => {
+      if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
+        setProducts(e.detail);
+        try {
+          localStorage.setItem('jahesh_products', JSON.stringify(e.detail));
+        } catch {}
+      }
+    };
+    window.addEventListener('jahesh-products-updated', handleProductsUpdatedEvent);
+
     // Listen for real-time orders updates via window events
     const handleOrdersUpdatedEvent = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) {
@@ -452,6 +451,22 @@ export default function App() {
       }
     };
     window.addEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
+
+    // Instant Supabase Realtime channel for products table
+    const productsChannel = supabase
+      .channel('public:products:realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+        try {
+          const fresh = await fetchProductsFromDb();
+          if (isMounted && fresh && Array.isArray(fresh) && fresh.length > 0) {
+            setProducts(fresh);
+            try {
+              localStorage.setItem('jahesh_products', JSON.stringify(fresh));
+            } catch {}
+          }
+        } catch (e) {}
+      })
+      .subscribe();
 
     // Instant Supabase Realtime channel for orders table
     const ordersChannel = supabase
@@ -466,9 +481,24 @@ export default function App() {
       })
       .subscribe();
 
-    // Periodic check to pull fresh role and orders (e.g. PC -> Mobile)
+    // Periodic check to pull fresh products, roles, and orders across devices (e.g. PC -> Mobile)
     const syncInterval = setInterval(async () => {
       try {
+        // 1. Sync fresh products and image changes from Supabase
+        const freshProducts = await fetchProductsFromDb();
+        if (isMounted && freshProducts && freshProducts.length > 0) {
+          setProducts((prev) => {
+            if (JSON.stringify(prev) !== JSON.stringify(freshProducts)) {
+              try {
+                localStorage.setItem('jahesh_products', JSON.stringify(freshProducts));
+              } catch {}
+              return freshProducts;
+            }
+            return prev;
+          });
+        }
+
+        // 2. Sync user roles
         const rawStored = localStorage.getItem('jahesh_current_user');
         if (rawStored) {
           const activeUser: User = JSON.parse(rawStored);
@@ -491,7 +521,7 @@ export default function App() {
           }
         }
 
-        // Periodic orders sync
+        // 3. Periodic orders sync
         const freshOrders = await fetchOrdersFromDb();
         if (isMounted && freshOrders) {
           setOrders(freshOrders);
@@ -499,12 +529,14 @@ export default function App() {
       } catch (err) {
         // silent
       }
-    }, 6000);
+    }, 5000);
 
     return () => {
       isMounted = false;
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
+      window.removeEventListener('jahesh-products-updated', handleProductsUpdatedEvent);
       window.removeEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
+      supabase.removeChannel(productsChannel);
       supabase.removeChannel(ordersChannel);
       clearInterval(syncInterval);
     };
@@ -664,22 +696,39 @@ export default function App() {
   };
 
   const handleAddNewProduct = async (newProduct: Product) => {
-    setProducts((prev) => [newProduct, ...prev]);
+    setProducts((prev) => {
+      const filtered = prev.filter((p) => p.id !== newProduct.id);
+      const updated = [newProduct, ...filtered];
+      try {
+        localStorage.setItem('jahesh_products', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     await saveProductToDb(newProduct);
-    showToast('محصول جدید در دیتابیس ابری ثبت شد.');
+    showToast('محصول جدید در دیتابیس ابری ثبت و منتشر شد.');
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
-    );
+    setProducts((prev) => {
+      const updated = prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p));
+      try {
+        localStorage.setItem('jahesh_products', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     await saveProductToDb(updatedProduct);
-    showToast(`محصول «${updatedProduct.title}» در دیتابیس به‌روزرسانی شد.`);
+    showToast(`محصول «${updatedProduct.title}» و تصویر آن در دیتابیس به‌روزرسانی شد.`);
   };
 
   const handleDeleteProduct = async (productId: string) => {
     if (confirm('آیا از حذف این محصول اطمینان دارید؟')) {
-      setProducts((prev) => prev.filter((p) => p.id !== productId));
+      setProducts((prev) => {
+        const updated = prev.filter((p) => p.id !== productId);
+        try {
+          localStorage.setItem('jahesh_products', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
       await deleteProductFromDb(productId);
       showToast('محصول از دیتابیس حذف شد.');
     }

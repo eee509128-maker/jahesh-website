@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2, ShoppingBag, Globe, ShieldCheck, ArrowLeft, AlertCircle, Sparkles, FileText, Ticket, CheckCircle2, Percent, Plus, Minus } from 'lucide-react';
 import { CartItem, User, Coupon } from '../types';
+import { getFallbackProductImage } from '../lib/imageUtils';
 
 interface CartModalProps {
   isOpen: boolean;
@@ -240,11 +241,11 @@ export const CartModal: React.FC<CartModalProps> = ({
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3.5">
                         <img
-                          src={prod.image || 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=300&q=80'}
+                          src={prod.image || getFallbackProductImage(prod.title, prod.category)}
                           alt={prod.title || 'محصول'}
                           className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl object-cover border border-purple-700/60 shrink-0 bg-black/40"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=300&q=80';
+                            (e.target as HTMLImageElement).src = getFallbackProductImage(prod.title, prod.category);
                           }}
                         />
                         <div className="space-y-1">

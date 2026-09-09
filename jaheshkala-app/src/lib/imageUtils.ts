@@ -4,9 +4,9 @@
 
 export async function compressImageFile(
   file: File,
-  maxWidth = 1200,
-  maxHeight = 1200,
-  quality = 0.82
+  maxWidth = 900,
+  maxHeight = 900,
+  quality = 0.80
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     // If it's an SVG, read directly as data URL without compression

@@ -40,6 +40,13 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
     if (error) {
       console.warn('Supabase fetch products error:', error.message);
+      try {
+        const saved = localStorage.getItem('jahesh_products');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
       return INITIAL_PRODUCTS;
     }
     if (data && data.length > 0) {
@@ -69,29 +76,28 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
         couponDiscountPercent: item.coupon_discount_percent ? Number(item.coupon_discount_percent) : undefined,
       }));
 
-      // Ensure INITIAL_PRODUCTS (specifically pkg-golden-jahesh) is never missing
-      const hasGolden = fetched.some(
-        (p) => p.id === 'pkg-golden-jahesh' || p.title.includes('طلایی') || p.isGolden
-      );
-
-      if (!hasGolden) {
-        // Auto-persist INITIAL_PRODUCTS to Supabase so it's permanently stored in the DB
-        INITIAL_PRODUCTS.forEach((p) => {
-          saveProductToDb(p).catch(() => {});
-        });
-        return [...INITIAL_PRODUCTS, ...fetched];
-      }
+      // Cache locally for offline/fast first-load
+      try {
+        localStorage.setItem('jahesh_products', JSON.stringify(fetched));
+      } catch {}
 
       return fetched;
     }
 
-    // If DB is empty, persist INITIAL_PRODUCTS to DB and return them
+    // If DB is completely empty, persist INITIAL_PRODUCTS to DB and return them
     INITIAL_PRODUCTS.forEach((p) => {
       saveProductToDb(p).catch(() => {});
     });
     return INITIAL_PRODUCTS;
   } catch (err) {
     console.warn('Failed to connect to Supabase products table:', err);
+    try {
+      const saved = localStorage.getItem('jahesh_products');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
     return INITIAL_PRODUCTS;
   }
 };
@@ -138,6 +144,21 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       console.warn('Save product error:', error.message);
       return false;
     }
+
+    // Broadcast change locally
+    try {
+      const saved = localStorage.getItem('jahesh_products');
+      let currentList: Product[] = saved ? JSON.parse(saved) : [];
+      const idx = currentList.findIndex((p) => p.id === product.id);
+      if (idx >= 0) {
+        currentList[idx] = product;
+      } else {
+        currentList = [product, ...currentList];
+      }
+      localStorage.setItem('jahesh_products', JSON.stringify(currentList));
+      window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: currentList }));
+    } catch {}
+
     return true;
   } catch (err) {
     console.warn('Save product exception:', err);
