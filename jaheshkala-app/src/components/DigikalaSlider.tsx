@@ -123,7 +123,10 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
           }}
           className="absolute inset-0 w-full h-full object-cover object-center transform scale-105 transition-all duration-700 ease-out"
         />
-        <div className={`absolute inset-0 bg-gradient-to-r ${active.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]'} opacity-90 backdrop-blur-[2px]`}></div>
+        <div
+          className={`absolute inset-0 bg-gradient-to-r ${active.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]'} backdrop-blur-[2px]`}
+          style={{ opacity: (active.overlayOpacity !== undefined ? active.overlayOpacity : 90) / 100 }}
+        ></div>
 
         {/* Content Box */}
         <div className="relative z-10 p-4 sm:p-8 md:p-10 flex flex-col justify-between min-h-[230px] sm:h-[300px] md:h-[340px] text-right">

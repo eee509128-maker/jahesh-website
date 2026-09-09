@@ -480,6 +480,28 @@ export default function App() {
     };
     window.addEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
 
+    // Listen for real-time banners updates via window events
+    const handleBannersUpdatedEvent = (e: any) => {
+      if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
+        setBanners(e.detail);
+        try {
+          localStorage.setItem('jahesh_banners', JSON.stringify(e.detail));
+        } catch {}
+      }
+    };
+    window.addEventListener('jahesh-banners-updated', handleBannersUpdatedEvent);
+
+    // Periodic sync for banners every 10 seconds across all devices
+    const bannerSyncInterval = setInterval(async () => {
+      if (!isMounted) return;
+      try {
+        const freshBanners = await fetchBannersFromDb();
+        if (isMounted && freshBanners && Array.isArray(freshBanners) && freshBanners.length > 0) {
+          setBanners(freshBanners);
+        }
+      } catch (err) {}
+    }, 10000);
+
     // Instant Supabase Realtime channel for products table
     const productsChannel = supabase
       .channel('public:products:realtime')
@@ -564,9 +586,11 @@ export default function App() {
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
       window.removeEventListener('jahesh-products-updated', handleProductsUpdatedEvent);
       window.removeEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
+      window.removeEventListener('jahesh-banners-updated', handleBannersUpdatedEvent);
       supabase.removeChannel(productsChannel);
       supabase.removeChannel(ordersChannel);
       clearInterval(syncInterval);
+      clearInterval(bannerSyncInterval);
     };
   }, []);
 

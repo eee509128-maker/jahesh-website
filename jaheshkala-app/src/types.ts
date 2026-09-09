@@ -90,8 +90,10 @@ export interface BannerSlide {
   actionType: 'incredible' | 'category' | 'link' | 'all';
   actionTarget?: string;
   gradient?: string;
+  overlayOpacity?: number;
   image: string;
   isActive?: boolean;
+  order?: number;
 }
 
 export interface Order {

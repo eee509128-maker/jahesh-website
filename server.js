@@ -106,6 +106,42 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'jahesh-kala-api' });
 });
 
+// Server-side Banners Persistence API
+const BANNERS_FILE = path.join(__dirname, 'data', 'banners.json');
+
+app.get('/api/banners', (_req, res) => {
+  try {
+    if (fs.existsSync(BANNERS_FILE)) {
+      const raw = fs.readFileSync(BANNERS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return res.json(parsed);
+      }
+    }
+  } catch (err) {
+    console.error('Error reading banners.json:', err);
+  }
+  return res.json([]);
+});
+
+app.post('/api/banners', (req, res) => {
+  try {
+    const banners = req.body;
+    if (!Array.isArray(banners)) {
+      return res.status(400).json({ error: 'Expected array of banners' });
+    }
+    const dataDir = path.dirname(BANNERS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners, null, 2), 'utf8');
+    return res.json({ success: true, count: banners.length });
+  } catch (err) {
+    console.error('Error saving banners.json:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Helper for Zibal URL (Uses ZIBAL_PROXY_URL if provided, else direct to https://gateway.zibal.ir/v1)
 function getZibalUrl(endpointPath) {
   const proxyUrl = process.env.ZIBAL_PROXY_URL && process.env.ZIBAL_PROXY_URL.trim();

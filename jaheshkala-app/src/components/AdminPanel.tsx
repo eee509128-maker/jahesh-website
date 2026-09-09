@@ -73,6 +73,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bannerActionType, setBannerActionType] = useState<'incredible' | 'category' | 'link' | 'all'>('incredible');
   const [bannerActionTarget, setBannerActionTarget] = useState('');
   const [bannerGradient, setBannerGradient] = useState('from-[#3b1261] via-[#220d3d] to-[#0d071a]');
+  const [bannerOpacity, setBannerOpacity] = useState<number>(90);
   const [bannerImage, setBannerImage] = useState('');
   const [bannerImageLoading, setBannerImageLoading] = useState(false);
   const [bannerSuccessMessage, setBannerSuccessMessage] = useState('');
@@ -146,6 +147,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBannerActionType(b.actionType || 'incredible');
     setBannerActionTarget(b.actionTarget || '');
     setBannerGradient(b.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]');
+    setBannerOpacity(b.overlayOpacity !== undefined ? b.overlayOpacity : 90);
     setBannerImage(b.image || '');
     setBannerSuccessMessage('');
   };
@@ -159,6 +161,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBannerActionType('incredible');
     setBannerActionTarget('');
     setBannerGradient('from-[#3b1261] via-[#220d3d] to-[#0d071a]');
+    setBannerOpacity(90);
     setBannerImage('');
     setBannerSuccessMessage('');
     if (bannerFileInputRef.current) bannerFileInputRef.current.value = '';
@@ -180,6 +183,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       actionType: bannerActionType,
       actionTarget: bannerActionTarget.trim() || undefined,
       gradient: bannerGradient,
+      overlayOpacity: bannerOpacity,
       image: bannerImage,
       isActive: true,
       order: editingBannerId
@@ -1967,6 +1971,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </button>
                         ))}
                       </div>
+
+                      {/* Opacity Control Slider */}
+                      <div className="mt-3.5 p-3.5 bg-[#0f0924] border border-purple-800/60 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+                          <span>درصد شفافیت تم رنگی پس‌زمینه (Opacity)</span>
+                          <span className="text-amber-400 font-bold px-2 py-0.5 bg-amber-950/60 border border-amber-500/40 rounded-lg text-xs" dir="ltr">
+                            {bannerOpacity}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 pt-1">
+                          <span className="text-[10px] text-slate-400 shrink-0">۰٪ (شفاف/عکس روشن)</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="5"
+                            value={bannerOpacity}
+                            onChange={(e) => setBannerOpacity(Number(e.target.value))}
+                            className="flex-1 h-2 bg-purple-900/80 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                          />
+                          <span className="text-[10px] text-slate-400 shrink-0">۱۰۰٪ (رنگ کامل)</span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Banner Image Upload & Preview */}
@@ -2016,7 +2043,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80';
                               }}
                             />
-                            <div className={`absolute inset-0 bg-gradient-to-r ${bannerGradient} opacity-90 backdrop-blur-[1px]`}></div>
+                            <div
+                              className={`absolute inset-0 bg-gradient-to-r ${bannerGradient} backdrop-blur-[1px]`}
+                              style={{ opacity: bannerOpacity / 100 }}
+                            ></div>
 
                             <div className="relative z-10 flex justify-between items-center">
                               {bannerBadge ? (

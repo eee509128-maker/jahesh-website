@@ -801,20 +801,25 @@ export const findUserByEmailInDb = async (email: string): Promise<User | null> =
 
 export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
   try {
-    const { data, error } = await supabase.from('banners').select('*').order('created_at', { ascending: true });
-    if (error) {
-      console.warn('Supabase fetch banners error:', error.message);
-      try {
-        const saved = localStorage.getItem('jahesh_banners');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch {}
-      return INITIAL_BANNERS;
+    // 1. First try server-side API endpoint for global multi-device sync
+    const res = await fetch('/api/banners');
+    if (res.ok) {
+      const serverBanners = await res.json();
+      if (Array.isArray(serverBanners) && serverBanners.length > 0) {
+        try {
+          localStorage.setItem('jahesh_banners', JSON.stringify(serverBanners));
+        } catch {}
+        return serverBanners;
+      }
     }
+  } catch (e) {
+    console.warn('Fetch server banners failed, trying Supabase/localStorage fallback:', e);
+  }
 
-    if (data && data.length > 0) {
+  // 2. Try Supabase fallback
+  try {
+    const { data, error } = await supabase.from('banners').select('*').order('created_at', { ascending: true });
+    if (!error && data && data.length > 0) {
       const fetched: BannerSlide[] = data.map((item: any) => ({
         id: String(item.id),
         badge: item.badge || '',
@@ -824,59 +829,46 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
         actionType: item.action_type || 'all',
         actionTarget: item.action_target || undefined,
         gradient: item.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
+        overlayOpacity: item.overlay_opacity !== undefined ? Number(item.overlay_opacity) : 90,
         image: item.image || '',
         isActive: item.is_active !== false,
       }));
 
       try {
         localStorage.setItem('jahesh_banners', JSON.stringify(fetched));
+        // Sync to server API in background
+        fetch('/api/banners', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fetched),
+        }).catch(() => {});
       } catch {}
       return fetched;
     }
-
-    // If DB is empty, initialize default banners into storage/state
-    try {
-      localStorage.setItem('jahesh_banners', JSON.stringify(INITIAL_BANNERS));
-    } catch {}
-    return INITIAL_BANNERS;
   } catch (err) {
-    console.warn('Failed to fetch banners:', err);
-    try {
-      const saved = localStorage.getItem('jahesh_banners');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_BANNERS;
+    console.warn('Supabase fetch banners exception:', err);
   }
+
+  // 3. Try LocalStorage fallback
+  try {
+    const saved = localStorage.getItem('jahesh_banners');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+
+  // 4. Default fallback
+  return INITIAL_BANNERS;
 };
 
 export const saveBannerToDb = async (banner: BannerSlide): Promise<boolean> => {
   try {
-    const payload = {
-      id: String(banner.id),
-      badge: banner.badge,
-      title: banner.title,
-      subtitle: banner.subtitle,
-      cta: banner.cta,
-      action_type: banner.actionType,
-      action_target: banner.actionTarget || null,
-      gradient: banner.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
-      image: banner.image,
-      is_active: banner.isActive !== false,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await supabase.from('banners').upsert(payload);
-    if (error) {
-      console.warn('Save banner supabase error (using local storage fallback):', error.message);
-    }
-
-    // Sync locally
+    // Sync locally & construct current list
+    let currentList: BannerSlide[] = [];
     try {
       const saved = localStorage.getItem('jahesh_banners');
-      let currentList: BannerSlide[] = saved ? JSON.parse(saved) : [...INITIAL_BANNERS];
+      currentList = saved ? JSON.parse(saved) : [...INITIAL_BANNERS];
       const idx = currentList.findIndex((b) => String(b.id) === String(banner.id));
       if (idx >= 0) {
         currentList[idx] = banner;
@@ -886,6 +878,34 @@ export const saveBannerToDb = async (banner: BannerSlide): Promise<boolean> => {
       localStorage.setItem('jahesh_banners', JSON.stringify(currentList));
       window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: currentList }));
     } catch {}
+
+    // Send full updated list to Server API for global persistence across all accounts & devices
+    try {
+      await fetch('/api/banners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentList),
+      });
+    } catch (apiErr) {
+      console.warn('Save banner server API error:', apiErr);
+    }
+
+    // Try Supabase sync if table exists
+    const payload = {
+      id: String(banner.id),
+      badge: banner.badge,
+      title: banner.title,
+      subtitle: banner.subtitle,
+      cta: banner.cta,
+      action_type: banner.actionType,
+      action_target: banner.actionTarget || null,
+      gradient: banner.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
+      overlay_opacity: banner.overlayOpacity ?? 90,
+      image: banner.image,
+      is_active: banner.isActive !== false,
+      updated_at: new Date().toISOString(),
+    };
+    supabase.from('banners').upsert(payload).then(() => {}).catch(() => {});
 
     return true;
   } catch (err) {
@@ -901,9 +921,17 @@ export const saveAllBannersToDb = async (banners: BannerSlide[]): Promise<boolea
       window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: banners }));
     } catch {}
 
-    for (const b of banners) {
-      await saveBannerToDb(b);
+    // Sync to Server API
+    try {
+      await fetch('/api/banners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(banners),
+      });
+    } catch (apiErr) {
+      console.warn('Save all banners server API error:', apiErr);
     }
+
     return true;
   } catch (err) {
     console.warn('Save all banners exception:', err);
@@ -914,20 +942,32 @@ export const saveAllBannersToDb = async (banners: BannerSlide[]): Promise<boolea
 export const deleteBannerFromDb = async (bannerId: string | number): Promise<boolean> => {
   try {
     const strId = String(bannerId);
-    const { error } = await supabase.from('banners').delete().eq('id', strId);
-    if (error) {
-      console.warn('Delete banner supabase error:', error.message);
-    }
+    let updatedList: BannerSlide[] = [];
 
     try {
       const saved = localStorage.getItem('jahesh_banners');
       if (saved) {
         const currentList: BannerSlide[] = JSON.parse(saved);
-        const updated = currentList.filter((b) => String(b.id) !== strId);
-        localStorage.setItem('jahesh_banners', JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: updated }));
+        updatedList = currentList.filter((b) => String(b.id) !== strId);
+        localStorage.setItem('jahesh_banners', JSON.stringify(updatedList));
+        window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: updatedList }));
       }
     } catch {}
+
+    // Sync deletion to Server API
+    if (updatedList.length >= 0) {
+      try {
+        await fetch('/api/banners', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedList),
+        });
+      } catch (apiErr) {
+        console.warn('Delete banner server API error:', apiErr);
+      }
+    }
+
+    supabase.from('banners').delete().eq('id', strId).then(() => {}).catch(() => {});
 
     return true;
   } catch (err) {
