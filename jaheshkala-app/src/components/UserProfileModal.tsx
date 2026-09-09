@@ -17,7 +17,27 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 }) => {
   if (!isOpen || !currentUser) return null;
 
-  const userOrders = orders.filter(o => o.userId === currentUser.id);
+  const normalizeDigits = (str?: string) => {
+    if (!str) return '';
+    const persianNumbers = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+    const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    let res = str.toString();
+    for (let i = 0; i < 10; i++) {
+      res = res.replace(new RegExp(persianNumbers[i], 'g'), i.toString());
+      res = res.replace(new RegExp(arabicNumbers[i], 'g'), i.toString());
+    }
+    return res.replace(/\D/g, '').replace(/^(\+?98|0)/, '');
+  };
+
+  const cleanPhone = normalizeDigits(currentUser.phone);
+  const cleanEmail = currentUser.email?.trim().toLowerCase();
+
+  const userOrders = orders.filter((o) => {
+    if (o.userId && o.userId === currentUser.id) return true;
+    if (cleanPhone && o.customerPhone && normalizeDigits(o.customerPhone) === cleanPhone) return true;
+    if (cleanEmail && o.customerEmail && o.customerEmail.trim().toLowerCase() === cleanEmail) return true;
+    return false;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">

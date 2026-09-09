@@ -746,15 +746,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <td className="p-3.5">
                             <select
                               value={order.status}
-                              onChange={(e) =>
-                                onUpdateOrderStatus(order.id, e.target.value as OrderStatus)
-                              }
-                              className="bg-[#0b061b] border border-purple-700/60 rounded-xl px-2.5 py-1.5 text-xs text-amber-200 focus:outline-none focus:border-amber-400 cursor-pointer"
+                              onChange={(e) => {
+                                const newStat = e.target.value as OrderStatus;
+                                onUpdateOrderStatus(order.id, newStat);
+                                if (selectedOrder && selectedOrder.id === order.id) {
+                                  setSelectedOrder({ ...selectedOrder, status: newStat });
+                                }
+                              }}
+                              className="bg-[#0b061b] border border-purple-700/60 rounded-xl px-2.5 py-1.5 text-xs text-amber-200 focus:outline-none focus:border-amber-400 cursor-pointer font-medium"
                             >
                               <option value="در حال بررسی">در حال بررسی</option>
-                              <option value="تایید شده و آغاز پروژه">تایید شده / در حال آماده‌سازی</option>
-                              <option value="در حال طراحی و بهینه‌سازی">ارسال شده به پست</option>
-                              <option value="تکمیل شده و تحویل نهایی">تحویل نهایی شده</option>
+                              <option value="تایید شده / در حال آماده‌سازی">تایید شده / در حال آماده‌سازی</option>
+                              <option value="ارسال شده به پست">ارسال شده به پست</option>
+                              <option value="در حال طراحی و کدنویسی">در حال طراحی و کدنویسی (پروژه‌ها)</option>
+                              <option value="تحویل نهایی شده">تحویل نهایی شده</option>
+                              <option value="لغو شده">لغو شده</option>
+                              {/* Legacy status mappings for backwards compatibility */}
+                              {order.status === 'در حال طراحی و بهینه‌سازی' && (
+                                <option value="در حال طراحی و بهینه‌سازی">در حال طراحی و کدنویسی</option>
+                              )}
+                              {order.status === 'تایید شده و آغاز پروژه' && (
+                                <option value="تایید شده و آغاز پروژه">تایید شده / در حال آماده‌سازی</option>
+                              )}
+                              {order.status === 'تکمیل شده و تحویل نهایی' && (
+                                <option value="تکمیل شده و تحویل نهایی">تحویل نهایی شده</option>
+                              )}
                             </select>
                           </td>
                           <td className="p-3.5 text-center">
@@ -2529,7 +2545,25 @@ on public.users for delete using (true);`;
                 )}
                 <p><strong>تاریخ ثبت:</strong> {selectedOrder.date}</p>
                 <p><strong>مبلغ کل پرداختی:</strong> {formatPrice(selectedOrder.totalAmount)}</p>
-                <p><strong>وضعیت:</strong> {selectedOrder.status}</p>
+                <div className="flex items-center gap-2 pt-1">
+                  <strong>وضعیت سفارش:</strong>
+                  <select
+                    value={selectedOrder.status}
+                    onChange={(e) => {
+                      const newStat = e.target.value as OrderStatus;
+                      onUpdateOrderStatus(selectedOrder.id, newStat);
+                      setSelectedOrder({ ...selectedOrder, status: newStat });
+                    }}
+                    className="bg-[#0b061b] border border-purple-700/80 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-bold focus:outline-none cursor-pointer"
+                  >
+                    <option value="در حال بررسی">در حال بررسی</option>
+                    <option value="تایید شده / در حال آماده‌سازی">تایید شده / در حال آماده‌سازی</option>
+                    <option value="ارسال شده به پست">ارسال شده به پست</option>
+                    <option value="در حال طراحی و کدنویسی">در حال طراحی و کدنویسی (پروژه‌ها)</option>
+                    <option value="تحویل نهایی شده">تحویل نهایی شده</option>
+                    <option value="لغو شده">لغو شده</option>
+                  </select>
+                </div>
 
                 <div className="pt-2">
                   <strong className="block mb-1 text-white">اقلام خریداری‌شده:</strong>

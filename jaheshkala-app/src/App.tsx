@@ -321,6 +321,12 @@ export default function App() {
         // 1. Save to DB (Supabase cloud) and local storage
         await saveOrderToDb(finalOrder);
 
+        if (finalOrder.customerPhone) {
+          try {
+            localStorage.setItem('jahesh_last_customer_phone', finalOrder.customerPhone);
+          } catch {}
+        }
+
         // 2. Update React state immediately
         setOrders((prev) => {
           const filtered = prev.filter(
@@ -439,13 +445,26 @@ export default function App() {
     };
     window.addEventListener('jahesh-user-updated', handleUserUpdatedEvent);
 
-    // Listen for real-time orders updates
+    // Listen for real-time orders updates via window events
     const handleOrdersUpdatedEvent = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) {
         setOrders(e.detail);
       }
     };
     window.addEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
+
+    // Instant Supabase Realtime channel for orders table
+    const ordersChannel = supabase
+      .channel('public:orders:realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+        try {
+          const fresh = await fetchOrdersFromDb();
+          if (isMounted && fresh && Array.isArray(fresh)) {
+            setOrders(fresh);
+          }
+        } catch (e) {}
+      })
+      .subscribe();
 
     // Periodic check to pull fresh role and orders (e.g. PC -> Mobile)
     const syncInterval = setInterval(async () => {
@@ -486,6 +505,7 @@ export default function App() {
       isMounted = false;
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
       window.removeEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
+      supabase.removeChannel(ordersChannel);
       clearInterval(syncInterval);
     };
   }, []);
