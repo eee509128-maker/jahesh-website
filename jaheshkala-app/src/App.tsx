@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   Sparkles, CheckCircle2, Filter, X
 } from 'lucide-react';
-import { Product, CartItem, Order, User, OrderStatus, Coupon } from './types';
+import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide } from './types';
 import { supabase } from './lib/supabase';
-import { INITIAL_PRODUCTS } from './data/initialData';
+import { INITIAL_PRODUCTS, INITIAL_BANNERS } from './data/initialData';
 import {
   fetchProductsFromDb,
   saveProductToDb,
@@ -18,6 +18,9 @@ import {
   saveCouponToDb,
   deleteCouponFromDb,
   INITIAL_COUPONS,
+  fetchBannersFromDb,
+  saveBannerToDb,
+  deleteBannerFromDb,
 } from './lib/dbService';
 import {
   verifyZibalPayment,
@@ -118,7 +121,23 @@ export default function App() {
     }
   });
 
-  // 6. Zibal merchant
+  // 6. Banners state (persisted in localStorage and cloud)
+  const [banners, setBanners] = useState<BannerSlide[]>(() => {
+    try {
+      const saved = localStorage.getItem('jahesh_banners');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+      return INITIAL_BANNERS;
+    } catch {
+      return INITIAL_BANNERS;
+    }
+  });
+
+  // 7. Zibal merchant
   const [zibalMerchant, setZibalMerchant] = useState<string>(() => {
     const saved = localStorage.getItem('jahesh_zibal_merchant');
     if (!saved || saved === 'zibal-jahesh-gateway') {
@@ -390,6 +409,15 @@ export default function App() {
         if (cloudCoupons && cloudCoupons.length > 0) {
           setCoupons(cloudCoupons);
         }
+
+        const cloudBanners = await fetchBannersFromDb();
+        if (!isMounted) return;
+        if (cloudBanners && cloudBanners.length > 0) {
+          setBanners(cloudBanners);
+          try {
+            localStorage.setItem('jahesh_banners', JSON.stringify(cloudBanners));
+          } catch {}
+        }
         
         // Dynamic import to avoid errors if function doesn't exist yet in dbService
         const { fetchAllUsersFromDb } = await import('./lib/dbService');
@@ -566,11 +594,71 @@ export default function App() {
     localStorage.setItem('jahesh_coupons', JSON.stringify(coupons));
   }, [coupons]);
 
+  useEffect(() => {
+    localStorage.setItem('jahesh_banners', JSON.stringify(banners));
+  }, [banners]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
     }, 3200);
+  };
+
+  // Instant Buy Handler: Quickly adds product to cart and opens checkout
+  const handleInstantBuy = (product: Product, requestedDomain?: string) => {
+    if (!product || !product.id) return;
+    setCartItems((prev) => {
+      const safePrev = Array.isArray(prev)
+        ? prev.filter((item) => item && item.product && item.product.id)
+        : [];
+      const existing = safePrev.find((item) => item.product.id === product.id);
+      if (existing) {
+        return safePrev;
+      }
+      return [
+        ...safePrev,
+        {
+          product,
+          quantity: 1,
+          requestedDomain: requestedDomain || (product.domainIncluded ? 'دامنه انتخابی من' : undefined),
+        },
+      ];
+    });
+    setDetailModalProduct(null);
+    setCartModalOpen(true);
+  };
+
+  // Banner Management Handlers
+  const handleSaveBanner = async (banner: BannerSlide) => {
+    setBanners((prev) => {
+      const index = prev.findIndex((b) => b.id === banner.id);
+      let updated: BannerSlide[];
+      if (index >= 0) {
+        updated = [...prev];
+        updated[index] = banner;
+      } else {
+        updated = [...prev, banner];
+      }
+      try {
+        localStorage.setItem('jahesh_banners', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    await saveBannerToDb(banner);
+    showToast('بنر اسلایدر با موفقیت ذخیره و به‌روزرسانی شد.');
+  };
+
+  const handleDeleteBanner = async (bannerId: string) => {
+    setBanners((prev) => {
+      const updated = prev.filter((b) => b.id !== bannerId);
+      try {
+        localStorage.setItem('jahesh_banners', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    await deleteBannerFromDb(bannerId);
+    showToast('بنر از اسلایدر حذف شد.');
   };
 
   // Cart Handlers
@@ -906,6 +994,7 @@ export default function App() {
         
         {/* 2. DIGIKALA MAIN HERO SLIDER BANNER */}
         <DigikalaSlider
+          banners={banners}
           onSelectCategory={handleSelectCategory}
           onScrollToIncredible={scrollToIncredible}
         />
@@ -922,6 +1011,7 @@ export default function App() {
         <DigikalaIncredibleOffer
           products={products}
           onAddToCart={handleAddToCart}
+          onInstantBuy={handleInstantBuy}
           onViewDetails={setDetailModalProduct}
         />
 
@@ -976,6 +1066,7 @@ export default function App() {
                   key={product.id}
                   product={product}
                   onAddToCart={handleAddToCart}
+                  onInstantBuy={handleInstantBuy}
                   onViewDetails={setDetailModalProduct}
                 />
               ))}
@@ -1004,6 +1095,7 @@ export default function App() {
         product={detailModalProduct}
         onClose={() => setDetailModalProduct(null)}
         onAddToCart={handleAddToCart}
+        onInstantBuy={handleInstantBuy}
       />
 
       {/* Digikala Cart Modal */}
@@ -1114,7 +1206,7 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
       />
 
-      {/* Admin Panel (Orders, New Product Form, Zibal Settings, Coupons, Users) */}
+      {/* Admin Panel (Orders, New Product Form, Zibal Settings, Coupons, Users, Banners) */}
       <AdminPanel
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
@@ -1136,6 +1228,9 @@ export default function App() {
         onDeleteUser={handleDeleteUser}
         onUpdateUser={handleUpdateUser}
         onAddNewUser={handleAddNewUser}
+        banners={banners}
+        onSaveBanner={handleSaveBanner}
+        onDeleteBanner={handleDeleteBanner}
       />
 
       {/* User Orders Modal */}

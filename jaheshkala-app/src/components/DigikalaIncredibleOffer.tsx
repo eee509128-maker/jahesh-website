@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Sparkles, ShoppingBag, Eye, CheckCircle2, ChevronLeft, ChevronRight,
-  Percent, ShieldCheck, Truck, Star
+  Percent, ShieldCheck, Truck, Star, Zap
 } from 'lucide-react';
 import { Product } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
@@ -9,12 +9,14 @@ import { getFallbackProductImage } from '../lib/imageUtils';
 interface DigikalaIncredibleOfferProps {
   products: Product[];
   onAddToCart: (product: Product) => void;
+  onInstantBuy?: (product: Product) => void;
   onViewDetails: (product: Product) => void;
 }
 
 export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = ({
   products,
   onAddToCart,
+  onInstantBuy,
   onViewDetails,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -215,22 +217,37 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => onViewDetails(activeProduct)}
-                    className="px-3.5 py-2.5 rounded-xl bg-purple-950/70 hover:bg-purple-900 text-slate-200 text-xs font-semibold border border-purple-800/40 transition-colors"
+                    className="px-3 py-2.5 rounded-xl bg-purple-950/70 hover:bg-purple-900 text-slate-200 text-xs font-semibold border border-purple-800/40 transition-colors"
+                    title="مشاهده جزئیات کامل"
                   >
                     <Eye className="w-3.5 h-3.5 inline mr-1" />
                     <span>مشاهده جزئیات</span>
                   </button>
 
                   <button
-                    id="incredible-buy-btn"
+                    id="incredible-add-cart-btn"
                     onClick={() => onAddToCart(activeProduct)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all"
+                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-purple-950/90 hover:bg-purple-900 border border-purple-700/60 text-purple-200 hover:text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+                    title="افزودن به سبد خرید"
                   >
-                    <ShoppingBag className="w-4 h-4 text-slate-950" />
-                    <span>خرید شگفت‌انگیز</span>
+                    <ShoppingBag className="w-3.5 h-3.5 text-purple-400" />
+                    <span>افزودن به سبد</span>
+                  </button>
+
+                  <button
+                    id="incredible-buy-btn"
+                    onClick={() => {
+                      if (onInstantBuy) onInstantBuy(activeProduct);
+                      else onAddToCart(activeProduct);
+                    }}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all"
+                    title="خرید سریع و مستقیم"
+                  >
+                    <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
+                    <span>خرید فوری شگفت‌انگیز</span>
                   </button>
                 </div>
               </div>

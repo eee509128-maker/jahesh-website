@@ -81,6 +81,19 @@ export interface Coupon {
   isActive: boolean;
 }
 
+export interface BannerSlide {
+  id: string;
+  badge: string;
+  title: string;
+  subtitle: string;
+  cta: string;
+  actionType: 'incredible' | 'category' | 'link' | 'all';
+  actionTarget?: string;
+  gradient?: string;
+  image: string;
+  isActive?: boolean;
+}
+
 export interface Order {
   id: string;
   trackingCode: string;

@@ -155,19 +155,9 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
 
         </div>
 
-        {/* Left side: Notifications, Login/User Profile, Divider, Cart */}
+        {/* Left side: Login/User Profile, Admin, Cart */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           
-          {/* Notifications Bell */}
-          <button
-            title="اطلاعیه‌های جهش"
-            onClick={() => onSelectCategory('شگفت‌انگیز')}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#181138] hover:bg-purple-950/80 border border-purple-900/40 text-slate-300 hover:text-white flex items-center justify-center transition-colors relative shrink-0"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-400 rounded-full animate-ping"></span>
-          </button>
-
           {/* User Auth / Profile */}
           {currentUser ? (
             <div className="flex items-center gap-1 sm:gap-2">

@@ -1,4 +1,4 @@
-import { Product } from '../types';
+import { Product, BannerSlide } from '../types';
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
@@ -28,5 +28,41 @@ export const INITIAL_PRODUCTS: Product[] = [
       '۱ ماه پشتیبانی فنی و آموزش کامل کاربری',
     ],
     image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1000&q=80',
+  },
+];
+
+export const INITIAL_BANNERS: BannerSlide[] = [
+  {
+    id: 'banner-1',
+    badge: 'جشنواره تخفیف‌های ویژه',
+    title: 'خرید آنلاین انواع کالاها و خدمات با بهترین قیمت',
+    subtitle: 'امکان خرید با درگاه امن بانکی، ضمانت اصالت و سلامت کالا و ارسال سریع به سراسر کشور',
+    cta: 'مشاهده تخفیف‌های شگفت‌انگیز',
+    actionType: 'incredible',
+    gradient: 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
+    image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80',
+    isActive: true,
+  },
+  {
+    id: 'banner-2',
+    badge: 'تضمین اصالت و کیفیت',
+    title: 'تنوع بی‌نظیر محصولات با ۷ روز ضمانت بازگشت',
+    subtitle: 'ارائه برترین کالاها، نرم‌افزارها و خدمات دیجیتال با پشتیبانی ۲۴ ساعته و تسویه آسان',
+    cta: 'مشاهده همه محصولات',
+    actionType: 'all',
+    gradient: 'from-[#172554] via-[#111827] to-[#080d1a]',
+    image: 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=1200&q=80',
+    isActive: true,
+  },
+  {
+    id: 'banner-3',
+    badge: 'پیشنهادهای روزانه',
+    title: 'خرید سریع و مطمئن با درگاه امن شاپرک و زیبال',
+    subtitle: 'هر آنچه برای خرید اینترنتی نیاز دارید، با خیال راحت در فروشگاه جهش‌کالا تهیه کنید',
+    cta: 'شروع خرید در جهش‌کالا',
+    actionType: 'incredible',
+    gradient: 'from-[#1e1b4b] via-[#171239] to-[#0c081f]',
+    image: 'https://images.unsplash.com/photo-1526178613552-2b45c6c302f0?auto=format&fit=crop&w=1200&q=80',
+    isActive: true,
   },
 ];

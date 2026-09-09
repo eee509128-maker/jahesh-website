@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
-import { Product, Order, User, Coupon } from '../types';
-import { INITIAL_PRODUCTS } from '../data/initialData';
+import { Product, Order, User, Coupon, BannerSlide } from '../types';
+import { INITIAL_PRODUCTS, INITIAL_BANNERS } from '../data/initialData';
 
 export const INITIAL_COUPONS: Coupon[] = [
   {
@@ -794,3 +794,145 @@ export const findUserByEmailInDb = async (email: string): Promise<User | null> =
     return null;
   }
 };
+
+// ==========================================
+// BANNER & SLIDER DATABASE PERSISTENCE
+// ==========================================
+
+export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
+  try {
+    const { data, error } = await supabase.from('banners').select('*').order('created_at', { ascending: true });
+    if (error) {
+      console.warn('Supabase fetch banners error:', error.message);
+      try {
+        const saved = localStorage.getItem('jahesh_banners');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+      return INITIAL_BANNERS;
+    }
+
+    if (data && data.length > 0) {
+      const fetched: BannerSlide[] = data.map((item: any) => ({
+        id: String(item.id),
+        badge: item.badge || '',
+        title: item.title || '',
+        subtitle: item.subtitle || '',
+        cta: item.cta || 'مشاهده',
+        actionType: item.action_type || 'all',
+        actionTarget: item.action_target || undefined,
+        gradient: item.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
+        image: item.image || '',
+        isActive: item.is_active !== false,
+      }));
+
+      try {
+        localStorage.setItem('jahesh_banners', JSON.stringify(fetched));
+      } catch {}
+      return fetched;
+    }
+
+    // If DB is empty, initialize default banners into storage/state
+    try {
+      localStorage.setItem('jahesh_banners', JSON.stringify(INITIAL_BANNERS));
+    } catch {}
+    return INITIAL_BANNERS;
+  } catch (err) {
+    console.warn('Failed to fetch banners:', err);
+    try {
+      const saved = localStorage.getItem('jahesh_banners');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_BANNERS;
+  }
+};
+
+export const saveBannerToDb = async (banner: BannerSlide): Promise<boolean> => {
+  try {
+    const payload = {
+      id: String(banner.id),
+      badge: banner.badge,
+      title: banner.title,
+      subtitle: banner.subtitle,
+      cta: banner.cta,
+      action_type: banner.actionType,
+      action_target: banner.actionTarget || null,
+      gradient: banner.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
+      image: banner.image,
+      is_active: banner.isActive !== false,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('banners').upsert(payload);
+    if (error) {
+      console.warn('Save banner supabase error (using local storage fallback):', error.message);
+    }
+
+    // Sync locally
+    try {
+      const saved = localStorage.getItem('jahesh_banners');
+      let currentList: BannerSlide[] = saved ? JSON.parse(saved) : [...INITIAL_BANNERS];
+      const idx = currentList.findIndex((b) => String(b.id) === String(banner.id));
+      if (idx >= 0) {
+        currentList[idx] = banner;
+      } else {
+        currentList.push(banner);
+      }
+      localStorage.setItem('jahesh_banners', JSON.stringify(currentList));
+      window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: currentList }));
+    } catch {}
+
+    return true;
+  } catch (err) {
+    console.warn('Save banner exception:', err);
+    return false;
+  }
+};
+
+export const saveAllBannersToDb = async (banners: BannerSlide[]): Promise<boolean> => {
+  try {
+    try {
+      localStorage.setItem('jahesh_banners', JSON.stringify(banners));
+      window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: banners }));
+    } catch {}
+
+    for (const b of banners) {
+      await saveBannerToDb(b);
+    }
+    return true;
+  } catch (err) {
+    console.warn('Save all banners exception:', err);
+    return false;
+  }
+};
+
+export const deleteBannerFromDb = async (bannerId: string | number): Promise<boolean> => {
+  try {
+    const strId = String(bannerId);
+    const { error } = await supabase.from('banners').delete().eq('id', strId);
+    if (error) {
+      console.warn('Delete banner supabase error:', error.message);
+    }
+
+    try {
+      const saved = localStorage.getItem('jahesh_banners');
+      if (saved) {
+        const currentList: BannerSlide[] = JSON.parse(saved);
+        const updated = currentList.filter((b) => String(b.id) !== strId);
+        localStorage.setItem('jahesh_banners', JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: updated }));
+      }
+    } catch {}
+
+    return true;
+  } catch (err) {
+    console.warn('Delete banner exception:', err);
+    return false;
+  }
+};
+

@@ -7,9 +7,10 @@ import {
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
   ChevronRight, ChevronLeft
 } from 'lucide-react';
-import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat } from '../types';
-import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb } from '../lib/dbService';
+import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide } from '../types';
+import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb } from '../lib/dbService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
+import { INITIAL_BANNERS } from '../data/initialData';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -32,6 +33,9 @@ interface AdminPanelProps {
   onDeleteUser?: (userId: string) => void;
   onUpdateUser?: (user: User) => void;
   onAddNewUser?: (user: User, initialPass?: string) => void;
+  banners?: BannerSlide[];
+  onSaveBanner?: (banner: BannerSlide) => void;
+  onDeleteBanner?: (bannerId: string) => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -55,8 +59,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteUser,
   onUpdateUser,
   onAddNewUser,
+  banners: initialBannersProp,
+  onSaveBanner,
+  onDeleteBanner,
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'coupons' | 'integrations' | 'users' | 'chats'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats'>('orders');
+  const [bannersList, setBannersList] = useState<BannerSlide[]>(initialBannersProp || INITIAL_BANNERS);
+  const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
+  const [bannerTitle, setBannerTitle] = useState('');
+  const [bannerSubtitle, setBannerSubtitle] = useState('');
+  const [bannerBadge, setBannerBadge] = useState('');
+  const [bannerCta, setBannerCta] = useState('مشاهده تخفیف‌های شگفت‌انگیز');
+  const [bannerActionType, setBannerActionType] = useState<'incredible' | 'category' | 'link' | 'all'>('incredible');
+  const [bannerActionTarget, setBannerActionTarget] = useState('');
+  const [bannerGradient, setBannerGradient] = useState('from-[#3b1261] via-[#220d3d] to-[#0d071a]');
+  const [bannerImage, setBannerImage] = useState('');
+  const [bannerImageLoading, setBannerImageLoading] = useState(false);
+  const [bannerSuccessMessage, setBannerSuccessMessage] = useState('');
+  const bannerFileInputRef = React.useRef<HTMLInputElement>(null);
   const [chats, setChats] = useState<UserChat[]>([]);
   const [selectedChat, setSelectedChat] = useState<UserChat | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -79,11 +99,145 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         const data = await fetchChatsFromDb();
         setChats(data);
       };
+      const loadBanners = async () => {
+        const data = await fetchBannersFromDb();
+        if (data && data.length > 0) {
+          setBannersList(data);
+        }
+      };
       loadChats();
+      loadBanners();
       const interval = setInterval(loadChats, 5000);
       return () => clearInterval(interval);
     }
   }, [isOpen]);
+
+  React.useEffect(() => {
+    if (initialBannersProp && initialBannersProp.length > 0) {
+      setBannersList(initialBannersProp);
+    }
+  }, [initialBannersProp]);
+
+  const handleBannerImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBannerImageLoading(true);
+    try {
+      // Compress to high quality web banner (max 1400px width, quality 0.82)
+      const compressed = await compressImageFile(file, 1400, 700, 0.82);
+      setBannerImage(compressed);
+    } catch (err) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setBannerImage(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setBannerImageLoading(false);
+    }
+  };
+
+  const handleStartEditBanner = (b: BannerSlide) => {
+    setEditingBannerId(b.id);
+    setBannerTitle(b.title);
+    setBannerSubtitle(b.subtitle || '');
+    setBannerBadge(b.badge || '');
+    setBannerCta(b.cta || 'مشاهده و خرید');
+    setBannerActionType(b.actionType || 'incredible');
+    setBannerActionTarget(b.actionTarget || '');
+    setBannerGradient(b.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]');
+    setBannerImage(b.image || '');
+    setBannerSuccessMessage('');
+  };
+
+  const handleResetBannerForm = () => {
+    setEditingBannerId(null);
+    setBannerTitle('');
+    setBannerSubtitle('');
+    setBannerBadge('');
+    setBannerCta('مشاهده تخفیف‌های شگفت‌انگیز');
+    setBannerActionType('incredible');
+    setBannerActionTarget('');
+    setBannerGradient('from-[#3b1261] via-[#220d3d] to-[#0d071a]');
+    setBannerImage('');
+    setBannerSuccessMessage('');
+    if (bannerFileInputRef.current) bannerFileInputRef.current.value = '';
+  };
+
+  const handleSaveBannerForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bannerTitle.trim() || !bannerImage.trim()) {
+      alert('لطفاً عنوان بنر و تصویر آن را وارد یا بارگذاری نمایید.');
+      return;
+    }
+
+    const newBanner: BannerSlide = {
+      id: editingBannerId || `banner_${Date.now()}`,
+      title: bannerTitle.trim(),
+      subtitle: bannerSubtitle.trim() || undefined,
+      badge: bannerBadge.trim() || undefined,
+      cta: bannerCta.trim() || 'مشاهده تخفیف‌های شگفت‌انگیز',
+      actionType: bannerActionType,
+      actionTarget: bannerActionTarget.trim() || undefined,
+      gradient: bannerGradient,
+      image: bannerImage,
+      isActive: true,
+      order: editingBannerId
+        ? (bannersList.find((b) => b.id === editingBannerId)?.order ?? 0)
+        : bannersList.length,
+    };
+
+    let updatedList: BannerSlide[];
+    if (editingBannerId) {
+      updatedList = bannersList.map((b) => (b.id === editingBannerId ? newBanner : b));
+    } else {
+      updatedList = [...bannersList, newBanner];
+    }
+
+    setBannersList(updatedList);
+    await saveBannerToDb(newBanner);
+    if (onSaveBanner) onSaveBanner(newBanner);
+
+    setBannerSuccessMessage(
+      editingBannerId ? 'بنر با موفقیت ویرایش و ذخیره شد!' : 'بنر جدید با موفقیت اضافه و ذخیره شد!'
+    );
+    handleResetBannerForm();
+    setTimeout(() => setBannerSuccessMessage(''), 4000);
+  };
+
+  const handleToggleBannerActive = async (banner: BannerSlide) => {
+    const updated: BannerSlide = { ...banner, isActive: banner.isActive === false ? true : false };
+    const newList = bannersList.map((b) => (b.id === banner.id ? updated : b));
+    setBannersList(newList);
+    await saveBannerToDb(updated);
+    if (onSaveBanner) onSaveBanner(updated);
+  };
+
+  const handleMoveBanner = async (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === bannersList.length - 1)
+    ) {
+      return;
+    }
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const newList = [...bannersList];
+    const [moved] = newList.splice(index, 1);
+    newList.splice(targetIndex, 0, moved);
+
+    // Update order values
+    const ordered = newList.map((item, idx) => ({ ...item, order: idx }));
+    setBannersList(ordered);
+    await saveAllBannersToDb(ordered);
+  };
+
+  const handleDeleteBannerSlide = async (bannerId: string) => {
+    if (!window.confirm('آیا از حذف این بنر مطمئن هستید؟')) return;
+    const newList = bannersList.filter((b) => b.id !== bannerId);
+    setBannersList(newList);
+    await deleteBannerFromDb(bannerId);
+    if (onDeleteBanner) onDeleteBanner(bannerId);
+  };
 
   const handleAdminFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFileUploadError('');
@@ -591,6 +745,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span>مدیریت کدهای تخفیف</span>
               <span className="bg-purple-900 text-purple-200 text-[10px] px-2 py-0.5 rounded-full">
                 {coupons.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('banners')}
+              className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'banners'
+                  ? 'border-amber-400 text-amber-300'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <ImageIcon className="w-4 h-4" />
+              <span>بنرها و اسلایدر صفحه اول</span>
+              <span className="bg-purple-900 text-purple-200 text-[10px] px-2 py-0.5 rounded-full">
+                {bannersList.length}
               </span>
             </button>
 
@@ -1642,6 +1811,390 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB: BANNERS & SLIDER MANAGEMENT */}
+          {activeTab === 'banners' && (
+            <div className="max-w-4xl mx-auto space-y-6">
+              
+              {/* Add / Edit Banner Form */}
+              <div className="bg-[#140c2e] border border-purple-800/80 rounded-2xl p-5 shadow-xl space-y-4">
+                <div className="flex items-center justify-between border-b border-purple-900/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-amber-400" />
+                    <h3 className="text-sm font-bold text-white">
+                      {editingBannerId ? 'ویرایش بنر اسلایدر' : 'افزودن بنر جدید به اسلایدر صفحه اصلی'}
+                    </h3>
+                  </div>
+                  {editingBannerId && (
+                    <button
+                      type="button"
+                      onClick={handleResetBannerForm}
+                      className="text-xs text-rose-300 hover:text-white bg-rose-950/60 px-3 py-1 rounded-lg border border-rose-800/60"
+                    >
+                      انصراف از ویرایش
+                    </button>
+                  )}
+                </div>
+
+                {bannerSuccessMessage && (
+                  <div className="p-3 bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-xs rounded-xl flex items-center gap-2 animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{bannerSuccessMessage}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveBannerForm} className="space-y-4 text-right">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Title */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        عنوان اصلی بنر <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={bannerTitle}
+                        onChange={(e) => setBannerTitle(e.target.value)}
+                        placeholder="مثلاً: جشنواره تخفیف‌های شگفت‌انگیز پاییزه"
+                        className="w-full bg-black/50 border border-purple-700/60 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+
+                    {/* Subtitle */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        توضیحات کوتاه بنر
+                      </label>
+                      <input
+                        type="text"
+                        value={bannerSubtitle}
+                        onChange={(e) => setBannerSubtitle(e.target.value)}
+                        placeholder="مثلاً: امکان خرید با درگاه امن بانکی و ضمانت اصالت"
+                        className="w-full bg-black/50 border border-purple-700/60 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+
+                    {/* Badge */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        نشانک / برچسب بالای بنر
+                      </label>
+                      <input
+                        type="text"
+                        value={bannerBadge}
+                        onChange={(e) => setBannerBadge(e.target.value)}
+                        placeholder="مثلاً: جشنواره تخفیف‌های ویژه یا تضمین اصالت"
+                        className="w-full bg-black/50 border border-purple-700/60 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+
+                    {/* CTA Button Text */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        متن دکمه اکشن بنر
+                      </label>
+                      <input
+                        type="text"
+                        value={bannerCta}
+                        onChange={(e) => setBannerCta(e.target.value)}
+                        placeholder="مثلاً: مشاهده تخفیف‌های شگفت‌انگیز یا خرید آنلاین"
+                        className="w-full bg-black/50 border border-purple-700/60 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+
+                    {/* Action Type */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        عملکرد کلیک روی دکمه بنر
+                      </label>
+                      <select
+                        value={bannerActionType}
+                        onChange={(e) => setBannerActionType(e.target.value as any)}
+                        className="w-full bg-black/50 border border-purple-700/60 rounded-xl px-3.5 py-2.5 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400"
+                      >
+                        <option value="incredible">هدایت به لیست شگفت‌انگیزها (تخفیف‌دارها)</option>
+                        <option value="all">نمایش تمام کالاها</option>
+                        <option value="category">انتخاب دسته‌بندی خاص</option>
+                        <option value="link">باز کردن لینک اینترنتی خارجی</option>
+                      </select>
+                    </div>
+
+                    {/* Action Target (if category or link) */}
+                    {(bannerActionType === 'category' || bannerActionType === 'link') && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1">
+                          {bannerActionType === 'category' ? 'نام دسته‌بندی مورد نظر' : 'آدرس اینترنتی لینک (URL)'}
+                        </label>
+                        <input
+                          type="text"
+                          value={bannerActionTarget}
+                          onChange={(e) => setBannerActionTarget(e.target.value)}
+                          placeholder={bannerActionType === 'category' ? 'مثلاً: کالای دیجیتال یا پوشاک' : 'https://example.com'}
+                          className="w-full bg-black/50 border border-purple-700/60 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    )}
+
+                    {/* Color Theme Preset */}
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-300 mb-2">
+                        تم رنگی پس‌زمینه بنر
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { name: 'بنفش سلطنتی', val: 'from-[#3b1261] via-[#220d3d] to-[#0d071a]' },
+                          { name: 'آبی اقیانوسی', val: 'from-[#172554] via-[#111827] to-[#080d1a]' },
+                          { name: 'نیلی تیره', val: 'from-[#1e1b4b] via-[#171239] to-[#0c081f]' },
+                          { name: 'زمردی تیره', val: 'from-[#064e3b] via-[#022c22] to-[#051310]' },
+                          { name: 'سرخ آتشین', val: 'from-[#881337] via-[#4c0519] to-[#1f020a]' },
+                          { name: 'طلایی تیره', val: 'from-[#713f12] via-[#422006] to-[#1a0e02]' },
+                        ].map((theme) => (
+                          <button
+                            key={theme.val}
+                            type="button"
+                            onClick={() => setBannerGradient(theme.val)}
+                            className={`p-2.5 rounded-xl border text-xs text-right flex items-center justify-between transition-all ${
+                              bannerGradient === theme.val
+                                ? 'border-amber-400 bg-purple-900/60 text-amber-300 font-bold shadow-md'
+                                : 'border-purple-800/40 bg-black/40 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <span>{theme.name}</span>
+                            <div className={`w-4 h-4 rounded-full bg-gradient-to-r ${theme.val} border border-white/20`} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Banner Image Upload & Preview */}
+                    <div className="md:col-span-2 space-y-3">
+                      <label className="block text-xs font-bold text-slate-300">
+                        تصویر بنر (بارگذاری مستقیم یا آدرس اینترنتی) <span className="text-rose-400">*</span>
+                      </label>
+
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <input
+                          type="file"
+                          ref={bannerFileInputRef}
+                          onChange={handleBannerImageUpload}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => bannerFileInputRef.current?.click()}
+                          disabled={bannerImageLoading}
+                          className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-900/80 hover:bg-purple-800 border border-purple-600/70 text-purple-200 hover:text-white font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 shrink-0"
+                        >
+                          <Camera className="w-4 h-4 text-amber-400" />
+                          <span>{bannerImageLoading ? 'در حال بهینه‌سازی عکس...' : 'بارگذاری عکس بنر از گالری/دستگاه'}</span>
+                        </button>
+
+                        <input
+                          type="text"
+                          value={bannerImage}
+                          onChange={(e) => setBannerImage(e.target.value)}
+                          placeholder="یا وارد کردن مستقیم لینک تصویر (https://...)"
+                          className="flex-1 bg-black/50 border border-purple-700/60 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      {/* Live Banner Preview Box */}
+                      {bannerImage && (
+                        <div className="mt-3 p-3 rounded-2xl bg-black/60 border border-purple-800/80 space-y-2">
+                          <span className="text-[11px] font-bold text-amber-300 block">پیش‌نمایش زنده بنر:</span>
+                          <div className="relative h-40 sm:h-48 rounded-xl overflow-hidden border border-purple-700/50 flex flex-col justify-between p-4 text-right">
+                            <img
+                              src={bannerImage}
+                              alt="پیش‌نمایش بنر"
+                              className="absolute inset-0 w-full h-full object-cover object-center"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80';
+                              }}
+                            />
+                            <div className={`absolute inset-0 bg-gradient-to-r ${bannerGradient} opacity-90 backdrop-blur-[1px]`}></div>
+
+                            <div className="relative z-10 flex justify-between items-center">
+                              {bannerBadge ? (
+                                <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-bold border border-white/30">
+                                  {bannerBadge}
+                                </span>
+                              ) : <span />}
+                            </div>
+
+                            <div className="relative z-10 space-y-1">
+                              <h4 className="text-white font-black text-sm sm:text-base">{bannerTitle || 'عنوان بنر شما'}</h4>
+                              <p className="text-slate-200 text-xs line-clamp-1">{bannerSubtitle || 'توضیحات کوتاه بنر'}</p>
+                            </div>
+
+                            <div className="relative z-10 flex justify-end">
+                              <span className="px-3 py-1 bg-amber-400 text-black font-black text-xs rounded-lg shadow">
+                                {bannerCta || 'مشاهده'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end gap-3">
+                    {editingBannerId && (
+                      <button
+                        type="button"
+                        onClick={handleResetBannerForm}
+                        className="px-4 py-2.5 bg-purple-950/80 hover:bg-purple-900 text-slate-300 rounded-xl text-xs font-bold transition-colors"
+                      >
+                        انصراف
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all flex items-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{editingBannerId ? 'ذخیره تغییرات بنر' : 'افزودن و انتشار بنر'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* List of Existing Banners with Sorting & Controls */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-purple-400" />
+                    <span>لیست بنرهای فعال در اسلایدر ({bannersList.length} بنر)</span>
+                  </h4>
+                  <span className="text-[10px] text-slate-400">
+                    می‌توانید با فلش‌های بالا/پایین، اولویت نمایش بنرها در اسلایدر را جابجا کنید.
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {bannersList.map((banner, index) => (
+                    <div
+                      key={banner.id}
+                      className={`p-3.5 rounded-2xl bg-[#140c2e] border transition-all flex flex-col sm:flex-row items-center justify-between gap-4 ${
+                        banner.isActive === false
+                          ? 'border-purple-950/60 opacity-60'
+                          : 'border-purple-800/80 shadow-md'
+                      }`}
+                    >
+                      {/* Left side preview & info */}
+                      <div className="flex items-center gap-3.5 w-full sm:w-auto">
+                        <div className="relative w-24 h-16 rounded-xl overflow-hidden shrink-0 border border-purple-700/60">
+                          <img
+                            src={banner.image}
+                            alt={banner.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80';
+                            }}
+                          />
+                          <div className={`absolute inset-0 bg-gradient-to-r ${banner.gradient || 'from-purple-900 to-black'} opacity-60`}></div>
+                          <span className="absolute top-1 right-1 text-[9px] bg-black/70 text-amber-300 px-1.5 py-0.5 rounded font-bold">
+                            #{index + 1}
+                          </span>
+                        </div>
+
+                        <div className="text-right flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-white text-xs truncate">{banner.title}</span>
+                            {banner.badge && (
+                              <span className="text-[9px] bg-purple-900/80 text-purple-200 px-2 py-0.5 rounded-full border border-purple-700/40">
+                                {banner.badge}
+                              </span>
+                            )}
+                          </div>
+                          {banner.subtitle && (
+                            <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{banner.subtitle}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1 text-[10px] text-amber-300/80">
+                            <span>دکمه: {banner.cta || 'مشاهده'}</span>
+                            <span>•</span>
+                            <span>وضعیت: {banner.isActive === false ? 'غیرفعال' : 'در حال نمایش'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right side actions */}
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        
+                        {/* Order Controls */}
+                        <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-purple-800/40">
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            onClick={() => handleMoveBanner(index, 'up')}
+                            className="p-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400"
+                            title="انتقال به اولویت بالاتر (عقب‌تر)"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                          <span className="text-[10px] text-slate-400 px-1 font-mono">{index + 1}</span>
+                          <button
+                            type="button"
+                            disabled={index === bannersList.length - 1}
+                            onClick={() => handleMoveBanner(index, 'down')}
+                            className="p-1 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400"
+                            title="انتقال به اولویت پایین‌تر (جلوتر)"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Toggle Active */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleBannerActive(banner)}
+                          className={`p-2 rounded-xl border transition-colors ${
+                            banner.isActive === false
+                              ? 'bg-purple-950/60 border-purple-800/40 text-slate-500 hover:text-white'
+                              : 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
+                          }`}
+                          title={banner.isActive === false ? 'فعال‌سازی بنر' : 'غیرفعال‌سازی بنر'}
+                        >
+                          {banner.isActive === false ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
+                        </button>
+
+                        {/* Edit Banner */}
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditBanner(banner)}
+                          className="p-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-xl text-xs transition-colors"
+                          title="ویرایش این بنر"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+
+                        {/* Delete Banner */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBannerSlide(banner.id)}
+                          className="p-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 rounded-xl text-xs transition-colors"
+                          title="حذف بنر"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+
+                      </div>
+                    </div>
+                  ))}
+
+                  {bannersList.length === 0 && (
+                    <div className="py-8 text-center text-slate-500 text-xs bg-[#120a28] rounded-2xl border border-dashed border-purple-900">
+                      هیچ بنری ثبت نشده است. از فرم بالا بنر جدید اضافه کنید.
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
           )}
 

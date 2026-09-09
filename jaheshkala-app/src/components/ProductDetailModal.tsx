@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Sparkles, CheckCircle2, Globe, ShieldCheck,
-  ShoppingBag, Gift, Truck, RotateCcw, Headphones, Star, Ticket, Images
+  ShoppingBag, Gift, Truck, RotateCcw, Headphones, Star, Ticket, Images, Zap, CreditCard
 } from 'lucide-react';
 import { Product } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
@@ -10,12 +10,14 @@ interface ProductDetailModalProps {
   product: Product | null;
   onClose: () => void;
   onAddToCart: (product: Product, requestedDomain?: string) => void;
+  onInstantBuy?: (product: Product, requestedDomain?: string) => void;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
   onClose,
   onAddToCart,
+  onInstantBuy,
 }) => {
   const [preferredDomain, setPreferredDomain] = useState('');
   const [selectedColor, setSelectedColor] = useState<string | null>(
@@ -51,6 +53,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handleAdd = () => {
     onAddToCart(product, preferredDomain);
+    onClose();
+  };
+
+  const handleInstantBuy = () => {
+    if (onInstantBuy) {
+      onInstantBuy(product, preferredDomain);
+    } else {
+      onAddToCart(product, preferredDomain);
+    }
     onClose();
   };
 
@@ -307,20 +318,28 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={onClose}
-              className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-purple-950/60 hover:bg-purple-900/60 transition-colors w-1/3 sm:w-auto text-center"
+              className="px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-purple-950/60 hover:bg-purple-900/60 transition-colors shrink-0 text-center"
             >
               انصراف
             </button>
             <button
               id="modal-add-to-cart-btn"
               onClick={handleAdd}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black px-7 py-3 rounded-xl shadow-xl shadow-amber-600/20 hover:scale-105 active:scale-95 transition-all text-xs"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-purple-950/90 hover:bg-purple-900 border border-purple-700/60 text-purple-200 hover:text-white font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl shadow-lg transition-all text-xs"
             >
-              <ShoppingBag className="w-4 h-4" />
-              <span>افزودن به سبد خرید</span>
+              <ShoppingBag className="w-4 h-4 text-purple-400" />
+              <span>افزودن به سبد</span>
+            </button>
+            <button
+              id="modal-instant-buy-btn"
+              onClick={handleInstantBuy}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl shadow-xl shadow-amber-500/25 hover:scale-105 active:scale-95 transition-all text-xs"
+            >
+              <Zap className="w-4 h-4 fill-slate-950 text-slate-950 shrink-0 animate-bounce" />
+              <span>خرید فوری و تسویه حساب</span>
             </button>
           </div>
         </div>

@@ -1,17 +1,19 @@
 import React from 'react';
-import { Sparkles, Star, Check, ShoppingBag, Eye, Truck, ShieldCheck, Ticket, Images } from 'lucide-react';
+import { Sparkles, Star, Check, ShoppingBag, Eye, Truck, ShieldCheck, Ticket, Images, Zap } from 'lucide-react';
 import { Product } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
 
 interface ProductCardProps {
   product: Product;
   onAddToCart: (product: Product) => void;
+  onInstantBuy?: (product: Product) => void;
   onViewDetails: (product: Product) => void;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   onAddToCart,
+  onInstantBuy,
   onViewDetails,
 }) => {
   const formatPrice = (num: number) => {
@@ -146,15 +148,31 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </button>
           </div>
 
-          {/* Add to Cart Button (Digikala Style) */}
-          <button
-            id={`add-to-cart-${product.id}`}
-            onClick={() => onAddToCart(product)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-purple-950/40 hover:scale-[1.02] active:scale-95"
-          >
-            <ShoppingBag className="w-4 h-4" />
-            <span>افزودن به سبد خرید</span>
-          </button>
+          {/* Action Buttons: Add to Cart + Quick Buy */}
+          <div className="flex items-center gap-2">
+            <button
+              id={`add-to-cart-${product.id}`}
+              onClick={() => onAddToCart(product)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-700/60 text-purple-200 hover:text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+              title="افزودن به سبد خرید"
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-[11px]">افزودن به سبد</span>
+            </button>
+
+            <button
+              id={`instant-buy-${product.id}`}
+              onClick={() => {
+                if (onInstantBuy) onInstantBuy(product);
+                else onAddToCart(product);
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 hover:scale-[1.02] active:scale-95"
+              title="خرید سریع و اتصال به درگاه پرداخت"
+            >
+              <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950 shrink-0" />
+              <span className="text-[11px]">خرید فوری</span>
+            </button>
+          </div>
 
         </div>
 
