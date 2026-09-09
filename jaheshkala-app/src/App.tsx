@@ -1104,6 +1104,7 @@ export default function App() {
         orders={orders}
         currentUser={currentUser}
         onOpenShop={() => setCartModalOpen(false)}
+        products={products}
       />
 
       {/* Footer Info Modal (Interactive modal for every footer link and statement) */}

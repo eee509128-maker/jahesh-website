@@ -13,8 +13,9 @@ import {
   RefreshCw,
   Check,
   Printer,
+  Package,
 } from 'lucide-react';
-import { Order, User } from '../types';
+import { Order, User, Product } from '../types';
 import { fetchOrdersFromDb } from '../lib/dbService';
 
 interface UserOrdersModalProps {
@@ -23,6 +24,7 @@ interface UserOrdersModalProps {
   orders: Order[];
   currentUser: User | null;
   onOpenShop: () => void;
+  products?: Product[];
 }
 
 export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
@@ -31,6 +33,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   orders: initialOrders,
   currentUser,
   onOpenShop,
+  products = [],
 }) => {
   const [currentOrders, setCurrentOrders] = useState<Order[]>(initialOrders);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -206,6 +209,17 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
       return 2;
     }
     return 1; // در حال بررسی
+  };
+
+  const getResolvedProduct = (itemProduct: Product) => {
+    if (!itemProduct) return itemProduct;
+    const cleanItemTitle = itemProduct.title?.trim().toLowerCase();
+    const live = products.find(
+      (p) =>
+        (p.id && itemProduct.id && p.id === itemProduct.id) ||
+        (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
+    );
+    return live ? { ...itemProduct, ...live } : itemProduct;
   };
 
   return (
@@ -426,31 +440,48 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
                   {/* Items in order */}
                   <div className="space-y-2">
-                    {order.items.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between text-xs bg-[#120a2a] p-2 rounded-xl border border-purple-900/30"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          {item.product.image ? (
-                            <img
-                              src={item.product.image}
-                              alt={item.product.title}
-                              className="w-8 h-8 rounded-lg object-cover border border-purple-800/40"
-                            />
-                          ) : (
-                            <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-                          )}
-                          <div>
-                            <span className="text-white font-bold block">{item.product.title}</span>
-                            <span className="text-[10px] text-slate-400">تعداد: {item.quantity} عدد</span>
+                    {order.items.map((item, idx) => {
+                      const prod = getResolvedProduct(item.product);
+                      const prodImg = prod?.image || item.product?.image;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between text-xs bg-[#120a2a] p-2.5 rounded-xl border border-purple-900/40 hover:border-purple-700/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-black/50 border border-purple-800/60 overflow-hidden flex items-center justify-center shrink-0 p-0.5 shadow-sm">
+                              {prodImg ? (
+                                <img
+                                  src={prodImg}
+                                  alt={prod.title}
+                                  className="w-full h-full object-contain"
+                                />
+                              ) : (
+                                <Package className="w-5 h-5 text-purple-400" />
+                              )}
+                            </div>
+                            <div className="space-y-0.5">
+                              <span className="text-white font-bold text-xs sm:text-sm block line-clamp-1">
+                                {prod.title}
+                              </span>
+                              <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                                <span>تعداد: <strong className="text-purple-300">{item.quantity}</strong> عدد</span>
+                                {prod.category && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-purple-400">{prod.category}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </div>
+                          <span className="text-amber-300 font-bold text-xs sm:text-sm shrink-0">
+                            {formatPrice(prod.price * item.quantity)}
+                          </span>
                         </div>
-                        <span className="text-amber-300 font-bold">
-                          {formatPrice(item.product.price * item.quantity)}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Details Footer */}
@@ -561,20 +592,39 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
             <div className="space-y-1.5">
               <span className="text-xs font-bold text-purple-300 block">اقلام فاکتور:</span>
-              <div className="max-h-36 overflow-y-auto space-y-1 text-xs">
-                {invoiceOrder.items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex justify-between bg-purple-950/30 p-2 rounded-lg border border-purple-900/30"
-                  >
-                    <span>
-                      {item.product.title} ({item.quantity} عدد)
-                    </span>
-                    <span className="font-bold text-amber-300">
-                      {formatPrice(item.product.price * item.quantity)}
-                    </span>
-                  </div>
-                ))}
+              <div className="max-h-48 overflow-y-auto space-y-1.5 text-xs">
+                {invoiceOrder.items.map((item, idx) => {
+                  const prod = getResolvedProduct(item.product);
+                  const prodImg = prod?.image || item.product?.image;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between bg-purple-950/40 p-2 rounded-xl border border-purple-900/40"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-lg bg-black/60 border border-purple-800/50 overflow-hidden flex items-center justify-center shrink-0 p-0.5">
+                          {prodImg ? (
+                            <img src={prodImg} alt={prod.title} className="w-full h-full object-contain" />
+                          ) : (
+                            <Package className="w-4 h-4 text-purple-400" />
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-white block text-xs">
+                            {prod.title}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            تعداد: {item.quantity} عدد
+                          </span>
+                        </div>
+                      </div>
+                      <span className="font-bold text-amber-300 text-xs">
+                        {formatPrice(prod.price * item.quantity)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

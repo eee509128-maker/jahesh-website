@@ -2566,14 +2566,50 @@ on public.users for delete using (true);`;
                 </div>
 
                 <div className="pt-2">
-                  <strong className="block mb-1 text-white">اقلام خریداری‌شده:</strong>
-                  <ul className="list-disc list-inside space-y-1 text-purple-200">
-                    {selectedOrder.items.map((item, idx) => (
-                      <li key={idx}>
-                        {item.product.title} - {item.quantity} عدد ({formatPrice(item.product.price * item.quantity)})
-                      </li>
-                    ))}
-                  </ul>
+                  <strong className="block mb-2 text-white text-xs">اقلام خریداری‌شده:</strong>
+                  <div className="space-y-2">
+                    {selectedOrder.items.map((item, idx) => {
+                      const cleanItemTitle = item.product?.title?.trim().toLowerCase();
+                      const live = products?.find(
+                        (p) =>
+                          (p.id && item.product?.id && p.id === item.product.id) ||
+                          (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
+                      );
+                      const prodImg = live?.image || item.product?.image;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between bg-black/40 p-2 rounded-xl border border-purple-800/40 text-xs"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 rounded-lg bg-black/60 border border-purple-800/50 overflow-hidden flex items-center justify-center shrink-0 p-0.5">
+                              {prodImg ? (
+                                <img
+                                  src={prodImg}
+                                  alt={item.product.title}
+                                  className="w-full h-full object-contain"
+                                />
+                              ) : (
+                                <Package className="w-4 h-4 text-purple-400" />
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-white block">
+                                {item.product.title}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                تعداد: {item.quantity} عدد
+                              </span>
+                            </div>
+                          </div>
+                          <span className="font-bold text-amber-300">
+                            {formatPrice(item.product.price * item.quantity)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
