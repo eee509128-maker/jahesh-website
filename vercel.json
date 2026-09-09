@@ -7,6 +7,10 @@
       "destination": "/assets/47887509.txt"
     },
     {
+      "source": "/api/zibal-proxy/:path*",
+      "destination": "https://gateway.zibal.ir/v1/:path*"
+    },
+    {
       "source": "/jaheshkala/:match*",
       "destination": "/jaheshkala/index.html"
     }

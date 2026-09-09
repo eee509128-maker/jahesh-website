@@ -1674,12 +1674,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   />
                   <button
                     type="button"
+                    onClick={() => onUpdateZibalMerchant('zibal')}
+                    className="px-3 py-1.5 bg-purple-950 text-purple-300 border border-purple-500/40 rounded-xl text-xs hover:bg-purple-900 transition-colors font-bold"
+                    title="تنظیم مرچنت آزمایشی (سندباکس) زیبال بدون محدودیت IP"
+                  >
+                    تستی (zibal)
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onUpdateZibalMerchant('6a9db4410df8756c31ea5d00')}
                     className="px-3 py-1.5 bg-emerald-950 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs hover:bg-emerald-900 transition-colors"
                     title="بازنشانی به مرچنت پیش‌فرض رسمی جهش"
                   >
-                    پیش‌فرض
+                    پیش‌فرض رسمی
                   </button>
+                </div>
+                <div className="bg-black/40 border border-emerald-500/20 rounded-xl p-3 text-[11px] leading-relaxed text-slate-300 space-y-1">
+                  <div className="text-amber-300 font-bold">⚡ رفع خطای عدم تطابق IP در سرورهای ابری Vercel:</div>
+                  <p>
+                    طبق مقررات شاپرک، در صورتی که گزینه «محدودیت IP» در درگاه فعال باشد، سرورهای Vercel به دلیل داشتن IP متغیر ممکن است با خطای ۱۱۳ یا ۱۱۵ روبرو شوند.
+                    جهت حل این مورد، کافی است در پنل کاربری زیبال (<span className="text-emerald-400 font-mono">zibal.ir</span>) در تنظیمات درگاه، تیک «محدودیت IP» را بردارید، یا متغیر محیطی <code className="text-purple-300 font-mono">ZIBAL_PROXY_URL</code> را با آدرس یک پروکسی آی‌پی ثابت تنظیم فرمایید.
+                  </p>
                 </div>
               </div>
 

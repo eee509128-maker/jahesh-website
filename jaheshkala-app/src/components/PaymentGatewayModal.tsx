@@ -38,6 +38,13 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [errorDetails, setErrorDetails] = useState<{
+    message: string;
+    isIpError?: boolean;
+    detectedIp?: string;
+    guidance?: string;
+    result?: number;
+  } | null>(null);
 
   // Close on Escape key press and handle pageshow BF cache
   useEffect(() => {
@@ -88,7 +95,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
     return num.toLocaleString('fa-IR') + ' ریال';
   };
 
-  const handleStartPayment = async () => {
+  const handleStartPayment = async (overrideMerchant?: string) => {
     if (!currentUser) {
       setErrorMessage('لطفاً جهت اتصال به درگاه پرداخت ابتدا وارد حساب کاربری خود شوید.');
       return;
@@ -101,6 +108,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
 
     setIsProcessing(true);
     setErrorMessage('');
+    setErrorDetails(null);
 
     const orderId = 'JAHESH-' + Math.floor(10000 + Math.random() * 90000).toString();
     const requestedDomain = safeCartItems.find((i) => i.requestedDomain)?.requestedDomain || '';
@@ -137,6 +145,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
     savePendingOrder(pendingOrder);
 
     // Call API to request Zibal payment session
+    const effectiveMerchant = overrideMerchant || zibalMerchant;
     const res = await requestZibalPayment({
       amountInTomans: payableTotal,
       orderId,
@@ -144,7 +153,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
       customerPhone: currentUser.phone,
       customerEmail: currentUser.email,
       description: `خرید از فروشگاه جهش کالا - فاکتور ${orderId}`,
-      merchant: zibalMerchant,
+      merchant: effectiveMerchant,
     });
 
     if (res.success && res.paymentUrl) {
@@ -152,9 +161,17 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
       window.location.href = res.paymentUrl;
     } else {
       setIsProcessing(false);
+      const isIpIssue = res.isIpError || res.result === 113 || res.result === 115;
+      setErrorDetails({
+        message: res.message || res.error || 'خطا در اتصال به درگاه زیبال.',
+        isIpError: isIpIssue,
+        detectedIp: res.detectedIp,
+        guidance: res.guidance,
+        result: res.result,
+      });
       setErrorMessage(
-        res.error ||
         res.message ||
+        res.error ||
         'خطا در برقراری ارتباط با درگاه پرداخت زیبال. لطفاً از اتصال اینترنت یا کد مرچنت اطمینان حاصل نمایید.'
       );
     }
@@ -288,16 +305,49 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
             </div>
           )}
 
-          {/* Error Message if any */}
+          {/* Error Message & IP Restriction Guidance */}
           {errorMessage && (
-            <div className="p-4 bg-rose-950/80 border border-rose-800/80 rounded-2xl space-y-2 text-xs text-rose-200 animate-in shake">
+            <div className="p-4 bg-rose-950/80 border border-rose-800/80 rounded-2xl space-y-3 text-xs text-rose-200 animate-in shake">
               <div className="flex items-start gap-2.5">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                <p className="leading-relaxed font-bold">{errorMessage}</p>
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="leading-relaxed font-bold text-rose-100">{errorMessage}</p>
+                  {errorDetails?.detectedIp && (
+                    <p className="text-[11px] font-mono text-rose-300">
+                      آی‌پی شناسایی‌شده توسط درگاه: {errorDetails.detectedIp}
+                    </p>
+                  )}
+                </div>
               </div>
-              <p className="text-[11px] text-rose-300/80 pr-6">
-                💡 جهت تست درگاه، کد مرچنت زیبال را می‌توانید از پنل مدیریت ویرایش فرمایید. همچنین می‌توانید با دکمه‌های زیر به سبد خرید یا صفحه اصلی بازگردید.
-              </p>
+
+              {errorDetails?.isIpError && (
+                <div className="bg-black/40 border border-rose-500/30 rounded-xl p-3 space-y-2 text-[11px] leading-relaxed text-slate-200">
+                  <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                    <span>⚠️ راهنمای حل مشکل IP متغیر در Vercel:</span>
+                  </div>
+                  <p className="text-slate-300">
+                    ۱. وارد پنل کاربری زیبال (<span className="font-mono text-emerald-400">zibal.ir</span>) شوید و در بخش درگاه پرداخت، تیک گزینه <strong className="text-white">«محدودیت IP»</strong> را غیرفعال فرمایید تا درخواست‌های سرورهای ابری با IP پویا پذیرفته شوند.
+                  </p>
+                  <p className="text-slate-300">
+                    ۲. یا می‌توانید هم‌اکنون با کلیک بر روی دکمه زیر، پرداخت را در حالت تستی (سندباکس رسمی زیبال) بررسی نمایید:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleStartPayment('zibal')}
+                    disabled={isProcessing}
+                    className="mt-1 w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                    <span>پرداخت با درگاه آزمایشی (سندباکس زیبال)</span>
+                  </button>
+                </div>
+              )}
+
+              {!errorDetails?.isIpError && (
+                <p className="text-[11px] text-rose-300/80 pr-6">
+                  💡 جهت تست درگاه، کد مرچنت زیبال را می‌توانید از پنل مدیریت ویرایش فرمایید. همچنین می‌توانید با دکمه‌های زیر به سبد خرید یا صفحه اصلی بازگردید.
+                </p>
+              )}
             </div>
           )}
 

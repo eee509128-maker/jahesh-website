@@ -106,11 +106,72 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'jahesh-kala-api' });
 });
 
+// Helper functions for Zibal
+function resolveZibalMerchant(merchantInput) {
+  if (
+    merchantInput &&
+    typeof merchantInput === 'string' &&
+    merchantInput.trim() &&
+    merchantInput !== 'undefined' &&
+    merchantInput !== 'null'
+  ) {
+    return merchantInput.trim();
+  }
+  if (process.env.ZIBAL_MERCHANT && process.env.ZIBAL_MERCHANT.trim()) {
+    return process.env.ZIBAL_MERCHANT.trim();
+  }
+  if (process.env.VITE_ZIBAL_MERCHANT && process.env.VITE_ZIBAL_MERCHANT.trim()) {
+    return process.env.VITE_ZIBAL_MERCHANT.trim();
+  }
+  return '6a9db4410df8756c31ea5d00';
+}
+
+function getZibalErrorMessage(result, rawMessage) {
+  const code = Number(result);
+  switch (code) {
+    case 100:
+      return 'عملیات با موفقیت انجام شد.';
+    case 102:
+      return 'کد مرچنت در سامانه زیبال یافت نشد.';
+    case 103:
+      return 'کد مرچنت درگاه غیرفعال است.';
+    case 104:
+      return 'کد مرچنت درگاه نامعتبر است.';
+    case 105:
+      return 'مبلغ پرداختی نامعتبر است. حداقل مبلغ پرداخت ۱,۰۰۰ تومان (۱۰,۰۰۰ ریال) است.';
+    case 106:
+      return 'آدرس بازگشت (Callback URL) نامعتبر است.';
+    case 113:
+      return 'خطای عدم تطابق IP (کد ۱۱۳ شاپرک): آدرس IP سرور با IP ثبت‌شده در درگاه زیبال مطابقت ندارد یا محدودیت IP فعال است.';
+    case 115:
+      return `محدودیت IP در درگاه زیبال فعال است (${rawMessage || ''}). در پنل زیبال محدودیت IP را غیرفعال فرمایید.`;
+    case 201:
+      return 'این تراکنش قبلاً با موفقیت تایید شده است.';
+    case 202:
+      return 'سفارش پرداخت نشده یا توسط خریدار در درگاه بانک لغو شده است.';
+    case 203:
+      return 'کد پیگیری تراکنش (trackId) در زیبال نامعتبر است.';
+    default:
+      return rawMessage || `خطای درگاه زیبال (کد ${result})`;
+  }
+}
+
 // Zibal Payment Request Endpoint
 app.post('/api/zibal-request', async (req, res) => {
   try {
-    const { amount, amountInTomans, callbackUrl, description, orderId, mobile, merchant } = req.body || {};
-    const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
+    const {
+      amount,
+      amountInTomans,
+      callbackUrl,
+      description,
+      orderId,
+      mobile,
+      customerName,
+      customerPhone,
+      merchant,
+    } = req.body || {};
+
+    const ZIBAL_MERCHANT = resolveZibalMerchant(merchant);
 
     let amountInRials = 0;
     if (amountInTomans) {
@@ -121,73 +182,134 @@ app.post('/api/zibal-request', async (req, res) => {
 
     if (!amountInRials || isNaN(amountInRials) || amountInRials < 10000) {
       return res.status(400).json({
+        success: false,
+        result: -1,
         error: 'مبلغ تراکنش نامعتبر است. حداقل مبلغ پرداخت ۱,۰۰۰ تومان (۱۰,۰۰۰ ریال) است.',
-        result: -1
+        message: 'مبلغ تراکنش نامعتبر است. حداقل مبلغ پرداخت ۱,۰۰۰ تومان (۱۰,۰۰۰ ریال) است.',
       });
     }
 
-    const finalCallbackUrl = callbackUrl || 'http://localhost:3000/jaheshkala';
+    const host = req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost:3000';
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const finalCallbackUrl = callbackUrl || `${proto}://${host}/jaheshkala`;
     const finalDescription = description || `سفارش شماره ${orderId || 'جهش کالا'}`;
+    const userPhone = mobile || customerPhone;
 
-    let zibalRes = await fetch('https://gateway.zibal.ir/v1/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        merchant: ZIBAL_MERCHANT,
-        amount: amountInRials,
-        callbackUrl: finalCallbackUrl,
-        description: finalDescription,
-        orderId: orderId ? String(orderId) : undefined,
-        mobile: mobile ? String(mobile) : undefined
-      })
-    });
+    const zibalPayload = {
+      merchant: ZIBAL_MERCHANT,
+      amount: amountInRials,
+      callbackUrl: finalCallbackUrl,
+      description: finalDescription,
+      orderId: orderId ? String(orderId) : undefined,
+      mobile: userPhone ? String(userPhone) : undefined,
+    };
 
-    let data = await zibalRes.json();
+    const proxyBaseUrl = (process.env.ZIBAL_PROXY_URL || process.env.PAYMENT_PROXY_URL || '').replace(/\/+$/, '');
+    const standardBaseUrl = 'https://gateway.zibal.ir';
+    const primaryUrl = proxyBaseUrl ? `${proxyBaseUrl}/v1/request` : `${standardBaseUrl}/v1/request`;
+
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'JaheshKala-Fintech/1.0',
+      'Accept': 'application/json',
+    };
+
+    let data = null;
     let isSandboxFallback = false;
+    let usedProxy = !!proxyBaseUrl;
 
-    // If request failed because of invalid IP (result 113) or other merchant errors, automatically fall back to 'zibal' sandbox
-    if (data.result !== 100 && ZIBAL_MERCHANT !== 'zibal') {
-      console.log(`[Zibal] Request with merchant ${ZIBAL_MERCHANT} failed (result: ${data.result}). Trying sandbox fallback 'zibal'...`);
-      const sandboxRes = await fetch('https://gateway.zibal.ir/v1/request', {
+    try {
+      const zibalRes = await fetch(primaryUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          merchant: 'zibal',
-          amount: amountInRials,
-          callbackUrl: finalCallbackUrl,
-          description: `[تست سندباکس] ${finalDescription}`,
-          orderId: orderId ? String(orderId) : undefined,
-          mobile: mobile ? String(mobile) : undefined
-        })
+        headers: requestHeaders,
+        body: JSON.stringify(zibalPayload),
       });
-      const sandboxData = await sandboxRes.json();
-      if (sandboxData.result === 100) {
-        data = sandboxData;
-        isSandboxFallback = true;
-        console.log(`[Zibal] Sandbox fallback succeeded with trackId: ${data.trackId}`);
+      data = await zibalRes.json();
+    } catch (networkErr) {
+      console.warn('[Zibal Request] Primary fetch error:', networkErr.message);
+      if (proxyBaseUrl) {
+        try {
+          const directRes = await fetch(`${standardBaseUrl}/v1/request`, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(zibalPayload),
+          });
+          data = await directRes.json();
+          usedProxy = false;
+        } catch (directErr) {
+          console.warn('[Zibal Request] Direct fallback error:', directErr.message);
+        }
       }
     }
 
-    if (data.result === 100) {
+    // Check IP restriction
+    const isIpRestriction = data && (data.result === 113 || data.result === 115);
+
+    if (isIpRestriction && ZIBAL_MERCHANT !== 'zibal') {
+      console.log(
+        `[Zibal IP Restriction] Request with merchant ${ZIBAL_MERCHANT} failed (result: ${data.result}). Attempting sandbox fallback 'zibal'...`
+      );
+      try {
+        const sandboxRes = await fetch(`${standardBaseUrl}/v1/request`, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: JSON.stringify({
+            ...zibalPayload,
+            merchant: 'zibal',
+            description: `[سندباکس] ${finalDescription}`,
+          }),
+        });
+        const sandboxData = await sandboxRes.json();
+        if (sandboxData.result === 100) {
+          data = sandboxData;
+          isSandboxFallback = true;
+          console.log(`[Zibal] Sandbox fallback succeeded with trackId: ${data.trackId}`);
+        }
+      } catch (sandboxErr) {
+        console.warn('[Zibal] Sandbox fallback error:', sandboxErr.message);
+      }
+    }
+
+    if (data && data.result === 100) {
       return res.json({
         success: true,
         result: data.result,
         trackId: data.trackId,
         isSandboxFallback,
-        message: data.message || 'success',
-        paymentUrl: `https://gateway.zibal.ir/start/${data.trackId}`
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        result: data.result,
-        message: data.message || 'خطا در ارتباط با درگاه زیبال',
-        details: data
+        usedProxy,
+        merchantUsed: isSandboxFallback ? 'zibal' : ZIBAL_MERCHANT,
+        message: isSandboxFallback
+          ? 'اتصال درگاه پرداخت در حالت آزمایشی زیبال انجام شد.'
+          : (data.message || 'success'),
+        paymentUrl: `https://gateway.zibal.ir/start/${data.trackId}`,
       });
     }
+
+    const resultNum = data ? data.result : -2;
+    const isIpErr = resultNum === 113 || resultNum === 115;
+    const persianMsg = getZibalErrorMessage(resultNum, data?.message);
+
+    return res.status(200).json({
+      success: false,
+      result: resultNum,
+      isIpError: isIpErr,
+      detectedIp: data?.message || null,
+      message: persianMsg,
+      merchantUsed: ZIBAL_MERCHANT,
+      guidance: isIpErr
+        ? 'به دلیل محدودیت آی‌پی شاپرک/زیبال روی سرور، گزینه محدودیت IP را در پنل زیبال غیرفعال فرمایید یا از متغیر محیطی ZIBAL_PROXY_URL استفاده کنید.'
+        : 'اطلاعات درگاه را بررسی فرمایید.',
+      rawDetails: data || null,
+    });
   } catch (err) {
     console.error('Error in /api/zibal-request:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Internal Server Error' });
+    return res.status(200).json({
+      success: false,
+      result: -99,
+      isIpError: false,
+      error: err.message || 'Internal Server Error',
+      message: 'خطا در ارتباط با درگاه پرداخت زیبال',
+    });
   }
 });
 
@@ -196,75 +318,128 @@ app.post('/api/zibal-verify', async (req, res) => {
   try {
     const { trackId, merchant } = req.body || {};
     if (!trackId) {
-      return res.status(400).json({ success: false, error: 'کد پیگیری تراکنش (trackId) ارسال نشده است.' });
+      return res.status(400).json({
+        success: false,
+        result: -1,
+        error: 'کد پیگیری تراکنش (trackId) ارسال نشده است.',
+        message: 'کد پیگیری تراکنش (trackId) ارسال نشده است.',
+      });
     }
 
-    const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
+    const ZIBAL_MERCHANT = resolveZibalMerchant(merchant);
+    const proxyBaseUrl = (process.env.ZIBAL_PROXY_URL || process.env.PAYMENT_PROXY_URL || '').replace(/\/+$/, '');
+    const standardBaseUrl = 'https://gateway.zibal.ir';
+    const primaryUrl = proxyBaseUrl ? `${proxyBaseUrl}/v1/verify` : `${standardBaseUrl}/v1/verify`;
 
-    let zibalRes = await fetch('https://gateway.zibal.ir/v1/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        merchant: ZIBAL_MERCHANT,
-        trackId: Number(trackId)
-      })
-    });
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'JaheshKala-Fintech/1.0',
+      'Accept': 'application/json',
+    };
 
-    let data = await zibalRes.json();
+    let data = null;
     let isSandboxFallback = false;
 
-    // Try sandbox fallback verify if the main merchant verify fails or was made in sandbox
-    if (data.result !== 100 && data.result !== 201 && ZIBAL_MERCHANT !== 'zibal') {
-      console.log(`[Zibal] Verify with merchant ${ZIBAL_MERCHANT} failed (result: ${data.result}). Trying sandbox fallback...`);
-      const sandboxRes = await fetch('https://gateway.zibal.ir/v1/verify', {
+    try {
+      const zibalRes = await fetch(primaryUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: requestHeaders,
         body: JSON.stringify({
-          merchant: 'zibal',
-          trackId: Number(trackId)
-        })
+          merchant: ZIBAL_MERCHANT,
+          trackId: Number(trackId),
+        }),
       });
-      const sandboxData = await sandboxRes.json();
-      if (sandboxData.result === 100 || sandboxData.result === 201) {
-        data = sandboxData;
-        isSandboxFallback = true;
+      data = await zibalRes.json();
+    } catch (networkErr) {
+      console.warn('[Zibal Verify] Network error:', networkErr.message);
+      if (proxyBaseUrl) {
+        try {
+          const directRes = await fetch(`${standardBaseUrl}/v1/verify`, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify({
+              merchant: ZIBAL_MERCHANT,
+              trackId: Number(trackId),
+            }),
+          });
+          data = await directRes.json();
+        } catch (directErr) {
+          console.warn('[Zibal Verify] Direct error:', directErr.message);
+        }
       }
     }
 
-    if (data.result === 100 || data.result === 201) {
+    // Try sandbox fallback verify if primary failed
+    const isPrimarySuccess = data && (data.result === 100 || data.result === 201);
+    if (!isPrimarySuccess && ZIBAL_MERCHANT !== 'zibal') {
+      try {
+        console.log(`[Zibal Verify] Trying sandbox fallback for trackId: ${trackId}...`);
+        const sandboxRes = await fetch(`${standardBaseUrl}/v1/verify`, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: JSON.stringify({
+            merchant: 'zibal',
+            trackId: Number(trackId),
+          }),
+        });
+        const sandboxData = await sandboxRes.json();
+        if (sandboxData.result === 100 || sandboxData.result === 201) {
+          data = sandboxData;
+          isSandboxFallback = true;
+        }
+      } catch (sandboxErr) {
+        console.warn('[Zibal Verify] Sandbox verify error:', sandboxErr.message);
+      }
+    }
+
+    if (data && (data.result === 100 || data.result === 201)) {
+      const amountRials = data.amount || 0;
+      const amountTomans = amountRials ? Math.round(amountRials / 10) : 0;
+      const refNumber = data.refNumber ? String(data.refNumber) : String(trackId);
+
       return res.json({
         success: true,
         result: data.result,
         status: data.status,
         isSandboxFallback,
-        refNumber: data.refNumber ? String(data.refNumber) : String(trackId),
-        amountInRials: data.amount,
-        amountInTomans: data.amount ? Math.round(data.amount / 10) : 0,
-        paidAt: data.paidAt,
+        refNumber,
+        amountInRials: amountRials,
+        amountInTomans: amountTomans,
+        paidAt: data.paidAt || new Date().toISOString(),
         cardNumber: data.cardNumber || '۵۸۹۲۱۰******۷۸۹۰',
         orderId: data.orderId || '',
-        message: data.message || 'پرداخت با موفقیت تأیید شد.'
-      });
-    } else if (data.result === 115) {
-      return res.status(200).json({
-        success: false,
-        result: 115,
-        invalidIp: true,
-        ip: data.message,
-        message: 'محدودیت IP در پنل زیبال فعال است. لطفاً در تنظیمات درگاه زیبال، گزینه محدودیت IP را غیرفعال کنید.',
-        details: data
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        result: data.result,
-        message: data.message || 'تأیید تراکنش با خطا مواجه شد.',
-        details: data
+        message: data.result === 201
+          ? 'این سفارش قبلاً تأیید شده است.'
+          : (data.message || 'پرداخت با موفقیت تأیید شد.'),
+        merchantUsed: isSandboxFallback ? 'zibal' : ZIBAL_MERCHANT,
       });
     }
+
+    const resultNum = data ? data.result : -2;
+    const isIpErr = resultNum === 113 || resultNum === 115;
+    const persianMsg = getZibalErrorMessage(resultNum, data?.message);
+
+    return res.status(200).json({
+      success: false,
+      result: resultNum,
+      isIpError: isIpErr,
+      detectedIp: data?.message || null,
+      message: persianMsg,
+      merchantUsed: ZIBAL_MERCHANT,
+      guidance: isIpErr
+        ? 'به دلیل متغیر بودن آی‌پی سرورهای ابری Vercel، در پنل زیبال گزینه «محدودیت IP» را غیرفعال فرمایید.'
+        : 'در صورت بروز مشکل، وضعیت سفارش را از بخش سفارشات پیگیری فرمایید.',
+      rawDetails: data || null,
+    });
   } catch (err) {
     console.error('Error in /api/zibal-verify:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Internal Server Error' });
+    return res.status(200).json({
+      success: false,
+      result: -99,
+      isIpError: false,
+      error: err.message || 'Internal Server Error',
+      message: 'خطا در ارتباط با سرور اعتبارسنجی زیبال',
+    });
   }
 });
 
