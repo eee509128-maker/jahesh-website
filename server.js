@@ -479,6 +479,11 @@ app.get('/47887509.txt', (req, res) => {
   res.status(404).send('Not found');
 });
 
+// Redirect /frwshgah to /jaheshkala
+app.get(['/frwshgah', '/frwshgah/*'], (req, res) => {
+  res.redirect(301, '/jaheshkala');
+});
+
 // Serve static assets and html files
 app.use(express.static(__dirname, {
   extensions: ['html'],
