@@ -92,9 +92,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-purple-100 hover:bg-rose-500 hover:text-white text-purple-900 dark:bg-purple-950 dark:hover:bg-rose-600 dark:text-slate-300 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-purple-300 dark:border-purple-800 shadow-sm"
+            title="بستن جزئیات کالا"
           >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
           </button>
         </div>
 
@@ -296,23 +297,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         </div>
 
         {/* Modal Bottom Footer with Price & Add to Cart */}
-        <div className="px-6 py-4 bg-[#140d30] border-t border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="px-6 py-4 bg-white dark:bg-[#140d30] border-t border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
             <div className="text-right">
-              <span className="text-xs text-slate-400 block">قیمت نهایی:</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">قیمت نهایی:</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-amber-300">
+                <span className="text-2xl font-black text-purple-700 dark:text-amber-300">
                   {formatPrice(product.price)}
                 </span>
                 {product.originalPrice && (
-                  <span className="text-xs text-slate-500 line-through">
+                  <span className="text-xs text-slate-400 dark:text-slate-500 line-through font-medium">
                     {formatPrice(product.originalPrice)}
                   </span>
                 )}
               </div>
             </div>
             {product.discountPercent && (
-              <span className="text-xs font-bold px-2 py-1 rounded-lg bg-rose-600/30 text-rose-300 border border-rose-600/40">
+              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-rose-100 dark:bg-rose-600/30 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-600/40">
                 {product.discountPercent}% تخفیف
               </span>
             )}
@@ -321,22 +322,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={onClose}
-              className="px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-purple-950/60 hover:bg-purple-900/60 transition-colors shrink-0 text-center"
+              className="px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-purple-100 hover:bg-purple-200 dark:text-slate-400 dark:hover:text-white dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-800 transition-colors shrink-0 text-center cursor-pointer shadow-sm"
             >
               انصراف
             </button>
             <button
               id="modal-add-to-cart-btn"
               onClick={handleAdd}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-purple-950/90 hover:bg-purple-900 border border-purple-700/60 text-purple-200 hover:text-white font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl shadow-lg transition-all text-xs"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/90 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-700/60 text-purple-900 hover:text-purple-950 dark:text-purple-200 dark:hover:text-white font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl shadow-sm transition-all text-xs cursor-pointer"
             >
-              <ShoppingBag className="w-4 h-4 text-purple-400" />
+              <ShoppingBag className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               <span>افزودن به سبد</span>
             </button>
             <button
               id="modal-instant-buy-btn"
               onClick={handleInstantBuy}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl shadow-xl shadow-amber-500/25 hover:scale-105 active:scale-95 transition-all text-xs"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl shadow-xl shadow-amber-500/25 hover:scale-105 active:scale-95 transition-all text-xs cursor-pointer"
             >
               <Zap className="w-4 h-4 fill-slate-950 text-slate-950 shrink-0 animate-bounce" />
               <span>خرید فوری و تسویه حساب</span>

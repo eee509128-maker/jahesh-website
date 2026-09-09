@@ -34,6 +34,9 @@ export interface Product {
   domainIncluded?: boolean;
   hostIncluded?: boolean;
   seoIncluded?: boolean;
+  isIncredible?: boolean;
+  incredibleTimerDuration?: '1day' | '3days' | '1week' | '1month' | 'custom' | string;
+  incredibleExpiresAt?: string; // ISO date string
 }
 
 export interface CartItem {

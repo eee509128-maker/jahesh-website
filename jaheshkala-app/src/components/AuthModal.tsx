@@ -195,46 +195,47 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" dir="rtl">
-      <div className="bg-[#140c2e] border border-purple-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl text-right">
+      <div className="bg-white dark:bg-[#140c2e] border border-purple-200 dark:border-purple-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl text-right">
         
         {/* Header */}
-        <div className="bg-[#1a1139] p-4 flex items-center justify-between border-b border-purple-900/60">
+        <div className="bg-purple-50 dark:bg-[#1a1139] p-4 flex items-center justify-between border-b border-purple-200 dark:border-purple-900/60">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-900/50 border border-purple-500/50 flex items-center justify-center text-purple-300">
+            <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/50 border border-purple-300 dark:border-purple-500/50 flex items-center justify-center text-purple-700 dark:text-purple-300 shadow-sm">
               {isRegisterMode ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black text-white">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white">
                   {isRegisterMode ? 'ثبت‌نام در جهش‌کالا' : 'ورود به حساب کاربری'}
                 </h3>
-                <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30 font-medium">
+                <span className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-500/30 font-bold">
                   <ShieldCheck className="w-3 h-3" />
                   محافظت هوشمند
                 </span>
               </div>
-              <p className="text-[11px] text-purple-300/80">
+              <p className="text-[11px] text-slate-600 dark:text-purple-300/80 font-medium">
                 {isRegisterMode ? 'ایجاد حساب جدید با شماره موبایل' : 'ورود با نام کاربری یا شماره موبایل'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-300 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-purple-100 hover:bg-rose-500 hover:text-white text-purple-900 dark:bg-purple-950 dark:hover:bg-rose-600 dark:text-slate-300 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-purple-300 dark:border-purple-800 shadow-sm"
+            title="بستن"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 stroke-[2.5]" />
           </button>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex border-b border-purple-900/50 bg-[#120a2a] p-1.5 gap-1.5">
+        <div className="flex border-b border-purple-200 dark:border-purple-900/50 bg-purple-50/60 dark:bg-[#120a2a] p-1.5 gap-1.5">
           <button
             type="button"
             onClick={() => { setIsRegisterMode(false); setErrorMsg(''); setSuccessMsg(''); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               !isRegisterMode
                 ? 'bg-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-purple-100/50 dark:hover:bg-purple-900/30'
             }`}
           >
             <LogIn className="w-3.5 h-3.5" />
@@ -243,10 +244,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="button"
             onClick={() => { setIsRegisterMode(true); setErrorMsg(''); setSuccessMsg(''); }}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               isRegisterMode
                 ? 'bg-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-purple-100/50 dark:hover:bg-purple-900/30'
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
@@ -257,14 +258,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Notifications */}
         <div className="px-6 pt-4">
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2">
-              <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-500/40 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2 font-medium">
+              <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
               <span className="leading-relaxed">{errorMsg}</span>
             </div>
           )}
           {successMsg && (
-            <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-300 flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/40 text-xs text-emerald-700 dark:text-emerald-300 flex items-start gap-2 font-medium">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
               <span className="leading-relaxed">{successMsg}</span>
             </div>
           )}
@@ -276,8 +277,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             /* REGISTER FIELDS */
             <>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <UserIcon className="w-3.5 h-3.5 text-purple-400" />
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                  <UserIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                   نام و نام خانوادگی:
                 </label>
                 <input
@@ -286,14 +287,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="مثال: عرفان مقدم"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-black/50 border border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-right"
+                  className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-right shadow-sm"
                   required
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-purple-400" />
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                   شماره موبایل:
                 </label>
                 <input
@@ -303,14 +304,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="09123456789"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full bg-black/50 border border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-left font-mono"
+                  className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-left font-mono shadow-sm"
                   required
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                   نام کاربری (انگلیسی):
                 </label>
                 <input
@@ -319,7 +320,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="erfan_123"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full bg-black/50 border border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-left font-mono"
+                  className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-left font-mono shadow-sm"
                   required
                 />
               </div>
@@ -327,8 +328,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           ) : (
             /* LOGIN FIELD */
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <UserIcon className="w-3.5 h-3.5 text-purple-400" />
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                <UserIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                 نام کاربری یا شماره موبایل:
               </label>
               <input
@@ -337,7 +338,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 placeholder="نام کاربری یا 0912..."
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                className="w-full bg-black/50 border border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-right"
+                className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-right shadow-sm"
                 required
               />
             </div>
@@ -345,8 +346,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {/* PASSWORD FIELD */}
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5 text-purple-400" />
+            <label className="text-xs font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
               رمز عبور:
             </label>
             <input
@@ -355,22 +356,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               placeholder="حداقل ۶ کاراکتر"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-black/50 border border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-left font-mono"
+              className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-left font-mono shadow-sm"
               required
             />
           </div>
 
           {/* Anti-Bot Math Captcha Box */}
-          <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl space-y-2">
+          <div className="p-3 bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 rounded-xl space-y-2 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-300 flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-xs font-bold text-purple-900 dark:text-amber-300 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400" />
                 تایید امنیتی (ضد ربات و اتک):
               </span>
               <button
                 type="button"
                 onClick={refreshCaptcha}
-                className="text-purple-400 hover:text-purple-200 transition-colors p-1"
+                className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-200 transition-colors p-1 cursor-pointer"
                 title="معمای جدید"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -379,7 +380,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="flex items-center gap-2">
               <div 
                 dir="ltr" 
-                className="bg-purple-900/60 px-4 py-2 rounded-lg text-white font-mono font-bold text-sm tracking-wider select-none border border-purple-700/50"
+                className="bg-purple-100 dark:bg-purple-900/60 px-4 py-2 rounded-lg text-purple-950 dark:text-white font-mono font-bold text-sm tracking-wider select-none border border-purple-300 dark:border-purple-700/50 shadow-inner"
               >
                 {captcha.question}
               </div>
@@ -389,7 +390,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 placeholder="پاسخ"
                 value={captchaInput}
                 onChange={(e) => setCaptchaInput(e.target.value)}
-                className="flex-1 bg-black/50 border border-purple-800 rounded-lg px-3 py-2 text-sm text-center text-white focus:outline-none focus:border-amber-400 font-mono"
+                className="flex-1 bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800 rounded-lg px-3 py-2 text-sm text-center text-slate-900 dark:text-white focus:outline-none focus:border-purple-600 dark:focus:border-amber-400 font-mono shadow-sm"
                 required
               />
             </div>
@@ -399,7 +400,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3.5 mt-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-purple-900/40 hover:scale-[1.01] active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3.5 mt-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-purple-900/40 hover:scale-[1.01] active:scale-98 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -420,7 +421,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 setErrorMsg('');
                 setSuccessMsg('');
               }}
-              className="text-xs text-purple-300 hover:text-white transition-colors underline decoration-purple-500/30 underline-offset-4"
+              className="text-xs text-purple-700 dark:text-purple-300 hover:text-purple-950 dark:hover:text-white transition-colors underline decoration-purple-500/30 underline-offset-4 cursor-pointer font-bold"
             >
               {isRegisterMode
                 ? 'قبلاً ثبت‌نام کرده‌اید؟ وارد شوید'

@@ -355,8 +355,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Product flags
   const [isPopular, setIsPopular] = useState(false);
   const [isIncredible, setIsIncredible] = useState(false);
+  const [incredibleTimerDuration, setIncredibleTimerDuration] = useState<'1day' | '3days' | '1week' | '1month' | 'custom'>('1week');
+  const [incredibleExpiresAt, setIncredibleExpiresAt] = useState<string>('');
   const [isFreeShipping, setIsFreeShipping] = useState(true);
   const [isInStock, setIsInStock] = useState(true);
+
+  // Helper function to set duration and calculate target expiration date
+  const handleSetIncredibleDuration = (duration: '1day' | '3days' | '1week' | '1month' | 'custom', customHours?: number) => {
+    setIncredibleTimerDuration(duration);
+    let target = Date.now();
+    if (duration === '1day') target += 24 * 60 * 60 * 1000;
+    else if (duration === '3days') target += 3 * 24 * 60 * 60 * 1000;
+    else if (duration === '1week') target += 7 * 24 * 60 * 60 * 1000;
+    else if (duration === '1month') target += 30 * 24 * 60 * 60 * 1000;
+    else if (duration === 'custom' && customHours) target += customHours * 60 * 60 * 1000;
+    setIncredibleExpiresAt(new Date(target).toISOString());
+  };
+
+  const formatPersianDateTime = (isoDate?: string) => {
+    if (!isoDate) return 'تنظیم نشده (پیش‌فرض ۲۴ ساعته)';
+    try {
+      const d = new Date(isoDate);
+      return d.toLocaleDateString('fa-IR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return isoDate;
+    }
+  };
+
+  const formatRemainingTime = (isoDate?: string) => {
+    if (!isoDate) return '۲۴ ساعت پیش‌فرض';
+    const diff = new Date(isoDate).getTime() - Date.now();
+    if (diff <= 0) return 'مهلت پایان یافته';
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60)) / (1000 * 60));
+    if (days > 0) return `${days} روز و ${hours} ساعت`;
+    return `${hours} ساعت و ${minutes} دقیقه`;
+  };
+
+  const formatForDateTimeLocal = (isoDate?: string) => {
+    if (!isoDate) return '';
+    try {
+      const d = new Date(isoDate);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    } catch {
+      return '';
+    }
+  };
 
   // Dedicated Product Coupon Code (Specifically for this product)
   const [newProductCouponCode, setNewProductCouponCode] = useState('');
@@ -471,6 +527,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewFeatures('کیفیت ساخت درجه یک و استاندارد\nدارای گارانتی سلامت فیزیکی\nارسال با بسته‌بندی ایمن سراسر کشور');
     setIsPopular(false);
     setIsIncredible(false);
+    setIncredibleTimerDuration('1week');
+    setIncredibleExpiresAt('');
     setIsFreeShipping(true);
     setIsInStock(true);
     setNewProductCouponCode('');
@@ -510,7 +568,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewFullDesc(prod.fullDescription || '');
     setNewFeatures(prod.features ? prod.features.join('\n') : '');
     setIsPopular(!!prod.isPopular);
-    setIsIncredible(!!(prod.discountPercent && prod.discountPercent > 0));
+    setIsIncredible(!!(prod.isIncredible || (prod.discountPercent && prod.discountPercent > 0)));
+    setIncredibleTimerDuration((prod.incredibleTimerDuration as any) || '1week');
+    setIncredibleExpiresAt(prod.incredibleExpiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
     setIsFreeShipping(true);
     setIsInStock(true);
     setNewProductCouponCode(prod.couponCode || '');
@@ -603,6 +663,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       features: newFeatures.split('\n').map((s) => s.trim()).filter(Boolean),
       image: finalImage,
       gallery: newGallery,
+      isIncredible: isIncredible,
+      incredibleTimerDuration: isIncredible ? incredibleTimerDuration : undefined,
+      incredibleExpiresAt: isIncredible ? (incredibleExpiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()) : undefined,
     };
 
     if (editingProductId && onUpdateProduct) {
@@ -1035,6 +1098,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30 w-fit">
                               <Ticket className="w-3 h-3" />
                               <span>کد تخفیف: <strong className="font-mono">{prod.couponCode}</strong> ({prod.couponDiscountPercent || 15}%)</span>
+                            </div>
+                          )}
+                          {prod.isIncredible && (
+                            <div className="flex items-center gap-1 mt-1 text-[10px] text-rose-300 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-500/30 w-fit">
+                              <Clock className="w-3 h-3 text-rose-400" />
+                              <span>تایمر شگفت‌انگیز: {formatRemainingTime(prod.incredibleExpiresAt)}</span>
                             </div>
                           )}
                         </div>
@@ -1588,7 +1657,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <input
                       type="checkbox"
                       checked={isIncredible}
-                      onChange={(e) => setIsIncredible(e.target.checked)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setIsIncredible(checked);
+                        if (checked && !incredibleExpiresAt) {
+                          handleSetIncredibleDuration(incredibleTimerDuration || '1week');
+                        }
+                      }}
                       className="rounded border-rose-500 text-rose-500 focus:ring-0"
                     />
                     <span className="text-rose-300 font-bold flex items-center gap-1">
@@ -1636,6 +1711,155 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </span>
                   </label>
                 </div>
+
+                {/* 6.1 Incredible Offer Countdown Timer Configuration (Configurable: 1 day, 1 week, 1 month, custom) */}
+                {isIncredible && (
+                  <div className="p-4 bg-gradient-to-r from-rose-950/40 via-purple-950/50 to-indigo-950/40 border border-rose-600/50 rounded-2xl space-y-3.5 transition-all shadow-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-800/40 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-xl bg-rose-900/60 text-rose-300 border border-rose-500/40">
+                          <Clock className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-black text-rose-200">
+                            تنظیم تایمر شمارش معکوس پیشنهاد شگفت‌انگیز
+                          </h4>
+                          <p className="text-[11px] text-slate-300">
+                            تعیین مدت زمان نمایش در باکس شگفت‌انگیز و ساعت شمارش معکوس زنده در سایت
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-left font-mono text-xs text-rose-300">
+                        {incredibleExpiresAt ? (
+                          <span className="px-2.5 py-1 rounded-lg bg-black/60 border border-rose-500/30 text-[11px] inline-block">
+                            ⏳ {formatRemainingTime(incredibleExpiresAt)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">پیش‌فرض ۲۴ ساعته</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quick Preset Buttons */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-200">
+                        انتخاب سریع مدت زمان اعتبار تخفیف:
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSetIncredibleDuration('1day')}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center flex items-center justify-center gap-1 ${
+                            incredibleTimerDuration === '1day'
+                              ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-600/30'
+                              : 'bg-purple-950/60 text-slate-300 hover:text-white border-purple-800/60 hover:bg-purple-900/60'
+                          }`}
+                        >
+                          <span>⏱️ ۱ روز (۲۴ ساعت)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSetIncredibleDuration('3days')}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center flex items-center justify-center gap-1 ${
+                            incredibleTimerDuration === '3days'
+                              ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-600/30'
+                              : 'bg-purple-950/60 text-slate-300 hover:text-white border-purple-800/60 hover:bg-purple-900/60'
+                          }`}
+                        >
+                          <span>⏱️ ۳ روز (۷۲ ساعت)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSetIncredibleDuration('1week')}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center flex items-center justify-center gap-1 ${
+                            incredibleTimerDuration === '1week'
+                              ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-600/30'
+                              : 'bg-purple-950/60 text-slate-300 hover:text-white border-purple-800/60 hover:bg-purple-900/60'
+                          }`}
+                        >
+                          <span>⏱️ ۱ هفته (۷ روز)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSetIncredibleDuration('1month')}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center flex items-center justify-center gap-1 ${
+                            incredibleTimerDuration === '1month'
+                              ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-600/30'
+                              : 'bg-purple-950/60 text-slate-300 hover:text-white border-purple-800/60 hover:bg-purple-900/60'
+                          }`}
+                        >
+                          <span>⏱️ ۱ ماه (۳۰ روز)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setIncredibleTimerDuration('custom')}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center flex items-center justify-center gap-1 ${
+                            incredibleTimerDuration === 'custom'
+                              ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-600/30'
+                              : 'bg-purple-950/60 text-slate-300 hover:text-white border-purple-800/60 hover:bg-purple-900/60'
+                          }`}
+                        >
+                          <span>⚙️ زمان دلخواه</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Custom Date/Time input if 'custom' is selected */}
+                    {incredibleTimerDuration === 'custom' && (
+                      <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-black/40 p-3 rounded-xl border border-rose-900/40">
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">
+                            تاریخ و ساعت دقیق پایان تخفیف:
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={incredibleExpiresAt ? formatForDateTimeLocal(incredibleExpiresAt) : ''}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setIncredibleExpiresAt(new Date(e.target.value).toISOString());
+                              }
+                            }}
+                            className="w-full bg-[#110826] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-300 block mb-1">
+                            تمدید سریع برحسب ساعت دلخواه:
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="720"
+                            placeholder="مثلاً: ۴۸ ساعت"
+                            onChange={(e) => {
+                              const hrs = parseInt(e.target.value, 10);
+                              if (hrs > 0) {
+                                setIncredibleExpiresAt(new Date(Date.now() + hrs * 3600 * 1000).toISOString());
+                              }
+                            }}
+                            className="w-full bg-[#110826] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status Feedback */}
+                    <div className="flex flex-wrap items-center justify-between text-[11px] bg-rose-950/30 p-2.5 rounded-xl border border-rose-900/30 text-rose-200 gap-2">
+                      <span>
+                        زمان دقیق انقضا: <strong>{formatPersianDateTime(incredibleExpiresAt)}</strong>
+                      </span>
+                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" />
+                        تایمر شمارش معکوس برای این محصول در صفحه اول فعال است
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* 6. Descriptions */}
                 <div className="space-y-1">

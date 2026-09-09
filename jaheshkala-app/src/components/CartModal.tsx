@@ -185,42 +185,42 @@ export const CartModal: React.FC<CartModalProps> = ({
         }
       }}
     >
-      <div className="relative w-full max-w-2xl bg-[#110b27] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-6 max-h-[92vh] flex flex-col">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-[#110b27] border border-purple-200 dark:border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-6 max-h-[92vh] flex flex-col">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-purple-900/50 bg-[#160d33]">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-purple-200 dark:border-purple-900/50 bg-purple-50/70 dark:bg-[#160d33]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-purple-900/60 flex items-center justify-center text-purple-300">
+            <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900/60 flex items-center justify-center text-purple-700 dark:text-purple-300 shadow-sm">
               <ShoppingBag className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-xs sm:text-sm font-black text-white">سبد سفارشات و صدور فاکتور جهش</h3>
-              <p className="text-[10px] sm:text-[11px] text-slate-400">بررسی پکیج‌ها، ثبت دامنه هدیه و تایید قوانین</p>
+              <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">سبد سفارشات و صدور فاکتور جهش</h3>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium">بررسی پکیج‌ها، ثبت دامنه هدیه و تایید قوانین</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-purple-100 hover:bg-rose-500 hover:text-white text-purple-900 dark:bg-purple-950 dark:hover:bg-rose-600 dark:text-slate-300 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-purple-300 dark:border-purple-800 shadow-sm"
             title="بستن سبد خرید"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 stroke-[2.5]" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-3.5 sm:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-5">
+        <div className="p-3.5 sm:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-5 bg-[#faf8ff] dark:bg-[#110b27]">
           {safeCartItems.length === 0 ? (
             <div className="text-center py-12 space-y-4">
-              <div className="w-16 h-16 rounded-full bg-purple-950/60 border border-purple-800/40 flex items-center justify-center mx-auto text-purple-400">
+              <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/40 flex items-center justify-center mx-auto text-purple-600 dark:text-purple-400 shadow-sm">
                 <ShoppingBag className="w-8 h-8" />
               </div>
-              <h4 className="text-base font-bold text-white">سبد خرید شما فعلاً خالی است</h4>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              <h4 className="text-base font-black text-slate-900 dark:text-white">سبد خرید شما فعلاً خالی است</h4>
+              <p className="text-xs text-slate-600 dark:text-slate-400 max-w-sm mx-auto font-medium">
                 می‌توانید از بخش فروشگاه، پکیج طلایی طراحی سایت یا سایر خدمات و کالاها را به سبد خرید اضافه نمایید.
               </p>
               <button
                 onClick={onClose}
-                className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-lg cursor-pointer"
               >
                 مشاهده و انتخاب کالاها
               </button>
@@ -235,7 +235,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                 return (
                   <div
                     key={prod.id || Math.random()}
-                    className="bg-[#160e33] border border-purple-800/50 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg transition-all"
+                    className="bg-white dark:bg-[#160e33] border border-purple-200 dark:border-purple-800/50 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm dark:shadow-lg transition-all"
                   >
                     {/* Item Header: Image, Info & Delete button */}
                     <div className="flex items-start justify-between gap-3">
@@ -243,14 +243,14 @@ export const CartModal: React.FC<CartModalProps> = ({
                         <img
                           src={prod.image || getFallbackProductImage(prod.title, prod.category)}
                           alt={prod.title || 'محصول'}
-                          className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl object-cover border border-purple-700/60 shrink-0 bg-black/40"
+                          className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl object-cover border border-purple-200 dark:border-purple-700/60 shrink-0 bg-slate-100 dark:bg-black/40 shadow-sm"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = getFallbackProductImage(prod.title, prod.category);
                           }}
                         />
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-xs sm:text-sm font-black text-white leading-snug">
+                            <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-snug">
                               {prod.title || 'محصول بدون عنوان'}
                             </h4>
                             {prod.isGolden && (
@@ -259,7 +259,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                               </span>
                             )}
                           </div>
-                          <p className="text-xs sm:text-sm font-black text-amber-300">
+                          <p className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-300">
                             {formatPrice(itemPrice)}
                           </p>
                         </div>
@@ -267,7 +267,7 @@ export const CartModal: React.FC<CartModalProps> = ({
 
                       <button
                         onClick={() => onRemoveItem(prod.id)}
-                        className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+                        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 dark:hover:border-rose-900/40 transition-colors cursor-pointer"
                         title="حذف کامل از سبد خرید"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -275,24 +275,24 @@ export const CartModal: React.FC<CartModalProps> = ({
                     </div>
 
                     {/* Digikala Style Quantity Stepper & Subtotal Row */}
-                    <div className="flex items-center justify-between gap-3 bg-black/40 border border-purple-900/60 rounded-xl px-3.5 py-2.5 shadow-inner">
+                    <div className="flex items-center justify-between gap-3 bg-purple-50/70 dark:bg-black/40 border border-purple-200 dark:border-purple-900/60 rounded-xl px-3.5 py-2.5 shadow-inner">
                       <div className="flex items-center gap-2.5">
-                        <span className="text-[11px] sm:text-xs text-slate-300 font-bold">تعداد:</span>
+                        <span className="text-[11px] sm:text-xs text-slate-700 dark:text-slate-300 font-bold">تعداد:</span>
                         
                         {/* Digikala Counter Box */}
-                        <div className="inline-flex items-center bg-[#0d0722] border border-purple-700/80 rounded-xl p-0.5 shadow-md">
+                        <div className="inline-flex items-center bg-white dark:bg-[#0d0722] border border-purple-300 dark:border-purple-700/80 rounded-xl p-0.5 shadow-sm">
                           {/* Plus button */}
                           <button
                             type="button"
                             onClick={() => onUpdateQuantity(prod.id, itemQuantity + 1)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg text-purple-200 hover:text-white hover:bg-purple-700/70 active:scale-90 transition-all cursor-pointer"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-purple-700 hover:text-purple-900 hover:bg-purple-100 dark:text-purple-200 dark:hover:text-white dark:hover:bg-purple-700/70 active:scale-90 transition-all cursor-pointer"
                             title="افزایش تعداد سفارش"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
 
                           {/* Quantity Number */}
-                          <span className="w-8 text-center text-xs font-black text-white font-mono select-none">
+                          <span className="w-8 text-center text-xs font-black text-slate-900 dark:text-white font-mono select-none">
                             {itemQuantity.toLocaleString('fa-IR')}
                           </span>
 
@@ -308,13 +308,13 @@ export const CartModal: React.FC<CartModalProps> = ({
                             }}
                             className={`w-7 h-7 flex items-center justify-center rounded-lg active:scale-90 transition-all cursor-pointer ${
                               itemQuantity === 1
-                                ? 'text-rose-400 hover:text-rose-300 hover:bg-rose-950/60'
-                                : 'text-purple-200 hover:text-white hover:bg-purple-700/70'
+                                ? 'text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/60'
+                                : 'text-purple-700 hover:text-purple-900 hover:bg-purple-100 dark:text-purple-200 dark:hover:text-white dark:hover:bg-purple-700/70'
                             }`}
                             title={itemQuantity === 1 ? 'حذف محصول از سبد' : 'کاهش تعداد'}
                           >
                             {itemQuantity === 1 ? (
-                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                              <Trash2 className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
                             ) : (
                               <Minus className="w-3.5 h-3.5" />
                             )}
@@ -325,7 +325,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                           <button
                             type="button"
                             onClick={() => onRemoveItem(prod.id)}
-                            className="text-[11px] text-rose-400/80 hover:text-rose-300 flex items-center gap-1 transition-colors pr-1.5 cursor-pointer"
+                            className="text-[11px] text-rose-500 hover:text-rose-700 dark:text-rose-400/80 dark:hover:text-rose-300 flex items-center gap-1 transition-colors pr-1.5 cursor-pointer font-bold"
                             title="حذف کل این کالا"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -336,8 +336,8 @@ export const CartModal: React.FC<CartModalProps> = ({
 
                       {/* Subtotal */}
                       <div className="flex items-center gap-2 text-left">
-                        <span className="text-[11px] text-slate-400">جمع جزء:</span>
-                        <span className="text-xs sm:text-sm font-black text-amber-300">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">جمع جزء:</span>
+                        <span className="text-xs sm:text-sm font-black text-purple-700 dark:text-amber-300">
                           {formatPrice(itemPrice * itemQuantity)}
                         </span>
                       </div>
@@ -345,13 +345,13 @@ export const CartModal: React.FC<CartModalProps> = ({
 
                     {/* Free Domain Field (if included) */}
                     {prod.domainIncluded && (
-                      <div className="bg-[#120a2a] p-3.5 rounded-xl border border-amber-500/30 space-y-2">
+                      <div className="bg-purple-50/70 dark:bg-[#120a2a] p-3.5 rounded-xl border border-amber-500/40 space-y-2 shadow-sm">
                         <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                            <Globe className="w-3.5 h-3.5 text-amber-400" />
+                          <label className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                            <Globe className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                             نام دامنه دلخواه رایگان شما (.ir یا ...):
                           </label>
-                          <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                          <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-500/30">
                             هدیه ۱۰۰٪ رایگان
                           </span>
                         </div>
@@ -361,9 +361,9 @@ export const CartModal: React.FC<CartModalProps> = ({
                           placeholder="نام انتخابی شما مثل: mycompany.ir"
                           value={item.requestedDomain || ''}
                           onChange={(e) => onUpdateDomain(prod.id, e.target.value)}
-                          className="w-full bg-black/60 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors"
+                          className="w-full bg-white dark:bg-black/60 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono placeholder:text-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors shadow-sm"
                         />
-                        <p className="text-[10px] text-slate-400">
+                        <p className="text-[10px] text-slate-600 dark:text-slate-400 font-medium">
                           * این دامنه پس از پرداخت توسط تیم جهش با مالکیت رسمی شما ثبت خواهد شد.
                         </p>
                       </div>
@@ -371,7 +371,7 @@ export const CartModal: React.FC<CartModalProps> = ({
 
                     {/* Additional notes / requirements */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-slate-300 block">
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
                         توضیحات تکمیلی یا رنگ‌بندی و امکانات خاص (اختیاری):
                       </label>
                       <input
@@ -379,7 +379,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                         placeholder="امکانات خاص مدنظرتان یا رنگ و طرح دلخواه را اینجا بنویسید..."
                         value={item.clientNotes || ''}
                         onChange={(e) => onUpdateNotes(prod.id, e.target.value)}
-                        className="w-full bg-black/40 border border-purple-900/60 hover:border-purple-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none transition-colors"
+                        className="w-full bg-white dark:bg-black/40 border border-purple-200 dark:border-purple-900/60 hover:border-purple-400 dark:hover:border-purple-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder-slate-500 focus:outline-none transition-colors shadow-sm"
                       />
                     </div>
                   </div>
@@ -388,14 +388,14 @@ export const CartModal: React.FC<CartModalProps> = ({
 
               {/* User Authentication Warning if not logged in */}
               {!currentUser && (
-                <div className="bg-amber-950/30 border border-amber-500/40 p-3.5 rounded-2xl flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs text-amber-200">
-                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-500/40 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-sm">
+                  <div className="flex items-center gap-2 text-xs text-amber-900 dark:text-amber-200 font-medium">
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                     <span>برای ثبت سفارش و ذخیره در پنل، ابتدا باید وارد حساب کاربری خود شوید.</span>
                   </div>
                   <button
                     onClick={onOpenAuth}
-                    className="shrink-0 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-xl shadow transition-colors"
+                    className="shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-xl shadow transition-colors cursor-pointer"
                   >
                     ورود / ثبت‌نام
                   </button>
@@ -403,13 +403,13 @@ export const CartModal: React.FC<CartModalProps> = ({
               )}
 
               {/* Discount Coupon Code Box (Secret / Confidential) */}
-              <div className="bg-[#150d33] border border-amber-500/40 p-4 rounded-2xl space-y-3">
+              <div className="bg-purple-50/70 dark:bg-[#150d33] border border-purple-200 dark:border-amber-500/40 p-4 rounded-2xl space-y-3 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-                    <Ticket className="w-4 h-4 text-amber-400" />
+                  <div className="flex items-center gap-2 text-xs font-black text-purple-900 dark:text-amber-300">
+                    <Ticket className="w-4 h-4 text-amber-500 dark:text-amber-400" />
                     <span>کد تخفیف دارید؟</span>
                   </div>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                     اعمال درصد تخفیف بر روی کل فاکتور
                   </span>
                 </div>
@@ -419,14 +419,14 @@ export const CartModal: React.FC<CartModalProps> = ({
                     <div className="relative flex-1">
                       <input
                         type="text"
-                        dir="ltr"
+                        dir="rtl"
                         placeholder="کد تخفیف را اینجا وارد کنید..."
                         value={couponInput}
                         onChange={(e) => {
                           setCouponInput(e.target.value);
                           setCouponError('');
                         }}
-                        className="w-full bg-black/60 border border-purple-800 focus:border-amber-400 rounded-xl px-3.5 py-2 text-xs text-amber-300 font-mono uppercase tracking-wider focus:outline-none transition-colors"
+                        className="w-full bg-white dark:bg-black/60 border border-purple-300 dark:border-purple-800/80 focus:border-purple-600 dark:focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-xs text-right text-purple-950 dark:text-amber-300 placeholder:text-slate-400 focus:outline-none transition-colors shadow-sm"
                       />
                     </div>
                     <button
@@ -437,14 +437,14 @@ export const CartModal: React.FC<CartModalProps> = ({
                     </button>
                   </form>
                 ) : (
-                  <div className="flex items-center justify-between bg-emerald-950/40 border border-emerald-500/50 p-3 rounded-xl">
+                  <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-500/50 p-3 rounded-xl shadow-sm">
                     <div className="flex items-center gap-2 text-xs">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <div>
-                        <span className="font-mono font-bold text-emerald-300">{appliedCoupon.code}</span>
-                        <span className="text-slate-300 mx-1.5">•</span>
-                        <span className="text-emerald-200 font-bold">{appliedCoupon.discountPercent}% تخفیف اعمال شد</span>
-                        <span className="text-[11px] text-emerald-400 block sm:inline sm:mr-2">
+                        <span className="font-mono font-black text-emerald-800 dark:text-emerald-300">{appliedCoupon.code}</span>
+                        <span className="text-slate-400 mx-1.5">•</span>
+                        <span className="text-emerald-900 dark:text-emerald-200 font-bold">{appliedCoupon.discountPercent}% تخفیف اعمال شد</span>
+                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400 block sm:inline sm:mr-2 font-medium">
                           (کسر مبلغ: {formatPrice(discountAmount)})
                         </span>
                       </div>
@@ -452,7 +452,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                     <button
                       type="button"
                       onClick={handleRemoveCoupon}
-                      className="text-[11px] text-red-400 hover:text-red-300 underline font-semibold px-2 py-1"
+                      className="text-[11px] text-rose-600 hover:text-rose-700 dark:text-red-400 dark:hover:text-red-300 underline font-bold px-2 py-1 cursor-pointer"
                     >
                       حذف کد
                     </button>
@@ -460,13 +460,13 @@ export const CartModal: React.FC<CartModalProps> = ({
                 )}
 
                 {couponError && (
-                  <p className="text-[11px] text-red-400 flex items-center gap-1">
+                  <p className="text-[11px] text-rose-600 dark:text-red-400 flex items-center gap-1 font-bold">
                     <AlertCircle className="w-3.5 h-3.5" />
                     <span>{couponError}</span>
                   </p>
                 )}
                 {couponSuccess && (
-                  <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400 flex items-center gap-1 font-bold">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>{couponSuccess}</span>
                   </p>
@@ -474,27 +474,27 @@ export const CartModal: React.FC<CartModalProps> = ({
               </div>
 
               {/* Terms and conditions Checkbox (REQUIRED BY USER) */}
-              <div className="bg-[#150e33] border border-purple-800/60 p-4 rounded-2xl space-y-2">
+              <div className="bg-purple-50/60 dark:bg-[#150e33] border border-purple-200 dark:border-purple-800/60 p-4 rounded-2xl space-y-2 shadow-sm">
                 <div className="flex items-start gap-3">
                   <input
                     id="terms-checkbox"
                     type="checkbox"
                     checked={termsAccepted}
                     onChange={onToggleTerms}
-                    className="w-5 h-5 rounded-md border-purple-600 text-purple-600 focus:ring-purple-500 bg-[#0e0a22] mt-0.5 cursor-pointer"
+                    className="w-5 h-5 rounded-md border-purple-400 text-purple-600 focus:ring-purple-500 bg-white dark:bg-[#0e0a22] mt-0.5 cursor-pointer"
                   />
                   <div className="flex-1 text-xs">
-                    <label htmlFor="terms-checkbox" className="font-bold text-white cursor-pointer">
+                    <label htmlFor="terms-checkbox" className="font-black text-slate-900 dark:text-white cursor-pointer">
                       تمامی قوانین و مقررات فنی و مالی خدمات تیم جهش را با دقت مطالعه کرده و می‌پذیرم.
                     </label>
-                    <p className="text-[11px] text-slate-400 mt-1">
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 font-medium">
                       (شامل شرایط شروع پس از تحویل بریف، ضوابط سئو، ثبت دامنه و هاست هدیه)
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={onOpenTermsModal}
-                    className="text-xs text-purple-300 hover:text-purple-200 underline font-semibold flex items-center gap-1 shrink-0"
+                    className="text-xs text-purple-700 hover:text-purple-900 dark:text-purple-300 dark:hover:text-purple-200 underline font-bold flex items-center gap-1 shrink-0 cursor-pointer"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     <span>مطالعه متن قوانین</span>
@@ -508,28 +508,28 @@ export const CartModal: React.FC<CartModalProps> = ({
 
         {/* Footer Summary & Checkout Button */}
         {safeCartItems.length > 0 && (
-          <div className="px-6 py-4 bg-[#140d30] border-t border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="px-6 py-4 bg-white dark:bg-[#140d30] border-t border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
             <div className="text-right w-full sm:w-auto space-y-0.5">
               {appliedCoupon ? (
                 <div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                  <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
                     <span>مبلغ کل:</span>
                     <span className="line-through">{formatPrice(rawTotalAmount)}</span>
-                    <span className="text-red-400 font-bold bg-red-950/80 px-1.5 py-0.5 rounded text-[10px]">
+                    <span className="text-rose-700 dark:text-red-400 font-bold bg-rose-100 dark:bg-red-950/80 px-1.5 py-0.5 rounded text-[10px]">
                       {appliedCoupon.discountPercent}% تخفیف ({formatPrice(discountAmount)}-)
                     </span>
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-xs text-slate-300">مبلغ نهایی قابل پرداخت:</span>
-                    <span className="text-2xl font-black text-emerald-400">
+                    <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">مبلغ نهایی قابل پرداخت:</span>
+                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
                       {formatPrice(finalPayableAmount)}
                     </span>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <span className="text-xs text-slate-400 block">مبلغ قابل پرداخت فاکتور:</span>
-                  <span className="text-2xl font-black text-amber-300">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">مبلغ قابل پرداخت فاکتور:</span>
+                  <span className="text-2xl font-black text-purple-700 dark:text-amber-300">
                     {formatPrice(rawTotalAmount)}
                   </span>
                 </div>
@@ -540,7 +540,7 @@ export const CartModal: React.FC<CartModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-purple-950/80 hover:bg-purple-900 border border-purple-800/50 transition-colors w-1/3 sm:w-auto text-center cursor-pointer"
+                className="px-4 py-3 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-purple-100 hover:bg-purple-200 dark:text-slate-300 dark:hover:text-white dark:bg-purple-950/80 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-800/50 transition-colors w-1/3 sm:w-auto text-center cursor-pointer shadow-sm"
                 title="بستن سبد خرید و بازگشت به فروشگاه"
               >
                 بستن و ادامه خرید
@@ -552,7 +552,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                 className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-black px-7 py-3 rounded-xl shadow-xl transition-all text-xs ${
                   termsAccepted
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-emerald-600/20 hover:scale-105 active:scale-95 cursor-pointer'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-300 dark:border-slate-700'
                 }`}
               >
                 <ShieldCheck className="w-4 h-4" />

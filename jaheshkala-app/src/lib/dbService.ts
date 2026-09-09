@@ -74,6 +74,9 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
         gallery: Array.isArray(item.gallery) ? item.gallery : [],
         couponCode: item.coupon_code || undefined,
         couponDiscountPercent: item.coupon_discount_percent ? Number(item.coupon_discount_percent) : undefined,
+        isIncredible: item.is_incredible !== undefined ? !!item.is_incredible : (item.isIncredible !== undefined ? !!item.isIncredible : !!(item.discount_percent && item.discount_percent > 0)),
+        incredibleExpiresAt: item.incredible_expires_at || item.incredibleExpiresAt || undefined,
+        incredibleTimerDuration: item.incredible_timer_duration || item.incredibleTimerDuration || undefined,
       }));
 
       // Cache locally for offline/fast first-load
@@ -126,23 +129,20 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       gallery: product.gallery || [],
       coupon_code: product.couponCode,
       coupon_discount_percent: product.couponDiscountPercent,
+      is_incredible: product.isIncredible,
+      incredible_expires_at: product.incredibleExpiresAt,
+      incredible_timer_duration: product.incredibleTimerDuration,
     };
     
-    // First attempt with gallery field
+    // First attempt with all fields
     const { error } = await supabase.from('products').upsert(payloadWithGallery);
     if (error) {
-      // If error is about gallery column not existing in older table schemas, retry without it
-      if (error.message && error.message.includes('gallery')) {
-        const { gallery, ...fallbackPayload } = payloadWithGallery;
-        const retryResult = await supabase.from('products').upsert(fallbackPayload);
-        if (retryResult.error) {
-          console.warn('Save product error (fallback):', retryResult.error.message);
-          return false;
-        }
-        return true;
+      // If error is about extra columns not existing in older table schemas, retry with minimal safe payload
+      const { gallery, is_incredible, incredible_expires_at, incredible_timer_duration, ...fallbackPayload } = payloadWithGallery;
+      const retryResult = await supabase.from('products').upsert(fallbackPayload);
+      if (retryResult.error) {
+        console.warn('Save product error (fallback):', retryResult.error.message);
       }
-      console.warn('Save product error:', error.message);
-      return false;
     }
 
     // Broadcast change locally
