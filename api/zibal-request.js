@@ -1,5 +1,6 @@
-function getZibalBaseUrl() {
+function getZibalUrl(endpointPath) {
   const proxyUrl = process.env.ZIBAL_PROXY_URL && process.env.ZIBAL_PROXY_URL.trim();
+  const cleanEndpoint = endpointPath.startsWith('/') ? endpointPath : `/${endpointPath}`;
   if (
     proxyUrl &&
     proxyUrl !== 'none' &&
@@ -10,9 +11,9 @@ function getZibalBaseUrl() {
     const formattedUrl = (proxyUrl.startsWith('http://') || proxyUrl.startsWith('https://'))
       ? proxyUrl
       : `https://${proxyUrl}`;
-    return formattedUrl.replace(/\/+$/, '');
+    return `${formattedUrl.replace(/\/+$/, '')}${cleanEndpoint}`;
   }
-  return 'https://gateway.zibal.ir/v1';
+  return `https://gateway.zibal.ir/v1${cleanEndpoint}`;
 }
 
 export default async function handler(req, res) {
@@ -71,8 +72,8 @@ export default async function handler(req, res) {
       mobile: mobile ? String(mobile) : undefined
     };
 
-    const baseUrl = getZibalBaseUrl();
-    const zibalRes = await fetch(`${baseUrl}/request`, {
+    const requestUrl = getZibalUrl('/request');
+    const zibalRes = await fetch(requestUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

@@ -106,9 +106,10 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'jahesh-kala-api' });
 });
 
-// Helper for Zibal Base URL (Supports ZIBAL_PROXY_URL with fallback to https://gateway.zibal.ir/v1)
-function getZibalBaseUrl() {
+// Helper for Zibal URL (Uses ZIBAL_PROXY_URL if provided, else direct to https://gateway.zibal.ir/v1)
+function getZibalUrl(endpointPath) {
   const proxyUrl = process.env.ZIBAL_PROXY_URL && process.env.ZIBAL_PROXY_URL.trim();
+  const cleanEndpoint = endpointPath.startsWith('/') ? endpointPath : `/${endpointPath}`;
   if (
     proxyUrl &&
     proxyUrl !== 'none' &&
@@ -119,9 +120,9 @@ function getZibalBaseUrl() {
     const formattedUrl = (proxyUrl.startsWith('http://') || proxyUrl.startsWith('https://'))
       ? proxyUrl
       : `https://${proxyUrl}`;
-    return formattedUrl.replace(/\/+$/, '');
+    return `${formattedUrl.replace(/\/+$/, '')}${cleanEndpoint}`;
   }
-  return 'https://gateway.zibal.ir/v1';
+  return `https://gateway.zibal.ir/v1${cleanEndpoint}`;
 }
 
 // Zibal Payment Request Endpoint
@@ -157,8 +158,7 @@ app.post('/api/zibal-request', async (req, res) => {
     if (orderId !== undefined) zibalPayload.orderId = String(orderId);
     if (mobile !== undefined) zibalPayload.mobile = String(mobile);
 
-    const baseUrl = getZibalBaseUrl();
-    const requestUrl = `${baseUrl}/request`;
+    const requestUrl = getZibalUrl('/request');
 
     let zibalRes = await fetch(requestUrl, {
       method: 'POST',
@@ -225,8 +225,7 @@ app.post('/api/zibal-verify', async (req, res) => {
     }
 
     const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
-    const baseUrl = getZibalBaseUrl();
-    const verifyUrl = `${baseUrl}/verify`;
+    const verifyUrl = getZibalUrl('/verify');
 
     const verifyPayload = {
       ...otherFields,
