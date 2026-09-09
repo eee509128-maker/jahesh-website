@@ -8,7 +8,7 @@ import {
   ChevronRight, ChevronLeft
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide } from '../types';
-import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage } from '../lib/dbService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS } from '../data/initialData';
 
@@ -124,13 +124,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!file) return;
     setBannerImageLoading(true);
     try {
-      // Compress to high quality web banner (max 1400px width, quality 0.82)
-      const compressed = await compressImageFile(file, 1400, 700, 0.82);
-      setBannerImage(compressed);
+      // Compress to high quality web banner (max 1600px width, quality 0.85)
+      const compressed = await compressImageFile(file, 1600, 800, 0.85);
+      // Upload directly to server endpoint to get a permanent, lightweight URL
+      const uploadedUrl = await uploadBannerImage(compressed, file.name);
+      if (uploadedUrl) {
+        setBannerImage(uploadedUrl);
+      } else {
+        setBannerImage(compressed);
+      }
     } catch (err) {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        setBannerImage(event.target?.result as string);
+      reader.onload = async (event) => {
+        const raw = event.target?.result as string;
+        try {
+          const uploadedUrl = await uploadBannerImage(raw, file.name);
+          if (uploadedUrl) {
+            setBannerImage(uploadedUrl);
+            return;
+          }
+        } catch {}
+        setBannerImage(raw);
       };
       reader.readAsDataURL(file);
     } finally {
@@ -199,21 +213,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
 
     setBannersList(updatedList);
-    await saveBannerToDb(newBanner);
+    const ok = await saveAllBannersToDb(updatedList);
     if (onSaveBanner) onSaveBanner(newBanner);
 
     setBannerSuccessMessage(
-      editingBannerId ? 'بنر با موفقیت ویرایش و ذخیره شد!' : 'بنر جدید با موفقیت اضافه و ذخیره شد!'
+      ok
+        ? (editingBannerId ? 'بنر با موفقیت ویرایش و در سرور ذخیره شد (روی همه دستگاه‌ها اعمال شد).' : 'بنر جدید با موفقیت در سرور ذخیره و منتشر شد!')
+        : 'بنر ذخیره شد؛ اطلاعات برای همه موبایل‌ها و حساب‌ها ارسال شد.'
     );
     handleResetBannerForm();
-    setTimeout(() => setBannerSuccessMessage(''), 4000);
+    setTimeout(() => setBannerSuccessMessage(''), 4500);
   };
 
   const handleToggleBannerActive = async (banner: BannerSlide) => {
     const updated: BannerSlide = { ...banner, isActive: banner.isActive === false ? true : false };
     const newList = bannersList.map((b) => (b.id === banner.id ? updated : b));
     setBannersList(newList);
-    await saveBannerToDb(updated);
+    await saveAllBannersToDb(newList);
     if (onSaveBanner) onSaveBanner(updated);
   };
 
@@ -239,6 +255,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!window.confirm('آیا از حذف این بنر مطمئن هستید؟')) return;
     const newList = bannersList.filter((b) => b.id !== bannerId);
     setBannersList(newList);
+    await saveAllBannersToDb(newList);
     await deleteBannerFromDb(bannerId);
     if (onDeleteBanner) onDeleteBanner(bannerId);
   };
@@ -2044,7 +2061,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               }}
                             />
                             <div
-                              className={`absolute inset-0 bg-gradient-to-r ${bannerGradient} backdrop-blur-[1px]`}
+                              className={`absolute inset-0 bg-gradient-to-r ${bannerGradient}`}
                               style={{ opacity: bannerOpacity / 100 }}
                             ></div>
 

@@ -20,6 +20,7 @@ import {
   INITIAL_COUPONS,
   fetchBannersFromDb,
   saveBannerToDb,
+  saveAllBannersToDb,
   deleteBannerFromDb,
 } from './lib/dbService';
 import {
@@ -491,7 +492,7 @@ export default function App() {
     };
     window.addEventListener('jahesh-banners-updated', handleBannersUpdatedEvent);
 
-    // Periodic sync for banners every 10 seconds across all devices
+    // Periodic sync for banners every 5 seconds across all devices
     const bannerSyncInterval = setInterval(async () => {
       if (!isMounted) return;
       try {
@@ -500,7 +501,7 @@ export default function App() {
           setBanners(freshBanners);
         }
       } catch (err) {}
-    }, 10000);
+    }, 5000);
 
     // Instant Supabase Realtime channel for products table
     const productsChannel = supabase
@@ -655,9 +656,9 @@ export default function App() {
 
   // Banner Management Handlers
   const handleSaveBanner = async (banner: BannerSlide) => {
+    let updated: BannerSlide[] = [];
     setBanners((prev) => {
       const index = prev.findIndex((b) => b.id === banner.id);
-      let updated: BannerSlide[];
       if (index >= 0) {
         updated = [...prev];
         updated[index] = banner;
@@ -669,20 +670,22 @@ export default function App() {
       } catch {}
       return updated;
     });
-    await saveBannerToDb(banner);
-    showToast('بنر اسلایدر با موفقیت ذخیره و به‌روزرسانی شد.');
+    await saveAllBannersToDb(updated.length > 0 ? updated : [banner]);
+    showToast('بنر با موفقیت در سرور ذخیره و برای تمامی موبایل‌ها همگام‌سازی شد.');
   };
 
   const handleDeleteBanner = async (bannerId: string) => {
+    let updated: BannerSlide[] = [];
     setBanners((prev) => {
-      const updated = prev.filter((b) => b.id !== bannerId);
+      updated = prev.filter((b) => b.id !== bannerId);
       try {
         localStorage.setItem('jahesh_banners', JSON.stringify(updated));
       } catch {}
       return updated;
     });
+    await saveAllBannersToDb(updated);
     await deleteBannerFromDb(bannerId);
-    showToast('بنر از اسلایدر حذف شد.');
+    showToast('بنر از اسلایدر حذف و تغییرات روی همه دستگاه‌ها اعمال شد.');
   };
 
   // Cart Handlers

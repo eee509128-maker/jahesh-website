@@ -798,11 +798,32 @@ export const findUserByEmailInDb = async (email: string): Promise<User | null> =
 // ==========================================
 // BANNER & SLIDER DATABASE PERSISTENCE
 // ==========================================
+// BANNER & SLIDER DATABASE PERSISTENCE
+// ==========================================
+
+export const uploadBannerImage = async (image: string, filename?: string): Promise<string | null> => {
+  try {
+    const res = await fetch('/api/upload-banner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image, filename }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) {
+        return data.url;
+      }
+    }
+  } catch (err) {
+    console.warn('Upload banner image to server failed:', err);
+  }
+  return null;
+};
 
 export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
   try {
     // 1. First try server-side API endpoint for global multi-device sync
-    const res = await fetch('/api/banners');
+    const res = await fetch('/api/banners', { cache: 'no-store' });
     if (res.ok) {
       const serverBanners = await res.json();
       if (Array.isArray(serverBanners) && serverBanners.length > 0) {
@@ -813,14 +834,14 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
       }
     }
   } catch (e) {
-    console.warn('Fetch server banners failed, trying Supabase/localStorage fallback:', e);
+    console.warn('Fetch server banners failed, trying fallback:', e);
   }
 
   // 2. Try Supabase fallback
   try {
-    const { data, error } = await supabase.from('banners').select('*').order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('banners').select('*').order('order', { ascending: true });
     if (!error && data && data.length > 0) {
-      const fetched: BannerSlide[] = data.map((item: any) => ({
+      const fetched: BannerSlide[] = data.map((item: any, idx: number) => ({
         id: String(item.id),
         badge: item.badge || '',
         title: item.title || '',
@@ -832,6 +853,7 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
         overlayOpacity: item.overlay_opacity !== undefined ? Number(item.overlay_opacity) : 90,
         image: item.image || '',
         isActive: item.is_active !== false,
+        order: item.order !== undefined ? Number(item.order) : idx,
       }));
 
       try {
@@ -862,52 +884,66 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
   return INITIAL_BANNERS;
 };
 
-export const saveBannerToDb = async (banner: BannerSlide): Promise<boolean> => {
+export const saveBannerToDb = async (banner: BannerSlide, fullList?: BannerSlide[]): Promise<boolean> => {
   try {
     // Sync locally & construct current list
-    let currentList: BannerSlide[] = [];
-    try {
-      const saved = localStorage.getItem('jahesh_banners');
-      currentList = saved ? JSON.parse(saved) : [...INITIAL_BANNERS];
-      const idx = currentList.findIndex((b) => String(b.id) === String(banner.id));
-      if (idx >= 0) {
-        currentList[idx] = banner;
-      } else {
-        currentList.push(banner);
+    let currentList: BannerSlide[] = fullList ? [...fullList] : [];
+    if (!fullList) {
+      try {
+        const saved = localStorage.getItem('jahesh_banners');
+        currentList = saved ? JSON.parse(saved) : [...INITIAL_BANNERS];
+        const idx = currentList.findIndex((b) => String(b.id) === String(banner.id));
+        if (idx >= 0) {
+          currentList[idx] = banner;
+        } else {
+          currentList.push(banner);
+        }
+      } catch {
+        currentList = [banner];
       }
+    }
+
+    try {
       localStorage.setItem('jahesh_banners', JSON.stringify(currentList));
       window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: currentList }));
     } catch {}
 
     // Send full updated list to Server API for global persistence across all accounts & devices
+    let serverOk = false;
     try {
-      await fetch('/api/banners', {
+      const res = await fetch('/api/banners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(currentList),
       });
+      if (res.ok) {
+        serverOk = true;
+      }
     } catch (apiErr) {
       console.warn('Save banner server API error:', apiErr);
     }
 
-    // Try Supabase sync if table exists
-    const payload = {
-      id: String(banner.id),
-      badge: banner.badge,
-      title: banner.title,
-      subtitle: banner.subtitle,
-      cta: banner.cta,
-      action_type: banner.actionType,
-      action_target: banner.actionTarget || null,
-      gradient: banner.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
-      overlay_opacity: banner.overlayOpacity ?? 90,
-      image: banner.image,
-      is_active: banner.isActive !== false,
-      updated_at: new Date().toISOString(),
-    };
-    supabase.from('banners').upsert(payload).then(() => {}).catch(() => {});
+    // Try Supabase sync in background
+    try {
+      const payload = {
+        id: String(banner.id),
+        badge: banner.badge,
+        title: banner.title,
+        subtitle: banner.subtitle,
+        cta: banner.cta,
+        action_type: banner.actionType,
+        action_target: banner.actionTarget || null,
+        gradient: banner.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
+        overlay_opacity: banner.overlayOpacity ?? 90,
+        image: banner.image,
+        is_active: banner.isActive !== false,
+        order: banner.order ?? 0,
+        updated_at: new Date().toISOString(),
+      };
+      supabase.from('banners').upsert(payload).then(() => {}).catch(() => {});
+    } catch {}
 
-    return true;
+    return serverOk || true;
   } catch (err) {
     console.warn('Save banner exception:', err);
     return false;
@@ -921,18 +957,24 @@ export const saveAllBannersToDb = async (banners: BannerSlide[]): Promise<boolea
       window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: banners }));
     } catch {}
 
-    // Sync to Server API
+    // Sync to Server API with no-cache and check response
     try {
-      await fetch('/api/banners', {
+      const res = await fetch('/api/banners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(banners),
       });
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('Save all banners server API failed:', res.status, text);
+        return false;
+      }
+      console.log('All banners synced to server successfully');
+      return true;
     } catch (apiErr) {
       console.warn('Save all banners server API error:', apiErr);
+      return false;
     }
-
-    return true;
   } catch (err) {
     console.warn('Save all banners exception:', err);
     return false;
@@ -955,19 +997,19 @@ export const deleteBannerFromDb = async (bannerId: string | number): Promise<boo
     } catch {}
 
     // Sync deletion to Server API
-    if (updatedList.length >= 0) {
-      try {
-        await fetch('/api/banners', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedList),
-        });
-      } catch (apiErr) {
-        console.warn('Delete banner server API error:', apiErr);
-      }
+    try {
+      await fetch('/api/banners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedList),
+      });
+    } catch (apiErr) {
+      console.warn('Delete banner server API error:', apiErr);
     }
 
-    supabase.from('banners').delete().eq('id', strId).then(() => {}).catch(() => {});
+    try {
+      supabase.from('banners').delete().eq('id', strId).then(() => {}).catch(() => {});
+    } catch {}
 
     return true;
   } catch (err) {

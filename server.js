@@ -10,7 +10,16 @@ const app = express();
 const PORT = 3000;
 const HOST = '0.0.0.0';
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Static uploads directory for banners and user-uploaded media
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const BANNERS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'banners');
+if (!fs.existsSync(BANNERS_UPLOADS_DIR)) {
+  fs.mkdirSync(BANNERS_UPLOADS_DIR, { recursive: true });
+}
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Cloudflare AI Support Route for JaheshKala
 const CLOUDFLARE_ACCOUNT_ID = 'e8950358d5cf09f0f511b46172f65791';
@@ -109,7 +118,103 @@ app.get('/api/health', (_req, res) => {
 // Server-side Banners Persistence API
 const BANNERS_FILE = path.join(__dirname, 'data', 'banners.json');
 
+const DEFAULT_SERVER_BANNERS = [
+  {
+    id: 'banner-1',
+    badge: 'جشنواره تخفیف‌های ویژه',
+    title: 'خرید آنلاین انواع کالاها و خدمات با بهترین قیمت',
+    subtitle: 'امکان خرید با درگاه امن بانکی، ضمانت اصالت و سلامت کالا و ارسال سریع به سراسر کشور',
+    cta: 'مشاهده تخفیف‌های شگفت‌انگیز',
+    actionType: 'incredible',
+    gradient: 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
+    overlayOpacity: 90,
+    image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80',
+    isActive: false,
+    order: 0,
+  },
+  {
+    id: 'banner-2',
+    badge: 'پیشنهاد طلایی جهش',
+    title: 'پکیج طلایی طراحی سایت اختصاصی جهش',
+    subtitle: 'کدنویسی اختصاصی، هاست و دامین رایگان، درگاه پرداخت زیبال و پشتیبانی کامل ۲۴ ساعته',
+    cta: 'مشاهده جزئیات و خرید',
+    actionType: 'package',
+    gradient: 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
+    overlayOpacity: 90,
+    image: '/assets/ascend-dashboard_7euwiU1R0Bf04e0Jvhhd2.png',
+    isActive: true,
+    order: 1,
+  },
+  {
+    id: 'banner-3',
+    badge: 'پیشنهادهای روزانه',
+    title: 'خرید سریع و مطمئن با درگاه امن شاپرک و زیبال',
+    subtitle: 'هر آنچه برای خرید اینترنتی نیاز دارید، با خیال راحت در فروشگاه جهش‌کالا تهیه کنید',
+    cta: 'شروع خرید در جهش‌کالا',
+    actionType: 'incredible',
+    gradient: 'from-[#1e1b4b] via-[#171239] to-[#0c081f]',
+    overlayOpacity: 90,
+    image: 'https://images.unsplash.com/photo-1526178613552-2b45c6c302f0?auto=format&fit=crop&w=1200&q=80',
+    isActive: true,
+    order: 2,
+  },
+];
+
+// Endpoint to upload banner image file directly to server
+app.post('/api/upload-banner', (req, res) => {
+  try {
+    const { image, filename } = req.body || {};
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ error: 'داده تصویر الزامی است.' });
+    }
+
+    let ext = 'webp';
+    let buffer;
+    const matches = image.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+    if (matches) {
+      const type = matches[1].toLowerCase();
+      if (type.includes('png')) ext = 'png';
+      else if (type.includes('jpeg') || type.includes('jpg')) ext = 'jpg';
+      else if (type.includes('svg')) ext = 'svg';
+      else if (type.includes('webp')) ext = 'webp';
+      buffer = Buffer.from(matches[2], 'base64');
+    } else if (image.startsWith('data:')) {
+      const parts = image.split(',');
+      buffer = Buffer.from(parts[1] || '', 'base64');
+    } else {
+      buffer = Buffer.from(image, 'base64');
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'فرمت تصویر نامعتبر است.' });
+    }
+
+    const safeName = `banner_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const filePath = path.join(BANNERS_UPLOADS_DIR, safeName);
+    fs.writeFileSync(filePath, buffer);
+
+    // Also mirror to jaheshkala static directory if it exists
+    const distUploads = path.join(__dirname, 'jaheshkala', 'uploads', 'banners');
+    try {
+      if (!fs.existsSync(distUploads)) {
+        fs.mkdirSync(distUploads, { recursive: true });
+      }
+      fs.writeFileSync(path.join(distUploads, safeName), buffer);
+    } catch {}
+
+    const publicUrl = `/uploads/banners/${safeName}`;
+    console.log(`[Upload] Banner image saved to ${publicUrl}`);
+    return res.json({ success: true, url: publicUrl });
+  } catch (err) {
+    console.error('Error in /api/upload-banner:', err);
+    return res.status(500).json({ error: err.message || 'خطا در ذخیره‌سازی تصویر بنر' });
+  }
+});
+
 app.get('/api/banners', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     if (fs.existsSync(BANNERS_FILE)) {
       const raw = fs.readFileSync(BANNERS_FILE, 'utf8');
@@ -121,7 +226,19 @@ app.get('/api/banners', (_req, res) => {
   } catch (err) {
     console.error('Error reading banners.json:', err);
   }
-  return res.json([]);
+
+  // If banners.json does not exist yet, seed it with default banners
+  try {
+    const dataDir = path.dirname(BANNERS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(BANNERS_FILE, JSON.stringify(DEFAULT_SERVER_BANNERS, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('Could not initialize banners.json:', e);
+  }
+
+  return res.json(DEFAULT_SERVER_BANNERS);
 });
 
 app.post('/api/banners', (req, res) => {
@@ -135,6 +252,7 @@ app.post('/api/banners', (req, res) => {
       fs.mkdirSync(dataDir, { recursive: true });
     }
     fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners, null, 2), 'utf8');
+    console.log(`[Banners] Successfully persisted ${banners.length} banners across all devices.`);
     return res.json({ success: true, count: banners.length });
   } catch (err) {
     console.error('Error saving banners.json:', err);

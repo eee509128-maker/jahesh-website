@@ -84,6 +84,8 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
     if (!active) return;
     if (active.actionType === 'incredible') {
       onScrollToIncredible();
+    } else if (active.actionType === 'package') {
+      onSelectCategory('طراحی سایت و خدمات وب');
     } else if (active.actionType === 'category') {
       onSelectCategory(active.actionTarget || '');
     } else if (active.actionType === 'link' && active.actionTarget) {
@@ -124,7 +126,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
           className="absolute inset-0 w-full h-full object-cover object-center transform scale-105 transition-all duration-700 ease-out"
         />
         <div
-          className={`absolute inset-0 bg-gradient-to-r ${active.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]'} backdrop-blur-[2px]`}
+          className={`absolute inset-0 bg-gradient-to-r ${active.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]'}`}
           style={{ opacity: (active.overlayOpacity !== undefined ? active.overlayOpacity : 90) / 100 }}
         ></div>
 
