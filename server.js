@@ -106,10 +106,28 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'jahesh-kala-api' });
 });
 
+// Helper for Zibal Base URL (Supports ZIBAL_PROXY_URL with fallback to https://gateway.zibal.ir/v1)
+function getZibalBaseUrl() {
+  const proxyUrl = process.env.ZIBAL_PROXY_URL && process.env.ZIBAL_PROXY_URL.trim();
+  if (
+    proxyUrl &&
+    proxyUrl !== 'none' &&
+    proxyUrl !== 'null' &&
+    proxyUrl !== 'undefined' &&
+    proxyUrl !== 'false'
+  ) {
+    const formattedUrl = (proxyUrl.startsWith('http://') || proxyUrl.startsWith('https://'))
+      ? proxyUrl
+      : `https://${proxyUrl}`;
+    return formattedUrl.replace(/\/+$/, '');
+  }
+  return 'https://gateway.zibal.ir/v1';
+}
+
 // Zibal Payment Request Endpoint
 app.post('/api/zibal-request', async (req, res) => {
   try {
-    const { amount, amountInTomans, callbackUrl, description, orderId, mobile, merchant } = req.body || {};
+    const { amount, amountInTomans, callbackUrl, description, orderId, mobile, merchant, ...otherFields } = req.body || {};
     const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
 
     let amountInRials = 0;
@@ -129,17 +147,23 @@ app.post('/api/zibal-request', async (req, res) => {
     const finalCallbackUrl = callbackUrl || 'http://localhost:3000/jaheshkala';
     const finalDescription = description || `سفارش شماره ${orderId || 'جهش کالا'}`;
 
-    let zibalRes = await fetch('https://gateway.zibal.ir/v1/request', {
+    const zibalPayload = {
+      ...otherFields,
+      merchant: ZIBAL_MERCHANT,
+      amount: amountInRials,
+      callbackUrl: finalCallbackUrl,
+      description: finalDescription,
+    };
+    if (orderId !== undefined) zibalPayload.orderId = String(orderId);
+    if (mobile !== undefined) zibalPayload.mobile = String(mobile);
+
+    const baseUrl = getZibalBaseUrl();
+    const requestUrl = `${baseUrl}/request`;
+
+    let zibalRes = await fetch(requestUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        merchant: ZIBAL_MERCHANT,
-        amount: amountInRials,
-        callbackUrl: finalCallbackUrl,
-        description: finalDescription,
-        orderId: orderId ? String(orderId) : undefined,
-        mobile: mobile ? String(mobile) : undefined
-      })
+      body: JSON.stringify(zibalPayload)
     });
 
     let data = await zibalRes.json();
@@ -148,23 +172,24 @@ app.post('/api/zibal-request', async (req, res) => {
     // If request failed because of invalid IP (result 113) or other merchant errors, automatically fall back to 'zibal' sandbox
     if (data.result !== 100 && ZIBAL_MERCHANT !== 'zibal') {
       console.log(`[Zibal] Request with merchant ${ZIBAL_MERCHANT} failed (result: ${data.result}). Trying sandbox fallback 'zibal'...`);
-      const sandboxRes = await fetch('https://gateway.zibal.ir/v1/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          merchant: 'zibal',
-          amount: amountInRials,
-          callbackUrl: finalCallbackUrl,
-          description: `[تست سندباکس] ${finalDescription}`,
-          orderId: orderId ? String(orderId) : undefined,
-          mobile: mobile ? String(mobile) : undefined
-        })
-      });
-      const sandboxData = await sandboxRes.json();
-      if (sandboxData.result === 100) {
-        data = sandboxData;
-        isSandboxFallback = true;
-        console.log(`[Zibal] Sandbox fallback succeeded with trackId: ${data.trackId}`);
+      try {
+        const sandboxRes = await fetch(requestUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...zibalPayload,
+            merchant: 'zibal',
+            description: `[تست سندباکس] ${finalDescription}`
+          })
+        });
+        const sandboxData = await sandboxRes.json();
+        if (sandboxData.result === 100) {
+          data = sandboxData;
+          isSandboxFallback = true;
+          console.log(`[Zibal] Sandbox fallback succeeded with trackId: ${data.trackId}`);
+        }
+      } catch (sandboxErr) {
+        console.error('[Zibal] Sandbox request fallback error:', sandboxErr);
       }
     }
 
@@ -194,20 +219,25 @@ app.post('/api/zibal-request', async (req, res) => {
 // Zibal Payment Verify Endpoint
 app.post('/api/zibal-verify', async (req, res) => {
   try {
-    const { trackId, merchant } = req.body || {};
+    const { trackId, merchant, ...otherFields } = req.body || {};
     if (!trackId) {
       return res.status(400).json({ success: false, error: 'کد پیگیری تراکنش (trackId) ارسال نشده است.' });
     }
 
     const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
+    const baseUrl = getZibalBaseUrl();
+    const verifyUrl = `${baseUrl}/verify`;
 
-    let zibalRes = await fetch('https://gateway.zibal.ir/v1/verify', {
+    const verifyPayload = {
+      ...otherFields,
+      merchant: ZIBAL_MERCHANT,
+      trackId: Number(trackId)
+    };
+
+    let zibalRes = await fetch(verifyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        merchant: ZIBAL_MERCHANT,
-        trackId: Number(trackId)
-      })
+      body: JSON.stringify(verifyPayload)
     });
 
     let data = await zibalRes.json();
@@ -216,18 +246,23 @@ app.post('/api/zibal-verify', async (req, res) => {
     // Try sandbox fallback verify if the main merchant verify fails or was made in sandbox
     if (data.result !== 100 && data.result !== 201 && ZIBAL_MERCHANT !== 'zibal') {
       console.log(`[Zibal] Verify with merchant ${ZIBAL_MERCHANT} failed (result: ${data.result}). Trying sandbox fallback...`);
-      const sandboxRes = await fetch('https://gateway.zibal.ir/v1/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          merchant: 'zibal',
-          trackId: Number(trackId)
-        })
-      });
-      const sandboxData = await sandboxRes.json();
-      if (sandboxData.result === 100 || sandboxData.result === 201) {
-        data = sandboxData;
-        isSandboxFallback = true;
+      try {
+        const sandboxRes = await fetch(verifyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...verifyPayload,
+            merchant: 'zibal',
+            trackId: Number(trackId)
+          })
+        });
+        const sandboxData = await sandboxRes.json();
+        if (sandboxData.result === 100 || sandboxData.result === 201) {
+          data = sandboxData;
+          isSandboxFallback = true;
+        }
+      } catch (sandboxErr) {
+        console.error('[Zibal] Sandbox verify fallback error:', sandboxErr);
       }
     }
 

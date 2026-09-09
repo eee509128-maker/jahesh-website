@@ -1,3 +1,20 @@
+function getZibalBaseUrl() {
+  const proxyUrl = process.env.ZIBAL_PROXY_URL && process.env.ZIBAL_PROXY_URL.trim();
+  if (
+    proxyUrl &&
+    proxyUrl !== 'none' &&
+    proxyUrl !== 'null' &&
+    proxyUrl !== 'undefined' &&
+    proxyUrl !== 'false'
+  ) {
+    const formattedUrl = (proxyUrl.startsWith('http://') || proxyUrl.startsWith('https://'))
+      ? proxyUrl
+      : `https://${proxyUrl}`;
+    return formattedUrl.replace(/\/+$/, '');
+  }
+  return 'https://gateway.zibal.ir/v1';
+}
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,7 +30,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { trackId, merchant } = req.body || {};
+    const { trackId, merchant, ...otherFields } = req.body || {};
 
     if (!trackId) {
       return res.status(400).json({
@@ -23,13 +40,15 @@ export default async function handler(req, res) {
     }
 
     const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
+    const baseUrl = getZibalBaseUrl();
 
-    const zibalRes = await fetch('https://gateway.zibal.ir/v1/verify', {
+    const zibalRes = await fetch(`${baseUrl}/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        ...otherFields,
         merchant: ZIBAL_MERCHANT,
         trackId: Number(trackId)
       })

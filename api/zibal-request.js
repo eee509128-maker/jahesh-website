@@ -1,3 +1,20 @@
+function getZibalBaseUrl() {
+  const proxyUrl = process.env.ZIBAL_PROXY_URL && process.env.ZIBAL_PROXY_URL.trim();
+  if (
+    proxyUrl &&
+    proxyUrl !== 'none' &&
+    proxyUrl !== 'null' &&
+    proxyUrl !== 'undefined' &&
+    proxyUrl !== 'false'
+  ) {
+    const formattedUrl = (proxyUrl.startsWith('http://') || proxyUrl.startsWith('https://'))
+      ? proxyUrl
+      : `https://${proxyUrl}`;
+    return formattedUrl.replace(/\/+$/, '');
+  }
+  return 'https://gateway.zibal.ir/v1';
+}
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -20,7 +37,8 @@ export default async function handler(req, res) {
       description,
       orderId,
       mobile,
-      merchant
+      merchant,
+      ...otherFields
     } = req.body || {};
 
     const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
@@ -44,6 +62,7 @@ export default async function handler(req, res) {
     const finalDescription = description || `سفارش شماره ${orderId || 'جهش کالا'}`;
 
     const zibalPayload = {
+      ...otherFields,
       merchant: ZIBAL_MERCHANT,
       amount: amountInRials,
       callbackUrl: finalCallbackUrl,
@@ -52,7 +71,8 @@ export default async function handler(req, res) {
       mobile: mobile ? String(mobile) : undefined
     };
 
-    const zibalRes = await fetch('https://gateway.zibal.ir/v1/request', {
+    const baseUrl = getZibalBaseUrl();
+    const zibalRes = await fetch(`${baseUrl}/request`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
