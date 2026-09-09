@@ -503,6 +503,25 @@ export default function App() {
       } catch (err) {}
     }, 5000);
 
+    // Instant Supabase Realtime channel for banners
+    const bannersChannel = supabase
+      .channel('public:chats:banners')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chats', filter: 'user_id=eq.SYSTEM_CONFIG_BANNERS' },
+        (payload: any) => {
+          if (payload.new && Array.isArray(payload.new.messages) && payload.new.messages.length > 0) {
+            if (isMounted) {
+              setBanners(payload.new.messages);
+              try {
+                localStorage.setItem('jahesh_banners', JSON.stringify(payload.new.messages));
+              } catch {}
+            }
+          }
+        }
+      )
+      .subscribe();
+
     // Instant Supabase Realtime channel for products table
     const productsChannel = supabase
       .channel('public:products:realtime')
@@ -588,6 +607,7 @@ export default function App() {
       window.removeEventListener('jahesh-products-updated', handleProductsUpdatedEvent);
       window.removeEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
       window.removeEventListener('jahesh-banners-updated', handleBannersUpdatedEvent);
+      supabase.removeChannel(bannersChannel);
       supabase.removeChannel(productsChannel);
       supabase.removeChannel(ordersChannel);
       clearInterval(syncInterval);

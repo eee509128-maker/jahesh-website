@@ -42,7 +42,7 @@ export const INITIAL_BANNERS: BannerSlide[] = [
     gradient: 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
     overlayOpacity: 90,
     image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80',
-    isActive: false,
+    isActive: true,
     order: 0,
   },
   {
@@ -70,5 +70,18 @@ export const INITIAL_BANNERS: BannerSlide[] = [
     image: 'https://images.unsplash.com/photo-1526178613552-2b45c6c302f0?auto=format&fit=crop&w=1200&q=80',
     isActive: true,
     order: 2,
+  },
+  {
+    id: 'banner-4',
+    badge: 'سیسیبییسیبییس',
+    title: 'یسیسی',
+    subtitle: 'بسییییب',
+    cta: 'مشاهده تخفیف‌های شگفت‌انگیز',
+    actionType: 'incredible',
+    gradient: 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
+    overlayOpacity: 90,
+    image: '/assets/ascend-dashboard_7euwiU1R0Bf04e0Jvhhd2.png',
+    isActive: true,
+    order: 3,
   },
 ];
