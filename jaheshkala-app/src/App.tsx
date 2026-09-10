@@ -197,9 +197,11 @@ export default function App() {
     if (theme === 'light') {
       document.documentElement.classList.add('theme-light');
       document.documentElement.classList.remove('theme-dark');
+      document.documentElement.classList.remove('dark');
     } else {
       document.documentElement.classList.add('theme-dark');
       document.documentElement.classList.remove('theme-light');
+      document.documentElement.classList.add('dark');
     }
   }, [theme]);
 
