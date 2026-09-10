@@ -108,8 +108,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       };
       loadChats();
       loadBanners();
-      const interval = setInterval(loadChats, 5000);
-      return () => clearInterval(interval);
+      const interval = setInterval(loadChats, 3000);
+
+      const handleChatsUpdated = () => {
+        loadChats();
+      };
+      window.addEventListener('jahesh-chats-updated', handleChatsUpdated);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('jahesh-chats-updated', handleChatsUpdated);
+      };
     }
   }, [isOpen]);
 
@@ -297,6 +306,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       sender: 'support',
       text: replyText.trim(),
       time: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+      isHumanAdmin: true,
+      senderTitle: 'کارشناس پشتیبانی جهش‌کالا',
       ...(replyTarget ? {
         replyTo: {
           id: replyTarget.id,

@@ -727,28 +727,67 @@ export const deleteCouponFromDb = async (couponId: string): Promise<boolean> => 
 
 // 5. CHATS DB SERVICE
 export const fetchChatsFromDb = async (): Promise<any[]> => {
+  // Try local storage cache first for instant response
+  let cachedChats: any[] = [];
+  try {
+    const saved = localStorage.getItem('jahesh_all_chats');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        cachedChats = parsed;
+      }
+    }
+  } catch {}
+
   try {
     const { data, error } = await supabase.from('chats').select('*').order('last_updated', { ascending: false });
-    if (error || !data) {
-      console.warn('Fetch chats error:', error?.message);
-      return [];
+    if (!error && data && Array.isArray(data)) {
+      const dbChats = data
+        .filter(item => !String(item.user_id || '').startsWith('SYSTEM_'))
+        .map(item => {
+          const parsedMsgs = typeof item.messages === 'string' ? JSON.parse(item.messages) : (item.messages || []);
+          return {
+            userId: item.user_id,
+            userName: item.user_name || 'کاربر ناشناس',
+            messages: parsedMsgs,
+            lastUpdated: item.last_updated || '',
+            isReadByAdmin: !!item.is_read_by_admin,
+            needsHumanSupport: item.needs_human_support !== undefined 
+              ? !!item.needs_human_support 
+              : parsedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس')),
+          };
+        });
+
+      // Cache locally
+      try {
+        localStorage.setItem('jahesh_all_chats', JSON.stringify(dbChats));
+      } catch {}
+
+      return dbChats;
     }
-    return data
-      .filter(item => !String(item.user_id || '').startsWith('SYSTEM_'))
-      .map(item => ({
-        userId: item.user_id,
-        userName: item.user_name || 'کاربر ناشناس',
-        messages: typeof item.messages === 'string' ? JSON.parse(item.messages) : (item.messages || []),
-        lastUpdated: item.last_updated || '',
-        isReadByAdmin: !!item.is_read_by_admin,
-      }));
   } catch (err) {
     console.warn('Fetch chats exception:', err);
-    return [];
   }
+
+  return cachedChats;
 };
 
 export const saveChatToDb = async (chat: any): Promise<boolean> => {
+  // Update local cache immediately
+  try {
+    const saved = localStorage.getItem('jahesh_all_chats');
+    let chatsList: any[] = saved ? JSON.parse(saved) : [];
+    const idx = chatsList.findIndex(c => c.userId === chat.userId);
+    if (idx >= 0) {
+      chatsList[idx] = chat;
+    } else {
+      chatsList.unshift(chat);
+    }
+    localStorage.setItem('jahesh_all_chats', JSON.stringify(chatsList));
+    localStorage.setItem(`jahesh_chat_${chat.userId}`, JSON.stringify(chat.messages));
+    window.dispatchEvent(new CustomEvent('jahesh-chats-updated', { detail: chat }));
+  } catch {}
+
   try {
     const payload = {
       user_id: chat.userId,
@@ -756,8 +795,9 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
       messages: chat.messages,
       last_updated: chat.lastUpdated,
       is_read_by_admin: chat.isReadByAdmin,
+      needs_human_support: !!chat.needsHumanSupport,
     };
-    const { error } = await supabase.from('chats').upsert(payload);
+    const { error } = await supabase.from('chats').upsert(payload, { onConflict: 'user_id' });
     if (error) {
        console.warn('Save chat error:', error.message);
        return false;

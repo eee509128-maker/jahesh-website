@@ -302,12 +302,25 @@
 .theme-light select,
 .theme-light textarea {
   background-color: #ffffff !important;
-  color: #1e113d !important;
+  color: #0f172a !important;
+  caret-color: #7c3aed !important;
   border-color: rgba(147, 51, 234, 0.25) !important;
 }
 .theme-light input::placeholder,
 .theme-light textarea::placeholder {
-  color: #8c78a9 !important;
+  color: #64748b !important;
+}
+
+/* Dark Mode Input controls */
+.theme-dark input:not([type="checkbox"]):not([type="radio"]),
+.theme-dark select,
+.theme-dark textarea {
+  color: #ffffff !important;
+  caret-color: #fbbf24 !important;
+}
+.theme-dark input::placeholder,
+.theme-dark textarea::placeholder {
+  color: #94a3b8 !important;
 }
 
 /* =================================================================

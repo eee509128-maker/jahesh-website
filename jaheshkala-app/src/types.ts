@@ -126,6 +126,8 @@ export interface ChatMessage {
   sender: 'user' | 'support';
   text: string;
   time: string;
+  isHumanAdmin?: boolean; // True when message is authored directly by the human admin in panel
+  senderTitle?: string;
   replyTo?: {
     id: string;
     text: string;
