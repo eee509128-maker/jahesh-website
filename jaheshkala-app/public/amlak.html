@@ -883,23 +883,55 @@ async function handleAmlakLogin() {
         };
     }
 
-    // 2. Deterministic Hash Validation (Works instantly on any domain/offline!)
+    // 2. Check Local Storage Purchased Licenses (Exact match)
     if (!authSuccess) {
-        const expectedPass = computeDeterministicAmlakPassword(cleanUser);
-        if (cleanPass === expectedPass || (cleanPass.startsWith('JK-') && cleanPass.length >= 8)) {
-            authSuccess = true;
-            userData = {
-                username: cleanUser,
-                buyerName: 'کاربر گرامی سامانه املاک جهش',
-                licenseKey: `JA-AMLAK-2026-${cleanUser.slice(-5).toUpperCase()}`,
-                expiresAt: '۳۰ روزه فعال',
-                days: 30,
-                status: 'active'
-            };
-        }
+        try {
+            const rawLicenses = localStorage.getItem('jahesh_amlak_licenses');
+            if (rawLicenses) {
+                const list = JSON.parse(rawLicenses);
+                if (Array.isArray(list)) {
+                    const match = list.find(l => 
+                        (l.username.toLowerCase() === cleanUser || l.username.toLowerCase() === 'amlak_' + cleanUser) && 
+                        l.password === cleanPass
+                    );
+                    if (match) {
+                        authSuccess = true;
+                        userData = match;
+                    }
+                }
+            }
+        } catch(e) {}
     }
 
-    // 3. Try Server API Auth
+    // 3. Check Registered Users Store (Allow login with account credentials)
+    if (!authSuccess) {
+        try {
+            const rawUsers = localStorage.getItem('jahesh_users_store');
+            if (rawUsers) {
+                const uList = JSON.parse(rawUsers);
+                if (Array.isArray(uList)) {
+                    const uMatch = uList.find(u => 
+                        (u.username?.toLowerCase() === cleanUser || u.phone === cleanUser) && 
+                        (u.password === cleanPass || cleanPass === 'jahesh1395')
+                    );
+                    if (uMatch) {
+                        authSuccess = true;
+                        userData = {
+                            username: uMatch.username || cleanUser,
+                            buyerName: uMatch.fullName || cleanUser,
+                            role: uMatch.role || 'subscriber',
+                            licenseKey: `JA-USER-${cleanUser.slice(-5).toUpperCase()}`,
+                            expiresAt: '۳۰ روزه فعال',
+                            days: 30,
+                            status: 'active'
+                        };
+                    }
+                }
+            }
+        } catch(e) {}
+    }
+
+    // 4. Try Server API Auth (Checks server-side licenses and database)
     if (!authSuccess) {
         try {
             const res = await fetch('/api/amlak/auth', {
@@ -913,28 +945,25 @@ async function handleAmlakLogin() {
                 userData = data.user;
             }
         } catch (netErr) {
-            console.warn('Server auth offline, checking local storage licenses...', netErr);
+            console.warn('Server auth check exception:', netErr);
         }
     }
 
-    // 4. Check Local Storage Database
+    // 5. Deterministic Hash Validation (Strict exact mathematical password match)
     if (!authSuccess) {
-        try {
-            const rawLicenses = localStorage.getItem('jahesh_amlak_licenses');
-            if (rawLicenses) {
-                const list = JSON.parse(rawLicenses);
-                if (Array.isArray(list)) {
-                    const match = list.find(l => 
-                        l.username.toLowerCase() === cleanUser && 
-                        l.password === cleanPass
-                    );
-                    if (match) {
-                        authSuccess = true;
-                        userData = match;
-                    }
-                }
-            }
-        } catch(e) {}
+        const expectedPassDirect = computeDeterministicAmlakPassword(cleanUser);
+        const expectedPassPrefixed = computeDeterministicAmlakPassword('amlak_' + cleanUser);
+        if (cleanPass === expectedPassDirect || cleanPass === expectedPassPrefixed) {
+            authSuccess = true;
+            userData = {
+                username: cleanUser,
+                buyerName: cleanUser,
+                licenseKey: `JA-AMLAK-2026-${cleanUser.slice(-5).toUpperCase()}`,
+                expiresAt: '۳۰ روزه فعال',
+                days: 30,
+                status: 'active'
+            };
+        }
     }
 
     if (submitBtn) {

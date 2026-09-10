@@ -33,7 +33,7 @@ function hashString(str: string): number {
 }
 
 /**
- * Computes a 100% stable, deterministic password from seed (username, order ID, phone)
+ * Computes a 100% stable, deterministic password from seed (exact username)
  */
 export function generateDeterministicAmlakPassword(seed: string): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -64,50 +64,55 @@ export function generateDeterministicLicenseKey(seed: string): string {
 
 /**
  * Generates or retrieves an existing permanent license for the buyer.
- * Fixed and permanent across all renders and reloads.
+ * Uses the EXACT username registered in Jahesh Kala.
  */
 export function generateAmlakLicense(
   order: Partial<Order>,
   user?: User | null
 ): AmlakSubscriptionLicense {
-  // 1. If order already has a persistent license, return it immediately without re-calculating!
-  if (order.amlakLicense && order.amlakLicense.password && order.amlakLicense.username) {
-    saveAmlakLicenseLocally(order.amlakLicense);
-    syncAmlakLicenseWithServer(order.amlakLicense).catch(() => {});
-    return order.amlakLicense;
-  }
-
-  // 2. Derive stable username
-  let cleanUserSlug = '';
-  if (user?.username) {
-    cleanUserSlug = user.username.toLowerCase().replace(/[^a-z0-9]/g, '');
-  } else if (order.customerPhone) {
-    cleanUserSlug = order.customerPhone.slice(-4);
+  // 1. Derive EXACT username from user's registration in Jahesh Kala (No unwanted prefixes)
+  let exactUsername = '';
+  if (user?.username && user.username.trim().length > 0) {
+    exactUsername = user.username.trim();
+  } else if (order.customerPhone && order.customerPhone.trim().length > 0) {
+    exactUsername = order.customerPhone.trim();
+  } else if (user?.phone && user.phone.trim().length > 0) {
+    exactUsername = user.phone.trim();
   } else if (order.trackingCode) {
-    cleanUserSlug = order.trackingCode.replace(/[^a-z0-9]/gi, '').slice(-5).toLowerCase();
+    exactUsername = order.trackingCode.trim();
   } else if (order.id) {
-    cleanUserSlug = order.id.replace(/[^a-z0-9]/gi, '').slice(-5).toLowerCase();
+    exactUsername = order.id.trim();
+  } else {
+    exactUsername = 'jahesh_user';
   }
 
-  if (!cleanUserSlug || cleanUserSlug.length < 3) {
-    cleanUserSlug = 'user' + (order.trackingCode || '1395');
+  // If order already has a persistent license, sanitize its username and return it
+  if (order.amlakLicense && order.amlakLicense.password && order.amlakLicense.username) {
+    const cleanLicUser = order.amlakLicense.username.startsWith('amlak_')
+      ? exactUsername || order.amlakLicense.username.replace('amlak_', '')
+      : order.amlakLicense.username;
+    
+    const updatedLic = {
+      ...order.amlakLicense,
+      username: cleanLicUser,
+    };
+    saveAmlakLicenseLocally(updatedLic);
+    syncAmlakLicenseWithServer(updatedLic).catch(() => {});
+    return updatedLic;
   }
-
-  const generatedUsername = `amlak_${cleanUserSlug}`;
 
   // 3. Check if local storage already has this user's license
   const localLicenses = getLocalAmlakLicenses();
   const existing = localLicenses.find(
-    (l) => l.username.toLowerCase() === generatedUsername.toLowerCase()
+    (l) => l.username.toLowerCase() === exactUsername.toLowerCase()
   );
   if (existing) {
     return existing;
   }
 
-  // 4. Deterministic stable password (NEVER changes across renders!)
-  const seed = generatedUsername;
-  const generatedPassword = generateDeterministicAmlakPassword(seed);
-  const licenseKey = generateDeterministicLicenseKey(seed);
+  // 4. Stable deterministic password & license key matching this exact username
+  const generatedPassword = generateDeterministicAmlakPassword(exactUsername);
+  const licenseKey = generateDeterministicLicenseKey(exactUsername);
 
   const amlakItem = (order.items || []).find(isAmlakProduct);
   const days = amlakItem?.subscriptionDays || 30;
@@ -116,10 +121,10 @@ export function generateAmlakLicense(
   const expireDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 
   const license: AmlakSubscriptionLicense = {
-    username: generatedUsername,
+    username: exactUsername,
     password: generatedPassword,
     licenseKey,
-    buyerName: order.customerName || user?.fullName || 'کاربر گرامی جهش‌کالا',
+    buyerName: order.customerName || user?.fullName || exactUsername,
     phone: order.customerPhone || user?.phone || '',
     days,
     startDate: now.toLocaleDateString('fa-IR', {

@@ -551,7 +551,7 @@ app.post('/api/amlak/auth', (req, res) => {
       });
     }
 
-    // 2. Deterministic Hash Validation (Instant Offline/Online Match)
+    // 2. Deterministic Hash Validation (Strict exact password check)
     function hashString(str) {
       let hash = 5381;
       for (let i = 0; i < str.length; i++) {
@@ -574,13 +574,15 @@ app.post('/api/amlak/auth', (req, res) => {
       return `JK-${digits}${letters}`;
     }
 
-    const expectedPass = generateDeterministicPassword(cleanUser);
-    if (cleanPass === expectedPass || (cleanPass.startsWith('JK-') && cleanPass.length >= 8)) {
+    const expectedPassDirect = generateDeterministicPassword(cleanUser);
+    const expectedPassPrefixed = generateDeterministicPassword('amlak_' + cleanUser);
+
+    if (cleanPass === expectedPassDirect || cleanPass === expectedPassPrefixed) {
       return res.json({
         success: true,
         user: {
           username: cleanUser,
-          buyerName: 'کاربر گرامی سامانه املاک جهش',
+          buyerName: cleanUser,
           role: 'subscriber',
           licenseKey: `JA-AMLAK-2026-${cleanUser.slice(-5).toUpperCase()}`,
           expiresAt: '۳۰ روزه فعال',
@@ -593,7 +595,7 @@ app.post('/api/amlak/auth', (req, res) => {
     // 3. Check Customer Purchased Licenses stored on server
     const licenses = getAmlakLicensesFromServer();
     const matched = licenses.find(
-      l => l.username.toLowerCase() === cleanUser && l.password === cleanPass
+      l => (l.username.toLowerCase() === cleanUser || l.username.toLowerCase() === 'amlak_' + cleanUser) && l.password === cleanPass
     );
 
     if (matched) {
