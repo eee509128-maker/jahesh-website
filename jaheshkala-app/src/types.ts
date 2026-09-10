@@ -26,6 +26,7 @@ export interface Product {
   features: string[];
   includedGifts?: string[];
   image: string;
+  imagePosition?: string; // e.g. 'center', 'top', 'bottom', 'left', 'right'
   gallery?: string[]; // Multiple photos like Digikala (گالری تصاویر محصول)
   warranty?: string;
   colors?: string[];

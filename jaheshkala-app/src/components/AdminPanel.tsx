@@ -74,6 +74,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bannerActionTarget, setBannerActionTarget] = useState('');
   const [bannerGradient, setBannerGradient] = useState('from-[#3b1261] via-[#220d3d] to-[#0d071a]');
   const [bannerOpacity, setBannerOpacity] = useState<number>(90);
+  const [bannerImagePosition, setBannerImagePosition] = useState('center');
   const [bannerImage, setBannerImage] = useState('');
   const [bannerImageLoading, setBannerImageLoading] = useState(false);
   const [bannerSuccessMessage, setBannerSuccessMessage] = useState('');
@@ -171,6 +172,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBannerActionTarget(b.actionTarget || '');
     setBannerGradient(b.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]');
     setBannerOpacity(b.overlayOpacity !== undefined ? b.overlayOpacity : 90);
+    setBannerImagePosition(b.imagePosition || 'center');
     setBannerImage(b.image || '');
     setBannerSuccessMessage('');
   };
@@ -185,6 +187,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBannerActionTarget('');
     setBannerGradient('from-[#3b1261] via-[#220d3d] to-[#0d071a]');
     setBannerOpacity(90);
+    setBannerImagePosition('center');
     setBannerImage('');
     setBannerSuccessMessage('');
     if (bannerFileInputRef.current) bannerFileInputRef.current.value = '';
@@ -207,6 +210,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       actionTarget: bannerActionTarget.trim() || undefined,
       gradient: bannerGradient,
       overlayOpacity: bannerOpacity,
+      imagePosition: bannerImagePosition,
       image: bannerImage,
       isActive: true,
       order: editingBannerId
@@ -2246,6 +2250,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <span className="text-[10px] text-slate-400 shrink-0">۱۰۰٪ (رنگ کامل)</span>
                         </div>
                       </div>
+                      {/* Image Position Control */}
+                      <div className="mt-3.5 p-3.5 bg-[#0f0924] border border-purple-800/60 rounded-xl space-y-2">
+                        <label className="block text-xs font-bold text-slate-200">
+                          محل قرارگیری عکس بنر (Focus Point)
+                        </label>
+                        <select
+                          value={bannerImagePosition}
+                          onChange={(e) => setBannerImagePosition(e.target.value)}
+                          className="w-full bg-[#1b1038] border border-purple-800/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                          dir="rtl"
+                        >
+                          <option value="center">وسط (پیش‌فرض)</option>
+                          <option value="top">بالا</option>
+                          <option value="bottom">پایین</option>
+                          <option value="left">چپ</option>
+                          <option value="right">راست</option>
+                          <option value="top left">بالا چپ</option>
+                          <option value="top right">بالا راست</option>
+                          <option value="bottom left">پایین چپ</option>
+                          <option value="bottom right">پایین راست</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Banner Image Upload & Preview */}
@@ -2290,7 +2316,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <img
                               src={bannerImage}
                               alt="پیش‌نمایش بنر"
-                              className="absolute inset-0 w-full h-full object-cover object-center"
+                              className="absolute inset-0 w-full h-full object-cover"
+                              style={{ objectPosition: bannerImagePosition }}
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80';
                               }}
