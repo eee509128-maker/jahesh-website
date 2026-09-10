@@ -1,0 +1,21 @@
+                          <td className="p-3.5 text-slate-400">{user.createdAt}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+
+        {/* Selected Order Details Modal */}
+        {selectedOrder && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-[#140c2e] border border-purple-800 rounded-3xl p-6 max-w-lg w-full space-y-4 text-right">
+              <div className="flex items-center justify-between border-b border-purple-900 pb-3">
+                <h4 className="text-sm font-bold text-white">جزئیات کامل سفارش {selectedOrder.id}</h4>
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className="text-slate-400 hover:text-white"
