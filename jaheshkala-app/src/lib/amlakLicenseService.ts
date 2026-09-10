@@ -21,40 +21,96 @@ export function hasAmlakInItems(items: CartItem[]): boolean {
 }
 
 /**
- * Generates an exclusive username, password, and license key for the buyer
+ * Deterministic hash function ensuring password never changes randomly
+ */
+function hashString(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * Computes a 100% stable, deterministic password from seed (username, order ID, phone)
+ */
+export function generateDeterministicAmlakPassword(seed: string): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const cleanSeed = (seed || 'jahesh').toLowerCase().trim();
+  const num = hashString(cleanSeed + '_jahesh_amlak_secret_salt_2026');
+  const digits = 1000 + (num % 9000);
+  let letters = '';
+  let temp = Math.floor(num / 13);
+  for (let i = 0; i < 4; i++) {
+    letters += chars[temp % chars.length];
+    temp = Math.floor(temp / chars.length) + (i * 7) + 3;
+  }
+  return `JK-${digits}${letters}`;
+}
+
+export function generateDeterministicLicenseKey(seed: string): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const cleanSeed = (seed || 'jahesh').toLowerCase().trim();
+  const num = hashString(cleanSeed + '_license_key_salt_2026');
+  let keyChars = '';
+  let temp = num;
+  for (let i = 0; i < 5; i++) {
+    keyChars += chars[temp % chars.length];
+    temp = Math.floor(temp / chars.length) + (i * 5) + 1;
+  }
+  return `JA-AMLAK-2026-${keyChars}`;
+}
+
+/**
+ * Generates or retrieves an existing permanent license for the buyer.
+ * Fixed and permanent across all renders and reloads.
  */
 export function generateAmlakLicense(
   order: Partial<Order>,
   user?: User | null
 ): AmlakSubscriptionLicense {
-  // Find subscription duration if specified
-  const amlakItem = (order.items || []).find(isAmlakProduct);
-  const days = amlakItem?.subscriptionDays || 30;
+  // 1. If order already has a persistent license, return it immediately without re-calculating!
+  if (order.amlakLicense && order.amlakLicense.password && order.amlakLicense.username) {
+    saveAmlakLicenseLocally(order.amlakLicense);
+    syncAmlakLicenseWithServer(order.amlakLicense).catch(() => {});
+    return order.amlakLicense;
+  }
 
-  // Clean username creation
+  // 2. Derive stable username
   let cleanUserSlug = '';
   if (user?.username) {
     cleanUserSlug = user.username.toLowerCase().replace(/[^a-z0-9]/g, '');
   } else if (order.customerPhone) {
     cleanUserSlug = order.customerPhone.slice(-4);
+  } else if (order.trackingCode) {
+    cleanUserSlug = order.trackingCode.replace(/[^a-z0-9]/gi, '').slice(-5).toLowerCase();
+  } else if (order.id) {
+    cleanUserSlug = order.id.replace(/[^a-z0-9]/gi, '').slice(-5).toLowerCase();
   }
+
   if (!cleanUserSlug || cleanUserSlug.length < 3) {
-    cleanUserSlug = Math.floor(1000 + Math.random() * 9000).toString();
+    cleanUserSlug = 'user' + (order.trackingCode || '1395');
   }
 
   const generatedUsername = `amlak_${cleanUserSlug}`;
 
-  // Unique strong password for this customer
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let randChars = '';
-  for (let i = 0; i < 4; i++) {
-    randChars += chars.charAt(Math.floor(Math.random() * chars.length));
+  // 3. Check if local storage already has this user's license
+  const localLicenses = getLocalAmlakLicenses();
+  const existing = localLicenses.find(
+    (l) => l.username.toLowerCase() === generatedUsername.toLowerCase()
+  );
+  if (existing) {
+    return existing;
   }
-  const randDigits = Math.floor(1000 + Math.random() * 9000);
-  const generatedPassword = `JK-${randDigits}${randChars}`;
 
-  // License key
-  const licenseKey = `JA-AMLAK-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+  // 4. Deterministic stable password (NEVER changes across renders!)
+  const seed = generatedUsername;
+  const generatedPassword = generateDeterministicAmlakPassword(seed);
+  const licenseKey = generateDeterministicLicenseKey(seed);
+
+  const amlakItem = (order.items || []).find(isAmlakProduct);
+  const days = amlakItem?.subscriptionDays || 30;
 
   const now = new Date();
   const expireDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
@@ -79,7 +135,7 @@ export function generateAmlakLicense(
     status: 'active',
   };
 
-  // Persist locally & try to sync with server
+  // Persist permanently
   saveAmlakLicenseLocally(license);
   syncAmlakLicenseWithServer(license).catch(() => {});
 
@@ -92,12 +148,11 @@ export function saveAmlakLicenseLocally(license: AmlakSubscriptionLicense): void
     let list: AmlakSubscriptionLicense[] = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(list)) list = [];
     
-    // Replace if exists, or prepend
     const existingIdx = list.findIndex(
       (l) => l.username.toLowerCase() === license.username.toLowerCase()
     );
     if (existingIdx >= 0) {
-      list[existingIdx] = license;
+      list[existingIdx] = { ...list[existingIdx], ...license };
     } else {
       list.unshift(license);
     }
