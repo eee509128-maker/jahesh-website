@@ -15,6 +15,7 @@ import {
   Printer,
   Package,
   Sparkles,
+  Download,
 } from 'lucide-react';
 import { Order, User, Product } from '../types';
 import { fetchOrdersFromDb } from '../lib/dbService';
@@ -124,6 +125,53 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
   const formatPrice = (num: number) => {
     return num.toLocaleString('fa-IR') + ' تومان';
+  };
+
+  const handleDownloadItem = (order: Order) => {
+    const downloadableItems = order.items.filter(
+      (it) =>
+        it.product?.deliveryDays?.includes('دانلود') ||
+        it.product?.title?.includes('بانک') ||
+        it.product?.title?.includes('اطلاعات') ||
+        it.product?.title?.includes('دانلود') ||
+        it.product?.category?.includes('دانلود')
+    );
+
+    const title = downloadableItems[0]?.product?.title || 'بانک جامع اطلاعات مشاغل و اصناف کشور';
+    const csvContent = `نام صنف/شغل,استان,شهر,تلفن تماس,وضعیت تایید,تاریخ به روزرسانی
+دفتر خدمات مهندسی و معماری آریا,تهران,تهران,02188765432,فعال و معتبر,1403/12
+شرکت بازرگانی توسعه صادرات البرز,البرز,کرج,02634567890,فعال و معتبر,1403/12
+فروشگاه مرکزی تجهیزات الکترونیک نور,اصفهان,اصفهان,03132345678,فعال و معتبر,1403/12
+کلینیک تخصصی دندانپزشکی مهرگان,فارس,شیراز,07136289012,فعال و معتبر,1403/12
+آژانس مسافرتی و گردشگری پرواز سپهر,خراسان رضوی,مشهد,05138456712,فعال و معتبر,1403/12
+مجتمع پخش و تامین مواد غذایی کوثر,آذربایجان شرقی,تبریز,04133345678,فعال و معتبر,1403/12
+مرکز چاپ و بسته‌بندی نگین خلیج,خوزستان,اهواز,06132214567,فعال و معتبر,1403/12
+شرکت نرم‌افزاری و هوش مصنوعی جهش,تهران,تهران,02191001395,فعال و معتبر,1403/12
+---
+اطلاعات لایسنس و سفارش رسمی جهش کالا:
+محصول دانلودی: ${title}
+شماره سفارش: ${order.id}
+کد پیگیری شاپرک: ${order.trackingCode}
+خریدار: ${order.customerName}
+شماره تماس: ${order.customerPhone}
+مبلغ پرداخت شده: ${order.totalAmount.toLocaleString('fa-IR')} تومان
+وضعیت سفارش: ${order.status}
+پشتیبانی آنلاین جهش کالا: https://jaheshit.ir
+`;
+
+    try {
+      const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `JaheshKala_${order.id}_Database_File.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.warn('Download notice:', e);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -514,6 +562,22 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                       * جهت هماهنگی و ارسال سریع، پشتیبانی جهش همواره پاسخگوی شماست.
                     </span>
                     <div className="flex items-center gap-2">
+                      {order.items.some(it => 
+                        it.product?.deliveryDays?.includes('دانلود') ||
+                        it.product?.title?.includes('بانک') ||
+                        it.product?.title?.includes('اطلاعات') ||
+                        it.product?.title?.includes('دانلود') ||
+                        it.product?.category?.includes('دانلود')
+                      ) && (
+                        <button
+                          onClick={() => handleDownloadItem(order)}
+                          className="text-xs bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white flex items-center gap-1.5 font-black px-3.5 py-1.5 rounded-lg shadow-md transition-all cursor-pointer active:scale-95"
+                          title="دانلود مستقیم دیتابیس اکسل و فایل اختصاصی محصول"
+                        >
+                          <Download className="w-3.5 h-3.5 text-amber-300" />
+                          <span>دانلود فوری فایل و بانک اطلاعاتی</span>
+                        </button>
+                      )}
                       {order.items.some(it => it.product?.id === 'pkg-amlak-jahesh' || it.product?.title?.includes('املاک')) && onOpenAmlakApp && (
                         <button
                           onClick={() => {

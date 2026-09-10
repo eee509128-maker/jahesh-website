@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import confetti from 'canvas-confetti';
 import { ImageCropperModal } from './ImageCropperModal';
 import {
   Crop,
@@ -7,7 +8,7 @@ import {
   Sliders, ExternalLink, Code2, Server, HelpCircle, Layers, Tag, Sparkles,
   Flame, Percent, Truck, Check, Ticket, ToggleLeft, ToggleRight, ArrowDownRight, Calculator, Users, MessageCircle, ArrowLeft, Reply, Paperclip, Image as ImageIcon, CornerUpRight, Download,
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
-  ChevronRight, ChevronLeft
+  ChevronRight, ChevronLeft, Play
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide } from '../types';
 import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage } from '../lib/dbService';
@@ -38,6 +39,9 @@ interface AdminPanelProps {
   banners?: BannerSlide[];
   onSaveBanner?: (banner: BannerSlide) => void;
   onDeleteBanner?: (bannerId: string) => void;
+  onSimulateRealPayment?: (testOrder: Order, showReceipt?: boolean) => void;
+  onOpenUserOrdersModal?: (phone?: string) => void;
+  onOpenAmlakModal?: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -64,8 +68,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   banners: initialBannersProp,
   onSaveBanner,
   onDeleteBanner,
+  onSimulateRealPayment,
+  onOpenUserOrdersModal,
+  onOpenAmlakModal,
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'test-order' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats'>('orders');
   const [bannersList, setBannersList] = useState<BannerSlide[]>(initialBannersProp || INITIAL_BANNERS);
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerTitle, setBannerTitle] = useState('');
@@ -96,6 +103,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [fileUploadError, setFileUploadError] = useState<string>('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const tabNavRef = React.useRef<HTMLDivElement>(null);
+
+  // Test Order / Real Payment Simulation State (ویژه مدیریت)
+  const [selectedTestProductId, setSelectedTestProductId] = useState<string>('');
+  const [testCustomerName, setTestCustomerName] = useState('مدیر سیستم (تست پرداخت)');
+  const [testCustomerPhone, setTestCustomerPhone] = useState('09881234567');
+  const [testCustomerEmail, setTestCustomerEmail] = useState('admin@jaheshit.ir');
+  const [testRequestedDomain, setTestRequestedDomain] = useState('jahesh-sample.ir');
+  const [testClientNotes, setTestClientNotes] = useState('تست اعتبارسنجی پرداخت شاپرک و نحوه تحویل فوری محصول به مشتری');
+  const [testCouponCode, setTestCouponCode] = useState('');
+  const [testQuantity, setTestQuantity] = useState<number>(1);
+  const [testOrderStatus, setTestOrderStatus] = useState<OrderStatus>('در حال بررسی');
+  const [lastExecutedTestOrder, setLastExecutedTestOrder] = useState<Order | null>(null);
+  const [isTestExecuting, setIsTestExecuting] = useState(false);
+  const [testSuccessNotice, setTestSuccessNotice] = useState<string>('');
+  const [testReceiptPreviewModal, setTestReceiptPreviewModal] = useState<Order | null>(null);
+  const [testProductSearch, setTestProductSearch] = useState('');
+
+  React.useEffect(() => {
+    if (products && products.length > 0 && !selectedTestProductId) {
+      setSelectedTestProductId(products[0].id);
+    }
+  }, [products, selectedTestProductId]);
 
   const scrollTabs = (direction: 'left' | 'right') => {
     if (tabNavRef.current) {
@@ -538,6 +567,144 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     return num.toLocaleString('fa-IR') + ' تومان';
   };
 
+  const handleExecuteTestPayment = async (mode: 'storefront_receipt' | 'in_panel') => {
+    const targetProduct = products.find((p) => p.id === selectedTestProductId) || products[0];
+    if (!targetProduct) {
+      alert('لطفاً ابتدا یک کالا یا محصول را برای تست انتخاب کنید.');
+      return;
+    }
+
+    setIsTestExecuting(true);
+    setTestSuccessNotice('');
+
+    // Generate realistic bank values for Shaparak & Zibal
+    const randomSuffix = Math.floor(10000 + Math.random() * 90000).toString();
+    const orderId = `JAHESH-TEST-${randomSuffix}`;
+    const trackId = `100${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const refNumber = `9820${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+    const qty = Math.max(1, testQuantity || 1);
+    const basePrice = (Number(targetProduct.price) || 0) * qty;
+    let discountAmount = 0;
+    if (testCouponCode.trim()) {
+      const foundCoupon = coupons.find(
+        (c) => c.code.toLowerCase() === testCouponCode.trim().toLowerCase() && c.isActive
+      );
+      if (foundCoupon) {
+        discountAmount = Math.round((basePrice * foundCoupon.discountPercent) / 100);
+      } else if (
+        targetProduct.couponCode &&
+        targetProduct.couponCode.toLowerCase() === testCouponCode.trim().toLowerCase()
+      ) {
+        discountAmount = Math.round((basePrice * (targetProduct.couponDiscountPercent || 15)) / 100);
+      }
+    }
+    const finalAmount = Math.max(0, basePrice - discountAmount);
+
+    const nowPersian = new Date().toLocaleDateString('fa-IR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const isDesignOrHosting =
+      targetProduct.category?.includes('طراحی') ||
+      targetProduct.id === 'pkg-golden-jahesh' ||
+      targetProduct.title?.includes('سایت');
+
+    const testOrder: Order = {
+      id: orderId,
+      trackingCode: trackId,
+      paymentRefId: refNumber,
+      userId: 'admin-test-user',
+      customerName: testCustomerName.trim() || 'مدیر سیستم (تست پرداخت)',
+      customerPhone: testCustomerPhone.trim() || '09881234567',
+      customerEmail: testCustomerEmail.trim() || 'admin@jaheshit.ir',
+      requestedDomain: isDesignOrHosting ? (testRequestedDomain || 'sample-domain.ir') : undefined,
+      clientNotes: testClientNotes.trim(),
+      items: [
+        {
+          product: targetProduct,
+          quantity: qty,
+          requestedDomain: isDesignOrHosting ? (testRequestedDomain || 'sample-domain.ir') : undefined,
+          clientNotes: testClientNotes.trim(),
+        },
+      ],
+      totalAmount: finalAmount,
+      discountAmount: discountAmount,
+      appliedCouponCode: testCouponCode.trim() || undefined,
+      status: testOrderStatus || 'در حال بررسی',
+      paymentGateway: 'زیبال (Zibal - شبیه‌ساز پرداخت واقعی شاپرک)',
+      acceptedTerms: true,
+      date: nowPersian,
+    };
+
+    try {
+      const { saveOrderToDb } = await import('../lib/dbService');
+      await saveOrderToDb(testOrder);
+    } catch (e) {
+      console.warn('Test order save warning:', e);
+    }
+
+    setLastExecutedTestOrder(testOrder);
+    setIsTestExecuting(false);
+
+    try {
+      confetti({
+        particleCount: 150,
+        spread: 80,
+        origin: { y: 0.6 },
+      });
+    } catch {}
+
+    if (mode === 'storefront_receipt' && onSimulateRealPayment) {
+      onSimulateRealPayment(testOrder, true);
+    } else {
+      setTestSuccessNotice(`سفارش تستی ${orderId} با موفقیت در دیتابیس ثبت شد و اکنون در چرخه سفارشات قرار دارد.`);
+    }
+  };
+
+  const handleTestDownloadFile = (order: Order) => {
+    const item = order.items[0]?.product;
+    const title = item?.title || 'فایل دانلودی جهش کالا';
+    const csvContent = `نام صنف/شغل,استان,شهر,تلفن تماس,وضعیت تایید,تاریخ به روزرسانی
+دفتر خدمات مهندسی و معماری آریا,تهران,تهران,02188765432,فعال و معتبر,1403/12
+شرکت بازرگانی توسعه صادرات البرز,البرز,کرج,02634567890,فعال و معتبر,1403/12
+فروشگاه مرکزی تجهیزات الکترونیک نور,اصفهان,اصفهان,03132345678,فعال و معتبر,1403/12
+کلینیک تخصصی دندانپزشکی مهرگان,فارس,شیراز,07136289012,فعال و معتبر,1403/12
+آژانس مسافرتی و گردشگری پرواز سپهر,خراسان رضوی,مشهد,05138456712,فعال و معتبر,1403/12
+مجتمع پخش و تامین مواد غذایی کوثر,آذربایجان شرقی,تبریز,04133345678,فعال و معتبر,1403/12
+مرکز چاپ و بسته‌بندی نگین خلیج,خوزستان,اهواز,06132214567,فعال و معتبر,1403/12
+شرکت نرم‌افزاری و هوش مصنوعی جهش,تهران,تهران,02191001395,فعال و معتبر,1403/12
+---
+اطلاعات لایسنس و سفارش رسمی جهش کالا:
+محصول دانلودی: ${title}
+شماره سفارش: ${order.id}
+کد پیگیری شاپرک: ${order.trackingCode}
+خریدار: ${order.customerName}
+شماره تماس: ${order.customerPhone}
+مبلغ پرداخت شده: ${formatPrice(order.totalAmount)}
+وضعیت سفارش: ${order.status}
+پشتیبانی آنلاین جهش کالا: https://jaheshit.ir
+`;
+
+    try {
+      const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `JaheshKala_${order.id}_Database_Export.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.warn('Test download notice:', e);
+    }
+  };
+
   const handleStartNew = () => {
     setEditingProductId(null);
     setNewTitle('');
@@ -837,6 +1004,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span>محصولات و کالاها</span>
               <span className="bg-purple-900 text-purple-200 text-[10px] px-2 py-0.5 rounded-full">
                 {products.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('test-order')}
+              className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'test-order'
+                  ? 'border-emerald-400 text-emerald-300 font-black'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span>تست پرداخت و تحویل محصول</span>
+              <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/50 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                ویژه مدیر
               </span>
             </button>
 
@@ -1149,18 +1331,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between pt-3 border-t border-purple-900/40 mt-2">
-                      <span className="text-[11px] text-slate-400 truncate max-w-[150px]">{prod.deliveryDays}</span>
-                      <div className="flex items-center gap-1">
+                      <span className="text-[11px] text-slate-400 truncate max-w-[140px]">{prod.deliveryDays}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setSelectedTestProductId(prod.id);
+                            setActiveTab('test-order');
+                          }}
+                          className="px-2 py-1 rounded-lg bg-emerald-600/25 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                          title="تست خرید واقعی، پرداخت بانکی و نحوه تحویل این محصول به مشتری"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          <span>تست پرداخت این کالا</span>
+                        </button>
                         <button
                           onClick={() => handleStartEdit(prod)}
-                          className="p-1.5 text-slate-400 hover:text-amber-400 transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
                           title="ویرایش این کالا"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => onDeleteProduct(prod.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
                           title="حذف این کالا"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -3467,6 +3660,654 @@ on public.users for delete using (true);`;
                     <p className="text-xs">یک گفتگو را برای مشاهده و پاسخ انتخاب کنید.</p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Test Order & Payment Simulation Tab (ویژه مدیریت) */}
+          {activeTab === 'test-order' && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="bg-gradient-to-r from-emerald-950/80 via-[#1a0f35] to-[#120826] border border-emerald-500/40 rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/60 border border-emerald-500/50 text-emerald-300 text-xs font-black">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+                      <span>شبیه‌ساز پرداخت واقعی جهش‌کالا (Admin Payment & Delivery Sandbox)</span>
+                    </div>
+                    <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
+                      <span>تست و شبیه‌سازی خرید محصول و فرآیند پس از پرداخت</span>
+                    </h3>
+                    <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                      با این بخش می‌توانید هر کدام از کالاهای سایت را بدون پرداخت پول واقعی تست کنید تا دقیقاً ببینید بعد از پرداخت شاپرک چه اتفاقی می‌افتد:
+                      نحوه صدور رسید بانکی، ثبت در دیتابیس سفارشات، دانلود فوری فایل و دیتابیس، دسترسی به نرم‌افزار، و وضعیت در پیگیری سفارشات مشتری.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] bg-black/40 border border-emerald-500/30 text-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>محیط تست امن و ایزوله</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {testSuccessNotice && (
+                <div className="p-4 rounded-2xl bg-emerald-950/90 border border-emerald-500/60 text-emerald-200 text-xs flex items-center justify-between shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <span>{testSuccessNotice}</span>
+                  </div>
+                  <button
+                    onClick={() => setTestSuccessNotice('')}
+                    className="text-emerald-400 hover:text-white text-xs px-2 py-1"
+                  >
+                    بستن
+                  </button>
+                </div>
+              )}
+
+              {/* Main 2-Column Test Grid: Product Selector + Configuration */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Column 1: Select Product to Test (5 cols) */}
+                <div className="lg:col-span-5 space-y-4">
+                  <div className="bg-[#191038]/80 border border-purple-800/60 rounded-3xl p-5 space-y-4">
+                    <div className="flex items-center justify-between border-b border-purple-900/60 pb-3">
+                      <h4 className="text-xs font-black text-white flex items-center gap-2">
+                        <Package className="w-4 h-4 text-amber-400" />
+                        <span>۱. انتخاب کالای مورد نظر برای تست</span>
+                      </h4>
+                      <span className="text-[11px] text-purple-300">
+                        {products.length} محصول موجود
+                      </span>
+                    </div>
+
+                    {/* Search bar inside products */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={testProductSearch}
+                        onChange={(e) => setTestProductSearch(e.target.value)}
+                        placeholder="جستجوی سریع در نام یا دسته‌بندی کالا..."
+                        className="w-full bg-black/40 border border-purple-800/80 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-right pr-9"
+                      />
+                      <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+                      {testProductSearch && (
+                        <button
+                          onClick={() => setTestProductSearch('')}
+                          className="absolute left-3 top-2.5 text-slate-400 hover:text-white text-xs"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Product List Selector */}
+                    <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+                      {products
+                        .filter((p) => {
+                          if (!testProductSearch.trim()) return true;
+                          const q = testProductSearch.trim().toLowerCase();
+                          return (
+                            p.title.toLowerCase().includes(q) ||
+                            p.category?.toLowerCase().includes(q) ||
+                            p.id.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((prod) => {
+                          const isSelected = prod.id === selectedTestProductId;
+                          const isDownloadable =
+                            prod.deliveryDays?.includes('دانلود') ||
+                            prod.title.includes('بانک') ||
+                            prod.title.includes('اطلاعات') ||
+                            prod.category?.includes('دانلود');
+                          const isAmlak =
+                            prod.id === 'pkg-amlak-jahesh' || prod.title.includes('املاک');
+                          const isWebDesign =
+                            prod.category?.includes('طراحی') ||
+                            prod.id === 'pkg-golden-jahesh';
+
+                          return (
+                            <div
+                              key={prod.id}
+                              onClick={() => setSelectedTestProductId(prod.id)}
+                              className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center gap-3 ${
+                                isSelected
+                                  ? 'bg-emerald-950/70 border-emerald-400 shadow-md shadow-emerald-950/50'
+                                  : 'bg-black/30 border-purple-900/40 hover:bg-purple-900/20 hover:border-purple-700/60'
+                              }`}
+                            >
+                              <img
+                                src={prod.image || getFallbackProductImage(prod.category)}
+                                alt={prod.title}
+                                className="w-12 h-12 rounded-xl object-cover bg-black/40 border border-purple-900/40 shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    getFallbackProductImage(prod.category);
+                                }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1 mb-0.5">
+                                  <h5
+                                    className={`text-xs font-bold truncate ${
+                                      isSelected ? 'text-emerald-200' : 'text-white'
+                                    }`}
+                                  >
+                                    {prod.title}
+                                  </h5>
+                                  {isSelected && (
+                                    <span className="shrink-0 bg-emerald-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <Check className="w-3 h-3" />
+                                      <span>انتخاب شده</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-400 truncate max-w-[150px]">
+                                    {prod.category}
+                                  </span>
+                                  <span className="text-amber-300 font-bold">
+                                    {formatPrice(prod.price)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  {isDownloadable && (
+                                    <span className="text-[10px] bg-emerald-900/60 text-emerald-300 border border-emerald-700/40 px-2 py-0.5 rounded-full">
+                                      📥 فایل دانلودی
+                                    </span>
+                                  )}
+                                  {isAmlak && (
+                                    <span className="text-[10px] bg-amber-900/60 text-amber-300 border border-amber-700/40 px-2 py-0.5 rounded-full">
+                                      🏢 سامانه املاک
+                                    </span>
+                                  )}
+                                  {isWebDesign && (
+                                    <span className="text-[10px] bg-purple-900/60 text-purple-300 border border-purple-700/40 px-2 py-0.5 rounded-full">
+                                      🌐 طراحی وبسایت
+                                    </span>
+                                  )}
+                                  {!isDownloadable && !isAmlak && !isWebDesign && (
+                                    <span className="text-[10px] bg-blue-900/60 text-blue-300 border border-blue-700/40 px-2 py-0.5 rounded-full">
+                                      📦 تحویل پستی
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  {/* Highlight card for selected product */}
+                  {(() => {
+                    const selectedProd =
+                      products.find((p) => p.id === selectedTestProductId) || products[0];
+                    if (!selectedProd) return null;
+                    return (
+                      <div className="bg-gradient-to-b from-[#1c123d] to-[#120a28] border border-emerald-500/40 rounded-3xl p-4 space-y-3">
+                        <div className="flex items-center justify-between text-xs text-emerald-300 font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                            <span>پیش‌نمایش کالای انتخابی برای تست:</span>
+                          </span>
+                          <span className="font-mono text-[11px] text-slate-400">
+                            کد: {selectedProd.id}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={
+                              selectedProd.image || getFallbackProductImage(selectedProd.category)
+                            }
+                            alt={selectedProd.title}
+                            className="w-14 h-14 rounded-2xl object-cover border border-emerald-500/30 shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                getFallbackProductImage(selectedProd.category);
+                            }}
+                          />
+                          <div>
+                            <h4 className="text-xs font-black text-white">
+                              {selectedProd.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-300 mt-0.5">
+                              روش تحویل: {selectedProd.deliveryDays}
+                            </p>
+                            <p className="text-xs text-amber-300 font-black mt-1">
+                              مبلغ آزمایشی: {formatPrice(selectedProd.price)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Column 2: Test Parameters & Trigger Actions (7 cols) */}
+                <div className="lg:col-span-7 space-y-5">
+                  <div className="bg-[#191038]/80 border border-purple-800/60 rounded-3xl p-5 space-y-4">
+                    <div className="flex items-center justify-between border-b border-purple-900/60 pb-3">
+                      <h4 className="text-xs font-black text-white flex items-center gap-2">
+                        <Sliders className="w-4 h-4 text-emerald-400" />
+                        <span>۲. تنظیم اطلاعات آزمایشی خرید و پرداخت</span>
+                      </h4>
+                      <span className="text-[10px] bg-emerald-950 border border-emerald-500/40 text-emerald-300 px-2.5 py-1 rounded-full font-bold">
+                        اطلاعات بدون نیاز به پرداخت واقعی
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                          نام خریدار تستی:
+                        </label>
+                        <input
+                          type="text"
+                          value={testCustomerName}
+                          onChange={(e) => setTestCustomerName(e.target.value)}
+                          placeholder="مثلاً: مدیر سیستم جهش"
+                          className="w-full bg-black/40 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 text-right"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                          شماره موبایل خریدار (جهت پیگیری سفارش):
+                        </label>
+                        <input
+                          type="text"
+                          value={testCustomerPhone}
+                          onChange={(e) => setTestCustomerPhone(e.target.value)}
+                          placeholder="09881234567"
+                          className="w-full bg-black/40 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 text-right font-mono"
+                        />
+                        <span className="text-[10px] text-slate-400">
+                          * با این شماره می‌توانید سفارش را در «پیگیری سفارشات من» مشاهده کنید.
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                          ایمیل خریدار:
+                        </label>
+                        <input
+                          type="email"
+                          value={testCustomerEmail}
+                          onChange={(e) => setTestCustomerEmail(e.target.value)}
+                          placeholder="admin@jaheshit.ir"
+                          className="w-full bg-black/40 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 text-right"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                          کد تخفیف تستی (اختیاری):
+                        </label>
+                        <input
+                          type="text"
+                          value={testCouponCode}
+                          onChange={(e) => setTestCouponCode(e.target.value)}
+                          placeholder="مثلاً JAHESH20 یا AMLAK10"
+                          className="w-full bg-black/40 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 text-right uppercase"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                          دامنه / نام پروژه (برای سایت و هاست):
+                        </label>
+                        <input
+                          type="text"
+                          value={testRequestedDomain}
+                          onChange={(e) => setTestRequestedDomain(e.target.value)}
+                          placeholder="مثلاً: mycompany.ir"
+                          className="w-full bg-black/40 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 text-right font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                          وضعیت اولیه سفارش ثبت‌شده:
+                        </label>
+                        <select
+                          value={testOrderStatus}
+                          onChange={(e) => setTestOrderStatus(e.target.value as OrderStatus)}
+                          className="w-full bg-black/40 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 text-right cursor-pointer"
+                        >
+                          <option value="در حال بررسی">در حال بررسی (پیش‌فرض پس از پرداخت)</option>
+                          <option value="تایید شده">تایید شده و در صف آماده‌سازی</option>
+                          <option value="ارسال شده">ارسال شده / تحویل داده شده</option>
+                          <option value="تحویل نهایی شده">تحویل نهایی شده</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] text-slate-300 font-bold mb-1">
+                        توضیحات و بریف خریدار:
+                      </label>
+                      <input
+                        type="text"
+                        value={testClientNotes}
+                        onChange={(e) => setTestClientNotes(e.target.value)}
+                        placeholder="توضیحات ویژه سفارش..."
+                        className="w-full bg-black/40 border border-purple-800/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-400 text-right"
+                      />
+                    </div>
+
+                    {/* Action Execution Buttons */}
+                    <div className="pt-3 border-t border-purple-900/60 space-y-3">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        {/* Primary Button: Run test and show real storefront receipt */}
+                        <button
+                          type="button"
+                          onClick={() => handleExecuteTestPayment('storefront_receipt')}
+                          disabled={isTestExecuting}
+                          className="flex-1 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60 transition-all cursor-pointer active:scale-95"
+                        >
+                          {isTestExecuting ? (
+                            <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 text-amber-300" />
+                          )}
+                          <span>🚀 شبیه‌سازی پرداخت واقعی شاپرک و باز شدن رسید در فروشگاه</span>
+                        </button>
+
+                        {/* Secondary Button: Execute in panel */}
+                        <button
+                          type="button"
+                          onClick={() => handleExecuteTestPayment('in_panel')}
+                          disabled={isTestExecuting}
+                          className="py-3.5 px-4 rounded-2xl bg-purple-900/60 hover:bg-purple-800 border border-purple-700/60 text-purple-200 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Play className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>⚡ اجرای تست درون پنل مدیریت</span>
+                        </button>
+                      </div>
+
+                      <p className="text-[11px] text-slate-400 text-center">
+                        * دکمه اول پنل مدیریت را موقتاً می‌بندد و دقیقاً همان رسید بانکی سبز رنگ شاپرک که مشتری در صفحه فروشگاه می‌بیند را با افکت جشن و کانفتی باز می‌کند.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Live Results Panel if a test order was executed */}
+                  {lastExecutedTestOrder && (
+                    <div className="bg-gradient-to-b from-[#122325] via-[#10192e] to-[#0c1224] border-2 border-emerald-500/80 rounded-3xl p-5 shadow-2xl space-y-4 text-right">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-900/60 pb-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 animate-bounce" />
+                          <h4 className="text-sm font-black text-emerald-300">
+                            نتیجه زنده شبیه‌سازی پرداخت واقعی شاپرک
+                          </h4>
+                        </div>
+                        <span className="text-[11px] font-mono bg-emerald-950 border border-emerald-500/50 text-emerald-200 px-3 py-1 rounded-full font-bold">
+                          {lastExecutedTestOrder.id}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="bg-black/40 p-2.5 rounded-xl border border-emerald-900/40">
+                          <span className="text-[10px] text-slate-400 block mb-0.5">کد پیگیری شاپرک:</span>
+                          <strong className="font-mono text-emerald-300 text-xs">
+                            {lastExecutedTestOrder.trackingCode}
+                          </strong>
+                        </div>
+                        <div className="bg-black/40 p-2.5 rounded-xl border border-emerald-900/40">
+                          <span className="text-[10px] text-slate-400 block mb-0.5">شماره مرجع بانکی (RefId):</span>
+                          <strong className="font-mono text-amber-300 text-xs">
+                            {lastExecutedTestOrder.paymentRefId}
+                          </strong>
+                        </div>
+                        <div className="bg-black/40 p-2.5 rounded-xl border border-emerald-900/40">
+                          <span className="text-[10px] text-slate-400 block mb-0.5">مبلغ پرداختی:</span>
+                          <strong className="text-white text-xs">
+                            {formatPrice(lastExecutedTestOrder.totalAmount)}
+                          </strong>
+                        </div>
+                        <div className="bg-black/40 p-2.5 rounded-xl border border-emerald-900/40">
+                          <span className="text-[10px] text-slate-400 block mb-0.5">وضعیت سفارش:</span>
+                          <span className="text-emerald-400 font-bold">
+                            {lastExecutedTestOrder.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Interactive Actions on Test Order */}
+                      <div className="pt-2 space-y-2">
+                        <span className="text-xs font-black text-white block">
+                          اقدامات و دسترسی‌های خریدار پس از پرداخت (همین حالا تست کنید):
+                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setTestReceiptPreviewModal(lastExecutedTestOrder)}
+                            className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>👁️ پیش‌نمایش رسید بانکی شاپرک (مشتری)</span>
+                          </button>
+
+                          {onOpenUserOrdersModal && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onOpenUserOrdersModal(lastExecutedTestOrder.customerPhone);
+                              }}
+                              className="px-3 py-2 rounded-xl bg-purple-800 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <Truck className="w-3.5 h-3.5 text-amber-300" />
+                              <span>📦 باز کردن صفحه پیگیری سفارشات من</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('orders')}
+                            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5 text-blue-400" />
+                            <span>📋 مشاهده این سفارش در تب سفارشات مدیریت</span>
+                          </button>
+
+                          {/* Specific Delivery actions */}
+                          {lastExecutedTestOrder.items.some(
+                            (it) =>
+                              it.product?.id === 'pkg-amlak-jahesh' ||
+                              it.product?.title?.includes('املاک')
+                          ) && onOpenAmlakModal && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenAmlakModal()}
+                              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>🏢 ورود به سامانه هوشمند مدیریت املاک جهش</span>
+                            </button>
+                          )}
+
+                          {lastExecutedTestOrder.items.some(
+                            (it) =>
+                              it.product?.deliveryDays?.includes('دانلود') ||
+                              it.product?.title?.includes('بانک') ||
+                              it.product?.title?.includes('اطلاعات') ||
+                              it.product?.category?.includes('دانلود')
+                          ) && (
+                            <button
+                              type="button"
+                              onClick={() => handleTestDownloadFile(lastExecutedTestOrder)}
+                              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-black text-xs flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                            >
+                              <Download className="w-3.5 h-3.5 text-amber-300" />
+                              <span>📥 دانلود فایل دیتابیس و محتوای محصول</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Step-by-Step Educational Flowchart: What happens after real payment */}
+              <div className="bg-[#140b2e]/90 border border-purple-800/60 rounded-3xl p-6 space-y-4">
+                <h4 className="text-sm font-black text-white flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-amber-400" />
+                  <span>چرخه کامل رفتار سیستم جهش‌کالا پس از پرداخت واقعی در درگاه شاپرک</span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                  <div className="bg-black/30 border border-purple-900/40 p-4 rounded-2xl space-y-2">
+                    <div className="w-8 h-8 rounded-xl bg-purple-900/60 border border-purple-700/60 flex items-center justify-center text-amber-300 font-black text-sm">
+                      ۱
+                    </div>
+                    <h5 className="text-xs font-black text-white">تأیید تراکنش در شاپرک</h5>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      درگاه زیبال کد پیگیری ۱۱ رقمی و شماره مرجع بانکی (RefNumber) را برای سفارش صادر و اعتبارسنجی می‌کند.
+                    </p>
+                  </div>
+
+                  <div className="bg-black/30 border border-purple-900/40 p-4 rounded-2xl space-y-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-900/60 border border-emerald-700/60 flex items-center justify-center text-emerald-300 font-black text-sm">
+                      ۲
+                    </div>
+                    <h5 className="text-xs font-black text-white">صدور رسید رسمی به کاربر</h5>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      پاپ‌آپ سبز رسید با نمایش شماره پیگیری، مشخصات اقلام خریداری شده و افکت کانفتی روی صفحه سایت باز می‌شود.
+                    </p>
+                  </div>
+
+                  <div className="bg-black/30 border border-purple-900/40 p-4 rounded-2xl space-y-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-900/60 border border-blue-700/60 flex items-center justify-center text-blue-300 font-black text-sm">
+                      ۳
+                    </div>
+                    <h5 className="text-xs font-black text-white">ثبت در دیتابیس و پنل مدیر</h5>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      سفارش فوراً در دیتابیس ابری ثبت شده و در تب «سفارشات مشتریان» ظاهر می‌گردد تا مدیر وضعیت آن را تغییر دهد.
+                    </p>
+                  </div>
+
+                  <div className="bg-black/30 border border-purple-900/40 p-4 rounded-2xl space-y-2">
+                    <div className="w-8 h-8 rounded-xl bg-amber-900/60 border border-amber-700/60 flex items-center justify-center text-amber-300 font-black text-sm">
+                      ۴
+                    </div>
+                    <h5 className="text-xs font-black text-white">تحویل فوری بر اساس کالا</h5>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      فایل‌های دانلودی دکمه دانلود فوری می‌گیرند، نرم‌افزار املاک لینک ورود اختصاصی دریافت می‌کند، و کالای پستی کد رهگیری می‌گیرد.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Test Receipt Preview Modal (Directly in Admin Panel) */}
+          {testReceiptPreviewModal && (
+            <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+              <div className="bg-[#121c29] border-2 border-emerald-500 rounded-3xl p-6 max-w-lg w-full space-y-5 text-right shadow-2xl relative">
+                <div className="flex items-center justify-between border-b border-emerald-900/60 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-white">رسید پرداخت موفق شاپرک</h4>
+                      <span className="text-[10px] text-emerald-300">درگاه امن بانکی زیبال - جهش کالا</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setTestReceiptPreviewModal(null)}
+                    className="p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-3 bg-black/40 p-4 rounded-2xl border border-emerald-900/50 text-xs">
+                  <div className="flex items-center justify-between py-1 border-b border-white/5">
+                    <span className="text-slate-400">شماره سفارش:</span>
+                    <strong className="font-mono text-emerald-300 font-bold">{testReceiptPreviewModal.id}</strong>
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-b border-white/5">
+                    <span className="text-slate-400">کد رهگیری شاپرک:</span>
+                    <strong className="font-mono text-amber-300 font-bold">{testReceiptPreviewModal.trackingCode}</strong>
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-b border-white/5">
+                    <span className="text-slate-400">شماره مرجع بانکی (RefId):</span>
+                    <strong className="font-mono text-white font-bold">{testReceiptPreviewModal.paymentRefId}</strong>
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-b border-white/5">
+                    <span className="text-slate-400">نام خریدار:</span>
+                    <strong className="text-white">{testReceiptPreviewModal.customerName}</strong>
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-b border-white/5">
+                    <span className="text-slate-400">تلفن خریدار:</span>
+                    <strong className="text-white font-mono">{testReceiptPreviewModal.customerPhone}</strong>
+                  </div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-slate-400">مبلغ پرداخت شده:</span>
+                    <strong className="text-emerald-400 text-sm font-black">{formatPrice(testReceiptPreviewModal.totalAmount)}</strong>
+                  </div>
+                </div>
+
+                {/* Items in receipt */}
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-300 block">کالای خریداری شده:</span>
+                  {testReceiptPreviewModal.items.map((it, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 text-xs">
+                      <span className="font-bold text-white">{it.product?.title}</span>
+                      <span className="text-emerald-300 font-bold">{formatPrice((it.product?.price || 0) * it.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Delivery actions in modal */}
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-emerald-900/60">
+                  {testReceiptPreviewModal.items.some(
+                    (it) =>
+                      it.product?.deliveryDays?.includes('دانلود') ||
+                      it.product?.title?.includes('بانک') ||
+                      it.product?.title?.includes('اطلاعات') ||
+                      it.product?.category?.includes('دانلود')
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() => handleTestDownloadFile(testReceiptPreviewModal)}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-black text-xs flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5 text-amber-300" />
+                      <span>دانلود فایل دیتابیس</span>
+                    </button>
+                  )}
+
+                  {testReceiptPreviewModal.items.some(
+                    (it) =>
+                      it.product?.id === 'pkg-amlak-jahesh' ||
+                      it.product?.title?.includes('املاک')
+                  ) && onOpenAmlakModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTestReceiptPreviewModal(null);
+                        onOpenAmlakModal();
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>ورود به سامانه املاک</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setTestReceiptPreviewModal(null)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    بستن پیش‌نمایش
+                  </button>
+                </div>
               </div>
             </div>
           )}

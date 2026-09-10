@@ -385,6 +385,45 @@ export default function App() {
     handleVerifyPayment();
   }, [zibalMerchant, currentUser]);
 
+  const handleSimulateRealPayment = async (testOrder: Order, showReceipt: boolean = true) => {
+    try {
+      await saveOrderToDb(testOrder);
+
+      if (testOrder.customerPhone) {
+        try {
+          localStorage.setItem('jahesh_last_customer_phone', testOrder.customerPhone);
+        } catch {}
+      }
+
+      setOrders((prev) => {
+        const filtered = prev.filter((o) => o.id !== testOrder.id && o.trackingCode !== testOrder.trackingCode);
+        return [testOrder, ...filtered];
+      });
+
+      try {
+        confetti({
+          particleCount: 160,
+          spread: 80,
+          origin: { y: 0.6 },
+        });
+      } catch (e) {}
+
+      if (showReceipt) {
+        setAdminModalOpen(false);
+        setCompletedOrderReceipt({
+          order: testOrder,
+          refNumber: testOrder.paymentRefId || String(Math.floor(100000000000 + Math.random() * 900000000000)),
+          trackId: testOrder.trackingCode,
+        });
+      }
+
+      showToast(`پرداخت تستی با موفقیت ثبت شد و سفارش ${testOrder.id} ایجاد گردید.`);
+    } catch (err) {
+      console.error('Test payment error:', err);
+      showToast('خطا در شبیه‌سازی پرداخت.');
+    }
+  };
+
   const handleOpenFooterTopic = (topicId: string) => {
     setActiveFooterTopic(topicId);
     setFooterInfoModalOpen(true);
@@ -1379,6 +1418,20 @@ export default function App() {
         banners={banners}
         onSaveBanner={handleSaveBanner}
         onDeleteBanner={handleDeleteBanner}
+        onSimulateRealPayment={handleSimulateRealPayment}
+        onOpenUserOrdersModal={(phone) => {
+          if (phone) {
+            try {
+              localStorage.setItem('jahesh_last_customer_phone', phone);
+            } catch {}
+          }
+          setAdminModalOpen(false);
+          setUserOrdersModalOpen(true);
+        }}
+        onOpenAmlakModal={() => {
+          setAdminModalOpen(false);
+          setAmlakModalOpen(true);
+        }}
       />
 
       {/* User Orders Modal */}
