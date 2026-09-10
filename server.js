@@ -456,6 +456,22 @@ app.post('/api/zibal-verify', async (req, res) => {
   }
 });
 
+// Explicit handler for Real Estate Management App (مدیریت املاک جهش)
+app.get(['/amlak.html', '/amlak', '/jaheshkala/amlak.html', '/jaheshkala/amlak'], (_req, res) => {
+  const candidates = [
+    path.join(__dirname, 'jaheshkala', 'amlak.html'),
+    path.join(__dirname, 'amlak.html'),
+    path.join(__dirname, 'jaheshkala-app', 'public', 'amlak.html')
+  ];
+  for (const filePath of candidates) {
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.sendFile(filePath);
+    }
+  }
+  return res.status(404).send('صفحه سامانه مدیریت املاک جهش یافت نشد.');
+});
+
 // Serve jaheshkala static files & SPA entry
 const jaheshkalaDir = path.join(__dirname, 'jaheshkala');
 app.use('/jaheshkala', express.static(jaheshkalaDir));

@@ -11,7 +11,8 @@ import {
   CreditCard,
   Building2,
   X,
-  Store
+  Store,
+  Gift
 } from 'lucide-react';
 import { CartItem, User, Order } from '../types';
 import { requestZibalPayment, savePendingOrder } from '../lib/zibalService';
@@ -74,8 +75,13 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
     0
   );
 
-  const discountAmount = appliedCoupon ? (appliedCoupon.discountAmount || 0) : 0;
-  const payableTotal = Math.max(0, rawTotalAmount - discountAmount);
+  const isAdmin = currentUser?.role === 'admin';
+  const discountAmount = isAdmin
+    ? rawTotalAmount
+    : appliedCoupon
+    ? (appliedCoupon.discountAmount || 0)
+    : 0;
+  const payableTotal = isAdmin ? 0 : Math.max(0, rawTotalAmount - discountAmount);
   const payableTotalInRials = payableTotal * 10;
 
   const formatPrice = (num?: number) => {
@@ -91,6 +97,47 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
   const handleStartPayment = async () => {
     if (!currentUser) {
       setErrorMessage('لطفاً جهت اتصال به درگاه پرداخت ابتدا وارد حساب کاربری خود شوید.');
+      return;
+    }
+
+    // Admin direct free checkout without going to Zibal/Shaparak
+    if (currentUser.role === 'admin') {
+      setIsProcessing(true);
+      setErrorMessage('');
+
+      const orderId = 'JAHESH-ADM-' + Math.floor(10000 + Math.random() * 90000).toString();
+      const requestedDomain = safeCartItems.find((i) => i.requestedDomain)?.requestedDomain || '';
+      const clientNotes = safeCartItems.map((i) => i.clientNotes).filter(Boolean).join(' | ') || 'ثبت سفارش با حساب مدیریت (رایگان)';
+
+      const adminOrder: Order = {
+        id: orderId,
+        trackingCode: 'ADM-' + Date.now().toString().slice(-6),
+        paymentRefId: 'FREE-ADM-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+        userId: currentUser.id,
+        customerName: currentUser.fullName || 'مدیر فروشگاه جهش‌کالا',
+        customerPhone: currentUser.phone || '09152331974',
+        customerEmail: currentUser.email || 'jahesh1395@gmail.com',
+        requestedDomain,
+        clientNotes,
+        items: [...safeCartItems],
+        totalAmount: 0,
+        discountAmount: rawTotalAmount,
+        appliedCouponCode: appliedCoupon?.code || 'ADMIN-FREE-VIP',
+        status: 'تایید شده / در حال آماده‌سازی',
+        paymentGateway: 'خرید مستقیم مدیریت (۱۰۰٪ رایگان)',
+        acceptedTerms: true,
+        date: new Date().toLocaleDateString('fa-IR', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      };
+
+      if (onPaymentSuccess) {
+        onPaymentSuccess(adminOrder);
+      }
       return;
     }
 
@@ -301,31 +348,47 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
             </div>
           )}
 
-          {/* Shaparak & Bank Features Info */}
-          <div className="grid grid-cols-2 gap-2.5 text-[11px] text-slate-300">
-            <div className="bg-[#160e33] p-2.5 rounded-xl border border-purple-900/40 flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>کلیه کارت‌های شتاب</span>
+          {/* Shaparak & Bank Features Info or Admin VIP notice */}
+          {isAdmin ? (
+            <div className="bg-gradient-to-r from-emerald-950/90 via-[#0a261e] to-teal-950/90 border border-emerald-500/50 p-3.5 rounded-2xl flex items-center gap-3 text-xs text-emerald-300 shadow-md">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <Gift className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-white">ورود با حساب مدیریت (VIP Admin)</span>
+                <p className="text-[11px] text-emerald-200/80 mt-0.5">
+                  خرید کلیه کالاها برای حساب مدیریت رایگان است و مستقیماً بدون نیاز به انتقال به درگاه شاپرک/زیبال ثبت و نهایی می‌گردد.
+                </p>
+              </div>
             </div>
-            <div className="bg-[#160e33] p-2.5 rounded-xl border border-purple-900/40 flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>تسویه رسمی شاپرک</span>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 text-[11px] text-slate-300">
+              <div className="bg-[#160e33] p-2.5 rounded-xl border border-purple-900/40 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>کلیه کارت‌های شتاب</span>
+              </div>
+              <div className="bg-[#160e33] p-2.5 rounded-xl border border-purple-900/40 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>تسویه رسمی شاپرک</span>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="text-[11px] text-slate-400 leading-relaxed bg-black/30 p-3 rounded-xl border border-white/5">
-            💡 با کلیک روی دکمه زیر، مستقیماً به صفحه رسمی پرداخت اینترنتی بانک (سامانه شاپرک / زیبال) هدایت می‌شوید.
-          </div>
+          {!isAdmin && (
+            <div className="text-[11px] text-slate-400 leading-relaxed bg-black/30 p-3 rounded-xl border border-white/5">
+              💡 با کلیک روی دکمه زیر، مستقیماً به صفحه رسمی پرداخت اینترنتی بانک (سامانه شاپرک / زیبال) هدایت می‌شوید.
+            </div>
+          )}
 
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 sm:p-5 bg-[#140c31] border-t border-purple-900/50 flex flex-col sm:flex-row items-center gap-3">
+        <div className="p-4 sm:p-5 bg-[#140c31] border-t border-purple-900/50 flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={handleCloseBack}
-              className="px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-purple-950/80 hover:bg-purple-900 border border-purple-800/50 transition-colors flex-1 sm:flex-none text-center cursor-pointer"
+              className="h-11 sm:h-12 px-4 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-purple-950/80 hover:bg-purple-900 border border-purple-800/50 transition-all flex-1 sm:flex-none text-center cursor-pointer whitespace-nowrap flex items-center justify-center shadow-sm active:scale-95"
               title="بازگشت به سبد خرید"
             >
               بازگشت به سبد
@@ -333,10 +396,10 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
             <button
               type="button"
               onClick={handleCloseEntirely}
-              className="px-3.5 py-3 rounded-xl text-xs font-semibold text-rose-300 hover:text-rose-200 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/40 transition-colors flex-1 sm:flex-none text-center cursor-pointer flex items-center justify-center gap-1"
+              className="h-11 sm:h-12 px-4 rounded-xl text-xs font-bold text-rose-300 hover:text-rose-200 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/40 transition-all flex-1 sm:flex-none text-center cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm active:scale-95"
               title="بستن کامل و بازگشت به صفحه فروشگاه"
             >
-              <Store className="w-3.5 h-3.5" />
+              <Store className="w-3.5 h-3.5 shrink-0" />
               <span>بستن و بازگشت</span>
             </button>
           </div>
@@ -344,18 +407,23 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
           <button
             onClick={handleStartPayment}
             disabled={isProcessing}
-            className="flex-1 w-full sm:w-auto flex items-center justify-center gap-2 font-black px-5 py-3.5 rounded-xl shadow-xl transition-all text-xs bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-600/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-11 sm:h-12 flex-1 w-full sm:w-auto flex items-center justify-center gap-2 font-black px-5 rounded-xl shadow-xl transition-all text-xs whitespace-nowrap bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-600/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isProcessing ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                <span>در حال اتصال به شاپرک...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-slate-950 shrink-0" />
+                <span>{isAdmin ? 'در حال ثبت سفارش رایگان مدیریت...' : 'در حال اتصال به شاپرک...'}</span>
+              </>
+            ) : isAdmin ? (
+              <>
+                <Gift className="w-4 h-4 text-slate-950 shrink-0" />
+                <span>تکمیل و ثبت رایگان سفارش (حساب مدیریت)</span>
               </>
             ) : (
               <>
-                <ShieldCheck className="w-4 h-4" />
+                <ShieldCheck className="w-4 h-4 shrink-0" />
                 <span>اتصال به درگاه و پرداخت {formatPrice(payableTotal)}</span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+                <ExternalLink className="w-3.5 h-3.5 opacity-70 shrink-0" />
               </>
             )}
           </button>

@@ -385,45 +385,6 @@ export default function App() {
     handleVerifyPayment();
   }, [zibalMerchant, currentUser]);
 
-  const handleSimulateRealPayment = async (testOrder: Order, showReceipt: boolean = true) => {
-    try {
-      await saveOrderToDb(testOrder);
-
-      if (testOrder.customerPhone) {
-        try {
-          localStorage.setItem('jahesh_last_customer_phone', testOrder.customerPhone);
-        } catch {}
-      }
-
-      setOrders((prev) => {
-        const filtered = prev.filter((o) => o.id !== testOrder.id && o.trackingCode !== testOrder.trackingCode);
-        return [testOrder, ...filtered];
-      });
-
-      try {
-        confetti({
-          particleCount: 160,
-          spread: 80,
-          origin: { y: 0.6 },
-        });
-      } catch (e) {}
-
-      if (showReceipt) {
-        setAdminModalOpen(false);
-        setCompletedOrderReceipt({
-          order: testOrder,
-          refNumber: testOrder.paymentRefId || String(Math.floor(100000000000 + Math.random() * 900000000000)),
-          trackId: testOrder.trackingCode,
-        });
-      }
-
-      showToast(`پرداخت تستی با موفقیت ثبت شد و سفارش ${testOrder.id} ایجاد گردید.`);
-    } catch (err) {
-      console.error('Test payment error:', err);
-      showToast('خطا در شبیه‌سازی پرداخت.');
-    }
-  };
-
   const handleOpenFooterTopic = (topicId: string) => {
     setActiveFooterTopic(topicId);
     setFooterInfoModalOpen(true);
@@ -892,6 +853,121 @@ export default function App() {
     setUserOrdersModalOpen(true);
   };
 
+  // Admin Instant Free Purchase directly from Admin Panel product list
+  const handleAdminInstantPurchase = async (product: Product, quantity: number = 1) => {
+    const adminUser = currentUser || {
+      id: 'admin-jahesh',
+      username: 'jahesh',
+      fullName: 'مدیر فروشگاه جهش‌کالا',
+      phone: '09152331974',
+      email: 'jahesh1395@gmail.com',
+      role: 'admin' as const,
+    };
+
+    const orderId = 'JAHESH-ADM-' + Math.floor(10000 + Math.random() * 90000).toString();
+    const isAmlakOrSub = Boolean(product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
+    
+    const newAdminOrder: Order = {
+      id: orderId,
+      trackingCode: 'ADM-' + Date.now().toString().slice(-6),
+      paymentRefId: 'FREE-ADM-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      userId: adminUser.id,
+      customerName: adminUser.fullName || 'مدیر فروشگاه جهش‌کالا',
+      customerPhone: adminUser.phone || '09152331974',
+      customerEmail: adminUser.email || 'jahesh1395@gmail.com',
+      requestedDomain: product.domainIncluded ? 'دامنه اختصاصی مدیریت' : undefined,
+      clientNotes: `ثبت سفارش رایگان از پنل مدیریت توسط ${adminUser.fullName}`,
+      items: [
+        {
+          product: { ...product },
+          quantity,
+          subscriptionDays: isAmlakOrSub ? 365 : undefined,
+          requestedDomain: product.domainIncluded ? 'دامنه اختصاصی مدیریت' : undefined,
+          clientNotes: 'سفارش مستقیم و رایگان پنل مدیریت',
+        },
+      ],
+      totalAmount: 0,
+      discountAmount: (Number(product.price) || 0) * quantity,
+      appliedCouponCode: 'ADMIN-PANEL-FREE',
+      status: 'تایید شده / در حال آماده‌سازی',
+      paymentGateway: 'خرید مستقیم مدیریت (۱۰۰٪ رایگان)',
+      acceptedTerms: true,
+      date: new Date().toLocaleDateString('fa-IR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+
+    setOrders((prev) => [newAdminOrder, ...prev]);
+    await saveOrderToDb(newAdminOrder);
+    showToast(`سفارش رایگان «${product.title}» برای حساب مدیریت با موفقیت در سیستم ثبت شد.`);
+  };
+
+  // Admin Free Checkout from Cart (completely bypasses Zibal gateway)
+  const handleAdminCartFreeCheckout = async (appliedCoupon?: { code: string; discountPercent: number; discountAmount: number }) => {
+    const adminUser = currentUser || {
+      id: 'admin-jahesh',
+      username: 'jahesh',
+      fullName: 'مدیر فروشگاه جهش‌کالا',
+      phone: '09152331974',
+      email: 'jahesh1395@gmail.com',
+      role: 'admin' as const,
+    };
+
+    const safeItems = Array.isArray(cartItems)
+      ? cartItems.filter((item) => item && item.product && typeof item.product === 'object' && item.product.id)
+      : [];
+
+    if (safeItems.length === 0) return;
+
+    const rawTotal = safeItems.reduce(
+      (sum, item) => sum + (Number(item.product?.price) || 0) * (Number(item.quantity) || 1),
+      0
+    );
+
+    const orderId = 'JAHESH-ADM-' + Math.floor(10000 + Math.random() * 90000).toString();
+    const requestedDomain = safeItems.find((i) => i.requestedDomain)?.requestedDomain || '';
+    const clientNotes = safeItems.map((i) => i.clientNotes).filter(Boolean).join(' | ') || 'خرید کلیه اقلام سبد توسط حساب مدیریت (۱۰۰٪ رایگان)';
+
+    const newAdminOrder: Order = {
+      id: orderId,
+      trackingCode: 'ADM-' + Date.now().toString().slice(-6),
+      paymentRefId: 'FREE-ADM-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      userId: adminUser.id,
+      customerName: adminUser.fullName || 'مدیر فروشگاه جهش‌کالا',
+      customerPhone: adminUser.phone || '09152331974',
+      customerEmail: adminUser.email || 'jahesh1395@gmail.com',
+      requestedDomain,
+      clientNotes,
+      items: [...safeItems],
+      totalAmount: 0,
+      discountAmount: rawTotal,
+      appliedCouponCode: appliedCoupon?.code || 'ADMIN-CART-FREE',
+      status: 'تایید شده / در حال آماده‌سازی',
+      paymentGateway: 'خرید مستقیم مدیریت (۱۰۰٪ رایگان)',
+      acceptedTerms: true,
+      date: new Date().toLocaleDateString('fa-IR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+
+    setOrders((prev) => [newAdminOrder, ...prev]);
+    setCartItems([]);
+    setCartModalOpen(false);
+    setPaymentModalOpen(false);
+    await saveOrderToDb(newAdminOrder);
+
+    showToast('سفارش رایگان حساب مدیریت بدون انتقال به درگاه پرداخت با موفقیت در سیستم ثبت شد.');
+    setUserOrdersModalOpen(true);
+  };
+
   // Auth handler: When user logs in
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
@@ -1300,6 +1376,10 @@ export default function App() {
         onOpenTermsModal={() => setTermsModalOpen(true)}
         onOpenAuth={() => setAuthModalOpen(true)}
         onProceedToPayment={(appliedCoupon) => {
+          if (currentUser?.role === 'admin') {
+            handleAdminCartFreeCheckout(appliedCoupon);
+            return;
+          }
           setAppliedCheckoutCoupon(appliedCoupon || null);
           setPaymentModalOpen(true);
         }}
@@ -1397,6 +1477,8 @@ export default function App() {
       <AdminPanel
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
+        currentUser={currentUser}
+        onAdminInstantPurchase={handleAdminInstantPurchase}
         orders={orders}
         onUpdateOrderStatus={handleUpdateOrderStatus}
         onDeleteOrder={handleDeleteOrder}
@@ -1418,20 +1500,6 @@ export default function App() {
         banners={banners}
         onSaveBanner={handleSaveBanner}
         onDeleteBanner={handleDeleteBanner}
-        onSimulateRealPayment={handleSimulateRealPayment}
-        onOpenUserOrdersModal={(phone) => {
-          if (phone) {
-            try {
-              localStorage.setItem('jahesh_last_customer_phone', phone);
-            } catch {}
-          }
-          setAdminModalOpen(false);
-          setUserOrdersModalOpen(true);
-        }}
-        onOpenAmlakModal={() => {
-          setAdminModalOpen(false);
-          setAmlakModalOpen(true);
-        }}
       />
 
       {/* User Orders Modal */}

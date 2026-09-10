@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, ShoppingBag, Globe, ShieldCheck, ArrowLeft, AlertCircle, Sparkles, FileText, Ticket, CheckCircle2, Percent, Plus, Minus } from 'lucide-react';
+import { X, Trash2, ShoppingBag, Globe, ShieldCheck, ArrowLeft, AlertCircle, Sparkles, FileText, Ticket, CheckCircle2, Percent, Plus, Minus, Gift } from 'lucide-react';
 import { CartItem, User, Coupon } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
 
@@ -60,18 +60,22 @@ export const CartModal: React.FC<CartModalProps> = ({
     ? cartItems.filter((item) => item && item.product && typeof item.product === 'object' && item.product.id)
     : [];
 
+  const isAdmin = currentUser?.role === 'admin';
+
   const rawTotalAmount = safeCartItems.reduce(
     (sum, item) => sum + (Number(item.product.price) || 0) * (Number(item.quantity) || 1),
     0
   );
 
-  const discountAmount = appliedCoupon
+  const discountAmount = isAdmin
+    ? rawTotalAmount
+    : appliedCoupon
     ? (appliedCoupon.discountAmount !== undefined
         ? appliedCoupon.discountAmount
         : Math.round((rawTotalAmount * (appliedCoupon.discountPercent || 0)) / 100))
     : 0;
 
-  const finalPayableAmount = Math.max(0, rawTotalAmount - discountAmount);
+  const finalPayableAmount = isAdmin ? 0 : Math.max(0, rawTotalAmount - discountAmount);
 
   const formatPrice = (num?: number) => {
     if (typeof num !== 'number' || isNaN(num)) return '۰ تومان';
@@ -227,6 +231,28 @@ export const CartModal: React.FC<CartModalProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
+              {/* VIP Admin Free Purchase Banner */}
+              {isAdmin && (
+                <div className="bg-gradient-to-r from-emerald-950/80 via-[#0d2a22] to-teal-950/80 border-2 border-emerald-500/60 p-4 rounded-2xl flex items-center justify-between gap-3 shadow-lg shadow-emerald-950/40">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-emerald-400 shrink-0">
+                      <Gift className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-black text-white">ورود با حساب مدیریت (VIP Admin)</h4>
+                        <span className="bg-emerald-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full">
+                          ۱۰۰٪ رایگان
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-200/90 font-medium mt-0.5 leading-relaxed">
+                        خرید کلیه کالاها و خدمات برای حساب مدیریت ۱۰۰٪ رایگان است و سفارش مستقیماً بدون نیاز به انتقال به درگاه پرداخت بانکی ثبت می‌شود.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {safeCartItems.map((item) => {
                 const prod = item.product || ({} as any);
                 const itemPrice = Number(prod.price) || 0;
@@ -518,20 +544,36 @@ export const CartModal: React.FC<CartModalProps> = ({
 
         {/* Footer Summary & Checkout Button */}
         {safeCartItems.length > 0 && (
-          <div className="px-6 py-4 bg-white dark:bg-[#140d30] border-t border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
-            <div className="text-right w-full sm:w-auto space-y-0.5">
-              {appliedCoupon ? (
+          <div className="px-5 sm:px-6 py-4 bg-white dark:bg-[#140d30] border-t border-purple-200 dark:border-purple-900/50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 shadow-xl">
+            <div className="text-right w-full md:w-auto space-y-1">
+              {isAdmin ? (
                 <div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span>مبلغ کل کالاها:</span>
+                    <span className="line-through">{formatPrice(rawTotalAmount)}</span>
+                    <span className="text-emerald-700 dark:text-emerald-300 font-black bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded text-[10px] border border-emerald-500/40">
+                      ۱۰۰٪ تخفیف ویژه مدیریت
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="text-xs text-slate-600 dark:text-slate-300 font-bold">مبلغ نهایی پرداختی:</span>
+                    <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                      ۰ تومان (رایگان)
+                    </span>
+                  </div>
+                </div>
+              ) : appliedCoupon ? (
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
                     <span>مبلغ کل:</span>
                     <span className="line-through">{formatPrice(rawTotalAmount)}</span>
                     <span className="text-rose-700 dark:text-red-400 font-bold bg-rose-100 dark:bg-red-950/80 px-1.5 py-0.5 rounded text-[10px]">
                       {appliedCoupon.discountPercent}% تخفیف ({formatPrice(discountAmount)}-)
                     </span>
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">مبلغ نهایی قابل پرداخت:</span>
-                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="text-xs text-slate-600 dark:text-slate-300 font-bold">مبلغ نهایی قابل پرداخت:</span>
+                    <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
                       {formatPrice(finalPayableAmount)}
                     </span>
                   </div>
@@ -539,34 +581,47 @@ export const CartModal: React.FC<CartModalProps> = ({
               ) : (
                 <div>
                   <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">مبلغ قابل پرداخت فاکتور:</span>
-                  <span className="text-2xl font-black text-purple-700 dark:text-amber-300">
+                  <span className="text-xl sm:text-2xl font-black text-purple-700 dark:text-amber-300">
                     {formatPrice(rawTotalAmount)}
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* Bottom Buttons: Symmetrical, equal height, no text wrap */}
+            <div className="flex items-center gap-2.5 sm:gap-3 w-full md:w-auto">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-3 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-purple-100 hover:bg-purple-200 dark:text-slate-300 dark:hover:text-white dark:bg-purple-950/80 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-800/50 transition-colors w-1/3 sm:w-auto text-center cursor-pointer shadow-sm"
-                title="بستن سبد خرید و بازگشت به فروشگاه"
+                className="h-11 sm:h-12 px-4 sm:px-6 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 dark:text-slate-200 dark:hover:text-white dark:bg-purple-950/80 dark:hover:bg-purple-900 border border-slate-300 dark:border-purple-800/60 transition-all whitespace-nowrap shrink-0 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+                title="بستن سبد خرید و ادامه بررسی محصولات فروشگاه"
               >
                 بستن و ادامه خرید
               </button>
+
               <button
                 id="proceed-payment-btn"
                 onClick={handleCheckoutClick}
                 disabled={!termsAccepted}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 font-black px-7 py-3 rounded-xl shadow-xl transition-all text-xs ${
+                className={`h-11 sm:h-12 flex-1 md:flex-initial flex items-center justify-center gap-2 font-black px-5 sm:px-7 rounded-xl shadow-lg transition-all text-xs whitespace-nowrap cursor-pointer ${
                   termsAccepted
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-emerald-600/20 hover:scale-105 active:scale-95 cursor-pointer'
+                    ? isAdmin
+                      ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-600/30 hover:shadow-emerald-600/50 hover:scale-[1.02] active:scale-95 ring-2 ring-emerald-400/50'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-emerald-600/20 hover:scale-[1.02] active:scale-95'
                     : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-300 dark:border-slate-700'
                 }`}
               >
-                <ShieldCheck className="w-4 h-4" />
-                <span>انتقال به درگاه پرداخت امن (زیبال / شاپرک)</span>
+                {isAdmin ? (
+                  <>
+                    <Gift className="w-4 h-4 text-slate-950 shrink-0" />
+                    <span>تکمیل و ثبت رایگان سفارش (حساب مدیریت)</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4 shrink-0" />
+                    <span>انتقال به درگاه پرداخت امن (زیبال / شاپرک)</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
