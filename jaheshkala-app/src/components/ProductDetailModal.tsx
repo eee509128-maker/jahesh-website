@@ -3,7 +3,7 @@ import {
   X, Sparkles, CheckCircle2, Globe, ShieldCheck,
   ShoppingBag, Gift, Truck, RotateCcw, Headphones, Star, Ticket, Images, Zap, CreditCard
 } from 'lucide-react';
-import { Product } from '../types';
+import { Product, User } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
 
 interface ProductDetailModalProps {
@@ -12,6 +12,7 @@ interface ProductDetailModalProps {
   onAddToCart: (product: Product, requestedDomain?: string, subscriptionDays?: number) => void;
   onInstantBuy?: (product: Product, requestedDomain?: string, subscriptionDays?: number) => void;
   onOpenAmlakApp?: () => void;
+  currentUser?: User | null;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
@@ -20,6 +21,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onAddToCart,
   onInstantBuy,
   onOpenAmlakApp,
+  currentUser,
 }) => {
   const [preferredDomain, setPreferredDomain] = useState('');
   const [selectedColor, setSelectedColor] = useState<string | null>(
@@ -220,29 +222,46 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               )}
 
-              {/* Direct Launch Button for Amlak / Online SaaS */}
-              {isAmlakOrSub && onOpenAmlakApp && (
-                <div className="bg-gradient-to-r from-emerald-950/70 via-teal-950/80 to-purple-950/70 border border-emerald-500/50 rounded-2xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
-                  <div className="text-right">
-                    <span className="text-xs font-black text-emerald-300 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-300" />
-                      سامانه ابری فعال و آنلاین جهش
+              {/* Direct Launch Button for Amlak / Online SaaS - STRICTLY FOR ADMIN ONLY */}
+              {isAmlakOrSub && onOpenAmlakApp && currentUser?.role === 'admin' && (
+                <div className="bg-gradient-to-br from-[#1b103c] to-[#12082b] border border-amber-500/35 rounded-2xl p-4 space-y-3 shadow-xl relative overflow-hidden">
+                  {/* Subtle top indicator bar */}
+                  <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-amber-400 via-emerald-400 to-amber-500" />
+                  
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-black text-white">
+                        محیط تست زنده سامانه (ویژه مدیر)
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-300 bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 rounded-full whitespace-nowrap">
+                      دسترسی VIP
                     </span>
-                    <p className="text-[11px] text-slate-300 mt-0.5">
-                      می‌توانید همین حالا محیط آنلاین این سامانه را به صورت زنده تست و مشاهده کنید.
-                    </p>
                   </div>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed text-right">
+                    شما با حساب مدیریت وارد شده‌اید. می‌توانید نرم‌افزار را پیش از هر اقدامی به‌صورت کامل و زنده اجرا و ارزیابی کنید.
+                  </p>
+
                   <button
                     type="button"
                     onClick={() => {
                       onClose();
                       onOpenAmlakApp();
                     }}
-                    className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-lg shadow-emerald-900/40 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer border border-emerald-400/40"
+                    className="w-full h-11 sm:h-12 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black shadow-lg shadow-emerald-950/60 hover:scale-[1.01] active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
                   >
-                    <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
-                    <span>ورود آنلاین و تست سامانه</span>
+                    <Sparkles className="w-4 h-4 text-slate-950 shrink-0" />
+                    <span>ورود آنلاین و اجرای زنده سامانه</span>
                   </button>
+
+                  <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 border-t border-purple-900/40 pt-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>این دکمه فقط برای حساب مدیریت فعال است و مشتریان عادی آن را نمی‌بینند</span>
+                  </div>
                 </div>
               )}
 
@@ -328,6 +347,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* اعلان صدور خودکار نام کاربری و رمز پس از خرید */}
+              {isAmlakOrSub && (
+                <div className="bg-gradient-to-r from-amber-500/10 via-purple-900/30 to-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 flex items-center gap-3 text-right">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 shrink-0">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-0.5 text-xs">
+                    <span className="font-bold text-amber-300 block">
+                      صدور آنی اکانت و رمز اختصاصی پس از خرید
+                    </span>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      بلافاصله پس از ثبت سفارش، نام کاربری و پسورد منحصربه‌فرد شما در فاکتور صادر می‌شود و می‌توانید سامانه را در تب جدید با حساب اختصاصی خود اجرا کنید.
+                    </p>
+                  </div>
+                </div>
+              )}
 
             </div>
 

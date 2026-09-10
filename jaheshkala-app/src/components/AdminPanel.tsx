@@ -40,6 +40,7 @@ interface AdminPanelProps {
   onDeleteBanner?: (bannerId: string) => void;
   currentUser?: User | null;
   onAdminInstantPurchase?: (product: Product, quantity?: number) => void;
+  onOpenAmlakApp?: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -68,6 +69,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteBanner,
   currentUser,
   onAdminInstantPurchase,
+  onOpenAmlakApp,
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats'>('orders');
   const [bannersList, setBannersList] = useState<BannerSlide[]>(initialBannersProp || INITIAL_BANNERS);
@@ -1227,7 +1229,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
 
                       {/* Admin Free Instant Buy Button */}
-                      <div className="pt-2 mt-2 border-t border-purple-900/30">
+                      <div className="pt-2 mt-2 border-t border-purple-900/30 space-y-1.5">
                         <button
                           type="button"
                           onClick={() => setAdminFreePurchaseModal({ isOpen: true, product: prod, quantity: 1 })}
@@ -1237,6 +1239,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <Gift className="w-3.5 h-3.5 text-amber-300" />
                           <span>خرید رایگان با حساب مدیریت</span>
                         </button>
+
+                        {(prod.id === 'pkg-amlak-jahesh' || prod.title?.includes('املاک') || prod.isSubscription) && onOpenAmlakApp && (
+                          <button
+                            type="button"
+                            onClick={onOpenAmlakApp}
+                            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md shadow-amber-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                            title="تست و باز کردن زنده محیط نرم‌افزار مدیریت املاک (ویژه مدیریت)"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>تست زنده سامانه املاک (مدیریت)</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3726,6 +3740,39 @@ on public.users for delete using (true);`;
                     })}
                   </div>
                 </div>
+
+                {/* نمایش لایسنس املاک جهش صادر شده برای مشتری */}
+                {selectedOrder.amlakLicense && (
+                  <div className="bg-amber-950/30 border border-amber-500/40 rounded-xl p-3 text-right space-y-2 text-xs">
+                    <div className="flex items-center justify-between text-amber-400 font-bold">
+                      <span>🏢 اطلاعات اشتراک و لایسنس سامانه املاک:</span>
+                      <span className="font-mono text-[11px] bg-amber-500/20 px-2 py-0.5 rounded text-amber-300">
+                        {selectedOrder.amlakLicense.licenseKey}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-black/40 p-2 rounded-lg border border-amber-500/20 font-mono">
+                      <div>
+                        <span className="text-slate-400 font-sans block text-[10px]">نام کاربری اختصاصی:</span>
+                        <span className="text-white font-bold">{selectedOrder.amlakLicense.username}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-sans block text-[10px]">رمز عبور اختصاصی:</span>
+                        <span className="text-amber-300 font-bold">{selectedOrder.amlakLicense.password}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] pt-1">
+                      <span className="text-slate-300">انقضا: {selectedOrder.amlakLicense.expiresAt}</span>
+                      <a
+                        href={`/amlak.html?u=${encodeURIComponent(selectedOrder.amlakLicense.username)}&p=${encodeURIComponent(selectedOrder.amlakLicense.password)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1 text-[11px]"
+                      >
+                        ورود به سامانه با این اکانت ↗
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button

@@ -103,6 +103,18 @@ export interface BannerSlide {
   order?: number;
 }
 
+export interface AmlakSubscriptionLicense {
+  username: string;
+  password: string;
+  licenseKey: string;
+  buyerName: string;
+  phone: string;
+  days: number;
+  startDate: string;
+  expiresAt: string;
+  status: 'active' | 'expired';
+}
+
 export interface Order {
   id: string;
   trackingCode: string;
@@ -119,10 +131,11 @@ export interface Order {
   discountAmount?: number;
   appliedCouponCode?: string;
   status: OrderStatus;
-  paymentGateway: 'زیبال (Zibal)' | 'شاپرک' | 'تست پرداخت';
+  paymentGateway: 'زیبال (Zibal)' | 'شاپرک' | 'تست پرداخت' | string;
   date: string;
   acceptedTerms: boolean;
   adminNotes?: string;
+  amlakLicense?: AmlakSubscriptionLicense;
 }
 
 export interface ChatMessage {

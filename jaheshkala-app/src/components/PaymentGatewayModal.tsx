@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { CartItem, User, Order } from '../types';
 import { requestZibalPayment, savePendingOrder } from '../lib/zibalService';
+import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
 
 interface PaymentGatewayModalProps {
   isOpen: boolean;
@@ -135,6 +136,10 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
         }),
       };
 
+      if (hasAmlakInItems(safeCartItems)) {
+        adminOrder.amlakLicense = generateAmlakLicense(adminOrder, currentUser);
+      }
+
       if (onPaymentSuccess) {
         onPaymentSuccess(adminOrder);
       }
@@ -179,6 +184,10 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
         minute: '2-digit',
       }),
     };
+
+    if (hasAmlakInItems(safeCartItems)) {
+      pendingOrder.amlakLicense = generateAmlakLicense(pendingOrder, currentUser);
+    }
 
     // Save locally
     savePendingOrder(pendingOrder);

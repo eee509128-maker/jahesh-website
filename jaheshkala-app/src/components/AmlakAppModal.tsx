@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ExternalLink, ShieldCheck, Sparkles, Building2, RotateCw, Loader2 } from 'lucide-react';
+import { X, ExternalLink, ShieldCheck, Sparkles, Building2, RotateCw, Loader2, Lock } from 'lucide-react';
 import { User } from '../types';
 
 interface AmlakAppModalProps {
@@ -17,6 +17,32 @@ export const AmlakAppModal: React.FC<AmlakAppModalProps> = ({
   const [isLoading, setIsLoading] = useState(true);
 
   if (!isOpen) return null;
+
+  // Strict Admin Gate: Only admin accounts can test and launch this system
+  if (currentUser?.role !== 'admin') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+        <div className="relative w-full max-w-md bg-[#130b2e] border border-amber-500/40 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+            <Lock className="w-7 h-7" />
+          </div>
+          <h3 className="text-base font-black text-white">دسترسی به تست فقط مخصوص مدیریت</h3>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            امکان تست مستقیم و باز کردن زنده محیط سامانه، فقط برای حساب مدیر کل فروشگاه تعریف شده است و کاربران عادی به محیط تست دسترسی ندارند.
+          </p>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-3 rounded-xl bg-purple-900 hover:bg-purple-800 text-white font-bold text-xs transition-all cursor-pointer shadow-lg"
+            >
+              متوجه شدم و بستن پنجره
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const launchUrl = `${origin}/jaheshkala/amlak.html?auth=direct&user=${encodeURIComponent(currentUser?.fullName || currentUser?.username || 'مدیر فروشگاه جهش‌کالا')}`;

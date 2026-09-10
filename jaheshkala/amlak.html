@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- تگ‌های مربوط به نصب وب اپلیکیشن (PWA) در اندروید و iOS -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="املاک جهش">
+
+<title>مدیریت املاک جهش</title>
+<meta name="theme-color" content="#000000">
+<style>
+:root{
+    --primary-color:#ff8c00;
+    --secondary-color:#000;
+    --background-color:#1a1a1a;
+    --text-color:#fff;
+    --accent-color:#bf360c;
+    --card-bg:rgba(26,26,26,.8);
+    --card-border:#ff8c00;
+    --customer-color:#42a5f5; 
+    --app-height: 100dvh;
+}
+body{
+    font-family:'Electrolize', Tahoma, sans-serif;
+    background:linear-gradient(135deg,var(--secondary-color)0%,var(--accent-color)50%,var(--primary-color)100%);
+    background-size:400% 400%;
+    animation:gradientBG 15s ease infinite;
+    color:var(--text-color);
+    margin:0;padding:20px;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;
+}
+@keyframes gradientBG{
+    0%{background-position:0% 50%}
+    50%{background-position:100% 50%}
+    100%{background-position:0% 50%}
+}
+.container{
+    background:rgba(0,0,0,.6);padding:30px;border-radius:15px;
+    box-shadow:0 0 20px rgba(255,140,0,.3),0 0 40px rgba(255,140,0,.2);
+    width:95%;max-width:1200px;text-align:center;
+}
+h1{
+    font-family:'Orbitron', Tahoma, sans-serif;color:var(--primary-color);
+    margin-bottom:10px;font-size:2.5em;
+    text-shadow:0 0 10px var(--primary-color),0 0 20px var(--accent-color);
+}
+.input-section,.search-section,.property-list,.favorites-section,.filter-section{
+    margin-bottom:40px;background:var(--card-bg);padding:25px;
+    border-radius:10px;box-shadow:inset 0 0 15px rgba(0,0,0,.5);
+}
+.input-section h2,.search-section h2,.property-list h2,.favorites-section h2,.filter-section h2{
+    color:var(--primary-color);font-family:'Orbitron', Tahoma, sans-serif;
+    margin-bottom:20px;text-shadow:0 0 8px var(--primary-color);
+}
+.customer-section h2 {
+    color: var(--customer-color);
+    text-shadow: 0 0 8px var(--customer-color);
+}
+.form-group{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:15px;margin-bottom:20px;text-align:right;
+}
+.form-group label{margin-bottom:8px;color:var(--text-color);font-weight:bold;}
+.form-group input,.form-group textarea,.form-group select{
+    width:100%;padding:12px;border:1px solid var(--primary-color);
+    border-radius:5px;background:var(--background-color);color:var(--text-color);
+    box-sizing:border-box;transition:border-color .3s,box-shadow .3s;
+    font-family:'Electrolize', Tahoma, sans-serif;
+}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{
+    outline:none;border-color:var(--accent-color);box-shadow:0 0 10px var(--accent-color);
+}
+.form-group select option {
+    background: var(--background-color);
+    color: var(--text-color);
+}
+.customer-inputs input:focus, .customer-inputs textarea:focus, .customer-inputs select:focus {
+    border-color: var(--customer-color);
+    box-shadow: 0 0 10px var(--customer-color);
+}
+textarea{resize:vertical;min-height:100px}
+button{
+    background:var(--primary-color);color:var(--secondary-color);border:none;
+    padding:12px 25px;border-radius:5px;cursor:pointer;
+    font-family:'Electrolize', Tahoma, sans-serif;font-size:1em;
+    transition:background .3s,transform .2s,box-shadow .3s;
+    margin-left:10px;margin-bottom:10px;box-shadow:0 0 10px var(--primary-color);
+}
+button:hover{background:var(--accent-color);transform:translateY(-2px);box-shadow:0 0 15px var(--accent-color);}
+button.delete-btn{background:#dc3545;box-shadow:0 0 10px #dc3545}
+button.delete-btn:hover{background:#c82333;box-shadow:0 0 15px #c82333}
+button.favorite-btn{background:transparent;border:2px solid var(--primary-color);color:var(--primary-color);}
+button.favorite-btn:hover{background:var(--primary-color);color:var(--secondary-color);box-shadow:0 0 15px var(--primary-color);}
+button.favorite-btn.favorited{background:var(--primary-color);color:var(--secondary-color);}
+.btn-customer {
+    background: var(--customer-color);
+    box-shadow: 0 0 10px var(--customer-color);
+    color: #fff;
+}
+.btn-customer:hover {
+    background: #1e88e5;
+    box-shadow: 0 0 15px #1e88e5;
+}
+.btn-match {
+    background: linear-gradient(135deg, #2e7d32, #4caf50) !important;
+    color: #fff !important;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5) !important;
+}
+.btn-match:hover {
+    background: linear-gradient(135deg, #4caf50, #81c784) !important;
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.8) !important;
+}
+.search-input{
+    width:calc(100% - 150px);padding:12px;border:1px solid var(--primary-color);
+    border-radius:5px;background:var(--background-color);color:var(--text-color);
+    margin-left:10px;font-family:'Electrolize', Tahoma, sans-serif;
+}
+.search-input-customer{
+    border-color: var(--customer-color);
+}
+.search-input-customer:focus{
+    border-color: var(--customer-color);
+    box-shadow: 0 0 10px var(--customer-color);
+    outline: none;
+}
+.property-card{
+    background:var(--card-bg);border:1px solid var(--card-border);border-radius:10px;
+    padding:20px;margin-bottom:20px;text-align:right;
+    box-shadow:0 4px 15px rgba(0,0,0,.3);transition:transform .3s,box-shadow .3s;
+    display:flex;flex-direction:column;justify-content:space-between;
+}
+.property-card:hover{transform:translateY(-5px);box-shadow:0 8px 25px rgba(255,140,0,.4)}
+.property-card h3{
+    font-family:'Orbitron', Tahoma, sans-serif;color:var(--primary-color);
+    margin:0 0 15px;font-size:1.4em;text-shadow:0 0 8px var(--primary-color);
+}
+.property-card p{margin-bottom:10px;line-height:1.6}
+.customer-card {
+    border-color: var(--customer-color);
+    box-shadow: 0 4px 15px rgba(66, 165, 245, 0.2);
+}
+.customer-card:hover {
+    box-shadow: 0 8px 25px rgba(66, 165, 245, 0.4);
+}
+.customer-card h3 {
+    color: var(--customer-color);
+    text-shadow: 0 0 8px var(--customer-color);
+}
+.actions{margin-top:20px;text-align:left}
+.card-buttons{display:flex;gap:10px;justify-content:flex-start;align-items:center;flex-wrap:wrap}
+.favorites-list .property-card{border-color:var(--accent-color);box-shadow:0 4px 15px rgba(191,54,12,.3)}
+.favorites-list .property-card:hover{box-shadow:0 8px 25px rgba(191,54,12,.5)}
+.favorites-list .property-card h3{color:var(--accent-color);text-shadow:0 0 8px var(--accent-color)}
+.field-360{
+    grid-column:1/-1;border:2px dashed var(--primary-color);border-radius:8px;
+    padding:18px;text-align:center;background:rgba(255,140,0,.04);
+}
+.field-360 p{margin:0 0 10px;color:var(--primary-color);font-weight:bold;}
+.field-360 small{color:#aaa;}
+.field-360 input[type=file]{display:block;margin:10px auto 0;color:var(--text-color);font-family:'Electrolize', Tahoma, sans-serif;}
+#preview-360-list{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+.thumb-wrap{position:relative;display:inline-block;}
+.thumb-wrap img{width:80px;height:50px;object-fit:cover;border-radius:4px;border:1px solid var(--primary-color);display:block;}
+.thumb-wrap .remove-thumb{
+    position:absolute;top:-6px;right:-6px;
+    background:#dc3545;color:#fff;border:none;border-radius:50%;
+    width:20px;height:20px;font-size:12px;line-height:20px;
+    text-align:center;cursor:pointer;padding:0;margin:0;
+    box-shadow:0 0 6px #dc3545;
+    transition:background .2s,transform .2s;
+}
+.thumb-wrap .remove-thumb:hover{background:#c82333;transform:scale(1.2);}
+.hotspot-editor{
+    background:rgba(0,0,0,0.35);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:8px;
+    padding:8px;
+    margin-top:6px;
+    width:220px;
+    font-size:0.82em;
+}
+.hotspot-editor h4{
+    margin:0 0 6px;
+    color:var(--primary-color);
+    font-size:0.9em;
+}
+.hotspot-row-mini{
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px;
+    align-items:center;
+    margin-bottom:6px;
+}
+.hotspot-row-mini input,
+.hotspot-row-mini select{
+    width:62px;
+    padding:4px 6px;
+    border-radius:6px;
+    border:1px solid rgba(255,255,255,0.2);
+    background:rgba(0,0,0,0.6);
+    color:#fff;
+    font-size:0.8em;
+}
+.hotspot-row-mini select{width:120px;}
+.hotspot-row-mini button{
+    margin:0;
+    padding:4px 8px;
+    font-size:0.75em;
+}
+.btn-add-hs{
+    background:rgba(255,140,0,0.15);
+    color:var(--primary-color);
+    border:1px dashed var(--primary-color);
+    box-shadow:none;
+    margin:4px 0;
+}
+.btn-360{
+    background:linear-gradient(135deg,#0d47a1,#1565c0) !important;
+    color:#fff !important;border:1px solid #42a5f5 !important;
+    box-shadow:0 0 10px rgba(66,165,245,.5) !important;
+}
+.btn-360:hover{background:linear-gradient(135deg,#1565c0,#1976d2) !important;box-shadow:0 0 18px rgba(66,165,245,.8) !important;}
+
+/* CSS دستیار هوشمند و AI */
+.smart-box {
+    background: rgba(42, 42, 42, 0.8);
+    border: 2px dashed var(--primary-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+    text-align: right;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+.customer-section .smart-box {
+    border-color: var(--customer-color);
+}
+.smart-box textarea {
+    width: 100%;
+    min-height: 80px;
+    margin-bottom: 15px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid #555;
+    color: #fff;
+    padding: 12px;
+    border-radius: 5px;
+    font-family: 'Electrolize', Tahoma, sans-serif;
+    box-sizing: border-box;
+    font-size: 1.05em;
+}
+.smart-box-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+@keyframes pulseRec {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+.recording-btn {
+    background: #dc3545 !important;
+    animation: pulseRec 1.5s infinite !important;
+}
+.btn-ai {
+    background: linear-gradient(135deg, #6a1b9a, #ab47bc) !important;
+    color: white !important;
+    border: 1px solid #e1bee7 !important;
+    box-shadow: 0 0 10px rgba(171, 71, 188, 0.5) !important;
+}
+.btn-ai:hover {
+    background: linear-gradient(135deg, #ab47bc, #ce93d8) !important;
+    box-shadow: 0 0 15px rgba(171, 71, 188, 0.8) !important;
+}
+.ai-analysis-box {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #ab47bc;
+    padding: 18px;
+    margin-top: 15px;
+    border-radius: 12px;
+    font-size: 0.95em;
+    color: #eee;
+    display: none;
+    text-align: right;
+    line-height: 1.8;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+#pano-modal{
+    display:none;position:fixed;inset:0;z-index:9999;
+    background:rgba(0,0,0,.97);
+    flex-direction:column;align-items:center;justify-content:center;
+    padding-top:env(safe-area-inset-top,12px);
+    padding-bottom:env(safe-area-inset-bottom,12px);
+}
+#pano-modal.open{display:flex;}
+#pano-modal-title{
+    font-family:'Orbitron', Tahoma, sans-serif;color:var(--primary-color);
+    font-size:1.1em;margin-bottom:8px;text-shadow:0 0 8px var(--primary-color);
+}
+#pano-canvas{
+    border:2px solid var(--primary-color);border-radius:8px;
+    cursor:grab;display:block;
+    box-shadow:0 0 30px rgba(255,140,0,.4);
+    width:100%;
+    max-width:min(96vw,1100px);
+    height:100%;
+    max-height:78vh;
+    touch-action: none;
+}
+#pano-canvas.dragging{cursor:grabbing;}
+#pano-close-btn{
+    position:absolute;top:12px;left:12px;background:#dc3545;color:#fff;border:none;
+    border-radius:50%;width:38px;height:38px;font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 10px #dc3545;z-index:10000;
+}
+.pano-controls{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;justify-content:center;}
+.pano-controls button{
+    padding:7px 13px;font-size:.82em;margin:0;
+    background:rgba(255,140,0,.15);border:1px solid var(--primary-color);
+    color:var(--primary-color);border-radius:5px;box-shadow:none;
+}
+.pano-controls button:hover{background:rgba(255,140,0,.35);transform:none;}
+.pano-controls button.on{background:rgba(255,140,0,.45);}
+#pano-thumbs{
+    display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;
+    max-width:98vw;overflow-x:auto;padding:4px 0;
+}
+#pano-thumbs img{
+    width:70px;height:45px;object-fit:cover;border-radius:4px;cursor:pointer;
+    border:2px solid transparent;transition:border-color .2s,transform .2s;
+    flex-shrink:0;
+}
+#pano-thumbs img.active{border-color:var(--primary-color);transform:scale(1.08);}
+#pano-hint{color:#888;font-size:.78em;margin-top:6px;}
+
+@media(max-width:768px){
+    .container{width:95%;padding:20px}
+    h1{font-size:2em}
+    .form-group{grid-template-columns:1fr}
+    .search-input{width:calc(100% - 120px)}
+    .tour-app.modalized{padding:10px;align-items:flex-start;justify-content:center;}
+    .tour-body{max-height:calc(100dvh - 24px);}
+    .tour-canvas-wrap{height:auto;max-height:74vh;min-height:220px;}
+}
+
+/* تور مجازی ۳۶۰ */
+.tour-app {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px;
+    box-sizing: border-box;
+    border-radius: 16px;
+    background: rgba(10, 10, 12, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    display: none;
+}
+.tour-app.modalized{
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    overflow: auto;
+    background: radial-gradient(circle at 20% 20%, rgba(255,140,0,0.12), rgba(0,0,0,0.92));
+    padding: calc(env(safe-area-inset-top,0px) + 12px) clamp(10px, 3vw, 18px) calc(env(safe-area-inset-bottom,0px) + 12px);
+    align-items: flex-start;
+    justify-content: center;
+    max-width: 100vw;
+    max-height: 100dvh;
+}
+.tour-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+}
+.tour-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 10px 12px;
+    border-radius: 12px;
+}
+.tour-controls h3{
+    margin:0;
+    color: var(--primary-color);
+    font-size: 1em;
+}
+.tour-actions{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+}
+.tour-actions button{
+    margin:0;
+    padding:8px 12px;
+    font-size:0.85em;
+}
+.tour-header {
+    font-family: 'Orbitron', Tahoma, sans-serif;
+    color: var(--primary-color);
+    font-size: 1.4em;
+    margin-bottom: 14px;
+    text-shadow: 0 0 12px rgba(255,140,0,0.35);
+}
+.tour-canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-height: 78vh;
+    min-height: 240px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: radial-gradient(circle at 20% 20%, rgba(255,140,0,0.08), rgba(0,0,0,0.9));
+    box-sizing: border-box;
+}
+#tour-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: grab;
+}
+#tour-canvas.dragging {
+    cursor: grabbing;
+}
+#hotspot-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.hotspot {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: #fff;
+    font-size: 0.75em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+.hotspot-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(255, 140, 0, 0.85);
+    box-shadow: 0 0 12px rgba(255,140,0,0.7), 0 0 24px rgba(255,140,0,0.4);
+    animation: hotspotPulse 1.8s infinite;
+    border: 2px solid rgba(255,255,255,0.7);
+}
+.hotspot-label {
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 2px 8px;
+    white-space: nowrap;
+}
+@keyframes hotspotPulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,140,0,0.7); }
+    70% { transform: scale(1.25); box-shadow: 0 0 0 18px rgba(255,140,0,0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,140,0,0); }
+}
+.tour-hud {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 0.75em;
+    color: #ddd;
+}
+#tour-close {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 10000;
+    background: #dc3545;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 12px #dc3545;
+}
+#tour-close.show{display:flex;}
+</style>
+</head>
+<body>
+
+<!-- سیستم ورود حرفه‌ای و اختصاصی سامانه املاک جهش -->
+<div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:radial-gradient(circle at center, #1b1035 0%, #0c071a 100%); z-index:999999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; padding:20px; box-sizing:border-box;">
+    
+    <div style="background:rgba(20, 12, 40, 0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); padding:32px 28px; border-radius:24px; border:1px solid rgba(255, 140, 0, 0.45); text-align:center; width:100%; max-width:440px; box-shadow:0 20px 60px rgba(0,0,0,0.8), 0 0 35px rgba(255,140,0,0.25); box-sizing:border-box;">
+        
+        <!-- لوگو و تیتر -->
+        <div style="width:64px; height:64px; margin:0 auto 16px; border-radius:20px; background:linear-gradient(135deg, rgba(255,140,0,0.2), rgba(255,179,0,0.1)); border:1.5px solid #ff8c00; display:flex; align-items:center; justify-content:center; font-size:30px; box-shadow:0 0 20px rgba(255,140,0,0.35);">
+            🏢
+        </div>
+
+        <h2 style="color:#ff8c00; font-family:'Orbitron', Tahoma, sans-serif; font-size:20px; margin:0 0 8px; text-shadow:0 0 10px rgba(255,140,0,0.5);">
+            ورود به سامانه مدیریت املاک جهش
+        </h2>
+        
+        <p style="color:#cbd5e1; font-size:12px; margin:0 0 24px; line-height:1.6;">
+            جهت استفاده از خدمات، نام کاربری و رمز عبور اختصاصی دریافتی از سفارش جهش‌کالا را وارد فرمایید.
+        </p>
+
+        <!-- فرم ورود -->
+        <div style="display:flex; flex-direction:column; gap:14px; text-align:right;">
+            <div>
+                <label style="display:block; font-size:12px; font-weight:bold; color:#ffb74d; margin-bottom:6px;">نام کاربری اختصاصی:</label>
+                <input type="text" id="app-username" placeholder="مثال: amlak_user..." dir="ltr" style="width:100%; padding:13px 14px; border-radius:12px; border:1px solid rgba(255,140,0,0.4); background:rgba(0,0,0,0.6); color:#fff; font-family:'Electrolize', Tahoma, sans-serif; font-size:14px; box-sizing:border-box; outline:none; transition:border-color 0.3s;" onkeypress="if(event.key === 'Enter') handleAmlakLogin()">
+            </div>
+
+            <div>
+                <label style="display:block; font-size:12px; font-weight:bold; color:#ffb74d; margin-bottom:6px;">رمز عبور اختصاصی:</label>
+                <div style="position:relative;">
+                    <input type="password" id="app-password" placeholder="رمز عبور دریافتی پس از خرید..." dir="ltr" style="width:100%; padding:13px 14px; border-radius:12px; border:1px solid rgba(255,140,0,0.4); background:rgba(0,0,0,0.6); color:#fff; font-family:'Electrolize', Tahoma, sans-serif; font-size:14px; box-sizing:border-box; outline:none; transition:border-color 0.3s;" onkeypress="if(event.key === 'Enter') handleAmlakLogin()">
+                </div>
+            </div>
+
+            <button type="button" id="login-submit-btn" onclick="handleAmlakLogin()" style="width:100%; padding:14px; font-weight:bold; font-size:14px; background:linear-gradient(135deg, #ff8c00, #ff6f00); color:#000; border:none; border-radius:12px; cursor:pointer; font-family:'Electrolize', Tahoma, sans-serif; margin:10px 0 0; box-shadow:0 4px 15px rgba(255,140,0,0.4); transition:all 0.2s;">
+                ورود و تایید لایسنس سامانه
+            </button>
+        </div>
+
+        <!-- پیام خطا یا وضعیت -->
+        <div id="login-error" style="display:none; color:#f87171; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); padding:10px; border-radius:10px; margin-top:16px; font-size:12px; line-height:1.6;">
+            نام کاربری یا رمز عبور اشتباه است!
+        </div>
+
+        <!-- راهنما و لینک خرید لایسنس از جهش‌کالا -->
+        <div style="margin-top:24px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.1); font-size:11px; color:#94a3b8; line-height:1.7;">
+            <span>هنوز حساب کاربری یا لایسنس دریافت نکرده‌اید؟</span>
+            <div style="margin-top:8px;">
+                <a href="/jaheshkala/" style="color:#ffb74d; text-decoration:none; font-weight:bold; display:inline-flex; align-items:center; gap:4px; padding:6px 12px; background:rgba(255,140,0,0.12); border:1px solid rgba(255,140,0,0.3); border-radius:8px;">
+                    🛒 خرید اشتراک و دریافت لایسنس از فروشگاه جهش‌کالا
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نوار بالای نرم‌افزار برای نمایش اطلاعات کاربر لاگین‌شده -->
+<div id="user-header-bar" style="display:none; width:95%; max-width:1200px; margin:0 auto 15px; background:rgba(0,0,0,0.7); border:1px solid rgba(255,140,0,0.4); border-radius:12px; padding:10px 18px; box-sizing:border-box; display:flex; justify-content:between; align-items:center; flex-wrap:wrap; gap:10px; font-size:12px;">
+    <div style="display:flex; align-items:center; gap:8px;">
+        <span style="color:#ff8c00; font-weight:bold;">🏢 حساب فعال:</span>
+        <span id="active-user-name" style="color:#fff; font-weight:bold;">-</span>
+        <span id="active-user-badge" style="background:#ff8c00; color:#000; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:bold;">اشتراک فعال</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+        <span style="color:#94a3b8;" id="active-user-expiry">-</span>
+        <button onclick="handleAmlakLogout()" style="background:rgba(220,53,69,0.25); border:1px solid #dc3545; color:#ff6b6b; padding:5px 12px; border-radius:6px; font-size:11px; cursor:pointer; margin:0;">
+            خروج از حساب
+        </button>
+    </div>
+</div>
+
+<div class="container">
+    <h1>مدیریت املاک جهش</h1>
+<a href="tel:09152331974" style="text-decoration: none; display: inline-block; margin-top: 30px; margin-bottom: 30px; width: 100%; text-align: center;">
+    <button type="button" style="
+        background: rgba(255, 255, 255, 0.15); 
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 20px;
+        padding: 18px 36px;
+        color: #ffffff;
+        font-family: 'Tahoma', sans-serif;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease-in-out;
+        outline: none;
+        min-width: 280px;
+    " 
+    onmouseover="this.style.background='rgba(255, 255, 255, 0.25)'; this.style.transform='scale(1.03)';" 
+    onmouseout="this.style.background='rgba(255, 255, 255, 0.15)'; this.style.transform='scale(1)';"
+    >
+        <span style="font-size: 1.1em; font-weight: bold; margin-bottom: 8px; direction: rtl;">
+            ساخته شده توسط جهش کمپانی
+        </span>
+        <div style="display: flex; align-items: center; direction: ltr; font-weight: 500; font-size: 1.1em; background: rgba(255,255,255,0.1); padding: 4px 14px; border-radius: 10px;">
+            <span style="margin-right: 10px;">📞</span>
+            <span style="letter-spacing: 1.5px;">0915 233 1974</span>
+        </div>
+    </button>
+</a>
+    
+    <div class="input-section" style="padding: 15px; text-align: center; border: 1px dashed var(--primary-color);">
+        <h2 style="font-size: 1.2em; margin-bottom: 15px;">انتقال و ادغام اطلاعات بین دستگاه‌ها</h2>
+        <p style="font-size: 0.85em; margin-bottom: 15px;">امکان پشتیبان‌گیری، دانلود فایل اطلاعات و ادغام یا جایگزینی اطلاعات روی تمام دستگاه‌ها.</p>
+        
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin-top: 15px;">
+            <button onclick="exportBackupData()" style="background: #2e7d32; box-shadow: 0 0 10px #2e7d32; margin:0;">📥 دانلود بکاپ فعلی</button>
+            <label for="merge-backup-file" style="cursor:pointer; background: #8e24aa; padding:12px 25px; border-radius:5px; color:#fff; box-shadow: 0 0 10px #8e24aa; display: inline-block; font-family:'Electrolize', Tahoma, sans-serif; transition: transform 0.2s; margin:0;">➕ افزودن بکاپ به اطلاعات فعلی</label>
+            <input type="file" id="merge-backup-file" accept=".json" style="display:none;" onchange="mergeBackupData(event)">
+            
+            <label for="import-backup-file" style="cursor:pointer; background: #d32f2f; padding:12px 25px; border-radius:5px; color:#fff; box-shadow: 0 0 10px #d32f2f; display: inline-block; font-family:'Electrolize', Tahoma, sans-serif; transition: transform 0.2s; margin:0;">⚠️ جایگزینی کامل</label>
+            <input type="file" id="import-backup-file" accept=".json" style="display:none;" onchange="importBackupData(event)">
+        </div>
+    </div>
+
+    <!-- بخش ثبت ملک -->
+    <div class="input-section">
+        <h2 id="form-title">ثبت ملک جدید</h2>
+
+        <!-- دستیار هوشمند املاک -->
+        <div class="smart-box">
+            <h3 style="margin-top:0; font-size: 1.1em; color: var(--primary-color);">🤖 دستیار هوشمند ثبت ملک</h3>
+            <p style="font-size: 0.85em; color: #ccc; margin-bottom: 10px;">توضیحات ملک را بنویسید یا به صورت صوتی بگویید؛ هوش مصنوعی فرم را تکمیل می‌کند:</p>
+            <textarea id="smart-prop-text" placeholder="اینجا تایپ کنید یا دکمه میکروفون را بزنید..."></textarea>
+            <div class="smart-box-controls">
+                <button type="button" id="btn-voice-prop" onclick="toggleVoiceRec('prop')" style="background: #0277bd;">🎙 تایپ صوتی (لایو)</button>
+                <button type="button" onclick="smartParseProperty()" style="background: #2e7d32;">✨ پردازش متـن و پر کردن فرم</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="title">عنوان آگهی:</label>
+            <input type="text" id="title" placeholder="مثال: آپارتمان لوکس در منطقه سعادت آباد">
+            
+            <label for="deal-type">نوع معامله:</label>
+            <select id="deal-type">
+                <option value="">انتخاب کنید...</option>
+                <option value="فروش">فروش</option>
+                <option value="رهن و اجاره">رهن و اجاره</option>
+            </select>
+
+            <label for="prop-type">نوع ملک:</label>
+            <select id="prop-type">
+                <option value="">انتخاب کنید...</option>
+                <option value="آپارتمان">آپارتمان</option>
+                <option value="ویلایی">ویلایی / دربست</option>
+                <option value="زمین">زمین / کلنگی</option>
+                <option value="مغازه">مغازه / تجاری</option>
+                <option value="دفتر کار">دفتر کار / اداری</option>
+                <option value="سایر">سایر موارد</option>
+            </select>
+
+            <label for="seller-name">نام فروشنده/موجر:</label>
+            <input type="text" id="seller-name" placeholder="نام کامل">
+            
+            <label for="contact">اطلاعات تماس:</label>
+            <input type="text" id="contact" placeholder="شماره موبایل یا تلفن">
+            
+            <label for="price">قیمت/پیش‌پرداخت (تومان):</label>
+            <input type="text" inputmode="numeric" id="price" placeholder="مثال: 5,000,000,000" oninput="formatCurrency(this)" dir="ltr" style="text-align: right;">
+            
+            <label for="area">متراژ (متر مربع):</label>
+            <input type="number" id="area" placeholder="مثال: 120">
+            
+            <label for="address">آدرس:</label>
+            <input type="text" id="address" placeholder="آدرس دقیق ملک">
+            
+            <label for="url">لینک آگهی:</label>
+            <input type="url" id="url" placeholder="آدرس اینترنتی آگهی (اختیاری)">
+            
+            <label for="description" style="grid-column: 1 / -1;">توضیحات تکمیلی:</label>
+            <textarea id="description" rows="3" placeholder="جزئیات بیشتر..." style="grid-column: 1 / -1;"></textarea>
+            
+            <div class="field-360">
+                <p>🌐 عکس‌های ۳۶۰ درجه (اختیاری — چند فایل)</p>
+                <small>فرمت‌های JPG، PNG، WebP</small>
+                <input type="file" id="photo360-input" accept="image/jpeg,image/png,image/webp,image/bmp" multiple="">
+                <div id="preview-360-list"></div>
+            </div>
+        </div>
+
+        <button type="button" id="submit-btn" onclick="addOrUpdateProperty(event)">ثبت ملک</button>
+        <button type="button" id="cancel-edit" onclick="cancelEdit()" style="display: none; background: rgb(119, 119, 119);">لغو و بازگشت</button>
+    </div>
+
+    <!-- بخش ثبت مشتری جدید -->
+    <div class="input-section customer-section">
+        <h2 id="cust-form-title">ثبت مشتری (متقاضی)</h2>
+
+        <!-- دستیار هوشمند مشتریان -->
+        <div class="smart-box">
+            <h3 style="margin-top:0; font-size: 1.1em; color: var(--customer-color);">🤖 دستیار هوشمند ثبت متقاضی</h3>
+            <p style="font-size: 0.85em; color: #ccc; margin-bottom: 10px;">درخواست متقاضی را بنویسید یا بگویید تا فرم به طور خودکار تکمیل شود:</p>
+            <textarea id="smart-cust-text" placeholder="اینجا تایپ کنید یا دکمه میکروفون را بزنید..."></textarea>
+            <div class="smart-box-controls">
+                <button type="button" id="btn-voice-cust" class="btn-customer" onclick="toggleVoiceRec('cust')" style="background: #0277bd;">🎙 تایپ صوتی (لایو)</button>
+                <button type="button" class="btn-customer" onclick="smartParseCustomer()" style="background: #2e7d32; box-shadow: 0 0 10px #2e7d32;">✨ پردازش متـن و پر کردن فرم</button>
+            </div>
+        </div>
+
+        <div class="form-group customer-inputs">
+            <label for="cust-name">نام متقاضی:</label>
+            <input type="text" id="cust-name" placeholder="نام و نام خانوادگی" style="border-color: var(--customer-color);">
+            
+            <label for="cust-phone">شماره تماس:</label>
+            <input type="text" id="cust-phone" placeholder="شماره تماس" style="border-color: var(--customer-color);">
+
+            <label for="cust-deal-type">نوع معامله درخواستی:</label>
+            <select id="cust-deal-type" style="border-color: var(--customer-color);">
+                <option value="">فرقی ندارد</option>
+                <option value="فروش">خرید</option>
+                <option value="رهن و اجاره">رهن و اجاره</option>
+            </select>
+
+            <label for="cust-prop-type">نوع ملک درخواستی:</label>
+            <select id="cust-prop-type" style="border-color: var(--customer-color);">
+                <option value="">فرقی ندارد</option>
+                <option value="آپارتمان">آپارتمان</option>
+                <option value="ویلایی">ویلایی / دربست</option>
+                <option value="زمین">زمین / کلنگی</option>
+                <option value="مغازه">مغازه / تجاری</option>
+                <option value="دفتر کار">دفتر کار / اداری</option>
+                <option value="سایر">سایر موارد</option>
+            </select>
+            
+            <label for="cust-min-price">حداقل بودجه (تومان):</label>
+            <input type="text" inputmode="numeric" id="cust-min-price" placeholder="مثال: 1,000,000,000" oninput="formatCurrency(this)" dir="ltr" style="text-align: right; border-color: var(--customer-color);">
+            
+            <label for="cust-max-price">حداکثر بودجه (تومان):</label>
+            <input type="text" inputmode="numeric" id="cust-max-price" placeholder="مثال: 4,000,000,000" oninput="formatCurrency(this)" dir="ltr" style="text-align: right; border-color: var(--customer-color);">
+            
+            <label for="cust-desc" style="grid-column: 1 / -1;">درخواست (محدوده/متراژ و ...):</label>
+            <input type="text" id="cust-desc" placeholder="مثال: دو خوابه، محدوده ونک" style="grid-column: 1 / -1; border-color: var(--customer-color);">
+        </div>
+        <button class="btn-customer" id="submit-cust-btn" onclick="addOrUpdateCustomer()">ثبت متقاضی</button>
+        <button class="btn-customer" id="cancel-cust-edit" onclick="cancelCustEdit()" style="display: none; background: rgb(119, 119, 119);">لغو و بازگشت</button>
+    </div>
+
+    <!-- لیست مشتریان -->
+    <div class="property-list customer-section" id="main-customers-section">
+        <h2>لیست مشتریان متقاضی</h2>
+        <div id="customers-container"><p>مشتری متقاضی یافت نشد.</p></div>
+    </div>
+
+    <!-- لیست املاک -->
+    <div class="property-list" id="main-properties-section">
+        <h2>لیست املاک ثبت‌شده</h2>
+        <div id="properties-container"><p>موردی یافت نشد.</p></div>
+    </div>
+</div>
+
+<script>
+// Authentication & Session Management
+function checkLoginStatus() {
+    try {
+        const rawSession = localStorage.getItem('amlak_session');
+        if (rawSession) {
+            const session = JSON.parse(rawSession);
+            if (session && session.username) {
+                applyLoggedInUI(session);
+                return;
+            }
+        }
+    } catch(e) {}
+
+    // Check if auto-fill params provided in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramUser = urlParams.get('username') || urlParams.get('u');
+    const paramPass = urlParams.get('password') || urlParams.get('p');
+    if (paramUser && document.getElementById('app-username')) {
+        document.getElementById('app-username').value = paramUser;
+    }
+    if (paramPass && document.getElementById('app-password')) {
+        document.getElementById('app-password').value = paramPass;
+    }
+}
+
+async function handleAmlakLogin() {
+    const userField = document.getElementById('app-username');
+    const passField = document.getElementById('app-password');
+    const errorBox = document.getElementById('login-error');
+    const submitBtn = document.getElementById('login-submit-btn');
+
+    const username = (userField ? userField.value : '').trim();
+    const password = (passField ? passField.value : '').trim();
+
+    if (!username || !password) {
+        if (errorBox) {
+            errorBox.style.display = 'block';
+            errorBox.innerText = 'لطفاً نام کاربری و رمز عبور اختصاصی را وارد نمایید.';
+        }
+        return;
+    }
+
+    if (errorBox) errorBox.style.display = 'none';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'در حال اعتبارسنجی لایسنس...';
+    }
+
+    let authSuccess = false;
+    let userData = null;
+
+    // 1. Try Server API Auth
+    try {
+        const res = await fetch('/api/amlak/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.user) {
+            authSuccess = true;
+            userData = data.user;
+        } else if (data.message) {
+            if (errorBox) {
+                errorBox.style.display = 'block';
+                errorBox.innerText = data.message;
+            }
+        }
+    } catch (netErr) {
+        console.warn('Server auth offline, checking local storage licenses...', netErr);
+    }
+
+    // 2. Fallback to Local Storage Database if server was unreachable
+    if (!authSuccess) {
+        // Check superadmin
+        if ((username.toLowerCase() === 'admin' || username.toLowerCase() === 'jahesh') && 
+            (password === 'jahesh1395' || password === 'jahesh')) {
+            authSuccess = true;
+            userData = {
+                username: 'admin',
+                buyerName: 'مدیر کل فروشگاه جهش‌کالا',
+                role: 'admin',
+                licenseKey: 'JA-ROOT-ADMIN-VIP',
+                expiresAt: 'نامحدود (حساب مدیریت)',
+                days: 365,
+                status: 'active'
+            };
+        } else {
+            // Check local licenses from orders
+            try {
+                const rawLicenses = localStorage.getItem('jahesh_amlak_licenses');
+                if (rawLicenses) {
+                    const list = JSON.parse(rawLicenses);
+                    if (Array.isArray(list)) {
+                        const match = list.find(l => 
+                            l.username.toLowerCase() === username.toLowerCase() && 
+                            l.password === password
+                        );
+                        if (match) {
+                            authSuccess = true;
+                            userData = match;
+                        }
+                    }
+                }
+            } catch(e) {}
+        }
+    }
+
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'ورود و تایید لایسنس سامانه';
+    }
+
+    if (authSuccess && userData) {
+        localStorage.setItem('amlak_session', JSON.stringify(userData));
+        localStorage.setItem('jahesh_logged_in', 'true');
+        applyLoggedInUI(userData);
+    } else {
+        if (errorBox && errorBox.style.display !== 'block') {
+            errorBox.style.display = 'block';
+            errorBox.innerText = 'نام کاربری یا رمز عبور اشتباه است. لطفاً مشخصات دریافتی پس از خرید اشتراک از جهش‌کالا را وارد نمایید.';
+        }
+    }
+}
+
+function applyLoggedInUI(user) {
+    const overlay = document.getElementById('login-overlay');
+    if (overlay) overlay.style.display = 'none';
+
+    const headerBar = document.getElementById('user-header-bar');
+    if (headerBar) {
+        headerBar.style.display = 'flex';
+        const nameEl = document.getElementById('active-user-name');
+        if (nameEl) nameEl.innerText = `${user.buyerName || user.username} (${user.username})`;
+
+        const expEl = document.getElementById('active-user-expiry');
+        if (expEl) expEl.innerText = `تاریخ انقضای لایسنس: ${user.expiresAt || '۳۰ روزه فعال'}`;
+    }
+}
+
+function handleAmlakLogout() {
+    if (confirm('آیا مایل به خروج از حساب کاربری سامانه املاک هستید؟')) {
+        localStorage.removeItem('amlak_session');
+        localStorage.removeItem('jahesh_logged_in');
+        const headerBar = document.getElementById('user-header-bar');
+        if (headerBar) headerBar.style.display = 'none';
+
+        const overlay = document.getElementById('login-overlay');
+        if (overlay) overlay.style.display = 'flex';
+
+        const userField = document.getElementById('app-username');
+        const passField = document.getElementById('app-password');
+        if (userField) userField.value = '';
+        if (passField) passField.value = '';
+    }
+}
+
+let properties = [];
+let customers = [];
+let favorites = [];
+let pending360 = [];
+
+function loadData() {
+    try {
+        properties = JSON.parse(localStorage.getItem('amlakProperties')) || [];
+        customers = JSON.parse(localStorage.getItem('amlakCustomers')) || [];
+        favorites = JSON.parse(localStorage.getItem('amlakFavorites')) || [];
+    } catch {}
+    renderProperties();
+    renderCustomers();
+}
+
+function formatCurrency(input) {
+    let val = input.value.replace(/,/g, '').replace(/\D/g, '');
+    input.value = val !== '' ? val.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '';
+}
+
+function renderProperties() {
+    const container = document.getElementById('properties-container');
+    if (!container) return;
+    if (properties.length === 0) {
+        container.innerHTML = '<p>موردی ثبت نشده است.</p>';
+        return;
+    }
+    container.innerHTML = properties.map(p => `
+        <div class="property-card">
+            <h3>${p.title}</h3>
+            <p><strong>نوع معامله:</strong> ${p.dealType} - ${p.propType}</p>
+            <p><strong>قیمت:</strong> ${Number(p.price || 0).toLocaleString('fa-IR')} تومان</p>
+            <p><strong>متراژ:</strong> ${p.area || '-'} متر</p>
+            <p><strong>آدرس:</strong> ${p.address || '-'}</p>
+            <p><strong>تماس:</strong> ${p.contact || '-'}</p>
+        </div>
+    `).join('');
+}
+
+function renderCustomers() {
+    const container = document.getElementById('customers-container');
+    if (!container) return;
+    if (customers.length === 0) {
+        container.innerHTML = '<p>متقاضی ثبت نشده است.</p>';
+        return;
+    }
+    container.innerHTML = customers.map(c => `
+        <div class="property-card customer-card">
+            <h3>${c.name}</h3>
+            <p><strong>تماس:</strong> ${c.phone || '-'}</p>
+            <p><strong>معامله درخواستی:</strong> ${c.dealType || 'همه'} - ${c.propType || 'همه'}</p>
+            <p><strong>حداکثر بودجه:</strong> ${Number(c.maxPrice || 0).toLocaleString('fa-IR')} تومان</p>
+            <p><strong>توضیحات:</strong> ${c.desc || '-'}</p>
+        </div>
+    `).join('');
+}
+
+function addOrUpdateProperty(e) {
+    if (e) e.preventDefault();
+    const title = document.getElementById('title').value.trim();
+    if (!title) return alert('عنوان الزامی است');
+    const newP = {
+        id: Date.now().toString(),
+        title,
+        dealType: document.getElementById('deal-type').value,
+        propType: document.getElementById('prop-type').value,
+        sellerName: document.getElementById('seller-name').value,
+        contact: document.getElementById('contact').value,
+        price: document.getElementById('price').value.replace(/,/g, ''),
+        area: document.getElementById('area').value,
+        address: document.getElementById('address').value,
+        description: document.getElementById('description').value,
+    };
+    properties.unshift(newP);
+    localStorage.setItem('amlakProperties', JSON.stringify(properties));
+    renderProperties();
+    alert('ملک با موفقیت ثبت شد!');
+}
+
+function addOrUpdateCustomer() {
+    const name = document.getElementById('cust-name').value.trim();
+    if (!name) return alert('نام الزامی است');
+    const newC = {
+        id: Date.now().toString(),
+        name,
+        phone: document.getElementById('cust-phone').value,
+        dealType: document.getElementById('cust-deal-type').value,
+        propType: document.getElementById('cust-prop-type').value,
+        maxPrice: document.getElementById('cust-max-price').value.replace(/,/g, ''),
+        desc: document.getElementById('cust-desc').value,
+    };
+    customers.unshift(newC);
+    localStorage.setItem('amlakCustomers', JSON.stringify(customers));
+    renderCustomers();
+    alert('مشتری با موفقیت ثبت شد!');
+}
+
+function exportBackupData() {
+    const dataStr = JSON.stringify({ properties, customers, favorites });
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "amlak_jahesh_backup.json";
+    a.click();
+}
+
+function mergeBackupData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.properties) properties = [...properties, ...data.properties];
+            if (data.customers) customers = [...customers, ...data.customers];
+            localStorage.setItem('amlakProperties', JSON.stringify(properties));
+            localStorage.setItem('amlakCustomers', JSON.stringify(customers));
+            renderProperties();
+            renderCustomers();
+            alert('اطلاعات با موفقیت ادغام شد!');
+        } catch {
+            alert('فایل نامعتبر است');
+        }
+    };
+    reader.readAsText(file);
+}
+
+function importBackupData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.properties) properties = data.properties;
+            if (data.customers) customers = data.customers;
+            localStorage.setItem('amlakProperties', JSON.stringify(properties));
+            localStorage.setItem('amlakCustomers', JSON.stringify(customers));
+            renderProperties();
+            renderCustomers();
+            alert('اطلاعات بازیابی شد!');
+        } catch {
+            alert('فایل نامعتبر است');
+        }
+    };
+    reader.readAsText(file);
+}
+
+checkLoginStatus();
+loadData();
+</script>
+</body>
+</html>

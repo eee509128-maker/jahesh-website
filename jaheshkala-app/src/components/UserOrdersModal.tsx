@@ -15,9 +15,14 @@ import {
   Printer,
   Package,
   Sparkles,
+  ExternalLink,
+  Copy,
+  Key,
+  ShieldCheck,
 } from 'lucide-react';
 import { Order, User, Product } from '../types';
 import { fetchOrdersFromDb } from '../lib/dbService';
+import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
 
 interface UserOrdersModalProps {
   isOpen: boolean;
@@ -41,6 +46,15 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   const [currentOrders, setCurrentOrders] = useState<Order[]>(initialOrders);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopyText = (text: string, fieldKey: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedField(fieldKey);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {}
+  };
 
   const [manualPhoneSearch, setManualPhoneSearch] = useState(() => {
     try {
@@ -509,12 +523,91 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                     </div>
                   </div>
 
+                  {/* کارت اختصاصی اکانت و لایسنس سامانه مدیریت املاک برای خریدار */}
+                  {hasAmlakInItems(order.items) && (() => {
+                    const license = order.amlakLicense || generateAmlakLicense(order, currentUser);
+                    const isUserCopied = copiedField === `user-${order.id}`;
+                    const isPassCopied = copiedField === `pass-${order.id}`;
+
+                    return (
+                      <div className="bg-gradient-to-br from-amber-500/15 via-[#180e30] to-orange-600/10 border border-amber-500/40 rounded-2xl p-4 text-right space-y-3 shadow-lg my-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-amber-500/30">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">🏢</span>
+                            <div>
+                              <span className="font-black text-amber-400 text-xs sm:text-sm block">
+                                حساب کاربری و لایسنس سامانه مدیریت املاک جهش
+                              </span>
+                              <span className="text-[10px] text-slate-300">
+                                شناسه لایسنس: <strong className="font-mono text-amber-300">{license.licenseKey}</strong>
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1">
+                              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                              <span>اشتراک فعال ({license.days} روزه)</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {/* نام کاربری */}
+                          <div className="bg-black/50 p-2.5 rounded-xl border border-amber-500/20 flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] text-slate-400 block font-sans">نام کاربری اختصاصی:</span>
+                              <span className="font-mono font-bold text-white text-xs">{license.username}</span>
+                            </div>
+                            <button
+                              onClick={() => handleCopyText(license.username, `user-${order.id}`)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-bold transition-colors cursor-pointer"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>{isUserCopied ? 'کپی شد!' : 'کپی'}</span>
+                            </button>
+                          </div>
+
+                          {/* رمز عبور اختصاصی */}
+                          <div className="bg-black/50 p-2.5 rounded-xl border border-amber-500/20 flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] text-slate-400 block font-sans">رمز عبور اختصاصی:</span>
+                              <span className="font-mono font-bold text-amber-300 text-xs tracking-wider">{license.password}</span>
+                            </div>
+                            <button
+                              onClick={() => handleCopyText(license.password, `pass-${order.id}`)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-bold transition-colors cursor-pointer"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>{isPassCopied ? 'کپی شد!' : 'کپی'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
+                          <span className="text-[11px] text-slate-300">
+                            اعتبار اشتراک تا: <strong className="text-amber-300">{license.expiresAt}</strong>
+                          </span>
+
+                          <a
+                            href={`/amlak.html?u=${encodeURIComponent(license.username)}&p=${encodeURIComponent(license.password)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer no-underline"
+                          >
+                            <span>ورود به سامانه مدیریت املاک در تب جدید</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <span className="text-[11px] text-slate-400">
                       * جهت هماهنگی و ارسال سریع، پشتیبانی جهش همواره پاسخگوی شماست.
                     </span>
                     <div className="flex items-center gap-2">
-                      {order.items.some(it => it.product?.id === 'pkg-amlak-jahesh' || it.product?.title?.includes('املاک')) && onOpenAmlakApp && (
+                      {order.items.some(it => it.product?.id === 'pkg-amlak-jahesh' || it.product?.title?.includes('املاک')) && onOpenAmlakApp && currentUser?.role === 'admin' && (
                         <button
                           onClick={() => {
                             onClose();
@@ -523,7 +616,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                           className="text-xs bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 flex items-center gap-1.5 font-black px-3.5 py-1.5 rounded-lg shadow-md transition-all cursor-pointer"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
-                          <span>ورود به سامانه مدیریت املاک جهش</span>
+                          <span>تست سامانه مدیریت املاک (مدیریت)</span>
                         </button>
                       )}
                       <button

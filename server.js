@@ -456,6 +456,128 @@ app.post('/api/zibal-verify', async (req, res) => {
   }
 });
 
+// Real Estate SaaS (مدیریت املاک جهش) Licenses Persistence & Auth
+const AMLAK_LICENSES_FILE = path.join(__dirname, 'data', 'amlak_licenses.json');
+
+function getAmlakLicensesFromServer() {
+  try {
+    if (fs.existsSync(AMLAK_LICENSES_FILE)) {
+      const content = fs.readFileSync(AMLAK_LICENSES_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn('Could not read amlak licenses:', err);
+  }
+  return [
+    // Pre-seeded default admin superuser
+    {
+      username: 'admin',
+      password: 'jahesh1395',
+      licenseKey: 'JA-ROOT-ADMIN-VIP',
+      buyerName: 'مدیر کل فروشگاه جهش‌کالا',
+      phone: '09152331974',
+      days: 365,
+      startDate: '۱۴۰۴/۰۱/۰۱',
+      expiresAt: '۱۴۰۵/۰۱/۰۱',
+      status: 'active'
+    }
+  ];
+}
+
+function saveAmlakLicensesToServer(licenses) {
+  try {
+    const dataDir = path.dirname(AMLAK_LICENSES_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(AMLAK_LICENSES_FILE, JSON.stringify(licenses, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not save amlak licenses:', err);
+  }
+}
+
+app.get('/api/amlak/licenses', (_req, res) => {
+  const licenses = getAmlakLicensesFromServer();
+  res.json({ success: true, licenses });
+});
+
+app.post('/api/amlak/licenses', (req, res) => {
+  try {
+    const newLicense = req.body;
+    if (!newLicense || !newLicense.username || !newLicense.password) {
+      return res.status(400).json({ success: false, error: 'اطلاعات لایسنس ناقص است.' });
+    }
+    const licenses = getAmlakLicensesFromServer();
+    const idx = licenses.findIndex(l => l.username.toLowerCase() === newLicense.username.toLowerCase());
+    if (idx >= 0) {
+      licenses[idx] = newLicense;
+    } else {
+      licenses.unshift(newLicense);
+    }
+    saveAmlakLicensesToServer(licenses);
+    return res.json({ success: true, license: newLicense });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/amlak/auth', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: 'نام کاربری و رمز عبور الزامی است.' });
+    }
+
+    const cleanUser = String(username).trim().toLowerCase();
+    const cleanPass = String(password).trim();
+
+    // 1. Check SuperAdmin credentials
+    if ((cleanUser === 'admin' || cleanUser === 'jahesh') && (cleanPass === 'jahesh1395' || cleanPass === 'jahesh')) {
+      return res.json({
+        success: true,
+        user: {
+          username: 'admin',
+          buyerName: 'مدیر کل سیستم جهش',
+          role: 'admin',
+          licenseKey: 'JA-ROOT-ADMIN-VIP',
+          expiresAt: 'نامحدود (حساب مدیریت)',
+          days: 365,
+          status: 'active'
+        }
+      });
+    }
+
+    // 2. Check Customer Purchased Licenses
+    const licenses = getAmlakLicensesFromServer();
+    const matched = licenses.find(
+      l => l.username.toLowerCase() === cleanUser && l.password === cleanPass
+    );
+
+    if (matched) {
+      return res.json({
+        success: true,
+        user: {
+          username: matched.username,
+          buyerName: matched.buyerName,
+          phone: matched.phone,
+          licenseKey: matched.licenseKey,
+          expiresAt: matched.expiresAt,
+          days: matched.days,
+          status: matched.status || 'active'
+        }
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      message: 'نام کاربری یا رمز عبور اشتباه است. لطفاً مشخصات دریافتی پس از خرید اشتراک از جهش‌کالا را وارد نمایید.'
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Explicit handler for Real Estate Management App (مدیریت املاک جهش)
 app.get(['/amlak.html', '/amlak', '/jaheshkala/amlak.html', '/jaheshkala/amlak'], (_req, res) => {
   const candidates = [

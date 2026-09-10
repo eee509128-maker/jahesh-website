@@ -29,6 +29,7 @@ import {
   clearPendingOrder,
   ZIBAL_DEFAULT_MERCHANT,
 } from './lib/zibalService';
+import { hasAmlakInItems, generateAmlakLicense } from './lib/amlakLicenseService';
 import confetti from 'canvas-confetti';
 
 // Digikala-styled Components
@@ -335,6 +336,10 @@ export default function App() {
               minute: '2-digit',
             }),
         };
+
+        if (hasAmlakInItems(fallbackItems) && !finalOrder.amlakLicense) {
+          finalOrder.amlakLicense = pendingOrder?.amlakLicense || generateAmlakLicense(finalOrder, activeUser);
+        }
 
         // 1. Save to DB (Supabase cloud) and local storage
         await saveOrderToDb(finalOrder);
@@ -841,6 +846,9 @@ export default function App() {
 
   // Payment success handler (Saved into Supabase Cloud DB)
   const handlePaymentSuccess = async (newOrder: Order) => {
+    if (hasAmlakInItems(newOrder.items) && !newOrder.amlakLicense) {
+      newOrder.amlakLicense = generateAmlakLicense(newOrder, currentUser);
+    }
     setOrders((prev) => [newOrder, ...prev]);
     setCartItems([]);
     setPaymentModalOpen(false);
@@ -901,6 +909,10 @@ export default function App() {
       }),
     };
 
+    if (isAmlakOrSub) {
+      newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
+    }
+
     setOrders((prev) => [newAdminOrder, ...prev]);
     await saveOrderToDb(newAdminOrder);
     showToast(`سفارش رایگان «${product.title}» برای حساب مدیریت با موفقیت در سیستم ثبت شد.`);
@@ -957,6 +969,10 @@ export default function App() {
         minute: '2-digit',
       }),
     };
+
+    if (hasAmlakInItems(safeItems)) {
+      newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
+    }
 
     setOrders((prev) => [newAdminOrder, ...prev]);
     setCartItems([]);
@@ -1352,6 +1368,7 @@ export default function App() {
         onAddToCart={handleAddToCart}
         onInstantBuy={handleInstantBuy}
         onOpenAmlakApp={() => setAmlakModalOpen(true)}
+        currentUser={currentUser}
       />
 
       {/* Real Estate App (مدیریت املاک جهش) Modal */}
@@ -1445,6 +1462,65 @@ export default function App() {
               </div>
             </div>
 
+            {/* کارت اختصاصی اطلاعات لایسنس و دسترسی سامانه املاک */}
+            {completedOrderReceipt.order.amlakLicense && (
+              <div className="bg-gradient-to-br from-amber-500/15 to-orange-600/10 border border-amber-500/40 rounded-2xl p-4 text-right space-y-3 shadow-lg text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-amber-500/30">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🏢</span>
+                    <span className="font-black text-amber-400">حساب کاربری اختصاصی سامانه املاک:</span>
+                  </div>
+                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                    لایسنس ۳۰ روزه فعال
+                  </span>
+                </div>
+
+                <div className="space-y-2 font-mono">
+                  <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                    <span className="text-slate-400 font-sans text-[11px]">نام کاربری ورود:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold text-xs">{completedOrderReceipt.order.amlakLicense.username}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(completedOrderReceipt.order.amlakLicense!.username);
+                          showToast('نام کاربری کپی شد.');
+                        }}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans bg-amber-500/20 px-1.5 py-0.5 rounded"
+                      >
+                        کپی
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                    <span className="text-slate-400 font-sans text-[11px]">رمز عبور اختصاصی:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-300 font-bold text-xs tracking-wider">{completedOrderReceipt.order.amlakLicense.password}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(completedOrderReceipt.order.amlakLicense!.password);
+                          showToast('رمز عبور کپی شد.');
+                        }}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans bg-amber-500/20 px-1.5 py-0.5 rounded"
+                      >
+                        کپی
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <a
+                  href={`/amlak.html?u=${encodeURIComponent(completedOrderReceipt.order.amlakLicense.username)}&p=${encodeURIComponent(completedOrderReceipt.order.amlakLicense.password)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-black text-xs shadow-md transition-all cursor-pointer no-underline"
+                >
+                  <span>ورود به سامانه مدیریت املاک در تب جدید</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            )}
+
             <div className="flex gap-2.5 pt-2">
               <button
                 onClick={() => {
@@ -1479,6 +1555,7 @@ export default function App() {
         onClose={() => setAdminModalOpen(false)}
         currentUser={currentUser}
         onAdminInstantPurchase={handleAdminInstantPurchase}
+        onOpenAmlakApp={() => setAmlakModalOpen(true)}
         orders={orders}
         onUpdateOrderStatus={handleUpdateOrderStatus}
         onDeleteOrder={handleDeleteOrder}
