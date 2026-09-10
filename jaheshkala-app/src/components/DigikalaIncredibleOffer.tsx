@@ -90,25 +90,52 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
         
         {/* Right Header Block: "پیشنهاد شگفت‌انگیز" Title & Countdown Clock */}
-        <div className="lg:col-span-3 flex flex-row lg:flex-col items-center justify-between lg:justify-center text-center p-3 sm:p-4 rounded-2xl bg-black/40 border border-white/10 gap-3">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 text-amber-400">
-              <Percent className="w-6 h-6 sm:w-8 sm:h-8 rotate-12" />
-              <Sparkles className="w-4 h-4 sm:w-6 sm:h-6 animate-pulse" />
+        <div className="lg:col-span-3 flex flex-col items-center justify-between text-center p-3 sm:p-4 rounded-2xl bg-black/40 border border-white/10 gap-3">
+          
+          {/* Top Row: Title + Pagination Controls */}
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 text-amber-400">
+                <Percent className="w-5 h-5 sm:w-7 sm:h-7 rotate-12 shrink-0" />
+                <Sparkles className="w-3.5 h-3.5 sm:w-5 sm:h-5 animate-pulse shrink-0" />
+              </div>
+
+              <div className="text-right">
+                <span className="text-xs sm:text-lg font-black text-white block leading-tight">
+                  پیشنهاد
+                </span>
+                <span className="text-sm sm:text-2xl font-black text-amber-400 tracking-wider block leading-tight">
+                  شگفت‌انگیز
+                </span>
+              </div>
             </div>
 
-            <div className="text-right lg:text-center">
-              <h3 className="text-sm sm:text-2xl font-black tracking-tight" style={{ color: '#ffffff' }}>
-                پیشنهاد
-              </h3>
-              <h3 className="text-base sm:text-3xl font-black text-amber-400 tracking-wider">
-                شگفت‌انگیز
-              </h3>
-            </div>
+            {/* Next/Prev Incredible Item Controls */}
+            {incredibleProducts.length > 1 && (
+              <div className="flex items-center gap-1 bg-purple-950/80 px-2 py-1 rounded-xl border border-purple-700/60 shrink-0">
+                <button
+                  onClick={handlePrev}
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer"
+                  title="کالای قبلی"
+                >
+                  <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </button>
+                <span className="text-[11px] text-amber-300 font-bold px-1.5 whitespace-nowrap select-none" dir="rtl">
+                  {currentIndex + 1} از {incredibleProducts.length}
+                </span>
+                <button
+                  onClick={handleNext}
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer"
+                  title="کالای بعدی"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Dynamic Countdown Clock */}
-          <div className="space-y-1.5 pt-0 lg:pt-1 text-center w-full">
+          <div className="space-y-1.5 pt-1 text-center w-full">
             <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-xs text-amber-200/90 font-medium">
               <Clock className="w-3.5 h-3.5 text-amber-400" />
               <span>زمان باقی‌مانده:</span>
@@ -163,29 +190,6 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
               </div>
             )}
           </div>
-
-          {/* Next/Prev Incredible Item Controls */}
-          {incredibleProducts.length > 1 && (
-            <div className="flex items-center gap-1.5 pt-0 lg:pt-1">
-              <button
-                onClick={handlePrev}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
-                title="کالای قبلی"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <span className="text-[10px] sm:text-[11px] text-slate-300 font-mono">
-                {currentIndex + 1} / {incredibleProducts.length}
-              </span>
-              <button
-                onClick={handleNext}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
-                title="کالای بعدی"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Left Side: Product Showcase Card */}

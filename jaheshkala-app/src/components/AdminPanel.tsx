@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { ImageCropperModal } from './ImageCropperModal';
 import {
+  Crop,
   ShieldCheck, Package, ShoppingCart, PlusCircle, Trash2, Edit3, CheckCircle2,
   AlertCircle, Phone, Mail, Clock, CreditCard, RefreshCw, X, FileText,
   Sliders, ExternalLink, Code2, Server, HelpCircle, Layers, Tag, Sparkles,
@@ -78,6 +80,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bannerImage, setBannerImage] = useState('');
   const [bannerImageLoading, setBannerImageLoading] = useState(false);
   const [bannerSuccessMessage, setBannerSuccessMessage] = useState('');
+  const [cropperModal, setCropperModal] = useState<{ isOpen: boolean, imageSrc: string, aspectRatio: number, target: 'banner' | 'product_main' | 'product_gallery' }>({
+    isOpen: false,
+    imageSrc: '',
+    aspectRatio: 1,
+    target: 'banner'
+  });
+
   const bannerFileInputRef = React.useRef<HTMLInputElement>(null);
   const [chats, setChats] = useState<UserChat[]>([]);
   const [selectedChat, setSelectedChat] = useState<UserChat | null>(null);
@@ -134,31 +143,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!file) return;
     setBannerImageLoading(true);
     try {
-      // Compress to high quality web banner (max 1600px width, quality 0.85)
-      const compressed = await compressImageFile(file, 1600, 800, 0.85);
-      // Upload directly to server endpoint to get a permanent, lightweight URL
-      const uploadedUrl = await uploadBannerImage(compressed, file.name);
-      if (uploadedUrl) {
-        setBannerImage(uploadedUrl);
-      } else {
-        setBannerImage(compressed);
-      }
-    } catch (err) {
       const reader = new FileReader();
-      reader.onload = async (event) => {
+      reader.onload = (event) => {
         const raw = event.target?.result as string;
-        try {
-          const uploadedUrl = await uploadBannerImage(raw, file.name);
-          if (uploadedUrl) {
-            setBannerImage(uploadedUrl);
-            return;
-          }
-        } catch {}
-        setBannerImage(raw);
+        if (raw) {
+          setCropperModal({
+            isOpen: true,
+            imageSrc: raw,
+            aspectRatio: 21 / 9,
+            target: 'banner',
+          });
+        }
       };
       reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Failed to read image:', err);
     } finally {
       setBannerImageLoading(false);
+      if (bannerFileInputRef.current) bannerFileInputRef.current.value = '';
     }
   };
 
@@ -441,11 +443,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!file) return;
     setIsUploadingImage(true);
     try {
-      const compressed = await compressImageFile(file, 1000, 1000, 0.82);
-      setNewImage(compressed);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const raw = event.target?.result as string;
+        if (raw) {
+          setCropperModal({
+            isOpen: true,
+            imageSrc: raw,
+            aspectRatio: 1,
+            target: 'product_main',
+          });
+        }
+      };
+      reader.readAsDataURL(file);
     } catch (err) {
-      console.error('Failed to compress image:', err);
-      alert('خطا در پردازش تصویر. لطفاً تصویر دیگری را امتحان کنید.');
+      console.error('Failed to read product image:', err);
+      alert('خطا در خواندن تصویر.');
     } finally {
       setIsUploadingImage(false);
       if (e.target) e.target.value = '';
@@ -1536,6 +1549,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             <button
                               type="button"
+                              onClick={() => {
+                                if (newImage) {
+                                  setCropperModal({
+                                    isOpen: true,
+                                    imageSrc: newImage,
+                                    aspectRatio: 1,
+                                    target: 'product_main',
+                                  });
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                              title="تنظیم کادر، زوم و برش تصویر کالا"
+                            >
+                              <Crop className="w-3.5 h-3.5" />
+                              <span>تنظیم کادر و برش (Crop)</span>
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={handleSetFallbackImage}
                               className="px-3 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-600/50 text-purple-200 hover:text-white font-medium text-xs transition-colors"
                               title="استفاده از تصویر پیش‌فرض فوق‌سبک داخلی بدون نیاز به اینترنت خارجی"
@@ -2250,28 +2282,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <span className="text-[10px] text-slate-400 shrink-0">۱۰۰٪ (رنگ کامل)</span>
                         </div>
                       </div>
-                      {/* Image Position Control */}
-                      <div className="mt-3.5 p-3.5 bg-[#0f0924] border border-purple-800/60 rounded-xl space-y-2">
-                        <label className="block text-xs font-bold text-slate-200">
-                          محل قرارگیری عکس بنر (Focus Point)
-                        </label>
-                        <select
-                          value={bannerImagePosition}
-                          onChange={(e) => setBannerImagePosition(e.target.value)}
-                          className="w-full bg-[#1b1038] border border-purple-800/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                          dir="rtl"
-                        >
-                          <option value="center">وسط (پیش‌فرض)</option>
-                          <option value="top">بالا</option>
-                          <option value="bottom">پایین</option>
-                          <option value="left">چپ</option>
-                          <option value="right">راست</option>
-                          <option value="top left">بالا چپ</option>
-                          <option value="top right">بالا راست</option>
-                          <option value="bottom left">پایین چپ</option>
-                          <option value="bottom right">پایین راست</option>
-                        </select>
-                      </div>
+                      
                     </div>
 
                     {/* Banner Image Upload & Preview */}
@@ -2292,11 +2303,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           type="button"
                           onClick={() => bannerFileInputRef.current?.click()}
                           disabled={bannerImageLoading}
-                          className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-900/80 hover:bg-purple-800 border border-purple-600/70 text-purple-200 hover:text-white font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 shrink-0"
+                          className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-900/80 hover:bg-purple-800 border border-purple-600/70 text-purple-200 hover:text-white font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 shrink-0 cursor-pointer"
                         >
                           <Camera className="w-4 h-4 text-amber-400" />
-                          <span>{bannerImageLoading ? 'در حال بهینه‌سازی عکس...' : 'بارگذاری عکس بنر از گالری/دستگاه'}</span>
+                          <span>{bannerImageLoading ? 'در حال آماده‌سازی...' : 'بارگذاری عکس بنر از گالری/دستگاه'}</span>
                         </button>
+
+                        {bannerImage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCropperModal({
+                                isOpen: true,
+                                imageSrc: bannerImage,
+                                aspectRatio: 21 / 9,
+                                target: 'banner',
+                              });
+                            }}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md active:scale-95 shrink-0 cursor-pointer"
+                            title="تنظیم کادر و زاویه نمایش بنر"
+                          >
+                            <Crop className="w-4 h-4" />
+                            <span>تنظیم کادر و برش (Crop)</span>
+                          </button>
+                        )}
 
                         <input
                           type="text"
@@ -3483,6 +3513,32 @@ on public.users for delete using (true);`;
               </button>
             </div>
           </div>
+        )}
+
+        {/* INTERACTIVE IMAGE CROPPER MODAL */}
+        {cropperModal.isOpen && (
+          <ImageCropperModal
+            imageSrc={cropperModal.imageSrc}
+            initialAspect={cropperModal.aspectRatio}
+            targetType={cropperModal.target === 'banner' ? 'banner' : 'product'}
+            onClose={() => setCropperModal((prev) => ({ ...prev, isOpen: false }))}
+            onCropComplete={async (croppedBase64) => {
+              if (cropperModal.target === 'banner') {
+                setBannerImageLoading(true);
+                try {
+                  const uploadedUrl = await uploadBannerImage(croppedBase64, 'banner_crop.jpg');
+                  setBannerImage(uploadedUrl || croppedBase64);
+                } catch {
+                  setBannerImage(croppedBase64);
+                } finally {
+                  setBannerImageLoading(false);
+                }
+              } else if (cropperModal.target === 'product_main') {
+                setNewImage(croppedBase64);
+              }
+              setCropperModal((prev) => ({ ...prev, isOpen: false }));
+            }}
+          />
         )}
 
       </div>

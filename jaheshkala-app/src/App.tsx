@@ -1109,20 +1109,33 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 scrollbar-none snap-x snap-mandatory">
-              {filteredProducts.map((product) => (
-                <div key={product.id} className="w-[85vw] sm:w-auto shrink-0 snap-center sm:snap-align-none flex">
-                  <div className="w-full">
-                    <ProductCard
-                      product={product}
-                      onAddToCart={handleAddToCart}
-                      onInstantBuy={handleInstantBuy}
-                      onViewDetails={setDetailModalProduct}
-                    />
-                  </div>
+            <>
+              {filteredProducts.length > 1 && (
+                <div className="sm:hidden flex items-center justify-between mb-2.5 px-2">
+                  <span className="text-[11px] font-black text-amber-300 bg-amber-400/15 px-3 py-1 rounded-full border border-amber-400/40 shadow-sm flex items-center gap-1.5 animate-pulse">
+                    <span>👈</span>
+                    <span>برای مشاهده سایر محصولات، به چپ بکشید</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {filteredProducts.length} کالا
+                  </span>
                 </div>
-              ))}
-            </div>
+              )}
+              <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 scrollbar-none snap-x snap-mandatory">
+                {filteredProducts.map((product) => (
+                  <div key={product.id} className="w-[85vw] sm:w-auto shrink-0 snap-center sm:snap-align-none flex">
+                    <div className="w-full">
+                      <ProductCard
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                        onInstantBuy={handleInstantBuy}
+                        onViewDetails={setDetailModalProduct}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </section>
 
