@@ -595,11 +595,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewShortDesc(prod.shortDescription || '');
     setNewFullDesc(prod.fullDescription || '');
     setNewFeatures(prod.features ? prod.features.join('\n') : '');
-    setIsPopular(!!prod.isPopular);
-    setIsIncredible(!!(prod.isIncredible || (prod.discountPercent && prod.discountPercent > 0)));
+    setIsPopular(Boolean(prod.isPopular));
+    setIsIncredible(Boolean(prod.isIncredible));
     setIncredibleTimerDuration((prod.incredibleTimerDuration as any) || '1week');
     setIncredibleExpiresAt(prod.incredibleExpiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
-    setIsFreeShipping(true);
+    setIsFreeShipping(Boolean(prod.deliveryDays?.includes('رایگان')));
     setIsInStock(true);
     setNewProductCouponCode(prod.couponCode || '');
     setNewProductCouponPercent(prod.couponDiscountPercent ? prod.couponDiscountPercent.toString() : '');
@@ -680,9 +680,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       discountPercent: discount && discount > 0 ? discount : undefined,
       couponCode: prodCouponCode,
       couponDiscountPercent: prodCouponCode ? (prodCouponPercent || discount || 15) : undefined,
-      badge: newBadge.trim() || (discount && discount > 0 ? `${discount}% تخفیف` : (isIncredible ? 'تخفیف ویژه' : (isPopular ? 'پرفروش' : undefined))),
-      isPopular: isPopular || (newBadge.includes('پرفروش')),
-      isGolden: newTitle.includes('طلایی') || finalCategory.includes('طراحی سایت'),
+      badge: newBadge.trim() || (discount && discount > 0 ? `${discount}% تخفیف` : undefined),
+      isPopular: Boolean(isPopular),
+      isGolden: Boolean(newTitle.includes('طلایی') || finalCategory.includes('طراحی سایت')),
       rating: 5.0,
       reviewsCount: Math.floor(Math.random() * 20) + 5,
       deliveryDays: newDeliveryDays.trim() || 'ارسال ۱ تا ۳ روز کاری',
@@ -691,7 +691,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       features: newFeatures.split('\n').map((s) => s.trim()).filter(Boolean),
       image: finalImage,
       gallery: newGallery,
-      isIncredible: isIncredible,
+      isIncredible: Boolean(isIncredible),
       incredibleTimerDuration: isIncredible ? incredibleTimerDuration : undefined,
       incredibleExpiresAt: isIncredible ? (incredibleExpiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()) : undefined,
     };

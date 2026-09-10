@@ -52,35 +52,40 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Filter products that have discounts or badges or explicit incredible offer flag
-  const incredibleProducts = products.filter(
-    (p) => p.isIncredible || (p.discountPercent && p.discountPercent > 0) || p.isPopular || p.isGolden
-  );
+  // Filter products that explicitly have isIncredible === true
+  const incredibleProducts = products.filter((p) => p.isIncredible === true);
 
-  const activeProduct = incredibleProducts[currentIndex] || products[0];
+  const safeIndex = incredibleProducts.length > 0 ? (currentIndex % incredibleProducts.length) : 0;
+  const activeProduct = incredibleProducts[safeIndex];
 
   // Dynamic Countdown Timer connected directly to product's expiration
   const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft(activeProduct?.incredibleExpiresAt));
 
   useEffect(() => {
-    setTimeLeft(calculateTimeLeft(activeProduct?.incredibleExpiresAt));
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft(activeProduct?.incredibleExpiresAt));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [activeProduct?.incredibleExpiresAt, currentIndex]);
+    if (activeProduct) {
+      setTimeLeft(calculateTimeLeft(activeProduct.incredibleExpiresAt));
+      const timer = setInterval(() => {
+        setTimeLeft(calculateTimeLeft(activeProduct.incredibleExpiresAt));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [activeProduct?.incredibleExpiresAt, safeIndex]);
 
   const formatNumber = (n: number) => n.toString().padStart(2, '0');
 
   const handleNext = () => {
-    setCurrentIndex((prev) => (prev + 1) % incredibleProducts.length);
+    if (incredibleProducts.length > 1) {
+      setCurrentIndex((prev) => (prev + 1) % incredibleProducts.length);
+    }
   };
 
   const handlePrev = () => {
-    setCurrentIndex((prev) => (prev === 0 ? incredibleProducts.length - 1 : prev - 1));
+    if (incredibleProducts.length > 1) {
+      setCurrentIndex((prev) => (prev === 0 ? incredibleProducts.length - 1 : prev - 1));
+    }
   };
 
-  if (!activeProduct) return null;
+  if (!activeProduct || incredibleProducts.length === 0) return null;
 
   return (
     <div
@@ -90,48 +95,22 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
         
         {/* Right Header Block: "پیشنهاد شگفت‌انگیز" Title & Countdown Clock */}
-        <div className="lg:col-span-3 flex flex-col items-center justify-between text-center p-3 sm:p-4 rounded-2xl bg-black/40 border border-white/10 gap-3">
+        <div className="lg:col-span-3 flex flex-col items-center justify-center text-center p-4 sm:p-5 rounded-2xl bg-black/40 border border-white/10 gap-3 relative">
           
-          {/* Top Row: Title + Pagination Controls */}
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 text-amber-400">
-                <Percent className="w-5 h-5 sm:w-7 sm:h-7 rotate-12 shrink-0" />
-                <Sparkles className="w-3.5 h-3.5 sm:w-5 sm:h-5 animate-pulse shrink-0" />
-              </div>
-
-              <div className="text-right">
-                <span className="text-xs sm:text-lg font-black text-white block leading-tight">
-                  پیشنهاد
-                </span>
-                <span className="text-sm sm:text-2xl font-black text-amber-400 tracking-wider block leading-tight">
-                  شگفت‌انگیز
-                </span>
-              </div>
+          {/* Top Title Section */}
+          <div className="flex flex-col items-center gap-1.5 w-full">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <Percent className="w-6 h-6 stroke-[2.5]" />
             </div>
 
-            {/* Next/Prev Incredible Item Controls */}
-            {incredibleProducts.length > 1 && (
-              <div className="flex items-center gap-1 bg-purple-950/80 px-2 py-1 rounded-xl border border-purple-700/60 shrink-0">
-                <button
-                  onClick={handlePrev}
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer"
-                  title="کالای قبلی"
-                >
-                  <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </button>
-                <span className="text-[11px] text-amber-300 font-bold px-1.5 whitespace-nowrap select-none" dir="rtl">
-                  {currentIndex + 1} از {incredibleProducts.length}
-                </span>
-                <button
-                  onClick={handleNext}
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer"
-                  title="کالای بعدی"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </button>
-              </div>
-            )}
+            <div className="mt-1">
+              <span className="text-xs sm:text-sm font-black text-slate-300 block">
+                پیشنهاد
+              </span>
+              <span className="text-lg sm:text-2xl font-black text-amber-400 tracking-wider block leading-tight">
+                شگفت‌انگیز
+              </span>
+            </div>
           </div>
 
           {/* Dynamic Countdown Clock */}
@@ -142,7 +121,7 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
             </div>
 
             {timeLeft.isExpired ? (
-              <div className="px-2 py-1 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300 text-xs font-bold">
+              <div className="px-3 py-1.5 rounded-xl bg-rose-950/80 border border-rose-500/40 text-rose-300 text-xs font-bold">
                 پایان مهلت تخفیف
               </div>
             ) : (
@@ -150,7 +129,7 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
                 {timeLeft.days > 0 && (
                   <>
                     <div className="flex flex-col items-center">
-                      <span className="min-w-[28px] sm:min-w-[34px] px-1 py-1 rounded-lg bg-black/80 text-amber-300 border border-amber-500/40 text-center font-bold">
+                      <span className="min-w-[28px] sm:min-w-[32px] px-1.5 py-1 rounded-lg bg-black/80 text-amber-300 border border-amber-500/40 text-center font-bold">
                         {timeLeft.days}
                       </span>
                       <span className="text-[8px] text-slate-400 mt-0.5">روز</span>
@@ -159,41 +138,84 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
                   </>
                 )}
                 <div className="flex flex-col items-center">
-                  <span className="min-w-[28px] sm:min-w-[34px] px-1 py-1 rounded-lg bg-black/80 text-white border border-white/20 text-center font-bold">
+                  <span className="min-w-[28px] sm:min-w-[32px] px-1.5 py-1 rounded-lg bg-black/80 text-white border border-white/20 text-center font-bold">
                     {formatNumber(timeLeft.hours)}
                   </span>
                   <span className="text-[8px] text-slate-400 mt-0.5">ساعت</span>
                 </div>
                 <span className="text-amber-400 font-bold self-start mt-1">:</span>
                 <div className="flex flex-col items-center">
-                  <span className="min-w-[28px] sm:min-w-[34px] px-1 py-1 rounded-lg bg-black/80 text-white border border-white/20 text-center font-bold">
+                  <span className="min-w-[28px] sm:min-w-[32px] px-1.5 py-1 rounded-lg bg-black/80 text-white border border-white/20 text-center font-bold">
                     {formatNumber(timeLeft.minutes)}
                   </span>
                   <span className="text-[8px] text-slate-400 mt-0.5">دقیقه</span>
                 </div>
                 <span className="text-amber-400 font-bold self-start mt-1">:</span>
                 <div className="flex flex-col items-center">
-                  <span className="min-w-[28px] sm:min-w-[34px] px-1 py-1 rounded-lg bg-black/80 text-white border border-white/20 text-center font-bold">
+                  <span className="min-w-[28px] sm:min-w-[32px] px-1.5 py-1 rounded-lg bg-black/80 text-white border border-white/20 text-center font-bold">
                     {formatNumber(timeLeft.seconds)}
                   </span>
                   <span className="text-[8px] text-slate-400 mt-0.5">ثانیه</span>
                 </div>
               </div>
             )}
-
-            {activeProduct?.incredibleTimerDuration && (
-              <div className="text-[9px] text-purple-300/80">
-                {activeProduct.incredibleTimerDuration === '1day' && '⏱️ تخفیف ویژه ۲۴ ساعته'}
-                {activeProduct.incredibleTimerDuration === '3days' && '⏱️ پیشنهاد ویژه ۳ روزه'}
-                {activeProduct.incredibleTimerDuration === '1week' && '⏱️ پیشنهاد هفتگی شگفت‌انگیز'}
-                {activeProduct.incredibleTimerDuration === '1month' && '⏱️ جشنواره ماهانه جهش'}
-              </div>
-            )}
           </div>
+
+          {/* Bottom Pagination Bar (Cleanly positioned at bottom of the banner) */}
+          {incredibleProducts.length > 1 && (
+            <div className="flex items-center justify-between w-full pt-2 border-t border-purple-800/40 mt-1">
+              <button
+                onClick={handlePrev}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer"
+                title="کالای قبلی"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-1.5">
+                {incredibleProducts.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentIndex(idx)}
+                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                      idx === safeIndex
+                        ? 'w-5 bg-amber-400'
+                        : 'w-1.5 bg-white/30 hover:bg-white/60'
+                    }`}
+                  />
+                ))}
+              </div>
+              <button
+                onClick={handleNext}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer"
+                title="کالای بعدی"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Left Side: Product Showcase Card */}
-        <div className="lg:col-span-9 bg-[#110826] border border-purple-800/60 rounded-2xl p-4 sm:p-5 shadow-xl relative">
+        <div className="lg:col-span-9 bg-[#110826] border border-purple-800/60 rounded-2xl p-4 sm:p-5 shadow-xl relative group">
+          {/* Floating Next/Prev on Card for fast switching */}
+          {incredibleProducts.length > 1 && (
+            <>
+              <button
+                onClick={handlePrev}
+                className="hidden sm:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-purple-900/90 border border-purple-500/50 hover:bg-amber-400 hover:text-slate-950 text-white items-center justify-center shadow-lg transition-all active:scale-90 cursor-pointer"
+                title="کالای قبلی"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleNext}
+                className="hidden sm:flex absolute -left-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-purple-900/90 border border-purple-500/50 hover:bg-amber-400 hover:text-slate-950 text-white items-center justify-center shadow-lg transition-all active:scale-90 cursor-pointer"
+                title="کالای بعدی"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
             
             {/* Product Image */}

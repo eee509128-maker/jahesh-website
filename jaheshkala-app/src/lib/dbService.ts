@@ -83,7 +83,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
         gallery: Array.isArray(item.gallery) ? item.gallery : [],
         couponCode: item.coupon_code || undefined,
         couponDiscountPercent: item.coupon_discount_percent ? Number(item.coupon_discount_percent) : undefined,
-        isIncredible: item.is_incredible !== undefined ? !!item.is_incredible : (item.isIncredible !== undefined ? !!item.isIncredible : !!(item.discount_percent && item.discount_percent > 0)),
+        isIncredible: item.is_incredible !== undefined ? !!item.is_incredible : (item.isIncredible !== undefined ? !!item.isIncredible : false),
         incredibleExpiresAt: item.incredible_expires_at || item.incredibleExpiresAt || undefined,
         incredibleTimerDuration: item.incredible_timer_duration || item.incredibleTimerDuration || undefined,
       }));
