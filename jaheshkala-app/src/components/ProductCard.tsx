@@ -21,12 +21,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <div
       id={`product-card-${product.id}`}
-      className="group rounded-2xl overflow-hidden bg-white dark:bg-[#130d2a] border border-purple-200 dark:border-purple-900/40 hover:border-purple-400 dark:hover:border-purple-600/70 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col justify-between p-3.5 sm:p-4"
+      className="group rounded-2xl overflow-hidden bg-white dark:bg-[#130d2a] border border-purple-200 dark:border-purple-900/40 hover:border-purple-400 dark:hover:border-purple-600/70 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col justify-between p-3.5 sm:p-4 h-full w-full"
     >
       {/* Top Image area with discount tag */}
       <div 
         onClick={() => onViewDetails(product)}
-        className="relative h-44 sm:h-50 rounded-xl overflow-hidden bg-purple-50 dark:bg-[#181138] mb-3 cursor-pointer border border-purple-100 dark:border-purple-900/20"
+        className="relative h-44 sm:h-48 rounded-xl overflow-hidden bg-purple-50 dark:bg-[#181138] mb-3 cursor-pointer border border-purple-100 dark:border-purple-900/20 shrink-0"
       >
         <img
           src={product.image}
@@ -40,7 +40,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
 
         {/* Digikala-style Top Badges */}
-        <div className="absolute top-2.5 right-2.5 flex flex-col gap-1 items-start">
+        <div className="absolute top-2.5 right-2.5 flex flex-col gap-1 items-start z-10">
           {product.badge && (
             <span className="text-[10px] sm:text-[11px] font-black px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1 shadow-md">
               <Sparkles className="w-3 h-3" />
@@ -56,7 +56,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {product.discountPercent && (
-          <div className="absolute top-2.5 left-2.5">
+          <div className="absolute top-2.5 left-2.5 z-10">
             <span className="text-xs font-black px-2 py-0.5 rounded-full bg-rose-600 text-white shadow-md">
               {product.discountPercent}%
             </span>
@@ -64,7 +64,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         )}
 
         {/* Delivery Badge (Digikala Style: ارسال امروز / سریع) */}
-        <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] font-medium bg-black/75 backdrop-blur-md text-emerald-400 px-2 py-0.5 rounded-md">
+        <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] font-medium bg-black/75 backdrop-blur-md text-emerald-400 px-2 py-0.5 rounded-md z-10">
           <Truck className="w-3 h-3 text-emerald-400" />
           <span>{product.deliveryDays || 'ارسال سریع'}</span>
         </div>
@@ -73,42 +73,45 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* Body: Title, Rating, Features */}
       <div className="flex-1 flex flex-col justify-between text-right space-y-2.5">
         
-        {/* Rating and Category / Brand */}
-        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-1.5">
-            <span className="text-purple-700 dark:text-purple-300 font-bold">{product.category}</span>
+        {/* Rating and Category / Brand (Strict 1-line truncate) */}
+        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 gap-1.5 h-5 min-h-[1.25rem]">
+          <div className="flex items-center gap-1 truncate min-w-0 flex-1">
+            <span className="text-purple-700 dark:text-purple-300 font-bold truncate">{product.category}</span>
             {product.brand && (
               <>
-                <span>•</span>
-                <span className="text-slate-700 dark:text-slate-300 font-semibold">{product.brand}</span>
+                <span className="shrink-0">•</span>
+                <span className="text-slate-700 dark:text-slate-300 font-semibold truncate">{product.brand}</span>
               </>
             )}
           </div>
-          <div className="flex items-center gap-1 text-amber-500 dark:text-amber-400 font-bold">
-            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+          <div className="flex items-center gap-1 text-amber-500 dark:text-amber-400 font-bold shrink-0">
+            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
             <span>{product.rating}</span>
             <span className="text-slate-400 dark:text-slate-500 font-normal">({product.reviewsCount})</span>
           </div>
         </div>
 
-        {/* Title */}
-        <h4
-          onClick={() => onViewDetails(product)}
-          className="text-xs sm:text-sm font-black text-slate-900 dark:text-white hover:text-purple-700 dark:hover:text-amber-300 transition-colors cursor-pointer line-clamp-2 leading-relaxed h-10"
-        >
-          {product.title}
-        </h4>
+        {/* Title (Fixed 2-line height container) */}
+        <div className="h-10 min-h-[2.5rem] max-h-[2.5rem] flex items-center overflow-hidden">
+          <h4
+            onClick={() => onViewDetails(product)}
+            className="text-xs sm:text-sm font-black text-slate-900 dark:text-white hover:text-purple-700 dark:hover:text-amber-300 transition-colors cursor-pointer line-clamp-2 leading-tight w-full"
+            title={product.title}
+          >
+            {product.title}
+          </h4>
+        </div>
 
-        {/* Dynamic Product Features (Top 2 specifications) */}
-        <div className="space-y-1 bg-purple-50/70 dark:bg-[#170f36] p-2 rounded-xl border border-purple-200 dark:border-purple-900/30 text-[11px] text-slate-700 dark:text-slate-200">
+        {/* Dynamic Product Features (Fixed height container) */}
+        <div className="h-[3.25rem] min-h-[3.25rem] space-y-1 bg-purple-50/70 dark:bg-[#170f36] p-2 rounded-xl border border-purple-200 dark:border-purple-900/30 text-[11px] text-slate-700 dark:text-slate-200 flex flex-col justify-center overflow-hidden shrink-0">
           {product.warranty && (
-            <div className="flex items-center gap-1.5 text-purple-800 dark:text-purple-300 font-medium">
+            <div className="flex items-center gap-1.5 text-purple-800 dark:text-purple-300 font-medium truncate">
               <ShieldCheck className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
               <span className="truncate">{product.warranty}</span>
             </div>
           )}
           {(product.features || []).slice(0, product.warranty ? 1 : 2).map((feat, idx) => (
-            <div key={idx} className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+            <div key={idx} className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 truncate">
               <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
               <span className="truncate">{feat}</span>
             </div>
@@ -116,9 +119,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {/* Pricing Block: Strikethrough discount + Single-row clean Persian price */}
-        <div className="pt-2 border-t border-purple-200 dark:border-purple-900/30 space-y-2">
+        <div className="pt-2.5 border-t border-purple-200 dark:border-purple-900/30 space-y-2 shrink-0 mt-auto">
           
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 min-h-[1.5rem]">
             {/* Main Price in 1 neat line */}
             <div className="flex items-baseline gap-1 whitespace-nowrap">
               <span className="text-base sm:text-lg font-black font-mono tracking-tight text-purple-800 dark:text-amber-300">

@@ -14,6 +14,7 @@ import {
   Check,
   Printer,
   Package,
+  Sparkles,
 } from 'lucide-react';
 import { Order, User, Product } from '../types';
 import { fetchOrdersFromDb } from '../lib/dbService';
@@ -25,6 +26,7 @@ interface UserOrdersModalProps {
   currentUser: User | null;
   onOpenShop: () => void;
   products?: Product[];
+  onOpenAmlakApp?: () => void;
 }
 
 export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
@@ -34,6 +36,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   currentUser,
   onOpenShop,
   products = [],
+  onOpenAmlakApp,
 }) => {
   const [currentOrders, setCurrentOrders] = useState<Order[]>(initialOrders);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -506,17 +509,31 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <span className="text-[11px] text-slate-400">
                       * جهت هماهنگی و ارسال سریع، پشتیبانی جهش همواره پاسخگوی شماست.
                     </span>
-                    <button
-                      onClick={() => setInvoiceOrder(order)}
-                      className="text-xs text-purple-300 hover:text-white flex items-center gap-1.5 font-bold px-3 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-900/70 transition-colors cursor-pointer"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-purple-300" />
-                      <span>مشاهده فاکتور و رسید</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {order.items.some(it => it.product?.id === 'pkg-amlak-jahesh' || it.product?.title?.includes('املاک')) && onOpenAmlakApp && (
+                        <button
+                          onClick={() => {
+                            onClose();
+                            onOpenAmlakApp();
+                          }}
+                          className="text-xs bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 flex items-center gap-1.5 font-black px-3.5 py-1.5 rounded-lg shadow-md transition-all cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>ورود به سامانه مدیریت املاک جهش</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setInvoiceOrder(order)}
+                        className="text-xs text-purple-300 hover:text-white flex items-center gap-1.5 font-bold px-3 py-1 rounded-lg bg-purple-900/40 hover:bg-purple-900/70 transition-colors cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-purple-300" />
+                        <span>مشاهده فاکتور و رسید</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

@@ -258,9 +258,19 @@ export const CartModal: React.FC<CartModalProps> = ({
                                 VIP
                               </span>
                             )}
+                            {(item.subscriptionDays || prod.subscriptionDays) && (
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 font-black px-2 py-0.5 rounded-md shadow-sm">
+                                اشتراک {Number(item.subscriptionDays || prod.subscriptionDays).toLocaleString('fa-IR')} روزه
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-300">
                             {formatPrice(itemPrice)}
+                            {(item.subscriptionDays || prod.subscriptionDays) && (
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-normal mr-1.5">
+                                (روزی {(prod.pricePerDay || 250000).toLocaleString('fa-IR')} تومان)
+                              </span>
+                            )}
                           </p>
                         </div>
                       </div>

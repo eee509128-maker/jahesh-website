@@ -14,32 +14,27 @@ interface DigikalaIncredibleOfferProps {
 }
 
 const calculateTimeLeft = (expiresAt?: string) => {
+  let targetTime: number;
   if (!expiresAt) {
-    // Default fallback: 24h rotating cycle
+    // Default fallback: end of current day (23:59:59)
     const now = new Date();
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-    const diff = Math.max(0, endOfDay.getTime() - now.getTime());
-    return {
-      days: 0,
-      hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-      minutes: Math.floor((diff / (1000 * 60)) % 60),
-      seconds: Math.floor((diff / 1000) % 60),
-      isExpired: false,
-    };
+    targetTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+  } else {
+    targetTime = new Date(expiresAt).getTime();
   }
 
-  const targetTime = new Date(expiresAt).getTime();
   const now = Date.now();
   const diff = targetTime - now;
 
-  if (diff <= 0) {
+  if (isNaN(targetTime) || diff <= 0) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true };
   }
 
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60)) / (1000 * 60));
-  const seconds = Math.floor((diff % 1000 * 60) / 1000) || Math.floor((diff % (1000 * 60)) / 1000);
+  const totalSeconds = Math.floor(diff / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
 
   return { days, hours, minutes, seconds, isExpired: false };
 };

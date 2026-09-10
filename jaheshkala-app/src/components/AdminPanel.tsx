@@ -377,6 +377,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isFreeShipping, setIsFreeShipping] = useState(true);
   const [isInStock, setIsInStock] = useState(true);
 
+  // Subscription Settings Flag & Daily Price
+  const [isSubscription, setIsSubscription] = useState(false);
+  const [pricePerDayInput, setPricePerDayInput] = useState('250000');
+
   // Helper function to set duration and calculate target expiration date
   const handleSetIncredibleDuration = (duration: '1day' | '3days' | '1week' | '1month' | 'custom', customHours?: number) => {
     setIncredibleTimerDuration(duration);
@@ -559,6 +563,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIncredibleExpiresAt('');
     setIsFreeShipping(true);
     setIsInStock(true);
+    setIsSubscription(false);
+    setPricePerDayInput('250000');
     setNewProductCouponCode('');
     setNewProductCouponPercent('');
     setFormSuccess('');
@@ -601,6 +607,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIncredibleExpiresAt(prod.incredibleExpiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
     setIsFreeShipping(Boolean(prod.deliveryDays?.includes('رایگان')));
     setIsInStock(true);
+    setIsSubscription(Boolean(prod.isSubscription || prod.id === 'pkg-amlak-jahesh'));
+    setPricePerDayInput(prod.pricePerDay ? prod.pricePerDay.toString() : '250000');
     setNewProductCouponCode(prod.couponCode || '');
     setNewProductCouponPercent(prod.couponDiscountPercent ? prod.couponDiscountPercent.toString() : '');
     setFormSuccess('');
@@ -694,6 +702,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       isIncredible: Boolean(isIncredible),
       incredibleTimerDuration: isIncredible ? incredibleTimerDuration : undefined,
       incredibleExpiresAt: isIncredible ? (incredibleExpiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()) : undefined,
+      isSubscription: Boolean(isSubscription),
+      pricePerDay: isSubscription ? (parseInt(pricePerDayInput.replace(/[^0-9]/g, ''), 10) || 250000) : undefined,
     };
 
     if (editingProductId && onUpdateProduct) {
@@ -1757,6 +1767,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       موجود در انبار
                     </span>
                   </label>
+                </div>
+
+                {/* 6.0 Subscription Configuration (Configurable duration selector for SaaS/Software products) */}
+                <div className="p-4 bg-gradient-to-r from-purple-950/70 via-indigo-950/70 to-purple-950/70 border border-amber-400/60 rounded-2xl space-y-3 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isSubscription}
+                        onChange={(e) => setIsSubscription(e.target.checked)}
+                        className="w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-0 cursor-pointer"
+                      />
+                      <span className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        خرید به صورت اشتراکی (دارای انتخاب مدت زمان اشتراک در موقع خرید)
+                      </span>
+                    </label>
+                    <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2.5 py-0.5 rounded-full">
+                      ویژه نرم‌افزارها و سامانه‌ها
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    با فعال‌سازی این گزینه، هنگامی که مشتری روی «افزودن به سبد خرید» یا «خرید فوری» این محصول کلیک کند، سیستم به طور ویژه از او می‌پرسد برای چه مدت (۱ روز، ۱ هفته، ۱ ماه، ۳ ماه، ۶ ماه، ۱ سال یا روزهای دلخواه) اشتراک تهیه می‌کند.
+                  </p>
+
+                  {isSubscription && (
+                    <div className="p-3 bg-black/60 border border-amber-400/50 rounded-xl space-y-2 animate-in fade-in">
+                      <label className="text-xs font-bold text-amber-200 block">
+                        قیمت پایه هر روز اشتراک (تومان):
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          placeholder="250000"
+                          value={pricePerDayInput}
+                          onChange={(e) => setPricePerDayInput(e.target.value)}
+                          className="w-48 bg-[#0f0820] border border-amber-400/80 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-black focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                        <span className="text-xs text-slate-300 font-bold">تومان به ازای هر روز</span>
+                        {pricePerDayInput && !isNaN(parseInt(pricePerDayInput, 10)) && (
+                          <span className="text-xs text-emerald-400 font-mono mr-auto">
+                            (۱ ماه اشتراک = { (parseInt(pricePerDayInput, 10) * 30).toLocaleString('fa-IR') } تومان)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 6.1 Incredible Offer Countdown Timer Configuration (Configurable: 1 day, 1 week, 1 month, custom) */}

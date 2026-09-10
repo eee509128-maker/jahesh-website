@@ -38,6 +38,8 @@ export interface Product {
   isIncredible?: boolean;
   incredibleTimerDuration?: '1day' | '3days' | '1week' | '1month' | 'custom' | string;
   incredibleExpiresAt?: string; // ISO date string
+  isSubscription?: boolean; // Subscription based product (e.g. Amlak SaaS)
+  pricePerDay?: number; // Price per day (e.g. 250,000 Tomans)
 }
 
 export interface CartItem {
@@ -45,6 +47,7 @@ export interface CartItem {
   requestedDomain?: string;
   selectedColor?: string;
   clientNotes?: string;
+  subscriptionDays?: number; // Days of subscription chosen
   quantity: number;
 }
 

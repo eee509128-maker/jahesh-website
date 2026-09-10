@@ -51,6 +51,8 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { ProductDetailModal } from './components/ProductDetailModal';
 import { LiveChatWidget } from './components/LiveChatWidget';
 import { FooterInfoModal } from './components/FooterInfoModal';
+import { AmlakAppModal } from './components/AmlakAppModal';
+import { SubscriptionDurationModal } from './components/SubscriptionDurationModal';
 
 export default function App() {
   // 1. Current logged in user (stored in localStorage)
@@ -166,7 +168,9 @@ export default function App() {
   const [userOrdersModalOpen, setUserOrdersModalOpen] = useState(false);
   const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
   const [detailModalProduct, setDetailModalProduct] = useState<Product | null>(null);
+  const [subscriptionModalProduct, setSubscriptionModalProduct] = useState<{ product: Product; initialIsInstantBuy?: boolean; requestedDomain?: string } | null>(null);
   const [footerInfoModalOpen, setFooterInfoModalOpen] = useState(false);
+  const [amlakModalOpen, setAmlakModalOpen] = useState(false);
   const [activeFooterTopic, setActiveFooterTopic] = useState('terms');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -673,26 +677,45 @@ export default function App() {
   };
 
   // Instant Buy Handler: Quickly adds product to cart and opens checkout
-  const handleInstantBuy = (product: Product, requestedDomain?: string) => {
+  const handleInstantBuy = (product: Product, requestedDomain?: string, subscriptionDays?: number) => {
     if (!product || !product.id) return;
+    const isAmlakOrSub = Boolean(product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
+
+    if (isAmlakOrSub && !subscriptionDays) {
+      setDetailModalProduct(null);
+      setSubscriptionModalProduct({ product, initialIsInstantBuy: true, requestedDomain });
+      return;
+    }
+
+    const finalDays = isAmlakOrSub ? (subscriptionDays || 30) : undefined;
+    const itemPrice = isAmlakOrSub ? (product.pricePerDay || 250000) * (finalDays || 30) : product.price;
+
+    const modifiedProduct = isAmlakOrSub ? {
+      ...product,
+      price: itemPrice,
+      subscriptionDays: finalDays
+    } : product;
+
     setCartItems((prev) => {
       const safePrev = Array.isArray(prev)
         ? prev.filter((item) => item && item.product && item.product.id)
         : [];
       const existing = safePrev.find((item) => item.product.id === product.id);
       if (existing) {
-        return safePrev;
+        return safePrev.map((item) => item.product.id === product.id ? { ...item, product: modifiedProduct, subscriptionDays: finalDays } : item);
       }
       return [
         ...safePrev,
         {
-          product,
+          product: modifiedProduct,
           quantity: 1,
+          subscriptionDays: finalDays,
           requestedDomain: requestedDomain || (product.domainIncluded ? 'دامنه انتخابی من' : undefined),
         },
       ];
     });
     setDetailModalProduct(null);
+    setSubscriptionModalProduct(null);
     setCartModalOpen(true);
   };
 
@@ -731,8 +754,25 @@ export default function App() {
   };
 
   // Cart Handlers
-  const handleAddToCart = (product: Product, requestedDomain?: string) => {
+  const handleAddToCart = (product: Product, requestedDomain?: string, subscriptionDays?: number) => {
     if (!product || !product.id) return;
+    const isAmlakOrSub = Boolean(product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
+
+    if (isAmlakOrSub && !subscriptionDays) {
+      setDetailModalProduct(null);
+      setSubscriptionModalProduct({ product, initialIsInstantBuy: false, requestedDomain });
+      return;
+    }
+
+    const finalDays = isAmlakOrSub ? (subscriptionDays || 30) : undefined;
+    const itemPrice = isAmlakOrSub ? (product.pricePerDay || 250000) * (finalDays || 30) : product.price;
+
+    const modifiedProduct = isAmlakOrSub ? {
+      ...product,
+      price: itemPrice,
+      subscriptionDays: finalDays
+    } : product;
+
     setCartItems((prev) => {
       const safePrev = Array.isArray(prev)
         ? prev.filter((item) => item && item.product && item.product.id)
@@ -741,20 +781,29 @@ export default function App() {
       if (existing) {
         return safePrev.map((item) =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + 1, product: modifiedProduct, subscriptionDays: finalDays }
             : item
         );
       }
       return [
         ...safePrev,
         {
-          product,
+          product: modifiedProduct,
           quantity: 1,
+          subscriptionDays: finalDays,
           requestedDomain: requestedDomain || (product.domainIncluded ? 'دامنه انتخابی من' : undefined),
         },
       ];
     });
-    showToast(`«${product.title}» به سبد خرید اضافه شد`);
+
+    setDetailModalProduct(null);
+    setSubscriptionModalProduct(null);
+
+    if (isAmlakOrSub) {
+      showToast(`اشتراک ${finalDays} روزه «${product.title}» با موفقیت به سبد خرید اضافه شد.`);
+    } else {
+      showToast(`«${product.title}» به سبد خرید اضافه شد`);
+    }
   };
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
@@ -1011,11 +1060,17 @@ export default function App() {
   const resolvedCartItems = cartItems.map((item) => {
     const latestProd = products.find((p) => p.id === item.product?.id);
     if (latestProd) {
+      const isSub = latestProd.isSubscription || latestProd.id === 'pkg-amlak-jahesh' || latestProd.category === 'اشتراک نرم‌افزار';
+      const days = item.subscriptionDays || item.product?.subscriptionDays || 1;
+      const price = isSub ? (latestProd.pricePerDay || 250000) * days : latestProd.price;
       return {
         ...item,
+        subscriptionDays: isSub ? days : undefined,
         product: {
           ...item.product,
           ...latestProd, // override with the latest details including updated price
+          price,
+          subscriptionDays: isSub ? days : undefined,
         },
       };
     }
@@ -1141,10 +1196,10 @@ export default function App() {
                   </span>
                 </div>
               )}
-              <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 scrollbar-none snap-x snap-mandatory">
+              <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 scrollbar-none snap-x snap-mandatory items-stretch">
                 {filteredProducts.map((product) => (
-                  <div key={product.id} className="w-[85vw] sm:w-auto shrink-0 snap-center sm:snap-align-none flex">
-                    <div className="w-full">
+                  <div key={product.id} className="w-[85vw] sm:w-auto shrink-0 snap-center sm:snap-align-none flex flex-col h-full">
+                    <div className="w-full h-full flex flex-col">
                       <ProductCard
                         product={product}
                         onAddToCart={handleAddToCart}
@@ -1181,6 +1236,14 @@ export default function App() {
         onClose={() => setDetailModalProduct(null)}
         onAddToCart={handleAddToCart}
         onInstantBuy={handleInstantBuy}
+        onOpenAmlakApp={() => setAmlakModalOpen(true)}
+      />
+
+      {/* Real Estate App (مدیریت املاک جهش) Modal */}
+      <AmlakAppModal
+        isOpen={amlakModalOpen}
+        onClose={() => setAmlakModalOpen(false)}
+        currentUser={currentUser}
       />
 
       {/* Digikala Cart Modal */}
@@ -1334,6 +1397,7 @@ export default function App() {
         currentUser={currentUser}
         onOpenShop={() => setCartModalOpen(false)}
         products={products}
+        onOpenAmlakApp={() => setAmlakModalOpen(true)}
       />
 
       {/* Footer Info Modal (Interactive modal for every footer link and statement) */}
@@ -1343,6 +1407,22 @@ export default function App() {
         initialTopicId={activeFooterTopic}
         onOpenTermsModal={() => setTermsModalOpen(true)}
       />
+
+      {/* Subscription Duration Picker Modal (Opens only when user clicks Add to Cart or Instant Buy on subscription products) */}
+      {subscriptionModalProduct && (
+        <SubscriptionDurationModal
+          product={subscriptionModalProduct.product}
+          initialIsInstantBuy={subscriptionModalProduct.initialIsInstantBuy}
+          onClose={() => setSubscriptionModalProduct(null)}
+          onConfirm={(product, days, isInstant) => {
+            if (isInstant) {
+              handleInstantBuy(product, subscriptionModalProduct.requestedDomain, days);
+            } else {
+              handleAddToCart(product, subscriptionModalProduct.requestedDomain, days);
+            }
+          }}
+        />
+      )}
 
     </div>
   );

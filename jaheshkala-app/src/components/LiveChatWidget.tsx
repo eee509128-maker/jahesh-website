@@ -6,7 +6,7 @@ import {
   AlertCircle, UserCheck, RefreshCw
 } from 'lucide-react';
 import { ChatMessage, User as UserType, UserChat } from '../types';
-import { fetchChatsFromDb, saveChatToDb } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, mergeChatMessages } from '../lib/dbService';
 import { askCloudflareAI } from '../lib/cloudflareAI';
 
 export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ currentUser }) => {
@@ -112,7 +112,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
         const allChats = await fetchChatsFromDb();
         const myChat = allChats.find(c => c.userId === currentUserId);
         if (myChat && myChat.messages && myChat.messages.length > 0) {
-          setMessages(myChat.messages);
+          setMessages((prevMsgs) => mergeChatMessages(prevMsgs, myChat.messages));
           setNeedsHumanSupport(!!myChat.needsHumanSupport);
           const hasHuman = myChat.messages.some((m: ChatMessage) => m.sender === 'support' && m.isHumanAdmin);
           setHasHumanReplied(hasHuman);
@@ -130,7 +130,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
     const handleCustomEvent = (e: any) => {
       if (e.detail && e.detail.userId === currentUserId) {
         if (e.detail.messages) {
-          setMessages(e.detail.messages);
+          setMessages((prevMsgs) => mergeChatMessages(prevMsgs, e.detail.messages));
           setNeedsHumanSupport(!!e.detail.needsHumanSupport);
           const hasHuman = e.detail.messages.some((m: ChatMessage) => m.sender === 'support' && m.isHumanAdmin);
           setHasHumanReplied(hasHuman);

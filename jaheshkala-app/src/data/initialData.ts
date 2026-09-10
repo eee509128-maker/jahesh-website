@@ -32,6 +32,42 @@ export const INITIAL_PRODUCTS: Product[] = [
     ],
     image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1000&q=80',
   },
+  {
+    id: 'pkg-amlak-jahesh',
+    title: 'نرم‌افزار جامع مدیریت املاک جهش (اشتراک آنلاین و ابری)',
+    category: 'نرم‌افزار و سامانه‌های هوشمند',
+    brand: 'جهش کمپانی (Jahesh Company)',
+    price: 250000,
+    originalPrice: 350000,
+    discountPercent: 28,
+    badge: 'سامانه هوشمند املاک',
+    isPopular: true,
+    isGolden: true,
+    isSubscription: true,
+    pricePerDay: 250000,
+    rating: 5.0,
+    reviewsCount: 64,
+    deliveryDays: 'فعال‌سازی آنی و دسترسی فوری',
+    warranty: 'پشتیبانی فنی اختصاصی + اتصال دیتابیس ابری و پشتیبان‌گیری',
+    couponCode: 'AMLAK10',
+    couponDiscountPercent: 10,
+    shortDescription: 'سامانه پیشرفته مشاورین و مدیران املاک با قابلیت ثبت صوتی، هوش مصنوعی تطبیق مشتری، تور مجازی ۳۶۰ درجه و هماهنگ‌سازی چندکاربره.',
+    fullDescription: 'نرم‌افزار جامع مدیریت املاک جهش یک پلتفرم نسل جدید برای مشاورین و آژانس‌های املاک است. با این سامانه می‌توانید اطلاعات فایل‌ها و متقاضیان را با هوش مصنوعی و تایپ صوتی ثبت کنید، تور مجازی و تصاویر ۳۶۰ درجه را مشاهده و ویرایش نمایید، فایل‌های منطبق با بودجه مشتری را در چند ثانیه تطبیق دهید و نسخه‌های پشتیبان را بین لپ‌تاپ و گوشی به اشتراک بگذارید.',
+    features: [
+      '🤖 دستیار هوشمند NLP و تایپ صوتی لایو برای ثبت سریع املاک و متقاضیان',
+      '🌐 نمایشگر و تور مجازی ۳۶۰ درجه پانوراما همراه با هات‌اسپات تعاملی',
+      '👥 سیستم پیشرفته Match Making (تطبیق هوشمند فایل و مشتری بر اساس بودجه و نیاز)',
+      '📥 قابلیت پشتیبان‌گیری، دانلود فایل و ادغام امن اطلاعات بین کامپیوتر و گوشی',
+      '⚡ امکان دسترسی آنلاین و مستقیم با حساب کاربری فعال جهش',
+      '💰 تعرفه منعطف: فقط ۲۵۰,۰۰۰ تومان به ازای هر روز اشتراک با تخفیف‌های دوره‌ای',
+    ],
+    image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1000&q=80',
+    gallery: [
+      'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1000&q=80',
+      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1000&q=80',
+      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1000&q=80',
+    ]
+  },
 ];
 
 export const INITIAL_BANNERS: BannerSlide[] = [

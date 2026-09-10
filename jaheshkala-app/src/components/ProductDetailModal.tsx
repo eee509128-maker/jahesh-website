@@ -9,8 +9,9 @@ import { getFallbackProductImage } from '../lib/imageUtils';
 interface ProductDetailModalProps {
   product: Product | null;
   onClose: () => void;
-  onAddToCart: (product: Product, requestedDomain?: string) => void;
-  onInstantBuy?: (product: Product, requestedDomain?: string) => void;
+  onAddToCart: (product: Product, requestedDomain?: string, subscriptionDays?: number) => void;
+  onInstantBuy?: (product: Product, requestedDomain?: string, subscriptionDays?: number) => void;
+  onOpenAmlakApp?: () => void;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
@@ -18,17 +19,25 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   onAddToCart,
   onInstantBuy,
+  onOpenAmlakApp,
 }) => {
   const [preferredDomain, setPreferredDomain] = useState('');
   const [selectedColor, setSelectedColor] = useState<string | null>(
     product?.colors && product.colors.length > 0 ? product.colors[0] : null
   );
   const [activeImage, setActiveImage] = useState<string>(product?.image || '');
+  const [subscriptionDays, setSubscriptionDays] = useState<number>(30); // Default 1 month
+
+  const isAmlakOrSub = Boolean(product?.isSubscription || product?.id === 'pkg-amlak-jahesh' || product?.category === 'اشتراک نرم‌افزار');
+  const pricePerDay = product?.pricePerDay || 250000;
 
   useEffect(() => {
     if (product) {
       setActiveImage(product.image);
       setSelectedColor(product.colors && product.colors.length > 0 ? product.colors[0] : null);
+      if (product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار') {
+        setSubscriptionDays(30);
+      }
     }
   }, [product]);
 
@@ -46,6 +55,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   if (!product) return null;
 
   const allImages = [product.image, ...(product.gallery || [])].filter((url, idx, arr) => url && arr.indexOf(url) === idx);
+
+  // Dynamic calculated price for display
+  const calculatedPrice = isAmlakOrSub ? pricePerDay : product.price;
+  const calculatedOriginalPrice = isAmlakOrSub ? product.originalPrice || (pricePerDay * 1.4) : product.originalPrice;
 
   const formatPrice = (num: number) => {
     return num.toLocaleString('fa-IR') + ' تومان';
@@ -207,6 +220,32 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               )}
 
+              {/* Direct Launch Button for Amlak / Online SaaS */}
+              {isAmlakOrSub && onOpenAmlakApp && (
+                <div className="bg-gradient-to-r from-emerald-950/70 via-teal-950/80 to-purple-950/70 border border-emerald-500/50 rounded-2xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+                  <div className="text-right">
+                    <span className="text-xs font-black text-emerald-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      سامانه ابری فعال و آنلاین جهش
+                    </span>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      می‌توانید همین حالا محیط آنلاین این سامانه را به صورت زنده تست و مشاهده کنید.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenAmlakApp();
+                    }}
+                    className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-lg shadow-emerald-900/40 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer border border-emerald-400/40"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
+                    <span>ورود آنلاین و تست سامانه</span>
+                  </button>
+                </div>
+              )}
+
               {/* Major Bonuses Card if applicable */}
               {product.includedGifts && product.includedGifts.length > 0 && (
                 <div className="bg-gradient-to-br from-purple-950/60 to-indigo-950/60 border border-purple-800/50 rounded-2xl p-4 space-y-3">
@@ -300,14 +339,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="px-6 py-4 bg-white dark:bg-[#140d30] border-t border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
             <div className="text-right">
-              <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">قیمت نهایی:</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">
+                {isAmlakOrSub ? 'تعرفه روزانه اشتراک:' : 'قیمت نهایی:'}
+              </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-black text-purple-700 dark:text-amber-300">
-                  {formatPrice(product.price)}
+                  {formatPrice(calculatedPrice)}
                 </span>
-                {product.originalPrice && (
+                {calculatedOriginalPrice && calculatedOriginalPrice > calculatedPrice && (
                   <span className="text-xs text-slate-400 dark:text-slate-500 line-through font-medium">
-                    {formatPrice(product.originalPrice)}
+                    {formatPrice(calculatedOriginalPrice)}
                   </span>
                 )}
               </div>

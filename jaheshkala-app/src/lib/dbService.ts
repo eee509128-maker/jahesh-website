@@ -36,6 +36,18 @@ export const INITIAL_COUPONS: Coupon[] = [
 
 // 1. PRODUCTS DB SERVICE
 export const fetchProductsFromDb = async (): Promise<Product[]> => {
+  // Helper to ensure default initial products (like Amlak and Golden package) exist if missing
+  const ensureDefaultProducts = (list: Product[]): Product[] => {
+    let result = [...list];
+    INITIAL_PRODUCTS.forEach((initP) => {
+      const exists = result.some((p) => p.id === initP.id);
+      if (!exists) {
+        result.push(initP);
+      }
+    });
+    return result;
+  };
+
   // 1. Primary Cloud Check: Fetch from Supabase SYSTEM_CONFIG_PRODUCTS (Always accessible, zero RLS schema friction)
   try {
     const { data: configData, error: configError } = await supabase
@@ -45,7 +57,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
       .maybeSingle();
 
     if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
-      const cloudProducts: Product[] = configData.messages;
+      const cloudProducts: Product[] = ensureDefaultProducts(configData.messages);
       try {
         localStorage.setItem('jahesh_products', JSON.stringify(cloudProducts));
       } catch {}
@@ -70,6 +82,8 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
         badge: item.badge || '',
         isPopular: !!item.is_popular,
         isGolden: !!item.is_golden,
+        isSubscription: item.is_subscription !== undefined ? !!item.is_subscription : (item.isSubscription !== undefined ? !!item.isSubscription : (item.id === 'pkg-amlak-jahesh')),
+        pricePerDay: item.price_per_day ? Number(item.price_per_day) : (item.pricePerDay ? Number(item.pricePerDay) : (item.id === 'pkg-amlak-jahesh' ? 250000 : undefined)),
         rating: item.rating ? Number(item.rating) : 5.0,
         reviewsCount: item.reviews_count || 0,
         deliveryDays: item.delivery_days || '',
@@ -88,13 +102,15 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
         incredibleTimerDuration: item.incredible_timer_duration || item.incredibleTimerDuration || undefined,
       }));
 
+      const finalFetched = ensureDefaultProducts(fetched);
+
       // Cache locally and synchronize to cloud config store
       try {
-        localStorage.setItem('jahesh_products', JSON.stringify(fetched));
-        saveAllProductsToDb(fetched).catch(() => {});
+        localStorage.setItem('jahesh_products', JSON.stringify(finalFetched));
+        saveAllProductsToDb(finalFetched).catch(() => {});
       } catch {}
 
-      return fetched;
+      return finalFetched;
     }
   } catch (err) {
     console.warn('Failed to connect to Supabase products table:', err);
@@ -105,7 +121,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     const saved = localStorage.getItem('jahesh_products');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return ensureDefaultProducts(parsed);
     }
   } catch {}
 
@@ -822,6 +838,39 @@ export const deleteCouponFromDb = async (couponId: string): Promise<boolean> => 
 };
 
 // 5. CHATS DB SERVICE
+export const mergeChatMessages = (localMsgs: any[], dbMsgs: any[]): any[] => {
+  if (!Array.isArray(localMsgs) || localMsgs.length === 0) return Array.isArray(dbMsgs) ? dbMsgs : [];
+  if (!Array.isArray(dbMsgs) || dbMsgs.length === 0) return Array.isArray(localMsgs) ? localMsgs : [];
+
+  const msgMap = new Map<string, any>();
+
+  // 1. Add DB messages first
+  for (const m of dbMsgs) {
+    if (m && m.id) {
+      msgMap.set(String(m.id), m);
+    }
+  }
+
+  // 2. Add local messages (keep local user messages if DB hasn't synced them yet)
+  for (const m of localMsgs) {
+    if (m && m.id) {
+      const strId = String(m.id);
+      const existing = msgMap.get(strId);
+      if (!existing) {
+        msgMap.set(strId, m);
+      } else {
+        if (existing.isHumanAdmin || existing.file) {
+          msgMap.set(strId, existing);
+        } else {
+          msgMap.set(strId, { ...existing, ...m });
+        }
+      }
+    }
+  }
+
+  return Array.from(msgMap.values());
+};
+
 export const fetchChatsFromDb = async (): Promise<any[]> => {
   // Try local storage cache first for instant response
   let cachedChats: any[] = [];
@@ -854,12 +903,38 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
           };
         });
 
-      // Cache locally
+      // Merge local cached chats with DB chats to prevent deleting un-synced user messages
+      const mergedMap = new Map<string, any>();
+      for (const c of cachedChats) {
+        if (c && c.userId) {
+          mergedMap.set(c.userId, c);
+        }
+      }
+
+      for (const dbChat of dbChats) {
+        const existingLocal = mergedMap.get(dbChat.userId);
+        if (existingLocal) {
+          const mergedMsgs = mergeChatMessages(existingLocal.messages, dbChat.messages);
+          mergedMap.set(dbChat.userId, {
+            ...existingLocal,
+            ...dbChat,
+            messages: mergedMsgs,
+            needsHumanSupport: dbChat.needsHumanSupport || existingLocal.needsHumanSupport,
+            lastUpdated: dbChat.lastUpdated > existingLocal.lastUpdated ? dbChat.lastUpdated : existingLocal.lastUpdated,
+          });
+        } else {
+          mergedMap.set(dbChat.userId, dbChat);
+        }
+      }
+
+      const mergedList = Array.from(mergedMap.values());
+
+      // Cache merged result locally
       try {
-        localStorage.setItem('jahesh_all_chats', JSON.stringify(dbChats));
+        localStorage.setItem('jahesh_all_chats', JSON.stringify(mergedList));
       } catch {}
 
-      return dbChats;
+      return mergedList;
     }
   } catch (err) {
     console.warn('Fetch chats exception:', err);
