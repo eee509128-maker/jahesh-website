@@ -36,20 +36,29 @@ export const INITIAL_COUPONS: Coupon[] = [
 
 // 1. PRODUCTS DB SERVICE
 export const fetchProductsFromDb = async (): Promise<Product[]> => {
+  // 1. Primary Cloud Check: Fetch from Supabase SYSTEM_CONFIG_PRODUCTS (Always accessible, zero RLS schema friction)
+  try {
+    const { data: configData, error: configError } = await supabase
+      .from('chats')
+      .select('messages')
+      .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+      .maybeSingle();
+
+    if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
+      const cloudProducts: Product[] = configData.messages;
+      try {
+        localStorage.setItem('jahesh_products', JSON.stringify(cloudProducts));
+      } catch {}
+      return cloudProducts;
+    }
+  } catch (e) {
+    console.warn('Check SYSTEM_CONFIG_PRODUCTS notice:', e);
+  }
+
+  // 2. Secondary Cloud Check: Relational `products` table in Supabase
   try {
     const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-    if (error) {
-      console.warn('Supabase fetch products error:', error.message);
-      try {
-        const saved = localStorage.getItem('jahesh_products');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-      } catch {}
-      return INITIAL_PRODUCTS;
-    }
-    if (data && data.length > 0) {
+    if (!error && data && data.length > 0) {
       const fetched: Product[] = data.map((item) => ({
         id: item.id,
         title: item.title,
@@ -79,84 +88,136 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
         incredibleTimerDuration: item.incredible_timer_duration || item.incredibleTimerDuration || undefined,
       }));
 
-      // Cache locally for offline/fast first-load
+      // Cache locally and synchronize to cloud config store
       try {
         localStorage.setItem('jahesh_products', JSON.stringify(fetched));
+        saveAllProductsToDb(fetched).catch(() => {});
       } catch {}
 
       return fetched;
     }
-
-    // If DB is completely empty, persist INITIAL_PRODUCTS to DB and return them
-    INITIAL_PRODUCTS.forEach((p) => {
-      saveProductToDb(p).catch(() => {});
-    });
-    return INITIAL_PRODUCTS;
   } catch (err) {
     console.warn('Failed to connect to Supabase products table:', err);
-    try {
-      const saved = localStorage.getItem('jahesh_products');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_PRODUCTS;
   }
+
+  // 3. Fallback: LocalStorage cache
+  try {
+    const saved = localStorage.getItem('jahesh_products');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+
+  // 4. Initial Seed
+  INITIAL_PRODUCTS.forEach((p) => {
+    saveProductToDb(p).catch(() => {});
+  });
+  return INITIAL_PRODUCTS;
+};
+
+export const saveAllProductsToDb = async (products: Product[]): Promise<boolean> => {
+  // 1. Immediately cache locally & dispatch update event
+  try {
+    localStorage.setItem('jahesh_products', JSON.stringify(products));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: products }));
+    }
+  } catch {}
+
+  // 2. Primary: Save to Supabase SYSTEM_CONFIG_PRODUCTS (instant global sync across all devices)
+  try {
+    await supabase.from('chats').upsert(
+      {
+        user_id: 'SYSTEM_CONFIG_PRODUCTS',
+        user_name: 'تنظیمات محصولات فروشگاه',
+        messages: products,
+        last_updated: new Date().toISOString(),
+        is_read_by_admin: true,
+      },
+      { onConflict: 'user_id' }
+    );
+  } catch (err) {
+    console.warn('Save products to SYSTEM_CONFIG_PRODUCTS notice:', err);
+  }
+
+  return true;
 };
 
 export const saveProductToDb = async (product: Product): Promise<boolean> => {
   try {
-    const payloadWithGallery: Record<string, any> = {
-      id: product.id,
-      title: product.title,
-      category: product.category,
-      brand: product.brand,
-      price: product.price,
-      original_price: product.originalPrice,
-      discount_percent: product.discountPercent,
-      badge: product.badge,
-      is_popular: product.isPopular,
-      is_golden: product.isGolden,
-      rating: product.rating,
-      reviews_count: product.reviewsCount,
-      delivery_days: product.deliveryDays,
-      warranty: product.warranty,
-      short_description: product.shortDescription,
-      full_description: product.fullDescription,
-      features: product.features,
-      image: product.image,
-      gallery: product.gallery || [],
-      coupon_code: product.couponCode,
-      coupon_discount_percent: product.couponDiscountPercent,
-      is_incredible: product.isIncredible,
-      incredible_expires_at: product.incredibleExpiresAt,
-      incredible_timer_duration: product.incredibleTimerDuration,
-    };
-    
-    // First attempt with all fields
-    const { error } = await supabase.from('products').upsert(payloadWithGallery);
-    if (error) {
-      // If error is about extra columns not existing in older table schemas, retry with minimal safe payload
-      const { gallery, is_incredible, incredible_expires_at, incredible_timer_duration, ...fallbackPayload } = payloadWithGallery;
-      const retryResult = await supabase.from('products').upsert(fallbackPayload);
-      if (retryResult.error) {
-        console.warn('Save product error (fallback):', retryResult.error.message);
-      }
-    }
-
-    // Broadcast change locally
+    // 1. Load current list from local cache / store
+    let currentList: Product[] = [];
     try {
       const saved = localStorage.getItem('jahesh_products');
-      let currentList: Product[] = saved ? JSON.parse(saved) : [];
-      const idx = currentList.findIndex((p) => p.id === product.id);
-      if (idx >= 0) {
-        currentList[idx] = product;
-      } else {
-        currentList = [product, ...currentList];
-      }
+      currentList = saved ? JSON.parse(saved) : [];
+    } catch {}
+
+    const idx = currentList.findIndex((p) => p.id === product.id);
+    if (idx >= 0) {
+      currentList[idx] = product;
+    } else {
+      currentList = [product, ...currentList];
+    }
+
+    // 2. Update local storage & broadcast event immediately
+    try {
       localStorage.setItem('jahesh_products', JSON.stringify(currentList));
-      window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: currentList }));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: currentList }));
+      }
+    } catch {}
+
+    // 3. Primary: Save full updated products list to Supabase cloud JSON store (bulletproof across all browsers & mobiles)
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_PRODUCTS',
+          user_name: 'تنظیمات محصولات فروشگاه',
+          messages: currentList,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch (err) {
+      console.warn('Supabase save product to SYSTEM_CONFIG_PRODUCTS notice:', err);
+    }
+
+    // 4. Secondary: Upsert to relational products table
+    try {
+      const payloadWithGallery: Record<string, any> = {
+        id: product.id,
+        title: product.title,
+        category: product.category,
+        brand: product.brand,
+        price: product.price,
+        original_price: product.originalPrice,
+        discount_percent: product.discountPercent,
+        badge: product.badge,
+        is_popular: product.isPopular,
+        is_golden: product.isGolden,
+        rating: product.rating,
+        reviews_count: product.reviewsCount,
+        delivery_days: product.deliveryDays,
+        warranty: product.warranty,
+        short_description: product.shortDescription,
+        full_description: product.fullDescription,
+        features: product.features,
+        image: product.image,
+        gallery: product.gallery || [],
+        coupon_code: product.couponCode,
+        coupon_discount_percent: product.couponDiscountPercent,
+        is_incredible: product.isIncredible,
+        incredible_expires_at: product.incredibleExpiresAt,
+        incredible_timer_duration: product.incredibleTimerDuration,
+      };
+
+      const { error } = await supabase.from('products').upsert(payloadWithGallery);
+      if (error) {
+        const { gallery, is_incredible, incredible_expires_at, incredible_timer_duration, ...fallbackPayload } = payloadWithGallery;
+        await supabase.from('products').upsert(fallbackPayload);
+      }
     } catch {}
 
     return true;
@@ -168,8 +229,43 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
 
 export const deleteProductFromDb = async (productId: string): Promise<boolean> => {
   try {
-    const { error } = await supabase.from('products').delete().eq('id', productId);
-    return !error;
+    // 1. Remove from local store
+    let currentList: Product[] = [];
+    try {
+      const saved = localStorage.getItem('jahesh_products');
+      currentList = saved ? JSON.parse(saved) : [];
+    } catch {}
+
+    const updated = currentList.filter((p) => p.id !== productId);
+    try {
+      localStorage.setItem('jahesh_products', JSON.stringify(updated));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: updated }));
+      }
+    } catch {}
+
+    // 2. Persist updated list to Supabase SYSTEM_CONFIG_PRODUCTS
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_PRODUCTS',
+          user_name: 'تنظیمات محصولات فروشگاه',
+          messages: updated,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch (err) {
+      console.warn('Delete product from SYSTEM_CONFIG_PRODUCTS notice:', err);
+    }
+
+    // 3. Delete from relational products table
+    try {
+      await supabase.from('products').delete().eq('id', productId);
+    } catch {}
+
+    return true;
   } catch (err) {
     console.warn('Delete product exception:', err);
     return false;

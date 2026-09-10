@@ -524,6 +524,25 @@ export default function App() {
       )
       .subscribe();
 
+    // Instant Supabase Realtime channel for cloud products config
+    const productsConfigChannel = supabase
+      .channel('public:chats:products')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chats', filter: 'user_id=eq.SYSTEM_CONFIG_PRODUCTS' },
+        (payload: any) => {
+          if (payload.new && Array.isArray(payload.new.messages) && payload.new.messages.length > 0) {
+            if (isMounted) {
+              setProducts(payload.new.messages);
+              try {
+                localStorage.setItem('jahesh_products', JSON.stringify(payload.new.messages));
+              } catch {}
+            }
+          }
+        }
+      )
+      .subscribe();
+
     // Instant Supabase Realtime channel for products table
     const productsChannel = supabase
       .channel('public:products:realtime')
@@ -610,6 +629,7 @@ export default function App() {
       window.removeEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
       window.removeEventListener('jahesh-banners-updated', handleBannersUpdatedEvent);
       supabase.removeChannel(bannersChannel);
+      supabase.removeChannel(productsConfigChannel);
       supabase.removeChannel(productsChannel);
       supabase.removeChannel(ordersChannel);
       clearInterval(syncInterval);
