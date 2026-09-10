@@ -143,7 +143,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
       </div>
 
       {/* Story-like Circular Category Items with unique icons */}
-      <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-none">
+      <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-none snap-x w-full">
         {allCategoryItems.map((item) => {
           const Icon = item.icon;
           const isSelected = selectedCategory === item.categoryValue;
@@ -151,7 +151,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
             <button
               key={item.id}
               onClick={item.action}
-              className="flex flex-col items-center gap-1.5 group shrink-0 cursor-pointer"
+              className="flex flex-col items-center gap-1.5 group shrink-0 cursor-pointer snap-start"
             >
               <div
                 className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl p-0.5 bg-gradient-to-tr ${

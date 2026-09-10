@@ -179,7 +179,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
           </div>
 
           {/* Action Button & Navigation Helper */}
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-1 sm:gap-2 flex-wrap">
             <button
               onClick={handleAction}
               className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[11px] sm:text-sm transition-all shadow-xl shadow-amber-400/20 active:scale-95 cursor-pointer"
@@ -190,7 +190,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
 
             {/* Mobile & Tablet Slider Navigation Arrow Controls */}
             {slides.length > 1 && (
-              <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md p-1 rounded-2xl border border-white/20 sm:hidden">
+              <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md p-1 rounded-2xl border border-white/20 sm:hidden shrink-0">
                 <button
                   type="button"
                   onClick={prevSlide}
@@ -199,7 +199,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
-                <span className="text-[10px] text-amber-300 font-bold px-1">
+                <span className="text-[10px] text-amber-300 font-bold px-1 whitespace-nowrap">
                   {currentSlide + 1} / {slides.length}
                 </span>
                 <button

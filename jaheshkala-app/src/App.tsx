@@ -1107,15 +1107,18 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 scrollbar-none snap-x snap-mandatory">
               {filteredProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAddToCart={handleAddToCart}
-                  onInstantBuy={handleInstantBuy}
-                  onViewDetails={setDetailModalProduct}
-                />
+                <div key={product.id} className="w-[85vw] sm:w-auto shrink-0 snap-center sm:snap-align-none flex">
+                  <div className="w-full">
+                    <ProductCard
+                      product={product}
+                      onAddToCart={handleAddToCart}
+                      onInstantBuy={handleInstantBuy}
+                      onViewDetails={setDetailModalProduct}
+                    />
+                  </div>
+                </div>
               ))}
             </div>
           )}

@@ -298,7 +298,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
               {/* Dropdown Menu Popup */}
               {categoryMenuOpen && (
                 <div
-                  className="absolute right-0 top-full mt-2 w-72 max-w-[85vw] bg-white dark:bg-[#160f38] border border-purple-200 dark:border-purple-700/80 rounded-2xl shadow-2xl p-2 space-y-1 z-50 animate-in fade-in max-h-80 overflow-y-auto"
+                  className="fixed top-28 left-4 right-4 sm:absolute sm:top-full sm:right-0 sm:left-auto mt-2 sm:w-72 sm:max-w-[85vw] bg-white dark:bg-[#160f38] border border-purple-200 dark:border-purple-700/80 rounded-2xl shadow-2xl p-2 space-y-1 z-50 animate-in fade-in max-h-80 overflow-y-auto"
                 >
                   <div className="px-3 py-1.5 text-[11px] font-bold text-purple-900 dark:text-amber-400 border-b border-purple-100 dark:border-purple-900/50 flex items-center justify-between">
                     <span>انتخاب دسته‌بندی فروشگاه</span>
