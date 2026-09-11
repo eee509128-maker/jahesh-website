@@ -303,26 +303,27 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
                   </div>
                 </div>
 
-                {/* Row 2: Desktop 3 Action Buttons strictly in ONE single row */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-2.5 w-full">
+                {/* Row 2: Desktop/Mobile 3 Action Buttons strictly in ONE single row */}
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 w-full">
                   {/* 1. View Details Button */}
                   <button
                     onClick={() => onViewDetails(activeProduct)}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-slate-200 hover:text-white text-xs sm:text-[13px] font-bold border border-purple-800/60 transition-all shadow-sm active:scale-95 whitespace-nowrap overflow-hidden"
+                    className="h-10 sm:h-11 flex items-center justify-center gap-1 sm:gap-1.5 px-2 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-slate-200 hover:text-white text-xs sm:text-[13px] font-bold border border-purple-800/60 transition-all shadow-xs active:scale-95 whitespace-nowrap overflow-hidden cursor-pointer"
                     title="مشاهده جزئیات کامل"
                   >
-                    <Eye className="w-4 h-4 text-purple-300 shrink-0" />
-                    <span className="truncate">مشاهده جزئیات</span>
+                    <Eye className="w-3.5 h-3.5 text-purple-300 shrink-0" />
+                    <span className="hidden sm:inline">مشاهده جزئیات</span>
+                    <span className="sm:hidden">جزئیات</span>
                   </button>
 
                   {/* 2. Add to Cart Button */}
                   <button
                     id="incredible-add-cart-btn"
                     onClick={() => onAddToCart(activeProduct)}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-purple-900/90 hover:bg-purple-800 border border-purple-700/80 text-purple-100 hover:text-white text-xs sm:text-[13px] font-bold transition-all shadow-sm active:scale-95 whitespace-nowrap overflow-hidden"
+                    className="h-10 sm:h-11 flex items-center justify-center gap-1 sm:gap-1.5 px-2 rounded-xl bg-purple-900/90 hover:bg-purple-800 border border-purple-700/80 text-purple-100 hover:text-white text-xs sm:text-[13px] font-bold transition-all shadow-xs active:scale-95 whitespace-nowrap overflow-hidden cursor-pointer"
                     title="افزودن به سبد خرید"
                   >
-                    <ShoppingBag className="w-4 h-4 text-purple-300 shrink-0" />
+                    <ShoppingBag className="w-3.5 h-3.5 text-purple-300 shrink-0" />
                     <span className="truncate">افزودن به سبد</span>
                   </button>
 
@@ -333,11 +334,11 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
                       if (onInstantBuy) onInstantBuy(activeProduct);
                       else onAddToCart(activeProduct);
                     }}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 text-xs sm:text-[13px] font-black shadow-lg shadow-amber-500/20 hover:shadow-amber-500/35 hover:scale-[1.02] active:scale-95 transition-all whitespace-nowrap overflow-hidden"
+                    className="h-10 sm:h-11 flex items-center justify-center gap-1 sm:gap-1.5 px-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs sm:text-[13px] font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all whitespace-nowrap overflow-hidden cursor-pointer"
                     title="خرید سریع و مستقیم"
                   >
-                    <Zap className="w-4 h-4 fill-slate-950 text-slate-950 shrink-0" />
-                    <span className="truncate">خرید فوری شگفت‌انگیز</span>
+                    <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950 shrink-0" />
+                    <span className="truncate">خرید فوری</span>
                   </button>
                 </div>
               </div>

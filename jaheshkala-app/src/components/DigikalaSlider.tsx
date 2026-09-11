@@ -101,7 +101,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
   return (
     <section 
       aria-label="اسلایدر بنرهای ویژه"
-      className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-purple-900/30 group select-none bg-[#0c081f]"
+      className="hero-banner relative w-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-purple-900/30 group select-none bg-[#0c081f] preserve-contrast dark-surface"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
@@ -218,10 +218,10 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
         </>
       )}
 
-      {/* Digikala Style Bottom Dots Pagination */}
+      {/* Digikala Style Bottom Dots Pagination - Placed in bottom-left corner */}
       {slides.length > 1 && (
         <div
-          className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/15"
+          className="absolute bottom-3 sm:bottom-4 left-3 sm:left-5 z-30 flex items-center gap-1 sm:gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border border-white/15 shadow-md"
           dir="ltr"
         >
           {slides.map((_, idx) => (
@@ -233,7 +233,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
               }}
               className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 cursor-pointer ${
                 currentSlide === idx
-                  ? 'w-5 sm:w-7 bg-amber-400 shadow-sm shadow-amber-400/50'
+                  ? 'w-4 sm:w-6 bg-amber-400 shadow-sm shadow-amber-400/50'
                   : 'w-1.5 sm:w-2 bg-white/40 hover:bg-white/70'
               }`}
               aria-label={`رفتن به اسلاید ${idx + 1}`}

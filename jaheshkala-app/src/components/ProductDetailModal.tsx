@@ -548,28 +548,28 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={onClose}
-              className="px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-purple-100 hover:bg-purple-200 dark:text-slate-400 dark:hover:text-white dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-800 transition-colors shrink-0 text-center cursor-pointer shadow-sm"
+              className="h-10 sm:h-11 px-3 sm:px-4 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border border-slate-200 dark:border-purple-800 transition-colors shrink-0 text-center cursor-pointer shadow-xs whitespace-nowrap active:scale-95"
             >
               انصراف
             </button>
             <button
               id="modal-add-to-cart-btn"
               onClick={handleAdd}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/90 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-700/60 text-purple-900 hover:text-purple-950 dark:text-purple-200 dark:hover:text-white font-bold px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl shadow-sm transition-all text-xs cursor-pointer"
+              className="flex-1 sm:flex-none h-10 sm:h-11 flex items-center justify-center gap-1.5 sm:gap-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/90 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-700/60 text-purple-900 hover:text-purple-950 dark:text-purple-200 dark:hover:text-white font-bold px-3 sm:px-4 rounded-xl shadow-xs transition-all text-xs cursor-pointer whitespace-nowrap active:scale-95"
             >
-              <ShoppingBag className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <ShoppingBag className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
               <span>افزودن به سبد</span>
             </button>
             <button
               id="modal-instant-buy-btn"
               onClick={handleInstantBuy}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl shadow-xl shadow-amber-500/25 hover:scale-105 active:scale-95 transition-all text-xs cursor-pointer"
+              className="flex-1 sm:flex-none h-10 sm:h-11 flex items-center justify-center gap-1.5 sm:gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black px-4 sm:px-5 rounded-xl shadow-md shadow-amber-500/20 active:scale-95 transition-all text-xs cursor-pointer whitespace-nowrap"
             >
-              <Zap className="w-4 h-4 fill-slate-950 text-slate-950 shrink-0 animate-bounce" />
-              <span>خرید فوری و تسویه حساب</span>
+              <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950 shrink-0" />
+              <span>خرید فوری</span>
             </button>
           </div>
         </div>

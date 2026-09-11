@@ -159,11 +159,11 @@ export const SubscriptionDurationModal: React.FC<SubscriptionDurationModalProps>
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 bg-slate-950 border-t border-purple-900/60 flex items-center justify-end gap-2.5">
+        <div className="p-4 bg-slate-950 border-t border-purple-900/60 flex items-center justify-end gap-2 sm:gap-2.5">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+            className="h-10 sm:h-11 px-3.5 sm:px-4 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer whitespace-nowrap active:scale-95"
           >
             انصراف
           </button>
@@ -171,19 +171,19 @@ export const SubscriptionDurationModal: React.FC<SubscriptionDurationModalProps>
           <button
             type="button"
             onClick={() => handleConfirmAction(false)}
-            className="flex items-center gap-2 bg-purple-900/80 hover:bg-purple-800 border border-purple-500/60 text-purple-100 font-bold px-4 py-2.5 rounded-xl text-xs transition-all cursor-pointer shadow-md"
+            className="h-10 sm:h-11 flex items-center justify-center gap-1.5 sm:gap-2 bg-purple-900/80 hover:bg-purple-800 border border-purple-500/60 text-purple-100 font-bold px-3 sm:px-4 rounded-xl text-xs transition-all cursor-pointer shadow-md whitespace-nowrap active:scale-95"
           >
-            <ShoppingBag className="w-4 h-4 text-purple-300" />
-            <span>افزودن به سبد خرید</span>
+            <ShoppingBag className="w-3.5 h-3.5 text-purple-300 shrink-0" />
+            <span>افزودن به سبد</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleConfirmAction(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs transition-all cursor-pointer shadow-lg shadow-amber-500/25 hover:scale-105 active:scale-95"
+            className="h-10 sm:h-11 flex items-center justify-center gap-1.5 sm:gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black px-4 sm:px-5 rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-amber-500/20 active:scale-95 whitespace-nowrap"
           >
-            <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
-            <span>خرید فوری و تسویه</span>
+            <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950 shrink-0" />
+            <span>خرید فوری</span>
           </button>
         </div>
       </div>

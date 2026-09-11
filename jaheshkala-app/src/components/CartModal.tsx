@@ -604,37 +604,40 @@ export const CartModal: React.FC<CartModalProps> = ({
             </div>
 
             {/* Bottom Buttons: Symmetrical, equal height, no text wrap */}
-            <div className="flex items-center gap-2.5 sm:gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto">
               <button
                 type="button"
                 onClick={onClose}
-                className="h-11 sm:h-12 px-4 sm:px-6 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 dark:text-slate-200 dark:hover:text-white dark:bg-purple-950/80 dark:hover:bg-purple-900 border border-slate-300 dark:border-purple-800/60 transition-all whitespace-nowrap shrink-0 flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+                className="h-10 sm:h-11 px-3.5 sm:px-5 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 dark:text-slate-200 dark:hover:text-white dark:bg-purple-950/80 dark:hover:bg-purple-900 border border-slate-300 dark:border-purple-800/60 transition-all whitespace-nowrap shrink-0 flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
                 title="بستن سبد خرید و ادامه بررسی محصولات فروشگاه"
               >
-                بستن و ادامه خرید
+                <span className="hidden sm:inline">بستن و ادامه خرید</span>
+                <span className="sm:hidden">ادامه خرید</span>
               </button>
 
               <button
                 id="proceed-payment-btn"
                 onClick={handleCheckoutClick}
                 disabled={!termsAccepted}
-                className={`h-11 sm:h-12 flex-1 md:flex-initial flex items-center justify-center gap-2 font-black px-5 sm:px-7 rounded-xl shadow-lg transition-all text-xs whitespace-nowrap cursor-pointer ${
+                className={`h-10 sm:h-11 flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 font-black px-4 sm:px-6 rounded-xl shadow-md transition-all text-xs whitespace-nowrap cursor-pointer ${
                   termsAccepted
                     ? isAdmin
-                      ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-600/30 hover:shadow-emerald-600/50 hover:scale-[1.02] active:scale-95 ring-2 ring-emerald-400/50'
+                      ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-600/30 hover:scale-[1.02] active:scale-95'
                       : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 shadow-emerald-600/20 hover:scale-[1.02] active:scale-95'
                     : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-300 dark:border-slate-700'
                 }`}
               >
                 {isAdmin ? (
                   <>
-                    <Gift className="w-4 h-4 text-slate-950 shrink-0" />
-                    <span>تکمیل و ثبت رایگان سفارش (حساب مدیریت)</span>
+                    <Gift className="w-3.5 h-3.5 text-slate-950 shrink-0" />
+                    <span className="hidden sm:inline">تکمیل و ثبت رایگان سفارش (حساب مدیریت)</span>
+                    <span className="sm:hidden">ثبت رایگان (مدیریت)</span>
                   </>
                 ) : (
                   <>
-                    <ShieldCheck className="w-4 h-4 shrink-0" />
-                    <span>انتقال به درگاه پرداخت امن (زیبال / شاپرک)</span>
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-slate-950" />
+                    <span className="hidden sm:inline">انتقال به درگاه پرداخت امن (شاپرک)</span>
+                    <span className="sm:hidden">پرداخت امن شاپرک</span>
                   </>
                 )}
               </button>
