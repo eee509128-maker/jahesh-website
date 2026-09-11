@@ -10,7 +10,8 @@ import {
   ChevronRight, ChevronLeft, Gift
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan } from '../types';
-import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage } from '../lib/dbService';
+import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS } from '../data/initialData';
 
@@ -89,6 +90,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bannerImage, setBannerImage] = useState('');
   const [bannerImageLoading, setBannerImageLoading] = useState(false);
   const [bannerSuccessMessage, setBannerSuccessMessage] = useState('');
+  const [isRefreshingOrders, setIsRefreshingOrders] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
+
+  const handleRefreshOrders = async () => {
+    setIsRefreshingOrders(true);
+    setRefreshNotice(null);
+    try {
+      // 1. Recover any pending order in localStorage
+      const pending = getPendingOrder();
+      if (pending && pending.id) {
+        await saveOrderToDb(pending);
+      }
+
+      // 2. Sync all orders across server disk, Supabase chats config, orders table, and localStorage
+      const fresh = await fetchOrdersFromDb();
+      if (fresh && Array.isArray(fresh)) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: fresh }));
+        }
+        setRefreshNotice(`لیست سفارشات به روزرسانی شد (${fresh.length.toLocaleString('fa-IR')} سفارش دریافتی)`);
+      } else {
+        setRefreshNotice('لیست سفارشات بررسی گردید.');
+      }
+    } catch (e) {
+      setRefreshNotice('خطا در دریافت سفارشات جدید از سرور.');
+    } finally {
+      setTimeout(() => {
+        setIsRefreshingOrders(false);
+      }, 500);
+      setTimeout(() => {
+        setRefreshNotice(null);
+      }, 4000);
+    }
+  };
   const [cropperModal, setCropperModal] = useState<{ isOpen: boolean, imageSrc: string, aspectRatio: number, target: 'banner' | 'product_main' | 'product_gallery' }>({
     isOpen: false,
     imageSrc: '',
@@ -634,14 +669,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // User Management State (Search, Filter, Edit Modal, Create Modal)
   const [userSearchTerm, setUserSearchTerm] = useState('');
-  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'admin' | 'user'>('all');
+  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'admin' | 'operator' | 'user'>('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserPhone, setNewUserPhone] = useState('');
   const [newUserUsername, setNewUserUsername] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'operator' | 'user'>('user');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [userActionMessage, setUserActionMessage] = useState('');
 
@@ -912,13 +947,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <h2 className="text-xs sm:text-base font-black text-white truncate">پنل مدیریت جهش‌کالا</h2>
-                <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-[9px] sm:text-[10px] font-bold text-emerald-300 shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  ابری
-                </span>
+                {currentUser?.role === 'operator' ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-[9px] sm:text-[10px] font-bold text-cyan-300 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                    ادمین محدود (اپراتور)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-[9px] sm:text-[10px] font-bold text-emerald-300 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    مدیر ارشد (ابری)
+                  </span>
+                )}
               </div>
               <p className="text-[10px] sm:text-xs text-purple-300/70 truncate hidden xs:block">
-                مدیریت محصولات، سفارشات، کدهای تخفیف، کاربران و پشتیبانی
+                {currentUser?.role === 'operator'
+                  ? 'مدیریت کالاها، ویرایش محصولات، سفارشات و پشتیبانی آنلاین (دسترسی محدود)'
+                  : 'مدیریت محصولات، سفارشات، کدهای تخفیف، کاربران، درگاه و پشتیبانی'}
               </p>
             </div>
           </div>
@@ -1038,17 +1082,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('integrations')}
-              className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
-                activeTab === 'integrations'
-                  ? 'border-amber-400 text-amber-300'
-                  : 'border-transparent text-slate-400 hover:text-white'
-              }`}
-            >
-              <Sliders className="w-4 h-4" />
-              <span>تنظیمات درگاه زیبال و دیپلوی</span>
-            </button>
+            {currentUser?.role === 'admin' && (
+              <button
+                onClick={() => setActiveTab('integrations')}
+                className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                  activeTab === 'integrations'
+                    ? 'border-amber-400 text-amber-300'
+                    : 'border-transparent text-slate-400 hover:text-white'
+                }`}
+              >
+                <Sliders className="w-4 h-4" />
+                <span>تنظیمات درگاه زیبال و دیپلوی</span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab('users')}
@@ -1114,26 +1160,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     کلیه تراکنش‌ها و سفارشات ثبت‌شده از طریق درگاه پرداخت در این بخش نمایش داده می‌شوند.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {refreshNotice && (
+                    <div className="bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 animate-fade-in shadow-md font-medium">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>{refreshNotice}</span>
+                    </div>
+                  )}
                   <button
-                    onClick={async () => {
-                      try {
-                        const fresh = await fetchOrdersFromDb();
-                        if (fresh && typeof window !== 'undefined') {
-                          window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: fresh }));
-                        }
-                      } catch (e) {}
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-xs font-bold transition-all cursor-pointer"
+                    onClick={handleRefreshOrders}
+                    disabled={isRefreshingOrders}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-xs font-bold transition-all cursor-pointer border border-purple-700/40 active:scale-95 disabled:opacity-50"
                     title="به‌روزرسانی و دریافت لیست جدید سفارشات"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>به‌روزرسانی سفارشات</span>
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingOrders ? 'animate-spin text-amber-400' : ''}`} />
+                    <span>{isRefreshingOrders ? 'در حال دریافت...' : 'به‌روزرسانی سفارشات'}</span>
                   </button>
                   {orders.length > 0 && onClearAllOrders && (
                     <button
                       onClick={onClearAllOrders}
-                      className="px-3 py-1.5 rounded-xl bg-rose-950/60 border border-rose-600/40 text-rose-300 hover:bg-rose-900/80 text-xs font-bold transition-colors"
+                      className="px-3 py-1.5 rounded-xl bg-rose-950/60 border border-rose-600/40 text-rose-300 hover:bg-rose-900/80 text-xs font-bold transition-colors cursor-pointer"
                     >
                       پاکسازی تمام سفارشات
                     </button>
@@ -1180,8 +1226,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             {order.customerPhone}
                           </td>
                           <td className="p-3.5">
-                            <div className="max-w-[220px] truncate font-medium">
-                              {order.items.map((i) => `${i.product.title} (${i.quantity} عدد)`).join('، ')}
+                            <div className="max-w-[280px] font-medium text-xs space-y-1">
+                              {order.items.map((i, idx) => (
+                                <div key={idx} className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-white font-bold">{i.product.title}</span>
+                                  {i.selectedPlan && (
+                                    <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40 shadow-xs">
+                                      تعرفه: {i.selectedPlan.name}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] text-slate-400">({i.quantity} عدد)</span>
+                                </div>
+                              ))}
                             </div>
                           </td>
                           <td className="p-3.5 font-bold text-amber-300 whitespace-nowrap">
@@ -1232,7 +1288,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               >
                                 جزئیات
                               </button>
-                              {onDeleteOrder && (
+                              {onDeleteOrder && currentUser?.role === 'admin' && (
                                 <button
                                   onClick={() => onDeleteOrder(order.id)}
                                   className="p-1 rounded-lg hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors"
@@ -1353,13 +1409,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => onDeleteProduct(prod.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors"
-                            title="حذف این کالا"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {currentUser?.role === 'admin' ? (
+                            <button
+                              onClick={() => onDeleteProduct(prod.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors"
+                              title="حذف این کالا"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="p-1.5 text-slate-600 opacity-40 cursor-not-allowed"
+                              title="حذف کالا نیازمند دسترسی مدیر ارشد است"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -2722,7 +2788,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             )}
                           </button>
                         )}
-                        {onDeleteCoupon && (
+                        {onDeleteCoupon && currentUser?.role === 'admin' && (
                           <button
                             onClick={() => onDeleteCoupon(cp.id)}
                             title="حذف کد تخفیف"
@@ -3504,7 +3570,8 @@ on public.users for delete using (true);`;
                     className="w-full bg-[#130b2e] border border-purple-900/50 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
                   >
                     <option value="all">همه نقش‌ها</option>
-                    <option value="admin">فقط مدیران (Admin)</option>
+                    <option value="admin">فقط مدیران ارشد (Super Admin)</option>
+                    <option value="operator">فقط ادمین‌های محدود (Operator)</option>
                     <option value="user">فقط کاربران عادی (User)</option>
                   </select>
                 </div>
@@ -3588,13 +3655,20 @@ on public.users for delete using (true);`;
                                   className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-bold border ${
                                     user.role === 'admin'
                                       ? 'bg-purple-950 text-purple-300 border-purple-500/50'
+                                      : user.role === 'operator'
+                                      ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50'
                                       : 'bg-slate-900/80 text-slate-300 border-slate-700/50'
                                   }`}
                                 >
                                   {user.role === 'admin' ? (
                                     <>
                                       <Shield className="w-3 h-3 text-purple-400" />
-                                      مدیر سیستم
+                                      مدیر ارشد
+                                    </>
+                                  ) : user.role === 'operator' ? (
+                                    <>
+                                      <Shield className="w-3 h-3 text-cyan-400" />
+                                      ادمین محدود
                                     </>
                                   ) : (
                                     <>
@@ -3621,17 +3695,34 @@ on public.users for delete using (true);`;
                                   {/* Toggle Role Button */}
                                   <button
                                     onClick={() => {
+                                      if (currentUser?.role === 'operator') {
+                                        alert('تغییر سطح دسترسی کاربران نیازمند دسترسی مدیر ارشد است.');
+                                        return;
+                                      }
                                       if (isMaster) {
                                         alert('نقش مدیر اصلی سایت قابل تغییر نیست.');
                                         return;
                                       }
-                                      const nextRole: 'admin' | 'user' = user.role === 'admin' ? 'user' : 'admin';
+                                      const nextRole: 'admin' | 'operator' | 'user' =
+                                        user.role === 'user' ? 'operator' : user.role === 'operator' ? 'admin' : 'user';
                                       const updated = { ...user, role: nextRole };
                                       onUpdateUser?.(updated);
-                                      setUserActionMessage(`نقش کاربر ${user.fullName} به ${nextRole === 'admin' ? 'مدیر' : 'کاربر عادی'} تغییر یافت.`);
+                                      const roleTitle = nextRole === 'admin' ? 'مدیر ارشد' : nextRole === 'operator' ? 'ادمین محدود (اپراتور)' : 'کاربر عادی';
+                                      setUserActionMessage(`نقش کاربر ${user.fullName} به «${roleTitle}» تغییر یافت.`);
                                     }}
-                                    title={user.role === 'admin' ? 'تنزل به کاربر عادی' : 'ارتقا به مدیر'}
-                                    className="p-1.5 rounded-lg bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-700/40 transition-colors"
+                                    disabled={currentUser?.role === 'operator'}
+                                    title={
+                                      currentUser?.role === 'operator'
+                                        ? 'تغییر نقش نیازمند دسترسی مدیر ارشد است'
+                                        : `تغییر نقش (فعلی: ${
+                                            user.role === 'admin' ? 'مدیر ارشد' : user.role === 'operator' ? 'ادمین محدود' : 'کاربر عادی'
+                                          })`
+                                    }
+                                    className={`p-1.5 rounded-lg border transition-colors ${
+                                      currentUser?.role === 'operator'
+                                        ? 'opacity-30 cursor-not-allowed bg-slate-900 border-slate-800 text-slate-600'
+                                        : 'bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-700/40'
+                                    }`}
                                   >
                                     <Shield className="w-3.5 h-3.5" />
                                   </button>
@@ -3639,6 +3730,10 @@ on public.users for delete using (true);`;
                                   {/* Delete Button */}
                                   <button
                                     onClick={() => {
+                                      if (currentUser?.role === 'operator') {
+                                        alert('حذف حساب کاربری نیازمند دسترسی مدیر ارشد است.');
+                                        return;
+                                      }
                                       if (isMaster) {
                                         alert('حساب کاربری مدیر اصلی سایت قابل حذف نیست.');
                                         return;
@@ -3648,10 +3743,10 @@ on public.users for delete using (true);`;
                                         setUserActionMessage(`کاربر «${user.fullName}» با موفقیت حذف شد.`);
                                       }
                                     }}
-                                    title="حذف کاربر"
-                                    disabled={isMaster}
+                                    title={currentUser?.role === 'operator' ? 'حذف کاربر نیازمند دسترسی مدیر ارشد است' : 'حذف کاربر'}
+                                    disabled={isMaster || currentUser?.role === 'operator'}
                                     className={`p-1.5 rounded-lg border transition-colors ${
-                                      isMaster
+                                      isMaster || currentUser?.role === 'operator'
                                         ? 'opacity-30 cursor-not-allowed bg-slate-900 border-slate-800 text-slate-600'
                                         : 'bg-rose-950/60 hover:bg-rose-900 text-rose-300 border-rose-700/40'
                                     }`}
@@ -3732,10 +3827,12 @@ on public.users for delete using (true);`;
                         <select
                           value={editingUser.role}
                           onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as any })}
-                          className="w-full bg-black/50 border border-purple-800/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                          disabled={currentUser?.role === 'operator'}
+                          className="w-full bg-black/50 border border-purple-800/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <option value="user">کاربر عادی (User)</option>
-                          <option value="admin">مدیر سایت (Admin)</option>
+                          <option value="operator">ادمین محدود (اپراتور)</option>
+                          <option value="admin">مدیر ارشد (Super Admin)</option>
                         </select>
                       </div>
                     </div>
@@ -3841,10 +3938,12 @@ on public.users for delete using (true);`;
                           <select
                             value={newUserRole}
                             onChange={(e) => setNewUserRole(e.target.value as any)}
-                            className="w-full bg-black/50 border border-purple-800/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
+                            disabled={currentUser?.role === 'operator'}
+                            className="w-full bg-black/50 border border-purple-800/60 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <option value="user">کاربر عادی (User)</option>
-                            <option value="admin">مدیر (Admin)</option>
+                            <option value="operator">ادمین محدود (اپراتور)</option>
+                            <option value="admin">مدیر ارشد (Super Admin)</option>
                           </select>
                         </div>
                       </div>
@@ -4229,18 +4328,21 @@ on public.users for delete using (true);`;
                           (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
                       );
                       const prodImg = live?.image || item.product?.image;
+                      const unitPrice = item.selectedPlan?.price !== undefined
+                        ? Number(item.selectedPlan.price)
+                        : (Number(item.product?.price) || 0);
 
                       return (
                         <div
                           key={idx}
-                          className="flex items-center justify-between bg-black/40 p-2 rounded-xl border border-purple-800/40 text-xs"
+                          className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-black/40 p-3 rounded-xl border border-purple-800/40 text-xs gap-2"
                         >
-                          <div className="flex items-center gap-2.5">
+                          <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-black/60 border border-purple-800/50 overflow-hidden flex items-center justify-center shrink-0 p-0.5">
                               {prodImg ? (
                                 <img
                                   src={prodImg}
-                                  alt={item.product.title}
+                                  alt={item.product?.title || 'محصول'}
                                   className="w-full h-full object-contain"
                                 />
                               ) : (
@@ -4249,15 +4351,25 @@ on public.users for delete using (true);`;
                             </div>
                             <div className="text-right">
                               <span className="font-bold text-white block">
-                                {item.product.title}
+                                {item.product?.title || 'پکیج/محصول'}
                               </span>
-                              <span className="text-[10px] text-slate-400">
-                                تعداد: {item.quantity} عدد
-                              </span>
+                              {item.selectedPlan ? (
+                                <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-950/80 border border-amber-500/40 text-[11px] font-bold text-amber-300">
+                                  <span>پکیج/تعرفه:</span>
+                                  <strong className="text-white">{item.selectedPlan.name}</strong>
+                                  {item.selectedPlan.durationLabel && (
+                                    <span className="text-slate-300 font-normal">({item.selectedPlan.durationLabel})</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 block mt-0.5">
+                                  خرید عادی محصول (تعداد: {item.quantity} عدد)
+                                </span>
+                              )}
                             </div>
                           </div>
-                          <span className="font-bold text-amber-300">
-                            {formatPrice(item.product.price * item.quantity)}
+                          <span className="font-bold text-amber-300 font-mono text-sm self-end sm:self-center">
+                            {formatPrice(unitPrice * item.quantity)}
                           </span>
                         </div>
                       );

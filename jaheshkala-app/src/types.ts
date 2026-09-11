@@ -72,13 +72,15 @@ export interface CartItem {
   quantity: number;
 }
 
+export type UserRole = 'admin' | 'operator' | 'user';
+
 export interface User {
   id: string;
   fullName: string;
   phone: string;
   email: string;
   username: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'operator' | 'user';
   guild?: string; // صنف و شغل کاربر (مثلاً: املاک و مستغلات، پزشکی، رستوران و...)
   customGuild?: string; // در صورت انتخاب سایر مشاغل
   createdAt: string;

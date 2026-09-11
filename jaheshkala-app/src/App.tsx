@@ -613,6 +613,22 @@ export default function App() {
       })
       .subscribe();
 
+    // Instant Supabase Realtime channel for cloud orders config
+    const ordersConfigChannel = supabase
+      .channel('public:chats:orders')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chats', filter: 'user_id=eq.SYSTEM_CONFIG_ORDERS' },
+        (payload: any) => {
+          if (payload.new && Array.isArray(payload.new.messages)) {
+            if (isMounted) {
+              setOrders(payload.new.messages);
+            }
+          }
+        }
+      )
+      .subscribe();
+
     // Instant Supabase Realtime channel for orders table
     const ordersChannel = supabase
       .channel('public:orders:realtime')
@@ -686,6 +702,7 @@ export default function App() {
       supabase.removeChannel(bannersChannel);
       supabase.removeChannel(productsConfigChannel);
       supabase.removeChannel(productsChannel);
+      supabase.removeChannel(ordersConfigChannel);
       supabase.removeChannel(ordersChannel);
       clearInterval(syncInterval);
       clearInterval(bannerSyncInterval);

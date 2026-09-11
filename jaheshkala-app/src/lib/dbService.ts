@@ -447,14 +447,43 @@ export const saveLocalOrdersStore = (orders: Order[]) => {
 
 export const fetchOrdersFromDb = async (): Promise<Order[]> => {
   const localOrders = getLocalOrdersStore();
+  let serverDiskOrders: Order[] = [];
+  let chatConfigOrders: Order[] = [];
+  let tableOrders: Order[] = [];
+
+  // 1. Layer 1: Fetch from server disk /api/orders
+  try {
+    const res = await fetch('/api/orders');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.orders)) {
+        serverDiskOrders = data.orders;
+      }
+    }
+  } catch (err) {
+    console.warn('Check /api/orders notice:', err);
+  }
+
+  // 2. Layer 2: Fetch from Supabase SYSTEM_CONFIG_ORDERS in chats table
+  try {
+    const { data: configData, error: configError } = await supabase
+      .from('chats')
+      .select('messages')
+      .eq('user_id', 'SYSTEM_CONFIG_ORDERS')
+      .maybeSingle();
+
+    if (!configError && configData && Array.isArray(configData.messages)) {
+      chatConfigOrders = configData.messages;
+    }
+  } catch (e) {
+    console.warn('Check SYSTEM_CONFIG_ORDERS notice:', e);
+  }
+
+  // 3. Layer 3: Fetch from Supabase orders table
   try {
     const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-    if (error) {
-      console.warn('Supabase fetch orders notice (using local store):', error.message);
-      return localOrders;
-    }
-    if (data) {
-      const cloudOrders: Order[] = data.map((item) => {
+    if (!error && data) {
+      tableOrders = data.map((item) => {
         let parsedItems = item.items;
         if (typeof item.items === 'string') {
           try {
@@ -483,29 +512,43 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
           acceptedTerms: true,
         };
       });
-
-      // Synchronize local cache to include cloud DB plus any unsynced local orders
-      const cloudIds = new Set(cloudOrders.map((o) => o.id));
-      const localUnsynced = localOrders.filter((o) => !cloudIds.has(o.id));
-      const mergedOrders = [...cloudOrders, ...localUnsynced];
-      saveLocalOrdersStore(mergedOrders);
-      return mergedOrders;
     }
-    return localOrders;
   } catch (err) {
-    console.warn('Failed to connect to Supabase orders table:', err);
-    return localOrders;
+    console.warn('Supabase fetch orders table notice:', err);
   }
+
+  // Merge all sources into a single deduplicated list
+  const allOrdersMap = new Map<string, Order>();
+  const addOrderToMap = (o: Order) => {
+    if (!o || (!o.id && !o.trackingCode)) return;
+    const key = o.id || o.trackingCode;
+    const existing = allOrdersMap.get(key);
+    if (!existing) {
+      allOrdersMap.set(key, o);
+    } else {
+      // Keep most complete order details
+      allOrdersMap.set(key, { ...existing, ...o });
+    }
+  };
+
+  serverDiskOrders.forEach(addOrderToMap);
+  chatConfigOrders.forEach(addOrderToMap);
+  tableOrders.forEach(addOrderToMap);
+  localOrders.forEach(addOrderToMap);
+
+  const mergedOrders = Array.from(allOrdersMap.values());
+  saveLocalOrdersStore(mergedOrders);
+  return mergedOrders;
 };
 
 export const saveOrderToDb = async (order: Order): Promise<boolean> => {
-  // 1. Immediately save to local persistent store & broadcast
+  // 1. Save locally & broadcast
+  let updatedList: Order[] = [];
   try {
     const currentLocal = getLocalOrdersStore();
     const existingIndex = currentLocal.findIndex(
       (o) => o.id === order.id || (o.trackingCode && order.trackingCode && o.trackingCode === order.trackingCode)
     );
-    let updatedList: Order[];
     if (existingIndex >= 0) {
       updatedList = [...currentLocal];
       updatedList[existingIndex] = { ...currentLocal[existingIndex], ...order };
@@ -520,7 +563,35 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
     console.warn('Local save order warning:', localErr);
   }
 
-  // 2. Persist to Supabase cloud
+  // 2. Persist to server disk via /api/orders/save
+  try {
+    await fetch('/api/orders/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order),
+    });
+  } catch (e) {
+    console.warn('Persist order to /api/orders/save notice:', e);
+  }
+
+  // 3. Primary Cloud: Save to Supabase SYSTEM_CONFIG_ORDERS in chats table (instant global sync across all devices)
+  try {
+    const fullStore = getLocalOrdersStore();
+    await supabase.from('chats').upsert(
+      {
+        user_id: 'SYSTEM_CONFIG_ORDERS',
+        user_name: 'لیست تمام سفارشات فروشگاه',
+        messages: fullStore,
+        last_updated: new Date().toISOString(),
+        is_read_by_admin: true,
+      },
+      { onConflict: 'user_id' }
+    );
+  } catch (err) {
+    console.warn('Save orders to SYSTEM_CONFIG_ORDERS notice:', err);
+  }
+
+  // 4. Secondary Cloud: Persist to Supabase orders table
   try {
     const payload = {
       id: order.id,
@@ -541,28 +612,23 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
       payment_gateway: order.paymentGateway,
     };
     
-    // First attempt with JSON string / array
     const { error } = await supabase.from('orders').upsert(payload);
     if (error) {
-      console.warn('Supabase save order attempt 1 notice:', error.message);
-      // Fallback: try with stringified items if schema requires text
       const stringifiedPayload = { ...payload, items: JSON.stringify(order.items) };
-      const retryRes = await supabase.from('orders').upsert(stringifiedPayload);
-      if (retryRes.error) {
-        console.warn('Supabase save order attempt 2 notice:', retryRes.error.message);
-      }
+      await supabase.from('orders').upsert(stringifiedPayload);
     }
-    return true;
   } catch (err) {
-    console.warn('Save order exception (order safely preserved locally):', err);
-    return true;
+    console.warn('Save order to orders table notice:', err);
   }
+
+  return true;
 };
 
 export const updateOrderStatusInDb = async (orderId: string, status: string): Promise<boolean> => {
+  let updated: Order[] = [];
   try {
     const current = getLocalOrdersStore();
-    const updated = current.map((o) => (o.id === orderId ? { ...o, status: status as any } : o));
+    updated = current.map((o) => (o.id === orderId ? { ...o, status: status as any } : o));
     saveLocalOrdersStore(updated);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updated }));
@@ -570,18 +636,40 @@ export const updateOrderStatusInDb = async (orderId: string, status: string): Pr
   } catch (e) {}
 
   try {
-    const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
-    return !error;
-  } catch (err) {
-    console.warn('Update order status exception:', err);
-    return true;
-  }
+    await fetch('/api/orders/update-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, status }),
+    });
+  } catch (e) {}
+
+  try {
+    if (updated.length > 0) {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_ORDERS',
+          user_name: 'لیست تمام سفارشات فروشگاه',
+          messages: updated,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    }
+  } catch (e) {}
+
+  try {
+    await supabase.from('orders').update({ status }).eq('id', orderId);
+  } catch (err) {}
+
+  return true;
 };
 
 export const deleteOrderFromDb = async (orderId: string): Promise<boolean> => {
+  let updated: Order[] = [];
   try {
     const current = getLocalOrdersStore();
-    const updated = current.filter((o) => o.id !== orderId && o.trackingCode !== orderId);
+    updated = current.filter((o) => o.id !== orderId && o.trackingCode !== orderId);
     saveLocalOrdersStore(updated);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updated }));
@@ -589,12 +677,31 @@ export const deleteOrderFromDb = async (orderId: string): Promise<boolean> => {
   } catch (e) {}
 
   try {
-    const { error } = await supabase.from('orders').delete().eq('id', orderId);
-    return !error;
-  } catch (err) {
-    console.warn('Delete order exception:', err);
-    return true;
-  }
+    await fetch('/api/orders/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId }),
+    });
+  } catch (e) {}
+
+  try {
+    await supabase.from('chats').upsert(
+      {
+        user_id: 'SYSTEM_CONFIG_ORDERS',
+        user_name: 'لیست تمام سفارشات فروشگاه',
+        messages: updated,
+        last_updated: new Date().toISOString(),
+        is_read_by_admin: true,
+      },
+      { onConflict: 'user_id' }
+    );
+  } catch (e) {}
+
+  try {
+    await supabase.from('orders').delete().eq('id', orderId);
+  } catch (err) {}
+
+  return true;
 };
 
 export const clearAllOrdersFromDb = async (): Promise<boolean> => {
@@ -606,12 +713,27 @@ export const clearAllOrdersFromDb = async (): Promise<boolean> => {
   } catch (e) {}
 
   try {
-    const { error } = await supabase.from('orders').delete().neq('id', '___non_existent___');
-    return !error;
-  } catch (err) {
-    console.warn('Clear orders exception:', err);
-    return true;
-  }
+    await fetch('/api/orders/clear', { method: 'POST' });
+  } catch (e) {}
+
+  try {
+    await supabase.from('chats').upsert(
+      {
+        user_id: 'SYSTEM_CONFIG_ORDERS',
+        user_name: 'لیست تمام سفارشات فروشگاه',
+        messages: [],
+        last_updated: new Date().toISOString(),
+        is_read_by_admin: true,
+      },
+      { onConflict: 'user_id' }
+    );
+  } catch (e) {}
+
+  try {
+    await supabase.from('orders').delete().neq('id', '___non_existent___');
+  } catch (err) {}
+
+  return true;
 };
 
 // 3. USERS DB SERVICE WITH HYBRID LOCAL & CLOUD SYNC
@@ -710,7 +832,7 @@ export const findUserInDb = async (usernameOrPhone: string, passwordAttempt: str
           phone: dbMatch.phone,
           email: dbMatch.email || '',
           username: dbMatch.username,
-          role: (dbMatch.role as 'admin' | 'user') || 'user',
+          role: (dbMatch.role as 'admin' | 'operator' | 'user') || 'user',
           createdAt: dbMatch.created_at,
         };
         userPassword = dbMatch.password;
@@ -905,7 +1027,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
           phone: matched.phone || existingLocal?.phone || '',
           email: matched.email || existingLocal?.email || '',
           username: matched.username || existingLocal?.username || '',
-          role: existingLocal?.role === 'admin' ? 'admin' : ((matched.role as 'admin' | 'user') || 'user'),
+          role: existingLocal?.role ? existingLocal.role : ((matched.role as 'admin' | 'operator' | 'user') || 'user'),
           createdAt: matched.created_at || existingLocal?.createdAt,
         });
       }

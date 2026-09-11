@@ -50,7 +50,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
             <div className="text-right">
               <h3 className="text-base font-black text-white">{currentUser.fullName}</h3>
-              <p className="text-xs text-purple-300">{currentUser.role === 'admin' ? 'مدیر سیستم' : 'کاربر عادی'}</p>
+              <p className="text-xs text-purple-300">
+                {currentUser.role === 'admin'
+                  ? 'مدیر ارشد سیستم'
+                  : currentUser.role === 'operator'
+                  ? 'ادمین محدود (اپراتور)'
+                  : 'کاربر عادی'}
+              </p>
             </div>
           </div>
           <button
@@ -82,7 +88,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
               <div className="bg-purple-950/40 border border-purple-900/50 p-3 rounded-xl space-y-1">
                 <p className="text-slate-400 flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> سطح دسترسی</p>
-                <p className="font-bold text-white">{currentUser.role === 'admin' ? 'مدیریت کل' : 'مشتری'}</p>
+                <p className="font-bold text-white">
+                  {currentUser.role === 'admin'
+                    ? 'مدیریت کل (ارشد)'
+                    : currentUser.role === 'operator'
+                    ? 'اپراتور / مدیر محدود'
+                    : 'مشتری'}
+                </p>
               </div>
             </div>
           </div>

@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* User / Login state */}
           {currentUser ? (
             <div className="flex items-center gap-2">
-              {currentUser.role === 'admin' ? (
+              {currentUser.role === 'admin' || currentUser.role === 'operator' ? (
                 <button
                   id="header-admin-btn"
                   onClick={onOpenAdmin}

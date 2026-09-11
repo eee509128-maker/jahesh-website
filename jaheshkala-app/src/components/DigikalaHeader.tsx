@@ -185,7 +185,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
           {/* User Auth / Profile */}
           {currentUser ? (
             <div className="flex items-center gap-1 sm:gap-2">
-              {currentUser.role === 'admin' ? (
+              {currentUser.role === 'admin' || currentUser.role === 'operator' ? (
                 <button
                   id="digikala-admin-btn"
                   onClick={onOpenAdmin}

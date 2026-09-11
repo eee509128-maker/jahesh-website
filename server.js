@@ -590,6 +590,136 @@ app.post('/api/products/delete', (req, res) => {
   }
 });
 
+// ==========================================
+// Orders Persistence API
+// ==========================================
+const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
+
+function readOrdersFromDisk() {
+  if (fs.existsSync(ORDERS_FILE)) {
+    try {
+      const raw = fs.readFileSync(ORDERS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn('Error reading orders.json:', e);
+    }
+  }
+  return [];
+}
+
+function writeOrdersToDisk(orders) {
+  try {
+    const dataDir = path.dirname(ORDERS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error writing orders.json:', e);
+  }
+}
+
+// GET /api/orders
+app.get('/api/orders', (_req, res) => {
+  try {
+    const orders = readOrdersFromDisk();
+    return res.json({ success: true, orders });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/orders
+app.post('/api/orders', (req, res) => {
+  try {
+    const incoming = req.body;
+    if (!Array.isArray(incoming)) {
+      return res.status(400).json({ error: 'Expected array of orders' });
+    }
+    const current = readOrdersFromDisk();
+    const existingMap = new Map(current.map((o) => [o.id, o]));
+    incoming.forEach((o) => {
+      if (o && o.id) {
+        existingMap.set(o.id, { ...existingMap.get(o.id), ...o });
+      }
+    });
+    const merged = Array.from(existingMap.values());
+    writeOrdersToDisk(merged);
+    return res.json({ success: true, count: merged.length, orders: merged });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/orders/save
+app.post('/api/orders/save', (req, res) => {
+  try {
+    const order = req.body;
+    if (!order || !order.id) {
+      return res.status(400).json({ error: 'Invalid order object' });
+    }
+    const current = readOrdersFromDisk();
+    const idx = current.findIndex(
+      (o) => o.id === order.id || (o.trackingCode && order.trackingCode && o.trackingCode === order.trackingCode)
+    );
+    let updated;
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = { ...current[idx], ...order };
+    } else {
+      updated = [order, ...current];
+    }
+    writeOrdersToDisk(updated);
+    console.log(`[Orders] Saved order ${order.id}. Total orders: ${updated.length}`);
+    return res.json({ success: true, order, count: updated.length, orders: updated });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/orders/update-status
+app.post('/api/orders/update-status', (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+    if (!orderId || !status) {
+      return res.status(400).json({ error: 'orderId and status required' });
+    }
+    const current = readOrdersFromDisk();
+    const updated = current.map((o) => (o.id === orderId ? { ...o, status } : o));
+    writeOrdersToDisk(updated);
+    return res.json({ success: true, count: updated.length, orders: updated });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/orders/delete
+app.post('/api/orders/delete', (req, res) => {
+  try {
+    const { orderId } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ error: 'orderId required' });
+    }
+    const current = readOrdersFromDisk();
+    const updated = current.filter((o) => o.id !== orderId && o.trackingCode !== orderId);
+    writeOrdersToDisk(updated);
+    return res.json({ success: true, count: updated.length, orders: updated });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/orders/clear
+app.post('/api/orders/clear', (_req, res) => {
+  try {
+    writeOrdersToDisk([]);
+    return res.json({ success: true, count: 0, orders: [] });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Helper for Zibal URL (Uses ZIBAL_PROXY_URL if provided, else direct to https://gateway.zibal.ir/v1)
 function getZibalUrl(endpointPath) {
   const proxyUrl = process.env.ZIBAL_PROXY_URL && process.env.ZIBAL_PROXY_URL.trim();
