@@ -57,22 +57,13 @@ import { AmlakAppModal } from './components/AmlakAppModal';
 import { SubscriptionDurationModal } from './components/SubscriptionDurationModal';
 import { ProductPlansModal } from './components/ProductPlansModal';
 
-export function sanitizeProduct(p: any): Product {
-  if (!p || typeof p !== 'object') {
-    return {
-      id: 'prod-fallback-' + Math.random().toString(36).substr(2, 6),
-      title: 'محصول جهش کالا',
-      category: 'کالای دیجیتال',
-      price: 0,
-      image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
-      description: '',
-      features: [],
-      rating: 5,
-      reviewsCount: 1,
-      inStock: true,
-      warranty: 'گارانتی اصالت و سلامت جهش',
-    };
-  }
+export function sanitizeProduct(p: any): Product | null {
+  if (!p || typeof p !== 'object') return null;
+  const title = (p.title || p.name || '').trim();
+  if (!title) return null;
+  if (title === 'محصول جهش کالا' && (!p.price || Number(p.price) === 0)) return null;
+  const id = p.id ? String(p.id).trim() : '';
+  if (!id || id.startsWith('prod-fallback')) return null;
 
   const rawPrice = p.price;
   const safePrice = typeof rawPrice === 'number' && !isNaN(rawPrice) ? rawPrice : (Number(rawPrice) || 0);
@@ -82,8 +73,8 @@ export function sanitizeProduct(p: any): Product {
 
   return {
     ...p,
-    id: p.id ? String(p.id) : 'prod-' + Math.random().toString(36).substr(2, 6),
-    title: p.title || p.name || 'محصول جهش کالا',
+    id,
+    title,
     category: p.category || 'کالای دیجیتال',
     price: safePrice,
     originalPrice: safeOriginalPrice,
@@ -97,6 +88,12 @@ export function sanitizeProduct(p: any): Product {
     inStock: p.inStock !== false,
     warranty: p.warranty || 'گارانتی اصالت و سلامت جهش',
   };
+}
+
+export function sanitizeProductsList(list: any[]): Product[] {
+  if (!Array.isArray(list)) return INITIAL_PRODUCTS;
+  const cleaned = list.map(sanitizeProduct).filter((p): p is Product => p !== null);
+  return cleaned.length > 0 ? cleaned : INITIAL_PRODUCTS;
 }
 
 export default function App() {
@@ -117,12 +114,13 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(sanitizeProduct);
+          const cleaned = parsed.map(sanitizeProduct).filter((p): p is Product => p !== null);
+          if (cleaned.length > 0) return cleaned;
         }
       }
-      return INITIAL_PRODUCTS.map(sanitizeProduct);
+      return INITIAL_PRODUCTS;
     } catch {
-      return INITIAL_PRODUCTS.map(sanitizeProduct);
+      return INITIAL_PRODUCTS;
     }
   });
 
@@ -520,9 +518,10 @@ export default function App() {
     // Listen for real-time products updates via local/broadcast events
     const handleProductsUpdatedEvent = (e: any) => {
       if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
-        setProducts(e.detail);
+        const cleaned = sanitizeProductsList(e.detail);
+        setProducts(cleaned);
         try {
-          localStorage.setItem('jahesh_products', JSON.stringify(e.detail));
+          localStorage.setItem('jahesh_products', JSON.stringify(cleaned));
         } catch {}
       }
     };
@@ -586,20 +585,11 @@ export default function App() {
         (payload: any) => {
           if (payload.new && Array.isArray(payload.new.messages) && payload.new.messages.length > 0) {
             if (isMounted) {
-              setProducts((prev) => {
-                const incoming: Product[] = payload.new.messages;
-                const pMap = new Map<string, Product>();
-                prev.forEach((p) => pMap.set(p.id, p));
-                incoming.forEach((p) => {
-                  const existing = pMap.get(p.id);
-                  pMap.set(p.id, existing ? mergeTwoProducts(existing, p) : p);
-                });
-                const merged = Array.from(pMap.values());
-                try {
-                  localStorage.setItem('jahesh_products', JSON.stringify(merged));
-                } catch {}
-                return merged;
-              });
+              const cleaned = sanitizeProductsList(payload.new.messages);
+              setProducts(cleaned);
+              try {
+                localStorage.setItem('jahesh_products', JSON.stringify(cleaned));
+              } catch {}
             }
           }
         }
@@ -613,19 +603,11 @@ export default function App() {
         try {
           const fresh = await fetchProductsFromDb();
           if (isMounted && fresh && Array.isArray(fresh) && fresh.length > 0) {
-            setProducts((prev) => {
-              const pMap = new Map<string, Product>();
-              prev.forEach((p) => pMap.set(p.id, p));
-              fresh.forEach((p) => {
-                const existing = pMap.get(p.id);
-                pMap.set(p.id, existing ? mergeTwoProducts(existing, p) : p);
-              });
-              const merged = Array.from(pMap.values());
-              try {
-                localStorage.setItem('jahesh_products', JSON.stringify(merged));
-              } catch {}
-              return merged;
-            });
+            const cleaned = sanitizeProductsList(fresh);
+            setProducts(cleaned);
+            try {
+              localStorage.setItem('jahesh_products', JSON.stringify(cleaned));
+            } catch {}
           }
         } catch (e) {}
       })
@@ -650,19 +632,13 @@ export default function App() {
         // 1. Sync fresh products and image changes from Supabase & server disk
         const freshProducts = await fetchProductsFromDb();
         if (isMounted && freshProducts && freshProducts.length > 0) {
+          const cleaned = sanitizeProductsList(freshProducts);
           setProducts((prev) => {
-            const pMap = new Map<string, Product>();
-            prev.forEach((p) => pMap.set(p.id, p));
-            freshProducts.forEach((p) => {
-              const existing = pMap.get(p.id);
-              pMap.set(p.id, existing ? mergeTwoProducts(existing, p) : p);
-            });
-            const merged = Array.from(pMap.values());
-            if (JSON.stringify(prev) !== JSON.stringify(merged)) {
+            if (JSON.stringify(prev) !== JSON.stringify(cleaned)) {
               try {
-                localStorage.setItem('jahesh_products', JSON.stringify(merged));
+                localStorage.setItem('jahesh_products', JSON.stringify(cleaned));
               } catch {}
-              return merged;
+              return cleaned;
             }
             return prev;
           });

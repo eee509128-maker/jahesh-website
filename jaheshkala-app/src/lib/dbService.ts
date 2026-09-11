@@ -98,11 +98,42 @@ export const mergeTwoProducts = (current: Product, incoming: Product): Product =
   };
 };
 
-export const fetchProductsFromDb = async (): Promise<Product[]> => {
-  const productMap = new Map<string, Product>();
+export function cleanProductItem(p: any): Product | null {
+  if (!p || typeof p !== 'object') return null;
+  const title = (p.title || p.name || '').trim();
+  if (!title) return null;
+  // Reject dummy fallback items
+  if (title === 'محصول جهش کالا' && (!p.price || Number(p.price) === 0)) return null;
+  const id = p.id ? String(p.id).trim() : '';
+  if (!id || id.startsWith('prod-fallback')) return null;
 
-  // 0. Seed base products as fallbacks
-  INITIAL_PRODUCTS.forEach((p) => productMap.set(p.id, p));
+  const rawPrice = p.price;
+  const safePrice = typeof rawPrice === 'number' && !isNaN(rawPrice) ? rawPrice : (Number(rawPrice) || 0);
+  const rawOrig = p.originalPrice;
+  const safeOriginalPrice = typeof rawOrig === 'number' && !isNaN(rawOrig) ? rawOrig : (rawOrig ? Number(rawOrig) : undefined);
+  const safeDiscount = typeof p.discountPercent === 'number' ? p.discountPercent : undefined;
+
+  return {
+    ...p,
+    id,
+    title,
+    category: p.category || 'کالای دیجیتال',
+    price: safePrice,
+    originalPrice: safeOriginalPrice,
+    discountPercent: safeDiscount,
+    rating: typeof p.rating === 'number' ? p.rating : 5,
+    reviewsCount: typeof p.reviewsCount === 'number' ? p.reviewsCount : 1,
+    image: p.image || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
+    images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []),
+    description: p.description || '',
+    features: Array.isArray(p.features) ? p.features : [],
+    inStock: p.inStock !== false,
+    warranty: p.warranty || 'گارانتی اصالت و سلامت جهش',
+  };
+}
+
+export const fetchProductsFromDb = async (): Promise<Product[]> => {
+  let authoritativeList: Product[] | null = null;
 
   // 1. Layer 1: Authoritative Server Disk Storage (/api/products)
   try {
@@ -110,12 +141,10 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     if (res.ok) {
       const serverProducts = await res.json();
       if (Array.isArray(serverProducts) && serverProducts.length > 0) {
-        serverProducts.forEach((p: Product) => {
-          if (p && p.id) {
-            const existing = productMap.get(p.id);
-            productMap.set(p.id, existing ? mergeTwoProducts(existing, p) : p);
-          }
-        });
+        const cleaned = serverProducts.map(cleanProductItem).filter((p): p is Product => p !== null);
+        if (cleaned.length > 0) {
+          authoritativeList = cleaned;
+        }
       }
     }
   } catch (err) {
@@ -123,94 +152,36 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
   }
 
   // 2. Layer 2: Primary Cloud Check - Supabase SYSTEM_CONFIG_PRODUCTS in chats table
-  try {
-    const { data: configData, error: configError } = await supabase
-      .from('chats')
-      .select('messages')
-      .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
-      .maybeSingle();
+  if (!authoritativeList || authoritativeList.length === 0) {
+    try {
+      const { data: configData, error: configError } = await supabase
+        .from('chats')
+        .select('messages')
+        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+        .maybeSingle();
 
-    if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
-      configData.messages.forEach((p: Product) => {
-        if (p && p.id) {
-          const existing = productMap.get(p.id);
-          productMap.set(p.id, existing ? mergeTwoProducts(existing, p) : p);
+      if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
+        const cleaned = configData.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
+        if (cleaned.length > 0) {
+          authoritativeList = cleaned;
         }
-      });
-    }
-  } catch (e) {
-    console.warn('Check SYSTEM_CONFIG_PRODUCTS notice:', e);
-  }
-
-  // 3. Layer 3: LocalStorage cache (merges if user made recent local changes)
-  try {
-    const saved = localStorage.getItem('jahesh_products');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        parsed.forEach((p: Product) => {
-          if (p && p.id) {
-            const existing = productMap.get(p.id);
-            productMap.set(p.id, existing ? mergeTwoProducts(existing, p) : p);
-          }
-        });
       }
+    } catch (e) {
+      console.warn('Check SYSTEM_CONFIG_PRODUCTS notice:', e);
     }
-  } catch {}
-
-  // 4. Layer 4: Relational `products` table in Supabase (ONLY for new products not yet in productMap)
-  // NEVER allow the SQL table with missing columns to overwrite existing rich products!
-  try {
-    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-    if (!error && data && data.length > 0) {
-      data.forEach((item) => {
-        if (item.id && !productMap.has(item.id)) {
-          const fetchedItem: Product = {
-            id: item.id,
-            title: item.title,
-            category: item.category,
-            brand: item.brand || '',
-            price: Number(item.price),
-            originalPrice: item.original_price ? Number(item.original_price) : undefined,
-            discountPercent: item.discount_percent || 0,
-            badge: item.badge || '',
-            isPopular: !!item.is_popular,
-            isGolden: !!item.is_golden,
-            isSubscription: item.is_subscription !== undefined ? !!item.is_subscription : (item.id === 'pkg-amlak-jahesh'),
-            pricePerDay: item.price_per_day ? Number(item.price_per_day) : (item.id === 'pkg-amlak-jahesh' ? 250000 : undefined),
-            rating: item.rating ? Number(item.rating) : 5.0,
-            reviewsCount: item.reviews_count || 0,
-            deliveryDays: item.delivery_days || '',
-            warranty: item.warranty || '',
-            shortDescription: item.short_description || '',
-            fullDescription: item.full_description || '',
-            features: Array.isArray(item.features)
-              ? item.features
-              : (typeof item.features === 'string' ? item.features.split('\n').filter(Boolean) : []),
-            image: item.image || '',
-            gallery: Array.isArray(item.gallery) ? item.gallery : [],
-            couponCode: item.coupon_code || undefined,
-            couponDiscountPercent: item.coupon_discount_percent ? Number(item.coupon_discount_percent) : undefined,
-            isIncredible: item.is_incredible !== undefined ? !!item.is_incredible : false,
-            incredibleExpiresAt: item.incredible_expires_at || undefined,
-            incredibleTimerDuration: item.incredible_timer_duration || undefined,
-          };
-          productMap.set(fetchedItem.id, fetchedItem);
-        }
-      });
-    }
-  } catch (err) {
-    console.warn('Failed to connect to Supabase products table:', err);
   }
 
-  const finalMerged = Array.from(productMap.values());
+  // 3. Fallback: If nothing exists yet, use INITIAL_PRODUCTS
+  const finalProducts = (authoritativeList && authoritativeList.length > 0)
+    ? authoritativeList
+    : INITIAL_PRODUCTS.map(cleanProductItem).filter((p): p is Product => p !== null);
 
-  // Cache locally & synchronize
+  // Synchronize localStorage with clean authoritative data (clears any old corrupted/dummy products)
   try {
-    localStorage.setItem('jahesh_products', JSON.stringify(finalMerged));
+    localStorage.setItem('jahesh_products', JSON.stringify(finalProducts));
   } catch {}
 
-  return finalMerged;
+  return finalProducts;
 };
 
 export const saveAllProductsToDb = async (products: Product[]): Promise<boolean> => {
