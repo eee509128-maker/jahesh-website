@@ -55,9 +55,6 @@ import { FooterInfoModal } from './components/FooterInfoModal';
 import { AmlakAppModal } from './components/AmlakAppModal';
 import { SubscriptionDurationModal } from './components/SubscriptionDurationModal';
 import { ProductPlansModal } from './components/ProductPlansModal';
-import { JaheshArzDashboard } from './components/jaheshArz/JaheshArzDashboard';
-import { loadUserArzData, saveUserArzData } from './lib/jaheshArzService';
-import { ArzTransaction } from './types/jaheshArz';
 
 export default function App() {
   // 1. Current logged in user (stored in localStorage)
@@ -177,7 +174,6 @@ export default function App() {
   const [customPlansModalProduct, setCustomPlansModalProduct] = useState<{ product: Product; initialIsInstantBuy?: boolean; requestedDomain?: string } | null>(null);
   const [footerInfoModalOpen, setFooterInfoModalOpen] = useState(false);
   const [amlakModalOpen, setAmlakModalOpen] = useState(false);
-  const [jaheshArzOpen, setJaheshArzOpen] = useState(false);
   const [activeFooterTopic, setActiveFooterTopic] = useState('terms');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -249,139 +245,6 @@ export default function App() {
 
     const handleVerifyPayment = async () => {
       showToast('در حال اعتبارسنجی پرداخت با درگاه شاپرک زیبال...');
-
-      // 1. Check if returning from a Jahesh Arz Deposit or Crypto Purchase via Zibal
-      const rawArzPending = localStorage.getItem('jahesh_arz_pending_deposit');
-      if (rawArzPending) {
-        let arzPending: any = null;
-        try {
-          arzPending = JSON.parse(rawArzPending);
-        } catch {}
-
-        if (arzPending) {
-          let verifyRes: any = null;
-          try {
-            verifyRes = await verifyZibalPayment(trackId, zibalMerchant);
-          } catch (err: any) {
-            console.warn('Arz payment verify error:', err);
-            verifyRes = { success: false, error: err?.message };
-          }
-
-          const isVerifySuccess =
-            verifyRes?.success ||
-            verifyRes?.result === 100 ||
-            verifyRes?.result === 201;
-          const isBankSuccess = success === '1' || status === '2';
-
-          if (isVerifySuccess || isBankSuccess) {
-            try {
-              confetti({
-                particleCount: 150,
-                spread: 80,
-                origin: { y: 0.6 },
-              });
-            } catch (e) {}
-
-            const refNum = String(verifyRes?.refNumber || trackId);
-            const paidAmountInTomans =
-              verifyRes?.amountInTomans || arzPending.amountInTomans || 0;
-
-            const userId =
-              arzPending.userId ||
-              currentUser?.email ||
-              (currentUser ? `${currentUser.username}@jahesh.ir` : 'erfan.mottaghi@gmail.com');
-            const userName =
-              arzPending.userName || currentUser?.fullName || currentUser?.username || 'کاربر گرامی';
-
-            const currentArzData = await loadUserArzData(userId, userName);
-            const targetCurrency = arzPending.targetCurrency || arzPending.currency || 'IRR';
-
-            const targetWallet =
-              currentArzData.wallets.find((w) => w.id === arzPending.walletId) ||
-              currentArzData.wallets.find((w) => w.currency === targetCurrency) ||
-              currentArzData.wallets[0];
-
-            const creditAmount =
-              targetCurrency === 'IRR'
-                ? paidAmountInTomans
-                : (arzPending.targetCryptoAmount || 0);
-
-            const updatedWallets = currentArzData.wallets.map((w) => {
-              if (w.id === targetWallet.id) {
-                return { ...w, balance: Number(((w.balance || 0) + creditAmount).toFixed(4)) };
-              }
-              return w;
-            });
-
-            const newTx: ArzTransaction = {
-              id: `tx-${Date.now()}`,
-              trackingNumber: `TC-DEP-${trackId}`,
-              type: 'charge',
-              typeTitle:
-                targetCurrency === 'IRR'
-                  ? 'شارژ آنلاین شتابی شاپرک (زیبال)'
-                  : `خرید مستقیم ${targetCurrency} با درگاه شاپرک`,
-              currency: targetCurrency,
-              amount: creditAmount,
-              fee: 0,
-              finalAmount: creditAmount,
-              status: 'completed',
-              statusLabel: 'تکمیل شده و تایید بانکی',
-              message: `پرداخت موفق مبلغ ${new Intl.NumberFormat('fa-IR').format(paidAmountInTomans)} تومان در درگاه پرداخت شاپرک زیبال (کد پیگیری: ${trackId}، شماره ارجاع: ${refNum}).`,
-              createdAt:
-                new Date().toLocaleDateString('fa-IR') +
-                ' - ' +
-                new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-              updatedAt:
-                new Date().toLocaleDateString('fa-IR') +
-                ' - ' +
-                new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-              paymentMethod: 'gateway',
-              referenceId: refNum,
-            };
-
-            const updatedData = {
-              ...currentArzData,
-              userId,
-              wallets: updatedWallets,
-              transactions: [newTx, ...(currentArzData.transactions || [])],
-            };
-
-            await saveUserArzData(userId, updatedData);
-
-            // Also sync to server
-            try {
-              await fetch('/api/jahesh-arz/credit-wallet', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId,
-                  walletId: targetWallet.id,
-                  currency: targetCurrency,
-                  amount: creditAmount,
-                  tx: newTx,
-                }),
-              });
-            } catch {}
-
-            localStorage.removeItem('jahesh_arz_pending_deposit');
-            setJaheshArzOpen(true);
-            showToast(
-              `پرداخت شاپرک تایید شد! مبلغ ${new Intl.NumberFormat('fa-IR').format(creditAmount)} ${
-                targetCurrency === 'IRR' ? 'تومان' : targetCurrency
-              } با موفقیت به کیف پول جهش ارز شما واریز گردید.`
-            );
-            return;
-          } else {
-            localStorage.removeItem('jahesh_arz_pending_deposit');
-            setJaheshArzOpen(true);
-            showToast('پرداخت در درگاه بانکی شاپرک لغو شد یا با خطا مواجه گردید.');
-            return;
-          }
-        }
-      }
-
-      // 2. Otherwise process eCommerce shop order
       const pendingOrder = getPendingOrder();
 
       const rawUser = localStorage.getItem('jahesh_current_user');
@@ -1406,37 +1269,6 @@ export default function App() {
     return item;
   });
 
-  // Check URL params for direct navigation to Jahesh Arz
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    if (
-      params.get('page') === 'arz' ||
-      params.get('tab') === 'arz' ||
-      params.get('arz') === '1' ||
-      window.location.hash === '#jahesh-arz' ||
-      localStorage.getItem('jahesh_arz_pending_deposit')
-    ) {
-      setJaheshArzOpen(true);
-    }
-  }, []);
-
-  if (jaheshArzOpen) {
-    return (
-      <div className={`min-h-screen font-['Vazirmatn',sans-serif] ${theme === 'light' ? 'theme-light' : 'theme-dark'}`}>
-        <JaheshArzDashboard
-          onClose={() => {
-            setJaheshArzOpen(false);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          userEmail={currentUser?.email || (currentUser ? `${currentUser.username}@jahesh.ir` : 'erfan.mottaghi@gmail.com')}
-          userName={currentUser?.fullName || currentUser?.username || 'عرفان متقی'}
-          zibalMerchant={zibalMerchant}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className={`min-h-screen flex flex-col font-['Vazirmatn',sans-serif] transition-colors duration-200 ${theme === 'light' ? 'theme-light bg-[#fbf9ff] text-slate-800' : 'theme-dark bg-[#0b0819] text-slate-100'}`}>
       
@@ -1463,7 +1295,6 @@ export default function App() {
         }}
         onOpenAdmin={() => setAdminModalOpen(true)}
         onOpenProfile={() => setUserProfileModalOpen(true)}
-        onOpenJaheshArz={() => setJaheshArzOpen(true)}
         onLogout={handleLogout}
         onScrollToIncredible={scrollToIncredible}
         onSelectCategory={handleSelectCategory}
@@ -1575,56 +1406,18 @@ export default function App() {
           )}
         </section>
 
-        {/* 6. PROMO BANNER: JAHESH ARZ (TOPCHANGE) ONLINE EXCHANGE & WALLET */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-950 via-slate-900 to-[#120a2e] border border-amber-400/30 p-5 sm:p-7 shadow-2xl">
-          <div className="absolute -top-16 -left-16 w-48 h-48 rounded-full bg-purple-600/20 blur-3xl pointer-events-none"></div>
-          <div className="absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-amber-500/20 blur-3xl pointer-events-none"></div>
-
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 text-right">
-            <div className="space-y-2.5 max-w-2xl">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[11px] font-black">
-                  🚀 سامانه صرافی اختصاصی تاپ‌چنج
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-bold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                  نرخ لحظه‌ای و اتصال مستقیم
-                </span>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-black text-white">
-                پروژه جهش ارز (TopChange) — کیف پول چندارزی و صرافی آنلاین
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                شارژ و برداشت آنی ریالی و تتری، تبدیل لحظه‌ای ارزها، انتقال داخلی بدون کارمزد، صدور و بازخرید ووچر (Voucher)، معامله همتا‌به‌همتا (P2P) و مدیریت تمام کیف‌پول‌های ارزی به صورت فوق‌حرفه‌ای.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full md:w-auto">
-              <button
-                id="open-jahesh-arz-home-btn"
-                onClick={() => setJaheshArzOpen(true)}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-              >
-                <span>ورود به سامانه جهش ارز و کیف پول</span>
-                <span className="text-base">←</span>
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* 7. DIGIKALA 5 TRUST BENEFITS ROW */}
+        {/* 6. DIGIKALA 5 TRUST BENEFITS ROW */}
         <DigikalaBenefits />
 
       </main>
 
-      {/* 8. DIGIKALA FLOATING HEADSET SUPPORT CHAT (Icon on bottom-left) */}
+      {/* 7. DIGIKALA FLOATING HEADSET SUPPORT CHAT (Icon on bottom-left) */}
       <LiveChatWidget currentUser={currentUser} />
 
-      {/* 9. DIGIKALA FOOTER */}
+      {/* 8. DIGIKALA FOOTER */}
       <DigikalaFooter
         onOpenTerms={() => handleOpenFooterTopic('terms')}
         onOpenTopic={handleOpenFooterTopic}
-        onOpenJaheshArz={() => setJaheshArzOpen(true)}
       />
 
       {/* MODALS */}
