@@ -542,7 +542,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
             </div>
             {product.discountPercent && (
-              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-rose-100 dark:bg-rose-600/30 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-600/40">
+              <span className="text-xs font-black px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-600/30 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-600/40 whitespace-nowrap shrink-0 leading-none inline-flex items-center justify-center">
                 {product.discountPercent}% تخفیف
               </span>
             )}

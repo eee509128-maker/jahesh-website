@@ -11,7 +11,7 @@ export interface FooterTopic {
 export const FOOTER_TOPICS: FooterTopic[] = [
   {
     id: 'about-jahesh',
-    title: 'درباره فروشگاه اینترنتی جهش‌کالا',
+    title: 'درباره جهش‌کالا',
     category: 'با جهش‌کالا',
     badge: 'jaheshit.ir',
     shortDesc: 'آشنایی با فروشگاه جامع جهش‌کالا، بازار آنلاین و تنوع کالاها و خدمات',
@@ -28,7 +28,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'terms',
-    title: 'شرایط و قوانین استفاده از جهش‌کالا',
+    title: 'شرایط و قوانین',
     category: 'با جهش‌کالا',
     badge: 'قوانین عمومی',
     shortDesc: 'مقررات و ضوابط عمومی حاکم بر ثبت سفارش، خرید، تحویل و حقوق کاربران',
@@ -46,7 +46,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'seller-center',
-    title: 'فرصت‌های همکاری و فروشندگی',
+    title: 'همکاری و فروشندگی',
     category: 'با جهش‌کالا',
     badge: 'همکاری تجاری',
     shortDesc: 'راهنمای پیوستن تامین‌کنندگان، تولیدکنندگان و فروشندگان کالا و خدمات به جهش‌کالا',
@@ -62,7 +62,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'faq',
-    title: 'پاسخ به پرسش‌های متداول (FAQ)',
+    title: 'پرسش‌های متداول',
     category: 'خدمات مشتریان',
     badge: 'راهنمای سریع',
     shortDesc: 'پاسخ به سوالات پرتکرار خریداران پیرامون ثبت سفارش، پرداخت، پیگیری و لغو',
@@ -79,7 +79,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'return-policy',
-    title: 'رویه‌های بازگرداندن کالا و ضمانت ۷ روزه',
+    title: 'ضمانت بازگشت کالا',
     category: 'خدمات مشتریان',
     badge: '۷ روز ضمانت',
     shortDesc: 'شرایط مرجوعی، تعویض کالا و بازگشت وجه در صورت مغایرت یا نقص فنی',
@@ -95,7 +95,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'privacy-policy',
-    title: 'حریم خصوصی و امنیت کاربران',
+    title: 'حریم خصوصی',
     category: 'خدمات مشتریان',
     badge: 'امنیت داده‌ها',
     shortDesc: 'تعهدنامه حفظ محرمانگی اطلاعات هویتی، آدرس‌ها، شماره‌ها و تراکنش‌های بانکی',
@@ -111,7 +111,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'report-bug',
-    title: 'گزارش باگ یا تخلف',
+    title: 'گزارش تخلف یا باگ',
     category: 'خدمات مشتریان',
     badge: 'رسیدگی فوری',
     shortDesc: 'ثبت و پیگیری مشکلات سیستمی، مغایرت‌ها یا پیشنهادات بهبود عملکرد سایت',
@@ -127,7 +127,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'order-guide',
-    title: 'نحوه ثبت سفارش در فروشگاه',
+    title: 'راهنمای ثبت سفارش',
     category: 'راهنمای خرید و پرداخت',
     badge: 'آموزش خرید',
     shortDesc: 'راهنمای گام‌به‌گام جستجوی کالا، افزودن به سبد، ثبت مشخصات و پرداخت آنلاین',
@@ -145,7 +145,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'shipping-policy',
-    title: 'رویه‌های ارسال و تحویل سفارش',
+    title: 'ارسال و تحویل سفارش',
     category: 'راهنمای خرید و پرداخت',
     badge: 'ارسال سریع',
     shortDesc: 'روش‌های ارسال کالاها و خدمات شامل پست پیشتاز، پیک موتوری و تحویل دیجیتال',
@@ -161,7 +161,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'payment-methods',
-    title: 'شیوه‌های پرداخت و درگاه بانکی',
+    title: 'روش‌های پرداخت بانکی',
     category: 'راهنمای خرید و پرداخت',
     badge: 'شاپرک و زیبال',
     shortDesc: 'روش‌های پرداخت اینترنتی شامل درگاه شاپرک با کلیه کارت‌های شتاب',
@@ -177,7 +177,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'invoice-issuance',
-    title: 'صدور فاکتور رسمی و خرید سازمانی',
+    title: 'صدور فاکتور رسمی',
     category: 'راهنمای خرید و پرداخت',
     badge: 'فاکتور رسمی',
     shortDesc: 'امکان صدور پیش‌فاکتور و فاکتور رسمی معتبر برای خریداران حقیقی و حقوقی',
@@ -192,7 +192,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'licenses-security',
-    title: 'مجوزها، نمادهای اعتماد و امنیت درگاه',
+    title: 'مجوزها و نمادهای اعتماد',
     category: 'مجوزها و نمادها',
     badge: 'امنیت تضمینی',
     shortDesc: 'اتصال به شبکه پرداخت شاپرک، رمزنگاری اطلاعات و تضمین اصالت و سلامت کالا',
@@ -208,7 +208,7 @@ export const FOOTER_TOPICS: FooterTopic[] = [
   },
   {
     id: 'contact-branch',
-    title: 'اطلاعات تماس، پشتیبانی و آدرس شعبه',
+    title: 'اطلاعات تماس و شعبه',
     category: 'اطلاعات تماس و شعب',
     badge: 'شعبه مرکزی',
     shortDesc: 'شماره‌های تماس ۲۴ ساعته، سایت اصلی jaheshit.ir و نشانی دقیق شعبه یک در مشهد',

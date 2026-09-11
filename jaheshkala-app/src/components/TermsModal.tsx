@@ -73,17 +73,19 @@ export const TermsModal: React.FC<TermsModalProps> = ({
             {JAHESH_TERMS.map((term) => (
               <div
                 key={term.id}
-                className="bg-[#181035] border border-purple-900/40 rounded-2xl p-4 transition-all hover:border-purple-700/50"
+                className="bg-[#181035] border border-purple-900/40 rounded-2xl p-3.5 sm:p-4 transition-all hover:border-purple-700/50"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-white flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-purple-900 text-purple-200 flex items-center justify-center text-[10px] font-bold">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="w-5 h-5 rounded-full bg-purple-900 text-purple-200 flex items-center justify-center text-[10px] font-bold shrink-0">
                       {term.id}
                     </span>
-                    {term.title}
-                  </span>
+                    <span className="text-xs font-black text-white truncate">
+                      {term.title}
+                    </span>
+                  </div>
                   {term.badge && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/30">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/30 whitespace-nowrap shrink-0">
                       {term.badge}
                     </span>
                   )}

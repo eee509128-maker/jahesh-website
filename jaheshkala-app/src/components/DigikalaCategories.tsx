@@ -85,8 +85,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
   const mainCategories = [
     {
       id: 'all',
-      name: 'همه محصولات و خدمات',
-      shortTitle: 'همه کالاها',
+      name: 'همه کالاها',
       badge: 'کامل',
       value: '',
       icon: Layers,
@@ -97,8 +96,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
     },
     {
       id: 'incredible',
-      name: 'پیشنهاد شگفت‌انگیز',
-      shortTitle: 'شگفت‌انگیز',
+      name: 'شگفت‌انگیز',
       badge: 'تخفیف‌دار',
       value: 'شگفت‌انگیز',
       icon: Percent,
@@ -109,8 +107,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
     },
     {
       id: 'popular',
-      name: 'پرفروش‌ترین‌ها',
-      shortTitle: 'پرفروش‌ها',
+      name: 'پرفروش‌ها',
       badge: 'محبوب‌ترین',
       value: 'پرفروش',
       icon: Flame,
@@ -121,8 +118,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
     },
     {
       id: 'guilds',
-      name: 'تفکیک بر اساس اصناف',
-      shortTitle: 'اصناف و مشاغل',
+      name: 'اصناف',
       badge: `${IRANIAN_GUILDS.length} صنف`,
       value: 'guilds-modal',
       icon: Building2,

@@ -145,34 +145,34 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
     switch (status) {
       case 'در حال بررسی':
         return (
-          <span className="inline-flex items-center gap-1.5 text-amber-800 bg-amber-100/90 border border-amber-300 dark:text-amber-300 dark:bg-amber-950/70 dark:border-amber-500/40 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-            <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            در حال بررسی کارشناسان جهش
+          <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-100 border border-amber-300 dark:text-amber-300 dark:bg-amber-950/70 dark:border-amber-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold animate-pulse whitespace-nowrap shrink-0">
+            <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+            در حال بررسی
           </span>
         );
       case 'تایید شده / در حال آماده‌سازی':
       case 'تایید شده و آماده‌سازی':
       case 'تایید شده و آغاز پروژه':
         return (
-          <span className="inline-flex items-center gap-1.5 text-purple-900 bg-purple-100 border border-purple-300 dark:text-purple-300 dark:bg-purple-950/70 dark:border-purple-500/40 px-3 py-1 rounded-full text-xs font-bold">
-            <CheckCircle2 className="w-3.5 h-3.5 text-purple-700 dark:text-purple-400" />
-            تایید شده و در حال آماده‌سازی
+          <span className="inline-flex items-center gap-1 text-purple-900 bg-purple-100 border border-purple-300 dark:text-purple-300 dark:bg-purple-950/70 dark:border-purple-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0">
+            <CheckCircle2 className="w-3 h-3 text-purple-700 dark:text-purple-400 shrink-0" />
+            تایید شده / آماده‌سازی
           </span>
         );
       case 'ارسال شده به پست':
       case 'ارسال شده':
       case 'تحویل به پست / پیک':
         return (
-          <span className="inline-flex items-center gap-1.5 text-cyan-900 bg-cyan-100 border border-cyan-300 dark:text-cyan-300 dark:bg-cyan-950/70 dark:border-cyan-500/40 px-3 py-1 rounded-full text-xs font-bold shadow-sm">
-            <Truck className="w-3.5 h-3.5 text-cyan-700 dark:text-cyan-400" />
-            ارسال شده به اداره پست
+          <span className="inline-flex items-center gap-1 text-cyan-900 bg-cyan-100 border border-cyan-300 dark:text-cyan-300 dark:bg-cyan-950/70 dark:border-cyan-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-xs whitespace-nowrap shrink-0">
+            <Truck className="w-3 h-3 text-cyan-700 dark:text-cyan-400 shrink-0" />
+            ارسال شده به پست
           </span>
         );
       case 'در حال طراحی و کدنویسی':
       case 'در حال طراحی و بهینه‌سازی':
         return (
-          <span className="inline-flex items-center gap-1.5 text-indigo-900 bg-indigo-100 border border-indigo-300 dark:text-indigo-300 dark:bg-indigo-950/70 dark:border-indigo-500/40 px-3 py-1 rounded-full text-xs font-bold">
-            <Code className="w-3.5 h-3.5 text-indigo-700 dark:text-indigo-400" />
+          <span className="inline-flex items-center gap-1 text-indigo-900 bg-indigo-100 border border-indigo-300 dark:text-indigo-300 dark:bg-indigo-950/70 dark:border-indigo-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0">
+            <Code className="w-3 h-3 text-indigo-700 dark:text-indigo-400 shrink-0" />
             در حال طراحی و کدنویسی
           </span>
         );
@@ -180,21 +180,21 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
       case 'تحویل داده شد':
       case 'تکمیل شده و تحویل نهایی':
         return (
-          <span className="inline-flex items-center gap-1.5 text-emerald-900 bg-emerald-100 border border-emerald-300 dark:text-emerald-300 dark:bg-emerald-950/70 dark:border-emerald-500/40 px-3 py-1 rounded-full text-xs font-bold">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
+          <span className="inline-flex items-center gap-1 text-emerald-900 bg-emerald-100 border border-emerald-300 dark:text-emerald-300 dark:bg-emerald-950/70 dark:border-emerald-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0">
+            <CheckCircle2 className="w-3 h-3 text-emerald-700 dark:text-emerald-400 shrink-0" />
             تحویل نهایی شده
           </span>
         );
       case 'لغو شده':
         return (
-          <span className="inline-flex items-center gap-1.5 text-rose-900 bg-rose-100 border border-rose-300 dark:text-rose-300 dark:bg-rose-950/70 dark:border-rose-500/40 px-3 py-1 rounded-full text-xs font-bold">
-            <XCircle className="w-3.5 h-3.5 text-rose-700 dark:text-rose-400" />
-            سفارش لغو شده
+          <span className="inline-flex items-center gap-1 text-rose-900 bg-rose-100 border border-rose-300 dark:text-rose-300 dark:bg-rose-950/70 dark:border-rose-500/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0">
+            <XCircle className="w-3 h-3 text-rose-700 dark:text-rose-400 shrink-0" />
+            لغو شده
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 text-slate-800 bg-slate-100 border border-slate-300 dark:text-slate-200 dark:bg-purple-900/60 dark:border-purple-700/50 px-3 py-1 rounded-full text-xs font-bold">
+          <span className="inline-flex items-center gap-1 text-slate-800 bg-slate-100 border border-slate-300 dark:text-slate-200 dark:bg-purple-900/60 dark:border-purple-700/50 px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0">
             {status}
           </span>
         );

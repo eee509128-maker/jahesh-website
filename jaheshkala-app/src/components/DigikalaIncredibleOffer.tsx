@@ -275,29 +275,29 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
               </div>
 
               {/* Price & Action Buttons Container */}
-              <div className="pt-2.5 border-t border-purple-900/50 space-y-3">
-                {/* Row 1: Price and Discount (Clean, balanced, attractive Persian typography) */}
-                <div className="flex items-center justify-between gap-3 bg-purple-950/40 px-3.5 py-2.5 rounded-xl border border-purple-800/40">
-                  {/* Discount percentage badge & original crossed price */}
-                  <div className="flex items-center gap-2">
+              <div className="pt-2.5 border-t border-purple-900/50 space-y-2.5">
+                {/* Row 1: Price and Discount (Clean, balanced, single-line horizontal Persian layout) */}
+                <div className="flex items-center justify-between gap-1.5 sm:gap-3 bg-purple-950/50 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-purple-800/40 w-full overflow-hidden">
+                  {/* Right side: Discount percentage badge & original crossed price */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     {Boolean(activeProduct.discountPercent && activeProduct.discountPercent > 0) ? (
-                      <span className="bg-rose-600 text-white text-[11px] sm:text-xs font-black px-2.5 py-1 rounded-lg shadow-sm">
-                        {activeProduct.discountPercent}٪ تخفیف ویژه
+                      <span className="bg-rose-600 text-white text-[11px] sm:text-xs font-black px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shadow-xs whitespace-nowrap shrink-0 leading-none inline-flex items-center justify-center">
+                        {activeProduct.discountPercent}٪
                       </span>
                     ) : null}
                     {Boolean(activeProduct.originalPrice && activeProduct.originalPrice > (activeProduct.price || 0)) ? (
-                      <span className="text-slate-400 text-xs sm:text-sm line-through decoration-rose-500/80">
+                      <span className="text-slate-400 text-[11px] sm:text-xs line-through decoration-rose-500/80 font-mono whitespace-nowrap shrink-0">
                         {(activeProduct.originalPrice || 0).toLocaleString('fa-IR')}
                       </span>
                     ) : null}
                   </div>
 
-                  {/* Final Price with تومان (Attractive, clear, appealing Persian font) */}
-                  <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-                    <span className="text-xl sm:text-2xl font-black text-amber-400 tracking-normal">
+                  {/* Left side: Final Price with تومان */}
+                  <div className="flex items-baseline gap-1 sm:gap-1.5 whitespace-nowrap shrink-0">
+                    <span className="text-base sm:text-xl font-black text-amber-400 tracking-tight font-mono">
                       {(activeProduct.price || 0).toLocaleString('fa-IR')}
                     </span>
-                    <span className="text-xs sm:text-sm font-extrabold text-amber-300">
+                    <span className="text-[11px] sm:text-xs font-bold text-amber-300">
                       تومان
                     </span>
                   </div>
@@ -308,23 +308,22 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
                   {/* 1. View Details Button */}
                   <button
                     onClick={() => onViewDetails(activeProduct)}
-                    className="h-10 sm:h-11 flex items-center justify-center gap-1 sm:gap-1.5 px-2 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-slate-200 hover:text-white text-xs sm:text-[13px] font-bold border border-purple-800/60 transition-all shadow-xs active:scale-95 whitespace-nowrap overflow-hidden cursor-pointer"
+                    className="h-9 sm:h-10 flex items-center justify-center gap-1 sm:gap-1.5 px-2 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-slate-200 hover:text-white text-xs font-bold border border-purple-800/60 transition-all shadow-xs active:scale-95 whitespace-nowrap cursor-pointer"
                     title="مشاهده جزئیات کامل"
                   >
                     <Eye className="w-3.5 h-3.5 text-purple-300 shrink-0" />
-                    <span className="hidden sm:inline">مشاهده جزئیات</span>
-                    <span className="sm:hidden">جزئیات</span>
+                    <span>جزئیات</span>
                   </button>
 
                   {/* 2. Add to Cart Button */}
                   <button
                     id="incredible-add-cart-btn"
                     onClick={() => onAddToCart(activeProduct)}
-                    className="h-10 sm:h-11 flex items-center justify-center gap-1 sm:gap-1.5 px-2 rounded-xl bg-purple-900/90 hover:bg-purple-800 border border-purple-700/80 text-purple-100 hover:text-white text-xs sm:text-[13px] font-bold transition-all shadow-xs active:scale-95 whitespace-nowrap overflow-hidden cursor-pointer"
+                    className="h-9 sm:h-10 flex items-center justify-center gap-1 sm:gap-1.5 px-2 rounded-xl bg-purple-900/90 hover:bg-purple-800 border border-purple-700/80 text-purple-100 hover:text-white text-xs font-bold transition-all shadow-xs active:scale-95 whitespace-nowrap cursor-pointer"
                     title="افزودن به سبد خرید"
                   >
                     <ShoppingBag className="w-3.5 h-3.5 text-purple-300 shrink-0" />
-                    <span className="truncate">افزودن به سبد</span>
+                    <span>سبد خرید</span>
                   </button>
 
                   {/* 3. Instant Buy Button */}
@@ -334,11 +333,11 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
                       if (onInstantBuy) onInstantBuy(activeProduct);
                       else onAddToCart(activeProduct);
                     }}
-                    className="h-10 sm:h-11 flex items-center justify-center gap-1 sm:gap-1.5 px-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs sm:text-[13px] font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all whitespace-nowrap overflow-hidden cursor-pointer"
+                    className="h-9 sm:h-10 flex items-center justify-center gap-1 sm:gap-1.5 px-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all whitespace-nowrap cursor-pointer"
                     title="خرید سریع و مستقیم"
                   >
                     <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950 shrink-0" />
-                    <span className="truncate">خرید فوری</span>
+                    <span>خرید فوری</span>
                   </button>
                 </div>
               </div>

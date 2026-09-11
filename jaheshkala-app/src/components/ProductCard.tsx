@@ -134,16 +134,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
             {/* Original Price & Discount badge (if any) */}
             {safeOriginalPrice ? (
-              <div className="flex items-center gap-1.5 whitespace-nowrap text-left">
-                <span className="text-slate-400 dark:text-slate-500 line-through text-[11px] font-mono">
+              <div className="flex items-center gap-1.5 whitespace-nowrap text-left shrink-0">
+                <span className="text-slate-400 dark:text-slate-500 line-through text-[11px] font-mono whitespace-nowrap">
                   {safeOriginalPrice.toLocaleString('fa-IR')}
                 </span>
-                <span className="bg-rose-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-md shadow-sm">
+                <span className="bg-rose-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-xs whitespace-nowrap shrink-0 leading-none inline-flex items-center justify-center">
                   {product.discountPercent}%
                 </span>
               </div>
             ) : (
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40 whitespace-nowrap shrink-0">
                 تضمین اصالت
               </span>
             )}

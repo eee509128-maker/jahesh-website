@@ -106,42 +106,42 @@ export const DigikalaFooter: React.FC<DigikalaFooterProps> = ({
         </div>
 
         {/* 4 Footer Columns (Digikala Structure) - General E-Commerce Store Topics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 py-6 border-b border-purple-200 dark:border-purple-900/30 text-right">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 py-6 border-b border-purple-200 dark:border-purple-900/30 text-right">
           
           {/* Column 1: با جهش‌کالا */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-slate-900 dark:text-white mb-3">با جهش‌کالا</h4>
-            <ul className="space-y-2 text-[11px]">
+            <h4 className="text-xs font-black text-slate-900 dark:text-white mb-2.5">با جهش‌کالا</h4>
+            <ul className="space-y-1.5 text-[11px]">
               <li>
                 <button
                   onClick={() => onOpenTopic('about-jahesh')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  درباره فروشگاه جهش‌کالا
+                  درباره جهش‌کالا
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => onOpenTopic('terms')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  شرایط و قوانین استفاده از سایت
+                  شرایط و قوانین سایت
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => onOpenTopic('seller-center')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  فرصت‌های همکاری و فروشندگی
+                  همکاری و فروشندگی
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => onOpenTopic('contact-branch')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  تماس با ما و اطلاعات شعب
+                  اطلاعات شعب و تماس
                 </button>
               </li>
             </ul>
@@ -149,28 +149,28 @@ export const DigikalaFooter: React.FC<DigikalaFooterProps> = ({
 
           {/* Column 2: خدمات مشتریان */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-slate-900 dark:text-white mb-3">خدمات مشتریان</h4>
-            <ul className="space-y-2 text-[11px]">
+            <h4 className="text-xs font-black text-slate-900 dark:text-white mb-2.5">خدمات مشتریان</h4>
+            <ul className="space-y-1.5 text-[11px]">
               <li>
                 <button
                   onClick={() => onOpenTopic('faq')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  پاسخ به پرسش‌های متداول
+                  پرسش‌های متداول
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => onOpenTopic('return-policy')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  رویه‌های بازگرداندن کالا
+                  ضمانت بازگشت کالا
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => onOpenTopic('privacy-policy')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
                   حریم خصوصی کاربران
                 </button>
@@ -178,7 +178,7 @@ export const DigikalaFooter: React.FC<DigikalaFooterProps> = ({
               <li>
                 <button
                   onClick={() => onOpenTopic('report-bug')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
                   گزارش باگ یا تخلف
                 </button>
@@ -188,38 +188,38 @@ export const DigikalaFooter: React.FC<DigikalaFooterProps> = ({
 
           {/* Column 3: راهنمای خرید و پرداخت */}
           <div className="space-y-3">
-            <h4 className="text-xs font-black text-slate-900 dark:text-white mb-3">راهنمای خرید و پرداخت</h4>
-            <ul className="space-y-2 text-[11px]">
+            <h4 className="text-xs font-black text-slate-900 dark:text-white mb-2.5">راهنمای خرید و پرداخت</h4>
+            <ul className="space-y-1.5 text-[11px]">
               <li>
                 <button
                   onClick={() => onOpenTopic('order-guide')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  نحوه ثبت سفارش در فروشگاه
+                  راهنمای ثبت سفارش
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => onOpenTopic('shipping-policy')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  رویه‌های ارسال و تحویل سفارش
+                  ارسال و تحویل سفارش
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => onOpenTopic('payment-methods')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  شیوه‌های پرداخت و درگاه بانکی
+                  روش‌های پرداخت بانکی
                 </button>
               </li>
               <li>
                 <button
                   onClick={() => onOpenTopic('invoice-issuance')}
-                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right block w-full cursor-pointer"
+                  className="text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 hover:font-bold dark:text-slate-300 dark:hover:text-amber-300 dark:hover:bg-purple-950/50 px-2 py-1 -mr-2 rounded-lg transition-all text-right block w-full cursor-pointer truncate"
                 >
-                  صدور فاکتور رسمی و خرید سازمانی
+                  صدور فاکتور رسمی
                 </button>
               </li>
             </ul>
@@ -251,27 +251,6 @@ export const DigikalaFooter: React.FC<DigikalaFooterProps> = ({
             </div>
           </div>
 
-        </div>
-
-        {/* Copyright notice (Digikala style) with Jahesh Official details */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
-          <p className="text-slate-600 dark:text-slate-400 text-center sm:text-right leading-relaxed font-medium">
-            برای استفاده از مطالب جهش‌کالا، داشتن «هدف غیرتجاری» و ذکر «منبع» کافیست. تمام حقوق اين وب‌سايت متعلق به{' '}
-            <a
-              href="https://jaheshit.ir"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-purple-700 dark:text-white font-black hover:text-purple-900 dark:hover:text-amber-400 underline decoration-purple-400"
-            >
-              فروشگاه اینترنتی جهش‌کالا (jaheshit.ir)
-            </a>{' '}
-            می‌باشد. تلفن‌های تماس پشتیبانی: 09152331974 - 09364864663
-          </p>
-          <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 shrink-0 font-medium">
-            <span>توسعه با</span>
-            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
-            <span className="font-bold text-slate-800 dark:text-slate-300">تیم مهندسی جهش</span>
-          </div>
         </div>
 
       </div>
