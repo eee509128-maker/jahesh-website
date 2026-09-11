@@ -155,8 +155,12 @@ export async function loadUserArzData(userId: string, userName?: string): Promis
 /**
  * Save user's Arz data to Server API + LocalStorage
  */
-export async function saveUserArzData(userId: string, data: UserArzData): Promise<boolean> {
-  const safeUserId = userId || 'usr-jahesh-master';
+export async function saveUserArzData(
+  userIdOrData: string | UserArzData,
+  maybeData?: UserArzData
+): Promise<boolean> {
+  const data: UserArzData = typeof userIdOrData === 'object' ? userIdOrData : (maybeData as UserArzData);
+  const safeUserId = (typeof userIdOrData === 'string' ? userIdOrData : data.userId) || 'usr-jahesh-master';
   const localKey = getStorageKey(safeUserId);
 
   try {

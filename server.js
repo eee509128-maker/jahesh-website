@@ -477,25 +477,54 @@ app.get('/api/jahesh-arz/data', (req, res) => {
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf-8');
       const data = JSON.parse(raw);
-      if (data && Array.isArray(data.wallets)) {
-        let changed = false;
-        data.wallets = data.wallets.map(w => {
-          if (w.balance === 15400000 || w.balance === 14500000 || w.balance === 350 || w.balance === 240 || w.balance === 340.5) {
-            w.balance = 0;
-            w.blockedBalance = 0;
-            changed = true;
-          }
-          return w;
-        });
-        if (changed) {
-          fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-        }
-      }
       return res.json({ success: true, data });
     }
     return res.json({ success: true, data: null });
   } catch (err) {
     console.error('Error in GET /api/jahesh-arz/data:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Credit Wallet directly upon successful payment gateway callback
+app.post('/api/jahesh-arz/credit-wallet', (req, res) => {
+  try {
+    const { userId, walletId, currency, amount, tx } = req.body || {};
+    if (!userId || !amount) {
+      return res.status(400).json({ success: false, error: 'پارامترهای ناقص است.' });
+    }
+    const filePath = getUserArzFilePath(userId);
+    let userData = null;
+    if (fs.existsSync(filePath)) {
+      try {
+        userData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      } catch {}
+    }
+    if (!userData || !Array.isArray(userData.wallets)) {
+      userData = {
+        userId,
+        wallets: [
+          { id: 'w-irr', currency: 'IRR', name: 'کیف پول ریال (تومان)', symbol: 'IRR', accountNumber: `TC-IRR-${Math.floor(100000 + Math.random() * 900000)}`, balance: 0, blockedBalance: 0, color: 'from-emerald-500 to-teal-600', iconBg: 'bg-emerald-500/20 text-emerald-400', isDefault: true },
+          { id: 'w-usd', currency: 'USD', name: 'کیف پول دلار آمریکا', symbol: '$', accountNumber: `TC-USD-${Math.floor(100000 + Math.random() * 900000)}`, balance: 0, blockedBalance: 0, color: 'from-blue-500 to-indigo-600', iconBg: 'bg-blue-500/20 text-blue-400' },
+          { id: 'w-usdt', currency: 'USDT', name: 'کیف پول تتر (Tether)', symbol: 'USDT', accountNumber: `TC-USDT-${Math.floor(100000 + Math.random() * 900000)}`, balance: 0, blockedBalance: 0, color: 'from-cyan-500 to-blue-600', iconBg: 'bg-cyan-500/20 text-cyan-400' },
+          { id: 'w-eur', currency: 'EUR', name: 'کیف پول یورو اروپا', symbol: '€', accountNumber: `TC-EUR-${Math.floor(100000 + Math.random() * 900000)}`, balance: 0, blockedBalance: 0, color: 'from-purple-500 to-indigo-600', iconBg: 'bg-purple-500/20 text-purple-400' }
+        ],
+        transactions: [],
+        vouchers: [],
+        bankAccounts: []
+      };
+    }
+    const targetWallet = userData.wallets.find(w => w.id === walletId) || userData.wallets.find(w => w.currency === currency) || userData.wallets[0];
+    if (targetWallet) {
+      targetWallet.balance = Number(((targetWallet.balance || 0) + Number(amount)).toFixed(4));
+    }
+    if (tx) {
+      userData.transactions = [tx, ...(userData.transactions || []).filter(t => t.id !== tx.id && t.trackingNumber !== tx.trackingNumber)];
+    }
+    fs.writeFileSync(filePath, JSON.stringify(userData, null, 2), 'utf-8');
+    return res.json({ success: true, balance: targetWallet?.balance, data: userData });
+  } catch (err) {
+    console.error('Error in POST /api/jahesh-arz/credit-wallet:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

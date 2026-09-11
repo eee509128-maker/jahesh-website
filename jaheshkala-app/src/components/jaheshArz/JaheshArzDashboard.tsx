@@ -33,6 +33,7 @@ interface JaheshArzDashboardProps {
   onClose?: () => void;
   userEmail?: string;
   userName?: string;
+  zibalMerchant?: string;
 }
 
 const STORAGE_KEYS = {
@@ -58,6 +59,7 @@ export const JaheshArzDashboard: React.FC<JaheshArzDashboardProps> = ({
   onClose,
   userEmail = 'erfan.mottaghi@gmail.com',
   userName = 'عرفان متقی',
+  zibalMerchant = 'zibal',
 }) => {
   // Navigation tabs
   const [activeTab, setActiveTab] = useState<
@@ -863,6 +865,10 @@ export const JaheshArzDashboard: React.FC<JaheshArzDashboardProps> = ({
         wallets={wallets}
         preselectedWallet={selectedWalletForAction}
         onSuccessDeposit={handleSuccessDeposit}
+        userEmail={userEmail}
+        userName={userName}
+        zibalMerchant={zibalMerchant}
+        rates={rates}
       />
 
       <WithdrawModal
@@ -882,6 +888,9 @@ export const JaheshArzDashboard: React.FC<JaheshArzDashboardProps> = ({
         preselectedWallet={selectedWalletForAction}
         preselectedRate={selectedRateForExchange}
         onSuccessExchange={handleSuccessExchange}
+        userEmail={userEmail}
+        userName={userName}
+        zibalMerchant={zibalMerchant}
       />
 
       <TransferModal

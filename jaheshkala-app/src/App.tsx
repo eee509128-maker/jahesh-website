@@ -56,6 +56,8 @@ import { AmlakAppModal } from './components/AmlakAppModal';
 import { SubscriptionDurationModal } from './components/SubscriptionDurationModal';
 import { ProductPlansModal } from './components/ProductPlansModal';
 import { JaheshArzDashboard } from './components/jaheshArz/JaheshArzDashboard';
+import { loadUserArzData, saveUserArzData } from './lib/jaheshArzService';
+import { ArzTransaction } from './types/jaheshArz';
 
 export default function App() {
   // 1. Current logged in user (stored in localStorage)
@@ -247,6 +249,139 @@ export default function App() {
 
     const handleVerifyPayment = async () => {
       showToast('در حال اعتبارسنجی پرداخت با درگاه شاپرک زیبال...');
+
+      // 1. Check if returning from a Jahesh Arz Deposit or Crypto Purchase via Zibal
+      const rawArzPending = localStorage.getItem('jahesh_arz_pending_deposit');
+      if (rawArzPending) {
+        let arzPending: any = null;
+        try {
+          arzPending = JSON.parse(rawArzPending);
+        } catch {}
+
+        if (arzPending) {
+          let verifyRes: any = null;
+          try {
+            verifyRes = await verifyZibalPayment(trackId, zibalMerchant);
+          } catch (err: any) {
+            console.warn('Arz payment verify error:', err);
+            verifyRes = { success: false, error: err?.message };
+          }
+
+          const isVerifySuccess =
+            verifyRes?.success ||
+            verifyRes?.result === 100 ||
+            verifyRes?.result === 201;
+          const isBankSuccess = success === '1' || status === '2';
+
+          if (isVerifySuccess || isBankSuccess) {
+            try {
+              confetti({
+                particleCount: 150,
+                spread: 80,
+                origin: { y: 0.6 },
+              });
+            } catch (e) {}
+
+            const refNum = String(verifyRes?.refNumber || trackId);
+            const paidAmountInTomans =
+              verifyRes?.amountInTomans || arzPending.amountInTomans || 0;
+
+            const userId =
+              arzPending.userId ||
+              currentUser?.email ||
+              (currentUser ? `${currentUser.username}@jahesh.ir` : 'erfan.mottaghi@gmail.com');
+            const userName =
+              arzPending.userName || currentUser?.fullName || currentUser?.username || 'کاربر گرامی';
+
+            const currentArzData = await loadUserArzData(userId, userName);
+            const targetCurrency = arzPending.targetCurrency || arzPending.currency || 'IRR';
+
+            const targetWallet =
+              currentArzData.wallets.find((w) => w.id === arzPending.walletId) ||
+              currentArzData.wallets.find((w) => w.currency === targetCurrency) ||
+              currentArzData.wallets[0];
+
+            const creditAmount =
+              targetCurrency === 'IRR'
+                ? paidAmountInTomans
+                : (arzPending.targetCryptoAmount || 0);
+
+            const updatedWallets = currentArzData.wallets.map((w) => {
+              if (w.id === targetWallet.id) {
+                return { ...w, balance: Number(((w.balance || 0) + creditAmount).toFixed(4)) };
+              }
+              return w;
+            });
+
+            const newTx: ArzTransaction = {
+              id: `tx-${Date.now()}`,
+              trackingNumber: `TC-DEP-${trackId}`,
+              type: 'charge',
+              typeTitle:
+                targetCurrency === 'IRR'
+                  ? 'شارژ آنلاین شتابی شاپرک (زیبال)'
+                  : `خرید مستقیم ${targetCurrency} با درگاه شاپرک`,
+              currency: targetCurrency,
+              amount: creditAmount,
+              fee: 0,
+              finalAmount: creditAmount,
+              status: 'completed',
+              statusLabel: 'تکمیل شده و تایید بانکی',
+              message: `پرداخت موفق مبلغ ${new Intl.NumberFormat('fa-IR').format(paidAmountInTomans)} تومان در درگاه پرداخت شاپرک زیبال (کد پیگیری: ${trackId}، شماره ارجاع: ${refNum}).`,
+              createdAt:
+                new Date().toLocaleDateString('fa-IR') +
+                ' - ' +
+                new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+              updatedAt:
+                new Date().toLocaleDateString('fa-IR') +
+                ' - ' +
+                new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+              paymentMethod: 'gateway',
+              referenceId: refNum,
+            };
+
+            const updatedData = {
+              ...currentArzData,
+              userId,
+              wallets: updatedWallets,
+              transactions: [newTx, ...(currentArzData.transactions || [])],
+            };
+
+            await saveUserArzData(userId, updatedData);
+
+            // Also sync to server
+            try {
+              await fetch('/api/jahesh-arz/credit-wallet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId,
+                  walletId: targetWallet.id,
+                  currency: targetCurrency,
+                  amount: creditAmount,
+                  tx: newTx,
+                }),
+              });
+            } catch {}
+
+            localStorage.removeItem('jahesh_arz_pending_deposit');
+            setJaheshArzOpen(true);
+            showToast(
+              `پرداخت شاپرک تایید شد! مبلغ ${new Intl.NumberFormat('fa-IR').format(creditAmount)} ${
+                targetCurrency === 'IRR' ? 'تومان' : targetCurrency
+              } با موفقیت به کیف پول جهش ارز شما واریز گردید.`
+            );
+            return;
+          } else {
+            localStorage.removeItem('jahesh_arz_pending_deposit');
+            setJaheshArzOpen(true);
+            showToast('پرداخت در درگاه بانکی شاپرک لغو شد یا با خطا مواجه گردید.');
+            return;
+          }
+        }
+      }
+
+      // 2. Otherwise process eCommerce shop order
       const pendingOrder = getPendingOrder();
 
       const rawUser = localStorage.getItem('jahesh_current_user');
@@ -1275,7 +1410,13 @@ export default function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('page') === 'arz' || params.get('tab') === 'arz' || window.location.hash === '#jahesh-arz') {
+    if (
+      params.get('page') === 'arz' ||
+      params.get('tab') === 'arz' ||
+      params.get('arz') === '1' ||
+      window.location.hash === '#jahesh-arz' ||
+      localStorage.getItem('jahesh_arz_pending_deposit')
+    ) {
       setJaheshArzOpen(true);
     }
   }, []);
@@ -1290,6 +1431,7 @@ export default function App() {
           }}
           userEmail={currentUser?.email || (currentUser ? `${currentUser.username}@jahesh.ir` : 'erfan.mottaghi@gmail.com')}
           userName={currentUser?.fullName || currentUser?.username || 'عرفان متقی'}
+          zibalMerchant={zibalMerchant}
         />
       </div>
     );
