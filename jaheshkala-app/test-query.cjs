@@ -1,1 +1,0 @@
-const { createClient } = require('@supabase/supabase-js'); const supabase = createClient('https://qxoyvlcpkysucmezxwdn.supabase.co', 'sb_publishable_DVRGP68TwGwXrZP5OzzuRQ_wLOHOLSB'); supabase.from('chats').select('*').eq('user_id', 'SYSTEM_CONFIG_PRODUCTS').then(console.log);

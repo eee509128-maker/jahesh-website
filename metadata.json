@@ -1,8 +1,0 @@
-{
-  "name": "انجمن علمی جهش",
-  "description": "مرجع تخصصی طراحی سایت اختصاصی، فروشگاه آنلاین جهش کالا و بستر فعالیت‌های علمی و نوآوری.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
