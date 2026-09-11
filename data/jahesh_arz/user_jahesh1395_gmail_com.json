@@ -1,0 +1,68 @@
+{
+  "userId": "jahesh1395@gmail.com",
+  "wallets": [
+    {
+      "id": "w-irr-jahesh1395@gmail.com",
+      "currency": "IRR",
+      "name": "کیف پول ریال (تومان)",
+      "symbol": "IRR",
+      "accountNumber": "TC-IRR-101788",
+      "balance": 0,
+      "blockedBalance": 0,
+      "color": "from-emerald-500 to-teal-600",
+      "iconBg": "bg-emerald-500/20 text-emerald-400",
+      "isDefault": true
+    },
+    {
+      "id": "w-usd-jahesh1395@gmail.com",
+      "currency": "USD",
+      "name": "کیف پول دلار آمریکا",
+      "symbol": "$",
+      "accountNumber": "TC-USD-201788",
+      "balance": 0,
+      "blockedBalance": 0,
+      "color": "from-blue-500 to-indigo-600",
+      "iconBg": "bg-blue-500/20 text-blue-400"
+    },
+    {
+      "id": "w-usdt-jahesh1395@gmail.com",
+      "currency": "USDT",
+      "name": "کیف پول تتر (Tether)",
+      "symbol": "USDT",
+      "accountNumber": "TC-USDT-301788",
+      "balance": 0,
+      "blockedBalance": 0,
+      "color": "from-cyan-500 to-blue-600",
+      "iconBg": "bg-cyan-500/20 text-cyan-400"
+    },
+    {
+      "id": "w-eur-jahesh1395@gmail.com",
+      "currency": "EUR",
+      "name": "کیف پول یورو اروپا",
+      "symbol": "€",
+      "accountNumber": "TC-EUR-401788",
+      "balance": 0,
+      "blockedBalance": 0,
+      "color": "from-purple-500 to-indigo-600",
+      "iconBg": "bg-purple-500/20 text-purple-400"
+    }
+  ],
+  "transactions": [],
+  "vouchers": [],
+  "bankAccounts": [
+    {
+      "id": "ba-1",
+      "bankName": "بانک ملت",
+      "bankCode": "mellat",
+      "accountHolder": "مدیر فروشگاه جهش‌کالا",
+      "cardNumber": "6104337890124567",
+      "shebaNumber": "IR820120000000001234567890",
+      "accountNumber": "4567891234",
+      "isDefault": true,
+      "isVerified": true,
+      "createdAt": "۱۴۰۴/۰۶/۱۰"
+    }
+  ],
+  "p2pAds": [],
+  "lastUpdated": "2026-09-11T10:35:00.000Z"
+}

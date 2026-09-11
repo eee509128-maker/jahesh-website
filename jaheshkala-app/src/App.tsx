@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Sparkles, CheckCircle2, Filter, X
 } from 'lucide-react';
-import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide } from './types';
+import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from './data/initialData';
 import {
@@ -54,6 +54,8 @@ import { LiveChatWidget } from './components/LiveChatWidget';
 import { FooterInfoModal } from './components/FooterInfoModal';
 import { AmlakAppModal } from './components/AmlakAppModal';
 import { SubscriptionDurationModal } from './components/SubscriptionDurationModal';
+import { ProductPlansModal } from './components/ProductPlansModal';
+import { JaheshArzDashboard } from './components/jaheshArz/JaheshArzDashboard';
 
 export default function App() {
   // 1. Current logged in user (stored in localStorage)
@@ -170,8 +172,10 @@ export default function App() {
   const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
   const [detailModalProduct, setDetailModalProduct] = useState<Product | null>(null);
   const [subscriptionModalProduct, setSubscriptionModalProduct] = useState<{ product: Product; initialIsInstantBuy?: boolean; requestedDomain?: string } | null>(null);
+  const [customPlansModalProduct, setCustomPlansModalProduct] = useState<{ product: Product; initialIsInstantBuy?: boolean; requestedDomain?: string } | null>(null);
   const [footerInfoModalOpen, setFooterInfoModalOpen] = useState(false);
   const [amlakModalOpen, setAmlakModalOpen] = useState(false);
+  const [jaheshArzOpen, setJaheshArzOpen] = useState(false);
   const [activeFooterTopic, setActiveFooterTopic] = useState('terms');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -682,32 +686,60 @@ export default function App() {
   };
 
   // Instant Buy Handler: Quickly adds product to cart and opens checkout
-  const handleInstantBuy = (product: Product, requestedDomain?: string, subscriptionDays?: number) => {
+  const handleInstantBuy = (product: Product, requestedDomain?: string, subscriptionDays?: number, selectedPlan?: SubscriptionPlan) => {
     if (!product || !product.id) return;
+
+    // Check if product has custom multi-tier plans
+    if (product.hasCustomPlans && product.subscriptionPlans && product.subscriptionPlans.length > 0 && !selectedPlan) {
+      setDetailModalProduct(null);
+      setCustomPlansModalProduct({ product, initialIsInstantBuy: true, requestedDomain });
+      return;
+    }
+
     const isAmlakOrSub = Boolean(product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
 
-    if (isAmlakOrSub && !subscriptionDays) {
+    if (isAmlakOrSub && !subscriptionDays && !selectedPlan) {
       setDetailModalProduct(null);
       setSubscriptionModalProduct({ product, initialIsInstantBuy: true, requestedDomain });
       return;
     }
 
-    const finalDays = isAmlakOrSub ? (subscriptionDays || 30) : undefined;
-    const itemPrice = isAmlakOrSub ? (product.pricePerDay || 250000) * (finalDays || 30) : product.price;
+    const finalDays = selectedPlan?.durationDays || (isAmlakOrSub ? (subscriptionDays || 30) : undefined);
+    const itemPrice = selectedPlan ? selectedPlan.price : (isAmlakOrSub ? (product.pricePerDay || 250000) * (finalDays || 30) : product.price);
 
-    const modifiedProduct = isAmlakOrSub ? {
+    const modifiedProduct = {
       ...product,
       price: itemPrice,
-      subscriptionDays: finalDays
-    } : product;
+      subscriptionDays: finalDays,
+    };
 
     setCartItems((prev) => {
       const safePrev = Array.isArray(prev)
         ? prev.filter((item) => item && item.product && item.product.id)
         : [];
-      const existing = safePrev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return safePrev.map((item) => item.product.id === product.id ? { ...item, product: modifiedProduct, subscriptionDays: finalDays } : item);
+      
+      const existingIndex = safePrev.findIndex((item) => {
+        if (product.hasCustomPlans) {
+          return item.product.id === product.id;
+        }
+        if (selectedPlan) {
+          return item.product.id === product.id && item.selectedPlan?.id === selectedPlan.id;
+        }
+        return item.product.id === product.id;
+      });
+
+      if (existingIndex >= 0) {
+        return safePrev.map((item, idx) =>
+          idx === existingIndex
+            ? {
+                ...item,
+                product: modifiedProduct,
+                subscriptionDays: finalDays,
+                selectedPlan,
+                requestedDomain: requestedDomain || item.requestedDomain,
+              }
+            : item
+        );
       }
       return [
         ...safePrev,
@@ -715,12 +747,14 @@ export default function App() {
           product: modifiedProduct,
           quantity: 1,
           subscriptionDays: finalDays,
+          selectedPlan,
           requestedDomain: requestedDomain || (product.domainIncluded ? 'دامنه انتخابی من' : undefined),
         },
       ];
     });
     setDetailModalProduct(null);
     setSubscriptionModalProduct(null);
+    setCustomPlansModalProduct(null);
     setCartModalOpen(true);
   };
 
@@ -759,34 +793,59 @@ export default function App() {
   };
 
   // Cart Handlers
-  const handleAddToCart = (product: Product, requestedDomain?: string, subscriptionDays?: number) => {
+  const handleAddToCart = (product: Product, requestedDomain?: string, subscriptionDays?: number, selectedPlan?: SubscriptionPlan) => {
     if (!product || !product.id) return;
+
+    // Check if product has custom multi-tier plans
+    if (product.hasCustomPlans && product.subscriptionPlans && product.subscriptionPlans.length > 0 && !selectedPlan) {
+      setDetailModalProduct(null);
+      setCustomPlansModalProduct({ product, initialIsInstantBuy: false, requestedDomain });
+      return;
+    }
+
     const isAmlakOrSub = Boolean(product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
 
-    if (isAmlakOrSub && !subscriptionDays) {
+    if (isAmlakOrSub && !subscriptionDays && !selectedPlan) {
       setDetailModalProduct(null);
       setSubscriptionModalProduct({ product, initialIsInstantBuy: false, requestedDomain });
       return;
     }
 
-    const finalDays = isAmlakOrSub ? (subscriptionDays || 30) : undefined;
-    const itemPrice = isAmlakOrSub ? (product.pricePerDay || 250000) * (finalDays || 30) : product.price;
+    const finalDays = selectedPlan?.durationDays || (isAmlakOrSub ? (subscriptionDays || 30) : undefined);
+    const itemPrice = selectedPlan ? selectedPlan.price : (isAmlakOrSub ? (product.pricePerDay || 250000) * (finalDays || 30) : product.price);
 
-    const modifiedProduct = isAmlakOrSub ? {
+    const modifiedProduct = {
       ...product,
       price: itemPrice,
-      subscriptionDays: finalDays
-    } : product;
+      subscriptionDays: finalDays,
+    };
 
     setCartItems((prev) => {
       const safePrev = Array.isArray(prev)
         ? prev.filter((item) => item && item.product && item.product.id)
         : [];
-      const existing = safePrev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return safePrev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1, product: modifiedProduct, subscriptionDays: finalDays }
+      
+      const existingIndex = safePrev.findIndex((item) => {
+        if (product.hasCustomPlans) {
+          return item.product.id === product.id;
+        }
+        if (selectedPlan) {
+          return item.product.id === product.id && item.selectedPlan?.id === selectedPlan.id;
+        }
+        return item.product.id === product.id;
+      });
+
+      if (existingIndex >= 0) {
+        return safePrev.map((item, idx) =>
+          idx === existingIndex
+            ? {
+                ...item,
+                quantity: (product.hasCustomPlans && item.selectedPlan?.id !== selectedPlan?.id) ? 1 : item.quantity + 1,
+                product: modifiedProduct,
+                subscriptionDays: finalDays,
+                selectedPlan,
+                requestedDomain: requestedDomain || item.requestedDomain,
+              }
             : item
         );
       }
@@ -796,6 +855,7 @@ export default function App() {
           product: modifiedProduct,
           quantity: 1,
           subscriptionDays: finalDays,
+          selectedPlan,
           requestedDomain: requestedDomain || (product.domainIncluded ? 'دامنه انتخابی من' : undefined),
         },
       ];
@@ -803,8 +863,11 @@ export default function App() {
 
     setDetailModalProduct(null);
     setSubscriptionModalProduct(null);
+    setCustomPlansModalProduct(null);
 
-    if (isAmlakOrSub) {
+    if (selectedPlan) {
+      showToast(`تعرفه «${selectedPlan.name}» محصول ${product.title} با موفقیت به سبد خرید اضافه شد.`);
+    } else if (isAmlakOrSub) {
       showToast(`اشتراک ${finalDays} روزه «${product.title}» با موفقیت به سبد خرید اضافه شد.`);
     } else {
       showToast(`«${product.title}» به سبد خرید اضافه شد`);
@@ -1208,6 +1271,30 @@ export default function App() {
     return item;
   });
 
+  // Check URL params for direct navigation to Jahesh Arz
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('page') === 'arz' || params.get('tab') === 'arz' || window.location.hash === '#jahesh-arz') {
+      setJaheshArzOpen(true);
+    }
+  }, []);
+
+  if (jaheshArzOpen) {
+    return (
+      <div className={`min-h-screen font-['Vazirmatn',sans-serif] ${theme === 'light' ? 'theme-light' : 'theme-dark'}`}>
+        <JaheshArzDashboard
+          onClose={() => {
+            setJaheshArzOpen(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          userEmail={currentUser?.email || (currentUser ? `${currentUser.username}@jahesh.ir` : 'erfan.mottaghi@gmail.com')}
+          userName={currentUser?.fullName || currentUser?.username || 'عرفان متقی'}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen flex flex-col font-['Vazirmatn',sans-serif] transition-colors duration-200 ${theme === 'light' ? 'theme-light bg-[#fbf9ff] text-slate-800' : 'theme-dark bg-[#0b0819] text-slate-100'}`}>
       
@@ -1234,6 +1321,7 @@ export default function App() {
         }}
         onOpenAdmin={() => setAdminModalOpen(true)}
         onOpenProfile={() => setUserProfileModalOpen(true)}
+        onOpenJaheshArz={() => setJaheshArzOpen(true)}
         onLogout={handleLogout}
         onScrollToIncredible={scrollToIncredible}
         onSelectCategory={handleSelectCategory}
@@ -1345,18 +1433,56 @@ export default function App() {
           )}
         </section>
 
-        {/* 6. DIGIKALA 5 TRUST BENEFITS ROW */}
+        {/* 6. PROMO BANNER: JAHESH ARZ (TOPCHANGE) ONLINE EXCHANGE & WALLET */}
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-950 via-slate-900 to-[#120a2e] border border-amber-400/30 p-5 sm:p-7 shadow-2xl">
+          <div className="absolute -top-16 -left-16 w-48 h-48 rounded-full bg-purple-600/20 blur-3xl pointer-events-none"></div>
+          <div className="absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-amber-500/20 blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 text-right">
+            <div className="space-y-2.5 max-w-2xl">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[11px] font-black">
+                  🚀 سامانه صرافی اختصاصی تاپ‌چنج
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  نرخ لحظه‌ای و اتصال مستقیم
+                </span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-white">
+                پروژه جهش ارز (TopChange) — کیف پول چندارزی و صرافی آنلاین
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                شارژ و برداشت آنی ریالی و تتری، تبدیل لحظه‌ای ارزها، انتقال داخلی بدون کارمزد، صدور و بازخرید ووچر (Voucher)، معامله همتا‌به‌همتا (P2P) و مدیریت تمام کیف‌پول‌های ارزی به صورت فوق‌حرفه‌ای.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0 w-full md:w-auto">
+              <button
+                id="open-jahesh-arz-home-btn"
+                onClick={() => setJaheshArzOpen(true)}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>ورود به سامانه جهش ارز و کیف پول</span>
+                <span className="text-base">←</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* 7. DIGIKALA 5 TRUST BENEFITS ROW */}
         <DigikalaBenefits />
 
       </main>
 
-      {/* 7. DIGIKALA FLOATING HEADSET SUPPORT CHAT (Icon on bottom-left) */}
+      {/* 8. DIGIKALA FLOATING HEADSET SUPPORT CHAT (Icon on bottom-left) */}
       <LiveChatWidget currentUser={currentUser} />
 
-      {/* 8. DIGIKALA FOOTER */}
+      {/* 9. DIGIKALA FOOTER */}
       <DigikalaFooter
         onOpenTerms={() => handleOpenFooterTopic('terms')}
         onOpenTopic={handleOpenFooterTopic}
+        onOpenJaheshArz={() => setJaheshArzOpen(true)}
       />
 
       {/* MODALS */}
@@ -1617,6 +1743,29 @@ export default function App() {
               handleInstantBuy(product, subscriptionModalProduct.requestedDomain, days);
             } else {
               handleAddToCart(product, subscriptionModalProduct.requestedDomain, days);
+            }
+          }}
+        />
+      )}
+
+      {/* Multi-Tier Custom Subscription & Pricing Plans Selection Modal */}
+      {customPlansModalProduct && (
+        <ProductPlansModal
+          product={customPlansModalProduct.product}
+          initialIsInstantBuy={customPlansModalProduct.initialIsInstantBuy}
+          onClose={() => setCustomPlansModalProduct(null)}
+          onConfirm={(product, selectedPlan, isInstant) => {
+            if (isInstant) {
+              handleInstantBuy(product, customPlansModalProduct.requestedDomain, undefined, selectedPlan);
+            } else {
+              handleAddToCart(product, customPlansModalProduct.requestedDomain, undefined, selectedPlan);
+            }
+          }}
+          onConfirmPlan={(product, selectedPlan, isInstant) => {
+            if (isInstant) {
+              handleInstantBuy(product, customPlansModalProduct.requestedDomain, undefined, selectedPlan);
+            } else {
+              handleAddToCart(product, customPlansModalProduct.requestedDomain, undefined, selectedPlan);
             }
           }}
         />

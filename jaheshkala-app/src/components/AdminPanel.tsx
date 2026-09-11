@@ -9,7 +9,7 @@ import {
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
   ChevronRight, ChevronLeft, Gift
 } from 'lucide-react';
-import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide } from '../types';
+import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan } from '../types';
 import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage } from '../lib/dbService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS } from '../data/initialData';
@@ -399,6 +399,98 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isSubscription, setIsSubscription] = useState(false);
   const [pricePerDayInput, setPricePerDayInput] = useState('250000');
 
+  // Custom Multi-Tier Subscription / Pricing Plans
+  const [hasCustomPlans, setHasCustomPlans] = useState(false);
+  const [customPlansTitle, setCustomPlansTitle] = useState('پکیج‌های تبلیغات هوشمند');
+  const [customPlansSubtitle, setCustomPlansSubtitle] = useState('انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
+  const [customPlans, setCustomPlans] = useState<SubscriptionPlan[]>([]);
+
+  const handleLoadDefaultPlansPreset = () => {
+    setCustomPlans([
+      {
+        id: 'plan-' + Date.now() + '-1',
+        name: 'پایه (استارتر)',
+        badge: 'مناسب شروع',
+        price: 9900000,
+        originalPrice: 14000000,
+        durationDays: 30,
+        durationLabel: 'دوره ۱ ماهه',
+        shortDescription: 'مناسب کسب‌وکارهای نوپا و تست اولیه بازار',
+        features: [
+          'لیست تا ۲,۰۰۰ شماره هدفمند',
+          '۲۰ پوستر حرفه‌ای',
+          '۱ تیزر تبلیغاتی',
+          'گزارش ساده از عملکرد کمپین',
+        ],
+        isPopular: false,
+      },
+      {
+        id: 'plan-' + Date.now() + '-2',
+        name: 'طلایی (پیشنهادی ویژه)',
+        badge: '🔥 پیشنهادی ویژه',
+        price: 25500000,
+        originalPrice: 36500000,
+        durationDays: 30,
+        durationLabel: 'دوره ۱ ماهه طلایی',
+        shortDescription: '۳۰٪ تخفیف ویژه اولین همکاری',
+        features: [
+          'تمام امکانات پیشرفته و تحلیلی',
+          '۵۰۰۰ + فیلتر حرفه‌ای مخاطبان',
+          'تیزر و ویدیو با هوش مصنوعی',
+          '۵۰ پوستر و محتوای اختصاصی',
+          'پشتیبانی مستقیم و مشاوره کمپین',
+        ],
+        isPopular: true,
+      },
+      {
+        id: 'plan-' + Date.now() + '-3',
+        name: 'پلاتینیوم (VIP)',
+        badge: 'VIP پلاتینیوم',
+        price: 490000000,
+        originalPrice: 590000000,
+        durationDays: 365,
+        durationLabel: 'کمپین جامع سالانه VIP',
+        shortDescription: 'بالاترین سطح دسترسی و مدیریت اختصاصی',
+        features: [
+          'همه امکانات طلایی + محتوای اختصاصی نامحدود',
+          'کمپین ویژه برای هر شهرستان به تفکیک',
+          'شناسایی و هماهنگی اینفلوئنسرها',
+          'پشتیبانی ۲۴ ساعته اختصاصی VIP',
+          'مدیریت صفر تا صد مارکتینگ و لایو',
+        ],
+        isPopular: false,
+      },
+    ]);
+  };
+
+  const handleAddNewPlan = () => {
+    const newP: SubscriptionPlan = {
+      id: 'plan-' + Date.now(),
+      name: `تعرفه ${customPlans.length + 1}`,
+      badge: '',
+      price: 10000000,
+      originalPrice: 15000000,
+      durationDays: 30,
+      durationLabel: 'دوره ۱ ماهه',
+      shortDescription: '',
+      features: ['ویژگی و امکانات اول', 'پشتیبانی اختصاصی'],
+      isPopular: customPlans.length === 1,
+    };
+    setCustomPlans([...customPlans, newP]);
+  };
+
+  const handleUpdatePlan = (index: number, updated: Partial<SubscriptionPlan>) => {
+    setCustomPlans((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...updated };
+      return next;
+    });
+  };
+
+  const handleDeletePlan = (index: number) => {
+    setCustomPlans((prev) => prev.filter((_, i) => i !== index));
+  };
+
   // Helper function to set duration and calculate target expiration date
   const handleSetIncredibleDuration = (duration: '1day' | '3days' | '1week' | '1month' | 'custom', customHours?: number) => {
     setIncredibleTimerDuration(duration);
@@ -583,6 +675,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsInStock(true);
     setIsSubscription(false);
     setPricePerDayInput('250000');
+    setHasCustomPlans(false);
+    setCustomPlansTitle('پکیج‌های تبلیغات هوشمند');
+    setCustomPlansSubtitle('انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
+    setCustomPlans([]);
     setNewProductCouponCode('');
     setNewProductCouponPercent('');
     setFormSuccess('');
@@ -627,6 +723,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsInStock(true);
     setIsSubscription(Boolean(prod.isSubscription || prod.id === 'pkg-amlak-jahesh'));
     setPricePerDayInput(prod.pricePerDay ? prod.pricePerDay.toString() : '250000');
+    setHasCustomPlans(Boolean(prod.hasCustomPlans));
+    setCustomPlansTitle(prod.customPlansTitle || 'پکیج‌های تبلیغات هوشمند');
+    setCustomPlansSubtitle(prod.customPlansSubtitle || 'انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
+    setCustomPlans(prod.subscriptionPlans && prod.subscriptionPlans.length > 0 ? prod.subscriptionPlans : []);
     setNewProductCouponCode(prod.couponCode || '');
     setNewProductCouponPercent(prod.couponDiscountPercent ? prod.couponDiscountPercent.toString() : '');
     setFormSuccess('');
@@ -722,6 +822,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       incredibleExpiresAt: isIncredible ? (incredibleExpiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()) : undefined,
       isSubscription: Boolean(isSubscription),
       pricePerDay: isSubscription ? (parseInt(pricePerDayInput.replace(/[^0-9]/g, ''), 10) || 250000) : undefined,
+      hasCustomPlans: Boolean(hasCustomPlans),
+      customPlansTitle: hasCustomPlans ? (customPlansTitle.trim() || 'پکیج‌های تبلیغات هوشمند') : undefined,
+      customPlansSubtitle: hasCustomPlans ? (customPlansSubtitle.trim() || 'انتخاب کنید و کمپین خود را به سطح بالاتری ببرید') : undefined,
+      subscriptionPlans: hasCustomPlans && customPlans.length > 0 ? customPlans : undefined,
     };
 
     if (editingProductId && onUpdateProduct) {
@@ -1960,7 +2064,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       />
                       <span className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4 text-amber-400" />
-                        خرید به صورت اشتراکی (دارای انتخاب مدت زمان اشتراک در موقع خرید)
+                        خرید به صورت اشتراکی روزانه (دارای انتخاب مدت زمان اشتراک در موقع خرید)
                       </span>
                     </label>
                     <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2.5 py-0.5 rounded-full">
@@ -1991,6 +2095,261 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             (۱ ماه اشتراک = { (parseInt(pricePerDayInput, 10) * 30).toLocaleString('fa-IR') } تومان)
                           </span>
                         )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 6.05 Custom Multi-Tier Subscription & Pricing Plans Builder (پکیج‌ها و تعرفه‌های اشتراک سفارشی) */}
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-[#170a2f] via-[#220d3f] to-[#120826] border-2 border-amber-400/70 rounded-2xl space-y-4 shadow-2xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/30 pb-3">
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hasCustomPlans}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setHasCustomPlans(checked);
+                          if (checked && customPlans.length === 0) {
+                            handleLoadDefaultPlansPreset();
+                          }
+                        }}
+                        className="w-5 h-5 rounded border-amber-400 text-amber-500 focus:ring-0 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1.5">
+                          <Tag className="w-4 h-4 text-amber-400" />
+                          خرید به صورت پلن و چند تعرفه‌ای (پکیج‌های انتخابی با قیمت و توضیحات مجزا)
+                        </span>
+                        <p className="text-[11px] text-slate-300 font-normal mt-0.5">
+                          مشابه صفحه پکیج‌های تبلیغات هوشمند یا پلن‌های پایه، طلایی و VIP همراه با پاپ‌آپ انتخاب تعرفه
+                        </p>
+                      </div>
+                    </label>
+
+                    <span className="text-[11px] bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black px-3 py-1 rounded-full shrink-0 shadow-md">
+                      {customPlans.length} تعرفه فعال
+                    </span>
+                  </div>
+
+                  {hasCustomPlans && (
+                    <div className="space-y-4 animate-in fade-in">
+                      {/* Top Configs: Titles */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-black/40 p-3.5 rounded-xl border border-purple-900/60">
+                        <div>
+                          <label className="text-xs font-bold text-amber-200 block mb-1">
+                            عنوان اصلی بخش تعرفه‌ها:
+                          </label>
+                          <input
+                            type="text"
+                            value={customPlansTitle}
+                            onChange={(e) => setCustomPlansTitle(e.target.value)}
+                            placeholder="مثلاً: پکیج‌های تبلیغات هوشمند"
+                            className="w-full bg-[#100824] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-amber-200 block mb-1">
+                            زیرعنوان و توضیحات معرفی:
+                          </label>
+                          <input
+                            type="text"
+                            value={customPlansSubtitle}
+                            onChange={(e) => setCustomPlansSubtitle(e.target.value)}
+                            placeholder="مثلاً: انتخاب کنید و کمپین خود را به سطح بالاتری ببرید"
+                            className="w-full bg-[#100824] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Presets & Add Plan Actions */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <span className="text-xs font-black text-amber-300">
+                          لیست تعرفه‌ها و پکیج‌های این محصول:
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleLoadDefaultPlansPreset}
+                            className="flex items-center gap-1.5 bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/50 text-amber-300 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-sm"
+                            title="بارگذاری ۳ تعرفه پایه، طلایی و پلاتینیوم"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                            <span>بارگذاری ۳ تعرفه پیش‌فرض (پایه، طلایی، VIP)</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleAddNewPlan}
+                            className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer shadow-md"
+                          >
+                            <PlusCircle className="w-3.5 h-3.5" />
+                            <span>افزودن تعرفه جدید (+)</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Plans List Editor */}
+                      <div className="space-y-4">
+                        {customPlans.map((plan, index) => (
+                          <div
+                            key={plan.id || index}
+                            className={`p-4 rounded-2xl border transition-all ${
+                              plan.isPopular
+                                ? 'bg-gradient-to-r from-amber-950/30 via-[#1d1136] to-[#140a28] border-amber-400 ring-1 ring-amber-400/40 shadow-lg'
+                                : 'bg-[#110924] border-purple-800/60'
+                            }`}
+                          >
+                            {/* Card Top Title & Controls */}
+                            <div className="flex items-center justify-between border-b border-purple-900/50 pb-2.5 mb-3">
+                              <div className="flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full bg-purple-900/80 border border-purple-500/50 text-amber-300 text-xs font-black flex items-center justify-center font-mono">
+                                  {index + 1}
+                                </span>
+                                <span className="text-xs sm:text-sm font-black text-white">
+                                  {plan.name || `تعرفه ${index + 1}`}
+                                </span>
+                                {plan.isPopular && (
+                                  <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                                    <Sparkles className="w-3 h-3" />
+                                    پلن ویژه طلایی
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <label className="flex items-center gap-1.5 text-xs text-amber-300 font-bold cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(plan.isPopular)}
+                                    onChange={(e) => handleUpdatePlan(index, { isPopular: e.target.checked })}
+                                    className="w-3.5 h-3.5 rounded border-amber-400 text-amber-500 focus:ring-0 cursor-pointer"
+                                  />
+                                  <span>علامت به عنوان طلایی (پیشنهادی ویژه)</span>
+                                </label>
+
+                                {customPlans.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeletePlan(index)}
+                                    className="text-rose-400 hover:text-rose-300 p-1 rounded-lg hover:bg-rose-950/50 transition-colors cursor-pointer"
+                                    title="حذف این تعرفه"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Plan Input Fields */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-right">
+                              {/* Plan Name */}
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                                  نام تعرفه / عنوان پکیج:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={plan.name}
+                                  onChange={(e) => handleUpdatePlan(index, { name: e.target.value })}
+                                  placeholder="مثلاً: طلایی (پیشنهادی ویژه)"
+                                  className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400 font-bold"
+                                />
+                              </div>
+
+                              {/* Price */}
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                                  قیمت تعرفه (تومان):
+                                </label>
+                                <input
+                                  type="number"
+                                  value={plan.price}
+                                  onChange={(e) => handleUpdatePlan(index, { price: parseInt(e.target.value, 10) || 0 })}
+                                  placeholder="مثلاً: 25500000"
+                                  className="w-full bg-[#180f33] border border-amber-400/80 rounded-xl px-3 py-1.5 text-xs text-amber-300 font-black font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                              </div>
+
+                              {/* Original Price */}
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                                  قیمت قبل از تخفیف (اختیاری):
+                                </label>
+                                <input
+                                  type="number"
+                                  value={plan.originalPrice || ''}
+                                  onChange={(e) => handleUpdatePlan(index, { originalPrice: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                                  placeholder="مثلاً: 36500000"
+                                  className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                              </div>
+
+                              {/* Badge */}
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                                  برچسب یا بج روی کارت:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={plan.badge || ''}
+                                  onChange={(e) => handleUpdatePlan(index, { badge: e.target.value })}
+                                  placeholder="مثلاً: 🔥 پیشنهادی ویژه"
+                                  className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                              </div>
+
+                              {/* Duration / Period */}
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                                  مدت زمان / دوره اشتراک:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={plan.durationLabel || ''}
+                                  onChange={(e) => handleUpdatePlan(index, { durationLabel: e.target.value })}
+                                  placeholder="مثلاً: دوره ۱ ماهه یا ۳۰ روزه"
+                                  className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                              </div>
+
+                              {/* Short Subtitle */}
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                                  زیرعنوان یا توضیح کوتاه:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={plan.shortDescription || ''}
+                                  onChange={(e) => handleUpdatePlan(index, { shortDescription: e.target.value })}
+                                  placeholder="مثلاً: ۳۰٪ تخفیف ویژه اولین همکاری"
+                                  className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Features list (multiline textarea) */}
+                            <div className="mt-3">
+                              <label className="text-[11px] font-bold text-amber-200 block mb-1 flex items-center justify-between">
+                                <span>ویژگی‌ها و توضیحات خط‌به‌خط این تعرفه (هر خط یک ویژگی):</span>
+                                <span className="text-[10px] text-slate-400 font-normal font-mono">
+                                  {plan.features?.length || 0} ویژگی وارد شده
+                                </span>
+                              </label>
+                              <textarea
+                                rows={4}
+                                value={plan.features ? plan.features.join('\n') : ''}
+                                onChange={(e) => handleUpdatePlan(index, {
+                                  features: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean)
+                                })}
+                                placeholder="تمام امکانات پیشرفته&#10;۵۰۰۰ + فیلتر حرفه‌ای&#10;تیزر و ویدیو با هوش مصنوعی"
+                                className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 leading-relaxed font-sans"
+                              />
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

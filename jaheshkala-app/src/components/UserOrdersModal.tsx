@@ -481,20 +481,26 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                             <div className="space-y-0.5">
                               <span className="text-white font-bold text-xs sm:text-sm block line-clamp-1">
                                 {prod.title}
+                                {item.selectedPlan ? ` (${item.selectedPlan.name})` : ''}
                               </span>
                               <div className="flex items-center gap-2 text-[10px] text-slate-400">
                                 <span>تعداد: <strong className="text-purple-300">{item.quantity}</strong> عدد</span>
-                                {prod.category && (
+                                {item.selectedPlan ? (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-amber-300 font-bold">تعرفه {item.selectedPlan.name}</span>
+                                  </>
+                                ) : prod.category ? (
                                   <>
                                     <span>•</span>
                                     <span className="text-purple-400">{prod.category}</span>
                                   </>
-                                )}
+                                ) : null}
                               </div>
                             </div>
                           </div>
                           <span className="text-amber-300 font-bold text-xs sm:text-sm shrink-0">
-                            {formatPrice(prod.price * item.quantity)}
+                            {formatPrice((item.selectedPlan?.price !== undefined ? item.selectedPlan.price : prod.price) * item.quantity)}
                           </span>
                         </div>
                       );

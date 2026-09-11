@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Sparkles, CheckCircle2, Globe, ShieldCheck,
-  ShoppingBag, Gift, Truck, RotateCcw, Headphones, Star, Ticket, Images, Zap, CreditCard
+  ShoppingBag, Gift, Truck, RotateCcw, Headphones, Star, Ticket, Images, Zap, CreditCard, Check,
+  ChevronDown, ChevronUp, Info, ListChecks
 } from 'lucide-react';
-import { Product, User } from '../types';
+import { Product, User, SubscriptionPlan } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
 
 interface ProductDetailModalProps {
   product: Product | null;
   onClose: () => void;
-  onAddToCart: (product: Product, requestedDomain?: string, subscriptionDays?: number) => void;
-  onInstantBuy?: (product: Product, requestedDomain?: string, subscriptionDays?: number) => void;
+  onAddToCart: (product: Product, requestedDomain?: string, subscriptionDays?: number, selectedPlan?: SubscriptionPlan) => void;
+  onInstantBuy?: (product: Product, requestedDomain?: string, subscriptionDays?: number, selectedPlan?: SubscriptionPlan) => void;
   onOpenAmlakApp?: () => void;
   currentUser?: User | null;
 }
@@ -29,9 +30,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   );
   const [activeImage, setActiveImage] = useState<string>(product?.image || '');
   const [subscriptionDays, setSubscriptionDays] = useState<number>(30); // Default 1 month
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [showPlanDetails, setShowPlanDetails] = useState<boolean>(true);
 
   const isAmlakOrSub = Boolean(product?.isSubscription || product?.id === 'pkg-amlak-jahesh' || product?.category === 'اشتراک نرم‌افزار');
   const pricePerDay = product?.pricePerDay || 250000;
+  const hasCustomPlans = Boolean(product?.hasCustomPlans && product?.subscriptionPlans && product.subscriptionPlans.length > 0);
+  const currentPlan = hasCustomPlans ? (product?.subscriptionPlans?.find((p) => p.id === selectedPlanId) || product?.subscriptionPlans?.[0]) : null;
 
   useEffect(() => {
     if (product) {
@@ -39,6 +44,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       setSelectedColor(product.colors && product.colors.length > 0 ? product.colors[0] : null);
       if (product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار') {
         setSubscriptionDays(30);
+      }
+      if (product.hasCustomPlans && product.subscriptionPlans && product.subscriptionPlans.length > 0) {
+        const defaultPlan = product.subscriptionPlans.find((p) => p.isPopular) || product.subscriptionPlans[0];
+        setSelectedPlanId(defaultPlan.id);
       }
     }
   }, [product]);
@@ -59,23 +68,32 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const allImages = [product.image, ...(product.gallery || [])].filter((url, idx, arr) => url && arr.indexOf(url) === idx);
 
   // Dynamic calculated price for display
-  const calculatedPrice = isAmlakOrSub ? pricePerDay : product.price;
-  const calculatedOriginalPrice = isAmlakOrSub ? product.originalPrice || (pricePerDay * 1.4) : product.originalPrice;
+  const calculatedPrice = hasCustomPlans && currentPlan
+    ? currentPlan.price
+    : isAmlakOrSub
+    ? pricePerDay
+    : product.price;
+
+  const calculatedOriginalPrice = hasCustomPlans && currentPlan
+    ? currentPlan.originalPrice
+    : isAmlakOrSub
+    ? product.originalPrice || (pricePerDay * 1.4)
+    : product.originalPrice;
 
   const formatPrice = (num: number) => {
     return num.toLocaleString('fa-IR') + ' تومان';
   };
 
   const handleAdd = () => {
-    onAddToCart(product, preferredDomain);
+    onAddToCart(product, preferredDomain, undefined, currentPlan || undefined);
     onClose();
   };
 
   const handleInstantBuy = () => {
     if (onInstantBuy) {
-      onInstantBuy(product, preferredDomain);
+      onInstantBuy(product, preferredDomain, undefined, currentPlan || undefined);
     } else {
-      onAddToCart(product, preferredDomain);
+      onAddToCart(product, preferredDomain, undefined, currentPlan || undefined);
     }
     onClose();
   };
@@ -329,6 +347,139 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {product.fullDescription}
                 </p>
               </div>
+
+              {/* Custom Multi-Tier Plans Selection (if product has custom plans) */}
+              {hasCustomPlans && product.subscriptionPlans && product.subscriptionPlans.length > 0 && (
+                <div className="space-y-3.5 bg-gradient-to-br from-[#1c0e3a] via-[#150a2c] to-[#0f0722] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 border-amber-400/60 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs sm:text-sm font-black text-amber-300">
+                          {product.customPlansTitle || 'انتخاب تعرفه و پکیج اشتراک:'}
+                        </h3>
+                        {product.customPlansSubtitle && (
+                          <p className="text-[11px] text-slate-300 font-medium">{product.customPlansSubtitle}</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2.5 py-0.5 rounded-full">
+                      {product.subscriptionPlans.length} تعرفه موجود
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {product.subscriptionPlans.map((plan) => {
+                      const isSelected = plan.id === (currentPlan?.id || selectedPlanId);
+                      return (
+                        <div
+                          key={plan.id}
+                          onClick={() => setSelectedPlanId(plan.id)}
+                          className={`relative p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                            isSelected
+                              ? 'bg-gradient-to-b from-amber-950/40 via-purple-950/80 to-[#120826] border-amber-400 ring-2 ring-amber-400/40 shadow-xl scale-[1.02]'
+                              : 'bg-black/40 border-purple-900/60 hover:border-purple-600 opacity-85 hover:opacity-100'
+                          }`}
+                        >
+                          {plan.badge && (
+                            <span className="absolute -top-2.5 left-2 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                              {plan.badge}
+                            </span>
+                          )}
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-black text-white">{plan.name}</span>
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'border-amber-400 bg-amber-400 text-slate-950' : 'border-purple-600'}`}>
+                                {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                              </div>
+                            </div>
+
+                            {plan.shortDescription && (
+                              <p className="text-[10px] text-slate-300 line-clamp-1">{plan.shortDescription}</p>
+                            )}
+
+                            {plan.features && plan.features.length > 0 && (
+                              <ul className="space-y-1 text-[10px] text-slate-300 pt-1 border-t border-purple-900/40">
+                                {plan.features.slice(0, 3).map((f, fi) => (
+                                  <li key={fi} className="flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                    <span className="truncate">{f}</span>
+                                  </li>
+                                ))}
+                                {plan.features.length > 3 && (
+                                  <li className="text-[9px] text-amber-300 font-bold">+{plan.features.length - 3} مورد دیگر...</li>
+                                )}
+                              </ul>
+                            )}
+                          </div>
+
+                          <div className="pt-2.5 mt-2 border-t border-purple-900/40 text-left">
+                            <span className="text-xs font-black text-amber-300 font-mono block">
+                              {formatPrice(plan.price)}
+                            </span>
+                            {plan.durationLabel && (
+                              <span className="text-[9px] text-purple-300 block">{plan.durationLabel}</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Dedicated Compact Section: Specifications & Details of Selected Package */}
+                  {currentPlan && (
+                    <div className="mt-3 bg-black/50 border border-amber-400/40 rounded-2xl p-3.5 sm:p-4 space-y-3 animate-in fade-in transition-all">
+                      <div className="flex items-center justify-between border-b border-purple-900/50 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <ListChecks className="w-4 h-4 text-amber-400" />
+                          <h4 className="text-xs sm:text-sm font-black text-amber-300">
+                            مشخصات و امکانات کامل تعرفه «{currentPlan.name}»:
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowPlanDetails(!showPlanDetails)}
+                          className="text-[11px] text-purple-300 hover:text-amber-300 font-bold flex items-center gap-1 transition-colors cursor-pointer px-2 py-1 rounded-lg bg-purple-950/60 border border-purple-800/40"
+                        >
+                          <span>{showPlanDetails ? 'بستن مشخصات' : 'مشاهده بیشتر'}</span>
+                          {showPlanDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+
+                      {showPlanDetails && (
+                        <div className="space-y-2.5 pt-1">
+                          {currentPlan.shortDescription && (
+                            <p className="text-xs text-slate-300 leading-relaxed bg-purple-950/30 p-2.5 rounded-xl border border-purple-900/30">
+                              <span className="font-bold text-amber-300">توضیحات پکیج: </span>
+                              {currentPlan.shortDescription}
+                            </p>
+                          )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            {(currentPlan.features || []).map((feat, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-start gap-2 text-xs text-slate-200 bg-purple-950/40 border border-purple-800/30 p-2.5 rounded-xl"
+                              >
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                <span className="leading-snug">{feat}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-purple-900/40 text-[11px] text-slate-400">
+                            <span>مدت زمان خدمات: <strong className="text-amber-300">{currentPlan.durationLabel || `${currentPlan.durationDays} روز`}</strong></span>
+                            <span>قیمت این تعرفه: <strong className="text-emerald-400 font-mono text-xs">{formatPrice(currentPlan.price)}</strong></span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Full Specs checklist */}
               <div className="space-y-3">

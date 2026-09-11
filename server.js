@@ -456,6 +456,159 @@ app.post('/api/zibal-verify', async (req, res) => {
   }
 });
 
+// ==========================================
+// JAHESH ARZ (TOPCHANGE) PERSISTENCE & API
+// ==========================================
+const ARZ_DATA_DIR = path.join(__dirname, 'data', 'jahesh_arz');
+if (!fs.existsSync(ARZ_DATA_DIR)) {
+  fs.mkdirSync(ARZ_DATA_DIR, { recursive: true });
+}
+
+function getUserArzFilePath(userId) {
+  const safeId = (userId || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(ARZ_DATA_DIR, `user_${safeId}.json`);
+}
+
+// Get Jahesh Arz User Data (Wallets, Transactions, Bank Accounts, Vouchers)
+app.get('/api/jahesh-arz/data', (req, res) => {
+  try {
+    const userId = req.query.userId || 'usr-jahesh-master';
+    const filePath = getUserArzFilePath(userId);
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.wallets)) {
+        let changed = false;
+        data.wallets = data.wallets.map(w => {
+          if (w.balance === 15400000 || w.balance === 14500000 || w.balance === 350 || w.balance === 240 || w.balance === 340.5) {
+            w.balance = 0;
+            w.blockedBalance = 0;
+            changed = true;
+          }
+          return w;
+        });
+        if (changed) {
+          fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+        }
+      }
+      return res.json({ success: true, data });
+    }
+    return res.json({ success: true, data: null });
+  } catch (err) {
+    console.error('Error in GET /api/jahesh-arz/data:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Save Jahesh Arz User Data
+app.post('/api/jahesh-arz/data', (req, res) => {
+  try {
+    const { userId, wallets, transactions, vouchers, bankAccounts, p2pAds } = req.body || {};
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'شناسه کاربری الزامی است.' });
+    }
+    const filePath = getUserArzFilePath(userId);
+    const payload = {
+      userId,
+      wallets: wallets || [],
+      transactions: transactions || [],
+      vouchers: vouchers || [],
+      bankAccounts: bankAccounts || [],
+      p2pAds: p2pAds || [],
+      lastUpdated: new Date().toISOString()
+    };
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+    return res.json({ success: true, message: 'اطلاعات با موفقیت ذخیره شد.' });
+  } catch (err) {
+    console.error('Error in POST /api/jahesh-arz/data:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Pay Jahesh Kala Order directly from Jahesh Arz Wallet Balance
+app.post('/api/jahesh-arz/pay-order', (req, res) => {
+  try {
+    const { userId, orderId, amountInTomans, currency = 'IRR', items = [] } = req.body || {};
+    if (!userId || !amountInTomans) {
+      return res.status(400).json({ success: false, error: 'پارامترهای پرداخت ناقص است.' });
+    }
+
+    const filePath = getUserArzFilePath(userId);
+    let userData = null;
+    if (fs.existsSync(filePath)) {
+      try {
+        userData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      } catch {}
+    }
+
+    // If no existing file, load default wallets with 0 balance
+    if (!userData || !Array.isArray(userData.wallets)) {
+      userData = {
+        userId,
+        wallets: [
+          { id: 'w-irr', currency: 'IRR', name: 'کیف پول ریال (تومان)', symbol: 'IRR', accountNumber: `TC-IRR-${Math.floor(100000 + Math.random() * 900000)}`, balance: 0, blockedBalance: 0, color: 'from-emerald-500 to-teal-600', iconBg: 'bg-emerald-500/20 text-emerald-400', isDefault: true },
+          { id: 'w-usdt', currency: 'USDT', name: 'کیف پول تتر (Tether)', symbol: 'USDT', accountNumber: `TC-USDT-${Math.floor(100000 + Math.random() * 900000)}`, balance: 0, blockedBalance: 0, color: 'from-cyan-500 to-blue-600', iconBg: 'bg-cyan-500/20 text-cyan-400' },
+          { id: 'w-usd', currency: 'USD', name: 'کیف پول دلار آمریکا', symbol: '$', accountNumber: `TC-USD-${Math.floor(100000 + Math.random() * 900000)}`, balance: 0, blockedBalance: 0, color: 'from-blue-500 to-indigo-600', iconBg: 'bg-blue-500/20 text-blue-400' }
+        ],
+        transactions: [],
+        vouchers: [],
+        bankAccounts: []
+      };
+    }
+
+    const targetWallet = userData.wallets.find(w => w.currency === currency) || userData.wallets.find(w => w.currency === 'IRR');
+    if (!targetWallet) {
+      return res.status(400).json({ success: false, error: 'کیف پول معتبر یافت نشد.' });
+    }
+
+    const payableAmount = Number(amountInTomans);
+    if (targetWallet.balance < payableAmount) {
+      return res.status(400).json({
+        success: false,
+        error: `موجودی ناکافی است. موجودی فعلی: ${targetWallet.balance.toLocaleString('fa-IR')} تومان، مبلغ فاکتور: ${payableAmount.toLocaleString('fa-IR')} تومان`
+      });
+    }
+
+    // Deduct balance
+    targetWallet.balance -= payableAmount;
+
+    // Create Transaction
+    const trackingNumber = `TC-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+    const tx = {
+      id: `tx-ord-${Date.now()}`,
+      trackingNumber,
+      type: 'withdraw',
+      typeTitle: 'پرداخت فاکتور خرید جهش‌کالا',
+      currency: targetWallet.currency,
+      amount: payableAmount,
+      fee: 0,
+      finalAmount: payableAmount,
+      status: 'completed',
+      statusLabel: 'موفق و پرداخت شده',
+      message: `پرداخت سفارش ${orderId || ''} از طریق کیف پول جهش ارز به صورت آنی کسر و تایید گردید.`,
+      createdAt: new Date().toLocaleDateString('fa-IR') + ' - ' + new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+      updatedAt: new Date().toLocaleDateString('fa-IR') + ' - ' + new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+      paymentMethod: 'internal',
+      referenceId: `REF-JK-${Math.floor(1000000000 + Math.random() * 9000000000)}`
+    };
+
+    userData.transactions = [tx, ...(userData.transactions || [])];
+    fs.writeFileSync(filePath, JSON.stringify(userData, null, 2), 'utf-8');
+
+    return res.json({
+      success: true,
+      message: 'پرداخت با موفقیت از کیف پول جهش ارز انجام شد.',
+      trackingNumber,
+      refNumber: tx.referenceId,
+      remainingBalance: targetWallet.balance,
+      transaction: tx
+    });
+  } catch (err) {
+    console.error('Error in /api/jahesh-arz/pay-order:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Real Estate SaaS (مدیریت املاک جهش) Licenses Persistence & Auth
 const AMLAK_LICENSES_FILE = path.join(__dirname, 'data', 'amlak_licenses.json');
 

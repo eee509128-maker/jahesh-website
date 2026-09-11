@@ -40,6 +40,23 @@ export interface Product {
   incredibleExpiresAt?: string; // ISO date string
   isSubscription?: boolean; // Subscription based product (e.g. Amlak SaaS)
   pricePerDay?: number; // Price per day (e.g. 250,000 Tomans)
+  hasCustomPlans?: boolean; // Multi-tier subscription/tariff plans (پکیج‌ها و تعرفه‌های اشتراک انتخابی)
+  customPlansTitle?: string; // e.g. "پکیج‌های تبلیغات هوشمند"
+  customPlansSubtitle?: string; // e.g. "انتخاب کنید و کمپین خود را به سطح بالاتری ببرید"
+  subscriptionPlans?: SubscriptionPlan[]; // Array of custom tiers
+}
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string; // e.g. "پایه (استارتر)", "طلایی (پیشنهادی ویژه)", "پلاتینیوم (VIP)"
+  badge?: string; // e.g. "🔥 پیشنهادی ویژه", "۳۰٪ تخفیف ویژه اولین همکاری"
+  price: number; // in Tomans
+  originalPrice?: number; // Strike-through price before discount
+  durationDays?: number; // Duration in days (e.g. 30, 90, 365)
+  durationLabel?: string; // e.g. "ماهانه", "۳ ماهه", "سالانه", "پروژه اختصاصی"
+  shortDescription?: string; // Short note/subtitle
+  features: string[]; // Bullet-point features/descriptions
+  isPopular?: boolean; // Highlighted golden/featured card
 }
 
 export interface CartItem {
@@ -48,6 +65,7 @@ export interface CartItem {
   selectedColor?: string;
   clientNotes?: string;
   subscriptionDays?: number; // Days of subscription chosen
+  selectedPlan?: SubscriptionPlan; // The custom chosen plan tier
   quantity: number;
 }
 

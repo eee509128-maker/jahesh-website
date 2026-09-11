@@ -7,11 +7,13 @@ import {
 interface DigikalaFooterProps {
   onOpenTerms: () => void;
   onOpenTopic: (topicId: string) => void;
+  onOpenJaheshArz?: () => void;
 }
 
 export const DigikalaFooter: React.FC<DigikalaFooterProps> = ({
   onOpenTerms,
   onOpenTopic,
+  onOpenJaheshArz,
 }) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -144,6 +146,17 @@ export const DigikalaFooter: React.FC<DigikalaFooterProps> = ({
                   تماس با ما و اطلاعات شعب
                 </button>
               </li>
+              {onOpenJaheshArz && (
+                <li>
+                  <button
+                    onClick={onOpenJaheshArz}
+                    className="text-amber-600 dark:text-amber-400 hover:text-amber-700 font-bold hover:bg-amber-100/50 dark:hover:bg-purple-950/50 px-2.5 py-1.5 -mr-2 rounded-xl transition-all text-right flex items-center justify-between w-full cursor-pointer"
+                  >
+                    <span>صرافی آنلاین جهش ارز (TopChange)</span>
+                    <span className="text-[9px] bg-amber-400/20 text-amber-500 dark:text-amber-300 px-1.5 py-0.5 rounded font-mono">TC</span>
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
 

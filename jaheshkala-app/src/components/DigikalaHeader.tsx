@@ -3,7 +3,7 @@ import {
   Search, ShoppingCart, User as UserIcon, Bell, Menu,
   ChevronDown, Flame, Percent, Sparkles, ShieldCheck, LogOut,
   Package, HelpCircle, PhoneCall, Gift, Layers, Box, Check, Tag,
-  Sun, Moon
+  Sun, Moon, TrendingUp, Wallet
 } from 'lucide-react';
 import { CartItem, Product, User } from '../types';
 
@@ -18,6 +18,7 @@ interface DigikalaHeaderProps {
   onOpenOrders: () => void;
   onOpenAdmin: () => void;
   onOpenProfile?: () => void;
+  onOpenJaheshArz?: () => void;
   onLogout: () => void;
   onScrollToIncredible: () => void;
   onSelectCategory: (category: string) => void;
@@ -39,6 +40,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
   onOpenOrders,
   onOpenAdmin,
   onOpenProfile,
+  onOpenJaheshArz,
   onLogout,
   onScrollToIncredible,
   onSelectCategory,
@@ -158,6 +160,23 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
         {/* Left side: Login/User Profile, Admin, Cart */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           
+          {/* Jahesh Arz (TopChange) Direct Trigger Button */}
+          {onOpenJaheshArz && (
+            <button
+              id="jahesh-arz-top-btn"
+              onClick={onOpenJaheshArz}
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-purple-700 via-purple-600 to-amber-500 hover:from-purple-800 hover:to-amber-600 text-white text-xs font-black shadow-md shadow-purple-600/30 transition-all hover:scale-105 active:scale-95 shrink-0 cursor-pointer border border-amber-300/40"
+              title="صرافی آنلاین و کیف پول چندارزی جهش ارز (TopChange)"
+            >
+              <div className="w-5 h-5 rounded-lg bg-black/30 flex items-center justify-center text-[10px] font-mono font-black text-amber-300">
+                TC
+              </div>
+              <span className="hidden xs:inline">جهش ارز (کیف پول)</span>
+              <span className="xs:hidden">کیف پول</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse hidden sm:inline-block"></span>
+            </button>
+          )}
+
           {/* User Auth / Profile */}
           {currentUser ? (
             <div className="flex items-center gap-1 sm:gap-2">
@@ -345,6 +364,19 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
             </div>
 
             <div className="h-4 w-px bg-purple-200 dark:bg-purple-900/60 hidden sm:block shrink-0"></div>
+
+            {/* Jahesh Arz TopChange Menu Item */}
+            {onOpenJaheshArz && (
+              <button
+                id="jahesh-arz-nav-btn"
+                onClick={onOpenJaheshArz}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-200/80 hover:bg-purple-300/80 dark:bg-purple-900/60 dark:hover:bg-purple-800 text-purple-950 dark:text-amber-300 font-bold transition-all text-[11px] sm:text-xs shrink-0 cursor-pointer border border-purple-300 dark:border-purple-700/50"
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-purple-700 dark:text-amber-400 shrink-0" />
+                <span>جهش ارز (TopChange)</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              </button>
+            )}
 
             {/* Quick Filter Buttons */}
             <button

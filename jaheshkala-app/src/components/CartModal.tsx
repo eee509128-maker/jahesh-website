@@ -62,10 +62,12 @@ export const CartModal: React.FC<CartModalProps> = ({
 
   const isAdmin = currentUser?.role === 'admin';
 
-  const rawTotalAmount = safeCartItems.reduce(
-    (sum, item) => sum + (Number(item.product.price) || 0) * (Number(item.quantity) || 1),
-    0
-  );
+  const rawTotalAmount = safeCartItems.reduce((sum, item) => {
+    const unitPrice = item.selectedPlan?.price !== undefined
+      ? Number(item.selectedPlan.price)
+      : (Number(item.product?.price) || 0);
+    return sum + unitPrice * (Number(item.quantity) || 1);
+  }, 0);
 
   const discountAmount = isAdmin
     ? rawTotalAmount
@@ -255,7 +257,9 @@ export const CartModal: React.FC<CartModalProps> = ({
 
               {safeCartItems.map((item) => {
                 const prod = item.product || ({} as any);
-                const itemPrice = Number(prod.price) || 0;
+                const itemPrice = item.selectedPlan?.price !== undefined
+                  ? Number(item.selectedPlan.price)
+                  : (Number(prod.price) || 0);
                 const itemQuantity = Number(item.quantity) || 1;
 
                 return (
@@ -284,7 +288,13 @@ export const CartModal: React.FC<CartModalProps> = ({
                                 VIP
                               </span>
                             )}
-                            {(item.subscriptionDays || prod.subscriptionDays) && (
+                            {item.selectedPlan && (
+                              <span className="text-[10px] bg-amber-400/20 text-amber-600 dark:text-amber-300 border border-amber-400/50 font-black px-2 py-0.5 rounded-md shadow-sm flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-amber-400" />
+                                تعرفه: {item.selectedPlan.name} ({item.selectedPlan.durationLabel || `${item.selectedPlan.durationDays} روزه`})
+                              </span>
+                            )}
+                            {!item.selectedPlan && (item.subscriptionDays || prod.subscriptionDays) && (
                               <span className="text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 font-black px-2 py-0.5 rounded-md shadow-sm">
                                 اشتراک {Number(item.subscriptionDays || prod.subscriptionDays).toLocaleString('fa-IR')} روزه
                               </span>
@@ -292,7 +302,12 @@ export const CartModal: React.FC<CartModalProps> = ({
                           </div>
                           <p className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-300">
                             {formatPrice(itemPrice)}
-                            {(item.subscriptionDays || prod.subscriptionDays) && (
+                            {item.selectedPlan && item.selectedPlan.shortDescription && (
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-normal mr-1.5">
+                                — {item.selectedPlan.shortDescription}
+                              </span>
+                            )}
+                            {!item.selectedPlan && (item.subscriptionDays || prod.subscriptionDays) && (
                               <span className="text-[10px] text-slate-500 dark:text-slate-400 font-normal mr-1.5">
                                 (روزی {(prod.pricePerDay || 250000).toLocaleString('fa-IR')} تومان)
                               </span>
