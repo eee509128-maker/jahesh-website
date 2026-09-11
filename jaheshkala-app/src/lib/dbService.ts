@@ -162,12 +162,17 @@ export const saveAllProductsToDb = async (products: Product[]): Promise<boolean>
 
 export const saveProductToDb = async (product: Product): Promise<boolean> => {
   try {
-    // 1. Load current list from local cache / store
+    // 1. Load current list from CLOUD to prevent stale overwrites
     let currentList: Product[] = [];
     try {
-      const saved = localStorage.getItem('jahesh_products');
-      currentList = saved ? JSON.parse(saved) : [];
+      currentList = await fetchProductsFromDb();
     } catch {}
+    if (!currentList || currentList.length === 0) {
+      try {
+        const saved = localStorage.getItem('jahesh_products');
+        currentList = saved ? JSON.parse(saved) : [];
+      } catch {}
+    }
 
     const idx = currentList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
@@ -231,8 +236,19 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
 
       const { error } = await supabase.from('products').upsert(payloadWithGallery);
       if (error) {
-        const { gallery, is_incredible, incredible_expires_at, incredible_timer_duration, ...fallbackPayload } = payloadWithGallery;
-        await supabase.from('products').upsert(fallbackPayload);
+        const { 
+          gallery, 
+          is_incredible, 
+          incredible_expires_at, 
+          incredible_timer_duration,
+          coupon_code,
+          coupon_discount_percent,
+          is_subscription,
+          price_per_day,
+          ...fallbackPayload 
+        } = payloadWithGallery;
+        const res = await supabase.from('products').upsert(fallbackPayload);
+        if (res.error) console.error("Products fallback upsert error:", res.error);
       }
     } catch {}
 
@@ -245,12 +261,17 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
 
 export const deleteProductFromDb = async (productId: string): Promise<boolean> => {
   try {
-    // 1. Remove from local store
+    // 1. Remove from CLOUD list to prevent stale overwrites
     let currentList: Product[] = [];
     try {
-      const saved = localStorage.getItem('jahesh_products');
-      currentList = saved ? JSON.parse(saved) : [];
+      currentList = await fetchProductsFromDb();
     } catch {}
+    if (!currentList || currentList.length === 0) {
+      try {
+        const saved = localStorage.getItem('jahesh_products');
+        currentList = saved ? JSON.parse(saved) : [];
+      } catch {}
+    }
 
     const updated = currentList.filter((p) => p.id !== productId);
     try {

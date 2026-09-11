@@ -3,6 +3,8 @@ import { X, ShieldAlert, CheckCircle2, Loader2, Lock, UserPlus, LogIn, ShieldChe
 import { User as UserType } from '../types';
 import { registerUserInDb, findUserInDb } from '../lib/dbService';
 import { AntiBotGuard } from '../security/antiBot';
+import { IRANIAN_GUILDS } from '../data/guilds';
+import { ChevronDown, Search } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -25,6 +27,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
+  const [guild, setGuild] = useState('');
+  const [guildSearch, setGuildSearch] = useState('');
+  const [showGuildDropdown, setShowGuildDropdown] = useState(false);
 
   // Anti-Bot Captcha State
   const [captcha, setCaptcha] = useState<{ question: string; answer: number; challengeId: string }>({ question: '', answer: 0, challengeId: '' });
@@ -35,6 +40,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
 
   // Refresh math captcha challenge
+  const filteredGuilds = IRANIAN_GUILDS.filter(g => g.includes(guildSearch));
+
   const refreshCaptcha = () => {
     const newCap = AntiBotGuard.generateMathCaptcha();
     setCaptcha(newCap);
@@ -151,6 +158,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: '',
           username: cleanUsername,
           role: 'user',
+          guild: guild || undefined,
           createdAt: new Date().toLocaleDateString('fa-IR'),
         };
 
@@ -195,7 +203,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" dir="rtl">
-      <div className="bg-white dark:bg-[#140c2e] border border-purple-200 dark:border-purple-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl text-right">
+      <div className="bg-white dark:bg-[#140c2e] border border-purple-200 dark:border-purple-800 rounded-3xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden shadow-2xl text-right">
         
         {/* Header */}
         <div className="bg-purple-50 dark:bg-[#1a1139] p-4 flex items-center justify-between border-b border-purple-200 dark:border-purple-900/60">
@@ -272,7 +280,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Main Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-3.5 text-right">
+        <form onSubmit={handleSubmit} className="p-6 space-y-3.5 text-right overflow-y-auto custom-scrollbar">
           {isRegisterMode ? (
             /* REGISTER FIELDS */
             <>

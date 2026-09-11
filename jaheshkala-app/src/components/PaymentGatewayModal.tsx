@@ -37,6 +37,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
   currentUser,
   appliedCoupon,
   zibalMerchant,
+  onPaymentSuccess,
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');

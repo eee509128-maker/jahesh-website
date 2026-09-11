@@ -130,7 +130,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
       <div className="flex items-center justify-between mb-3 px-1">
         <h3 className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
           <Tag className="w-4 h-4 text-amber-500 shrink-0" />
-          <span className="font-bold">دسته‌بندی و فیلتر کالاها</span>
+          <span className="font-bold">صنف و فیلتر کالاها</span>
         </h3>
         {selectedCategory && (
           <button

@@ -97,7 +97,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
   const dynamicCategories = productCategories.map((catName) => ({
     title: catName,
     icon: getCategoryEmoji(catName),
-    desc: `مشاهده محصولات دسته ${catName}`,
+    desc: `مشاهده محصولات صنف ${catName}`,
     value: catName,
   }));
 
@@ -290,7 +290,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
               >
                 <Menu className="w-4 h-4 text-purple-700 dark:text-amber-400 shrink-0" />
                 <span className="text-[11px] sm:text-xs">
-                  {selectedCategory ? `دسته: ${selectedCategory}` : 'دسته‌بندی کالاها'}
+                  {selectedCategory ? `دسته: ${selectedCategory}` : 'صنف کالاها'}
                 </span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform shrink-0 ${categoryMenuOpen ? 'rotate-180 text-purple-700 dark:text-amber-400' : ''}`} />
               </button>
@@ -301,7 +301,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
                   className="fixed top-28 left-4 right-4 sm:absolute sm:top-full sm:right-0 sm:left-auto mt-2 sm:w-72 sm:max-w-[85vw] bg-white dark:bg-[#160f38] border border-purple-200 dark:border-purple-700/80 rounded-2xl shadow-2xl p-2 space-y-1 z-50 animate-in fade-in max-h-80 overflow-y-auto"
                 >
                   <div className="px-3 py-1.5 text-[11px] font-bold text-purple-900 dark:text-amber-400 border-b border-purple-100 dark:border-purple-900/50 flex items-center justify-between">
-                    <span>انتخاب دسته‌بندی فروشگاه</span>
+                    <span>انتخاب صنف فروشگاه</span>
                     {selectedCategory && (
                       <button
                         onClick={() => {

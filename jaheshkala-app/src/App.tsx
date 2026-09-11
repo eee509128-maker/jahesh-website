@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X
+  Sparkles, CheckCircle2, ExternalLink, Filter, X
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
@@ -1338,7 +1338,7 @@ export default function App() {
               <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-500" />
                 <span>
-                  {selectedCategory ? `کالاهای دسته‌بندی «${selectedCategory}»` : 'ویترین برگزیده کالاهای دیجیتال و خدمات جهش‌کالا'}
+                  {selectedCategory ? `کالاهای صنف «${selectedCategory}»` : 'ویترین برگزیده کالاهای دیجیتال و خدمات جهش‌کالا'}
                 </span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">

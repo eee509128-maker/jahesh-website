@@ -1,15 +1,25 @@
 const fs = require('fs');
-const file = './jaheshkala-app/src/components/DigikalaIncredibleOffer.tsx';
-let content = fs.readFileSync(file, 'utf8');
+let code = fs.readFileSync('jaheshkala-app/src/components/AdminPanel.tsx', 'utf-8');
 
-const targetPagination = `<span className="text-[10px] sm:text-[11px] text-slate-300 font-mono">
-                {currentIndex + 1} / {incredibleProducts.length}
-              </span>`;
+const oldCode = `                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setIsIncredible(checked);
+                        if (checked && !incredibleExpiresAt) {
+                          handleSetIncredibleDuration(incredibleTimerDuration || '1week');
+                        }
+                      }}`;
 
-const newPagination = `<span className="text-[10px] sm:text-[11px] text-slate-300 font-mono whitespace-nowrap" dir="ltr">
-                {currentIndex + 1} / {incredibleProducts.length}
-              </span>`;
+const newCode = `                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setIsIncredible(checked);
+                        if (checked) {
+                          const isExpired = incredibleExpiresAt && new Date(incredibleExpiresAt).getTime() <= Date.now();
+                          if (!incredibleExpiresAt || isExpired) {
+                            handleSetIncredibleDuration(incredibleTimerDuration || '1week');
+                          }
+                        }
+                      }}`;
 
-content = content.replace(targetPagination, newPagination);
-fs.writeFileSync(file, content, 'utf8');
-console.log('Incredible patched');
+code = code.replace(oldCode, newCode);
+fs.writeFileSync('jaheshkala-app/src/components/AdminPanel.tsx', code, 'utf-8');
+console.log('patched');

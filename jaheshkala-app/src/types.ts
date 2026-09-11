@@ -76,6 +76,7 @@ export interface User {
   email: string;
   username: string;
   role: 'admin' | 'user';
+  guild?: string;
   createdAt: string;
 }
 
@@ -107,12 +108,13 @@ export interface Coupon {
 }
 
 export interface BannerSlide {
+  imagePosition?: string;
   id: string;
   badge: string;
   title: string;
   subtitle: string;
   cta: string;
-  actionType: 'incredible' | 'category' | 'link' | 'all';
+  actionType: 'incredible' | 'category' | 'link' | 'all' | 'package';
   actionTarget?: string;
   gradient?: string;
   overlayOpacity?: number;

@@ -13,6 +13,7 @@ import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, Banne
 import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage } from '../lib/dbService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS } from '../data/initialData';
+import { IRANIAN_GUILDS } from '../data/guilds';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -632,14 +633,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Extract all existing unique categories from products
   const existingCategories = Array.from(
     new Set([
-      'کالای دیجیتال',
-      'موبایل و تبلت',
-      'لپ‌تاپ و کامپیوتر',
-      'پوشاک و مد',
-      'لوازم خانگی و آشپزخانه',
-      'زیبایی و سلامت',
-      'کتاب و فرهنگ',
-      'خدمات و نرم‌افزار',
+      ...IRANIAN_GUILDS,
       ...products.map((p) => p.category).filter(Boolean),
     ])
   );
@@ -1465,7 +1459,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     {editingProductId ? 'ویرایش اطلاعات کالا یا محصول' : 'فرم ثبت هرگونه کالا یا محصول جدید در فروشگاه'}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    شما می‌توانید هر نوع کالای فیزیکی، دیجیتالی، پوشاک، لوازم خانگی یا خدمات را همراه با دسته‌بندی دلخواه ثبت کنید.
+                    شما می‌توانید هر نوع کالای فیزیکی، دیجیتالی، پوشاک، لوازم خانگی یا خدمات را همراه با صنف دلخواه ثبت کنید.
                   </p>
                 </div>
                 {editingProductId && (
@@ -1518,7 +1512,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
                       <Tag className="w-4 h-4 text-amber-400" />
-                      <span>دسته‌بندی محصول:</span>
+                      <span>صنف محصول:</span>
                     </label>
                     <div className="flex items-center gap-3 text-xs">
                       <button
@@ -1530,7 +1524,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
-                        انتخاب از دسته‌های موجود
+                        انتخاب از اصناف موجود
                       </button>
                       <button
                         type="button"
@@ -1541,7 +1535,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
-                        + ساخت دسته‌بندی جدید
+                        + ساخت صنف جدید
                       </button>
                     </div>
                   </div>
@@ -1550,14 +1544,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <div className="space-y-1 animate-in fade-in">
                       <input
                         type="text"
-                        placeholder="نام دسته‌بندی دلخواه خود را بنویسید (مثلاً: پوشاک و کفش، عطر و ادکلن، ابزار برقی، کتاب، لوازم خودرو...)"
+                        placeholder="نام صنف دلخواه خود را بنویسید (مثلاً: پوشاک و کفش، عطر و ادکلن، ابزار برقی، کتاب، لوازم خودرو...)"
                         value={customCategoryName}
                         onChange={(e) => setCustomCategoryName(e.target.value)}
                         className="w-full bg-black/60 border border-amber-400/80 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none"
                         required={isCustomCategory}
                       />
                       <p className="text-[11px] text-amber-200/80">
-                        این دسته‌بندی جدید فوراً در نوار دسته‌بندی‌ها و فیلترهای بالای سایت قرار می‌گیرد.
+                        این صنف جدید فوراً در نوار صنف‌ها و فیلترهای بالای سایت قرار می‌گیرد.
                       </p>
                     </div>
                   ) : (
@@ -2000,8 +1994,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       onChange={(e) => {
                         const checked = e.target.checked;
                         setIsIncredible(checked);
-                        if (checked && !incredibleExpiresAt) {
-                          handleSetIncredibleDuration(incredibleTimerDuration || '1week');
+                        if (checked) {
+                          const isExpired = incredibleExpiresAt && new Date(incredibleExpiresAt).getTime() <= Date.now();
+                          if (!incredibleExpiresAt || isExpired) {
+                            handleSetIncredibleDuration(incredibleTimerDuration || '1week');
+                          }
                         }
                       }}
                       className="rounded border-rose-500 text-rose-500 focus:ring-0"
@@ -2342,7 +2339,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 rows={4}
                                 value={plan.features ? plan.features.join('\n') : ''}
                                 onChange={(e) => handleUpdatePlan(index, {
-                                  features: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean)
+                                  features: e.target.value.split('\n')
                                 })}
                                 placeholder="تمام امکانات پیشرفته&#10;۵۰۰۰ + فیلتر حرفه‌ای&#10;تیزر و ویدیو با هوش مصنوعی"
                                 className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-400 leading-relaxed font-sans"
@@ -2805,7 +2802,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       >
                         <option value="incredible">هدایت به لیست شگفت‌انگیزها (تخفیف‌دارها)</option>
                         <option value="all">نمایش تمام کالاها</option>
-                        <option value="category">انتخاب دسته‌بندی خاص</option>
+                        <option value="category">انتخاب صنف خاص</option>
                         <option value="link">باز کردن لینک اینترنتی خارجی</option>
                       </select>
                     </div>
@@ -2814,7 +2811,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     {(bannerActionType === 'category' || bannerActionType === 'link') && (
                       <div>
                         <label className="block text-xs font-bold text-slate-300 mb-1">
-                          {bannerActionType === 'category' ? 'نام دسته‌بندی مورد نظر' : 'آدرس اینترنتی لینک (URL)'}
+                          {bannerActionType === 'category' ? 'نام صنف مورد نظر' : 'آدرس اینترنتی لینک (URL)'}
                         </label>
                         <input
                           type="text"
