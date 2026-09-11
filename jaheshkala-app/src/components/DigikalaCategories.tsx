@@ -75,62 +75,63 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
   const [showAllGuildsModal, setShowAllGuildsModal] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState('');
 
-  // Extract unique categories from actual products in store
-  const productCategories = Array.from(
-    new Set(products.map((p) => p.category).filter(Boolean))
+  // Check if selected category is a specific guild
+  const isGuildSelected = selectedCategory && selectedCategory !== 'شگفت‌انگیز' && selectedCategory !== 'پرفروش';
+  const selectedGuildObj = IRANIAN_GUILDS.find(
+    (g) => g.shortName === selectedCategory || g.name === selectedCategory
   );
 
-  // Standard high-priority filters
-  const standardFilters = [
+  // 4 Primary Clean Categories as requested by user
+  const mainCategories = [
     {
       id: 'all',
-      name: 'همه اصناف و کالاها',
+      name: 'همه محصولات و خدمات',
+      shortTitle: 'همه کالاها',
+      badge: 'کامل',
       value: '',
       icon: Layers,
-      color: 'from-purple-600 to-indigo-600',
+      color: 'from-purple-600 via-indigo-600 to-purple-700',
+      activeColor: 'ring-2 ring-purple-400 bg-purple-100 dark:bg-purple-900/60',
       action: () => onSelectCategory(''),
+      isActive: selectedCategory === '',
     },
     {
       id: 'incredible',
-      name: 'شگفت‌انگیزها',
+      name: 'پیشنهاد شگفت‌انگیز',
+      shortTitle: 'شگفت‌انگیز',
+      badge: 'تخفیف‌دار',
       value: 'شگفت‌انگیز',
       icon: Percent,
-      color: 'from-rose-600 to-red-600',
+      color: 'from-rose-500 via-red-500 to-rose-600',
+      activeColor: 'ring-2 ring-rose-400 bg-rose-100 dark:bg-rose-950/60',
       action: onScrollToIncredible,
+      isActive: selectedCategory === 'شگفت‌انگیز',
     },
     {
       id: 'popular',
       name: 'پرفروش‌ترین‌ها',
+      shortTitle: 'پرفروش‌ها',
+      badge: 'محبوب‌ترین',
       value: 'پرفروش',
       icon: Flame,
-      color: 'from-amber-500 to-orange-500',
+      color: 'from-amber-500 via-orange-500 to-amber-600',
+      activeColor: 'ring-2 ring-amber-400 bg-amber-100 dark:bg-amber-950/60',
       action: () => onSelectCategory('پرفروش'),
+      isActive: selectedCategory === 'پرفروش',
+    },
+    {
+      id: 'guilds',
+      name: 'تفکیک بر اساس اصناف',
+      shortTitle: 'اصناف و مشاغل',
+      badge: `${IRANIAN_GUILDS.length} صنف`,
+      value: 'guilds-modal',
+      icon: Building2,
+      color: 'from-cyan-500 via-blue-600 to-indigo-600',
+      activeColor: 'ring-2 ring-cyan-400 bg-cyan-100 dark:bg-cyan-950/60',
+      action: () => setShowAllGuildsModal(true),
+      isActive: Boolean(isGuildSelected),
     },
   ];
-
-  // Prominent Popular Guilds to show in the carousel
-  const topGuilds = IRANIAN_GUILDS.filter((g) => g.isPopular).map((g) => ({
-    id: g.id,
-    name: g.shortName,
-    value: g.shortName,
-    icon: getGuildCategoryIcon(g.shortName),
-    color: g.color,
-    action: () => onSelectCategory(g.shortName),
-  }));
-
-  // Extra dynamic categories that exist on products but aren't explicitly in top guilds
-  const extraProductCategoryItems = productCategories
-    .filter((cat) => !topGuilds.some((tg) => tg.value === cat || tg.name === cat))
-    .map((cat, idx) => ({
-      id: `prod-cat-${idx}`,
-      name: cat,
-      value: cat,
-      icon: getGuildCategoryIcon(cat),
-      color: 'from-cyan-500 to-blue-600',
-      action: () => onSelectCategory(cat),
-    }));
-
-  const carouselItems = [...standardFilters, ...topGuilds, ...extraProductCategoryItems];
 
   // Filtered list for the "All Guilds" dialog
   const filteredAllGuilds = IRANIAN_GUILDS.filter((g) => {
@@ -147,80 +148,114 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
   return (
     <div className="py-3">
       {/* Title Bar */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-amber-400/20 flex items-center justify-center text-amber-500">
+      <div className="flex items-center justify-between mb-3 px-1 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-amber-400/20 flex items-center justify-center text-amber-500 shrink-0">
             <Briefcase className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="text-xs sm:text-sm font-black text-slate-800 dark:text-white flex items-center gap-1.5">
-              <span>صنف‌بندی و تفکیک خدمات اصناف</span>
+          <div className="min-w-0">
+            <h3 className="text-xs sm:text-sm font-black text-slate-800 dark:text-white flex items-center gap-1.5 truncate">
+              <span>دسته‌بندی و صنف‌بندی خدمات</span>
             </h3>
-            <p className="text-[10px] text-slate-500 dark:text-purple-300/70">
-              خدمات، سایت‌ها و راهکارهای تخصصی ویژه اصناف و کسب‌وکارهای کشور
+            <p className="text-[10px] text-slate-500 dark:text-purple-300/70 truncate hidden sm:block">
+              دسترسی سریع به کالاها، خدمات شگفت‌انگیز، پرفروش و مشاغل تخصصی کشور
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Action Buttons in single line */}
+        <div className="flex items-center gap-2 shrink-0">
           {selectedCategory && (
             <button
               onClick={() => onSelectCategory('')}
-              className="text-[11px] text-rose-600 hover:text-rose-700 font-bold bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-full border border-rose-200 dark:border-rose-800/60 cursor-pointer"
+              className="h-8 px-3 rounded-full text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 cursor-pointer whitespace-nowrap active:scale-95 transition-all"
             >
               نمایش همه
             </button>
           )}
           <button
             onClick={() => setShowAllGuildsModal(true)}
-            className="text-[11px] text-purple-700 dark:text-amber-300 font-bold bg-purple-100/80 dark:bg-purple-900/50 hover:bg-purple-200 px-2.5 py-1 rounded-full border border-purple-300 dark:border-purple-700 cursor-pointer flex items-center gap-1"
+            className="h-8 px-3 rounded-full text-[11px] font-bold text-purple-800 dark:text-amber-300 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/50 dark:hover:bg-purple-900/80 border border-purple-300 dark:border-purple-700 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shadow-xs active:scale-95 transition-all"
           >
-            <Search className="w-3 h-3" />
-            <span>همه اصناف ({IRANIAN_GUILDS.length})</span>
+            <Search className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400 shrink-0" />
+            <span className="whitespace-nowrap">همه اصناف ({IRANIAN_GUILDS.length})</span>
           </button>
         </div>
       </div>
 
-      {/* Story-like Circular Guild Items with unique icons */}
-      <div className="flex items-center gap-3.5 sm:gap-4 overflow-x-auto pb-2 scrollbar-none snap-x w-full">
-        {carouselItems.map((item) => {
-          const Icon = item.icon;
-          const isSelected = selectedCategory === item.value;
+      {/* 4 Clean Primary Categories Grid (All, Incredible, Best Sellers, Guilds) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
+        {mainCategories.map((cat) => {
+          const Icon = cat.icon;
           return (
             <button
-              key={item.id}
-              onClick={item.action}
-              className="flex flex-col items-center gap-1.5 group shrink-0 cursor-pointer snap-start"
+              key={cat.id}
+              onClick={cat.action}
+              className={`p-3 sm:p-3.5 rounded-2xl border transition-all cursor-pointer text-right flex items-center gap-3 relative overflow-hidden group shadow-xs hover:shadow-md active:scale-98 ${
+                cat.isActive
+                  ? `${cat.activeColor} border-purple-400 dark:border-amber-400/80 shadow-md`
+                  : 'bg-white dark:bg-[#150d30] border-slate-200 dark:border-purple-900/40 hover:border-purple-300 dark:hover:border-purple-700'
+              }`}
             >
               <div
-                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl p-0.5 bg-gradient-to-tr ${
-                  isSelected
-                    ? 'from-amber-400 to-yellow-300 ring-2 ring-amber-400/80 shadow-amber-500/30 shadow-lg scale-105'
-                    : item.color
-                } group-hover:scale-105 transition-all shadow-md flex items-center justify-center`}
+                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr ${cat.color} flex items-center justify-center text-white shrink-0 shadow-md group-hover:scale-105 transition-transform`}
               >
-                <div className="w-full h-full bg-[#1b1038] preserve-contrast dark-surface rounded-[14px] flex items-center justify-center group-hover:bg-[#25174e] transition-colors shadow-inner">
-                  <Icon
-                    className={`w-6 h-6 ${
-                      isSelected ? 'text-amber-300' : 'text-white'
-                    } group-hover:text-amber-300 transition-colors drop-shadow-sm`}
-                    style={{ color: isSelected ? '#fcd34d' : '#ffffff' }}
-                  />
+                <Icon className="w-5 h-5 sm:w-6 sm:h-6 drop-shadow" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate block">
+                    {cat.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] text-purple-700 dark:text-amber-300/90 font-bold bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded-md border border-purple-200 dark:border-purple-800/40 whitespace-nowrap">
+                    {cat.badge}
+                  </span>
+                  {cat.id === 'guilds' && isGuildSelected && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold truncate">
+                      ({selectedCategory})
+                    </span>
+                  )}
                 </div>
               </div>
-              <span
-                className={`text-[11px] max-w-[85px] sm:max-w-[95px] text-center truncate transition-colors ${
-                  isSelected ? 'text-amber-600 dark:text-amber-300 font-black' : 'text-slate-800 dark:text-slate-200 font-bold'
-                }`}
-              >
-                {item.name}
-              </span>
             </button>
           );
         })}
       </div>
 
-      {/* All Guilds Modal Dialog */}
+      {/* If specific guild is selected, show an active status bar */}
+      {isGuildSelected && (
+        <div className="mt-3 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-purple-100 via-indigo-50 to-purple-100 dark:from-purple-950/70 dark:via-[#1c1240] dark:to-purple-950/70 border border-purple-300 dark:border-purple-700/60 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-purple-200 dark:bg-purple-900/80 flex items-center justify-center text-purple-800 dark:text-amber-300">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div className="text-xs text-slate-800 dark:text-slate-200">
+              <span>در حال مشاهده محصولات و خدمات صنف: </span>
+              <strong className="text-purple-950 dark:text-amber-300 font-black px-1.5 py-0.5 bg-purple-200/70 dark:bg-black/40 rounded-lg">
+                {selectedCategory}
+              </strong>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAllGuildsModal(true)}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white cursor-pointer shadow-xs transition-colors"
+            >
+              تغییر صنف
+            </button>
+            <button
+              onClick={() => onSelectCategory('')}
+              className="px-2 py-1 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+            >
+              ✕ حذف فیلتر
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* All Guilds Modal Dialog (کدام صنف یا شغل مد نظر شماست؟) */}
       {showAllGuildsModal && (
         <div 
           className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm p-3 sm:p-4 flex min-h-full items-center justify-center animate-in fade-in"
@@ -236,10 +271,10 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
                 </div>
                 <div>
                   <h4 className="text-sm font-black text-slate-900 dark:text-white">
-                    صنف‌بندی و دسته‌بندی مشاغل جهش‌کالا
+                    کدام صنف یا شغل مد نظر شماست؟
                   </h4>
                   <p className="text-[11px] text-slate-500 dark:text-purple-300/70">
-                    صنف مورد نظر خود را انتخاب کنید تا خدمات و محصولات متناسب با آن نمایش داده شود
+                    صنف کاری خود را انتخاب کنید تا خدمات، سایت‌ها و محصولات متناسب با آن تفکیک شوند
                   </p>
                 </div>
               </div>
@@ -260,7 +295,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
                   dir="rtl"
                   value={modalSearchQuery}
                   onChange={(e) => setModalSearchQuery(e.target.value)}
-                  placeholder="جستجو در بین اصناف (مثلاً: املاک، پزشکی، پوشاک، رستوران، خودرو، وکالت...)"
+                  placeholder="جستجو در بین اصناف (املاک، طراحی سایت، پزشکی، رستوران، پوشاک، طلا، خودرو...)"
                   className="w-full bg-white dark:bg-black/60 border border-purple-200 dark:border-purple-800 rounded-xl pr-9 pl-4 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 shadow-xs"
                 />
               </div>
@@ -306,7 +341,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
             {/* Modal Footer */}
             <div className="p-3 bg-purple-50 dark:bg-[#1a1139] border-t border-purple-200 dark:border-purple-900 flex items-center justify-between">
               <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">
-                تعداد اصناف فعال: {filteredAllGuilds.length} صنف
+                تعداد کل اصناف: {filteredAllGuilds.length} صنف
               </span>
               <button
                 onClick={() => {

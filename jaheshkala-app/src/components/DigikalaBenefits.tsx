@@ -32,19 +32,24 @@ export const DigikalaBenefits: React.FC = () => {
 
   return (
     <div className="py-6 border-y border-purple-200 dark:border-purple-900/30">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {benefits.map((item, idx) => {
           const Icon = item.icon;
+          const isLastItem = idx === benefits.length - 1; // 5th item: 'ضمانت اصل بودن کالا'
           return (
             <div
               key={idx}
-              className="flex flex-col items-center text-center p-3.5 rounded-2xl bg-white dark:bg-[#130d2a]/50 hover:bg-purple-50/70 dark:hover:bg-[#181035] transition-all border border-purple-200 dark:border-purple-900/20 shadow-sm hover:shadow-md"
+              className={`flex flex-col items-center text-center p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-[#130d2a]/50 hover:bg-purple-50/70 dark:hover:bg-[#181035] transition-all border border-purple-200 dark:border-purple-900/20 shadow-xs hover:shadow-md ${
+                isLastItem
+                  ? 'col-span-2 sm:col-span-1 max-w-[260px] sm:max-w-none mx-auto w-full'
+                  : 'w-full'
+              }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/80 border border-purple-200 dark:border-purple-800/40 flex items-center justify-center text-purple-700 dark:text-amber-400 mb-2 shadow-inner">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/80 border border-purple-200 dark:border-purple-800/40 flex items-center justify-center text-purple-700 dark:text-amber-400 mb-2 shadow-inner shrink-0">
                 <Icon className="w-5 h-5" />
               </div>
-              <h5 className="text-xs font-black text-slate-900 dark:text-white mb-1">{item.title}</h5>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{item.desc}</p>
+              <h5 className="text-xs font-black text-slate-900 dark:text-white mb-1 whitespace-nowrap">{item.title}</h5>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{item.desc}</p>
             </div>
           );
         })}
