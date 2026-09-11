@@ -130,6 +130,22 @@ export interface BannerSlide {
   targetGuild?: string; // صنف هدف برای بنر (اختیاری)
   isActive?: boolean;
   order?: number;
+
+  // ویژگی‌های گرافیکی متن و پس‌زمینه
+  titleColor?: string; // رنگ عنوان اصلی
+  subtitleColor?: string; // رنگ متن توضیحات
+  highlightText?: string; // کلمه یا عبارتی که رنگ متفاوتی در عنوان دارد
+  highlightColor?: string; // رنگ کلمه هایلایت‌شده
+  textBackdropEnabled?: boolean; // فعال بودن باکس بلور و محوکننده پشت متن
+  textBackdropTheme?: 'dark' | 'purple' | 'navy' | 'light'; // تم باکس پشت متن
+  textBackdropOpacity?: number; // شفافیت باکس پشت متن (0-100)
+  aspectRatio?: '21/9' | '16/9'; // نسبت ابعاد بنر برای تطابق دقیق بین موبایل و دسکتاپ
+
+  // سایز فونت و کنترل خطوط متن (تک‌خطی و جلوگیری از شکستن کلمات به دو خط)
+  titleFontSize?: 'sm' | 'md' | 'lg' | 'xl'; // اندازه فونت عنوان اصلی
+  subtitleFontSize?: 'sm' | 'md' | 'lg'; // اندازه فونت زیرعنوان
+  singleLineTitle?: boolean; // قفل کردن عنوان در یک خط بدون شکستن (No-Wrap)
+  singleLineSubtitle?: boolean; // قفل کردن زیرعنوان در یک خط
 }
 
 export interface AmlakSubscriptionLicense {
@@ -162,6 +178,11 @@ export interface Order {
   status: OrderStatus;
   paymentGateway: 'زیبال (Zibal)' | 'شاپرک' | 'تست پرداخت' | string;
   date: string;
+  createdAt?: string; // ISO timestamp for exact sorting
+  zibalTrackId?: string; // شماره تراکنش اختصاصی زیبال
+  zibalRefNumber?: string; // شماره ارجاع بانکی شاپرک (RRN)
+  cardNumber?: string; // شماره کارت بانکی پرداخت کننده
+  paidAt?: string; // زمان پرداخت ثبت شده در درگاه
   acceptedTerms: boolean;
   adminNotes?: string;
   amlakLicense?: AmlakSubscriptionLicense;

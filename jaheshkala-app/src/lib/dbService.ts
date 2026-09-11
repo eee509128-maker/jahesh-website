@@ -135,39 +135,47 @@ export function cleanProductItem(p: any): Product | null {
 export const fetchProductsFromDb = async (): Promise<Product[]> => {
   let authoritativeList: Product[] | null = null;
 
-  // 1. Layer 1: Authoritative Server Disk Storage (/api/products)
+  // 1. Layer 1: Primary Cloud Check - Supabase SYSTEM_CONFIG_PRODUCTS (shared across all devices & Vercel)
   try {
-    const res = await fetch('/api/products');
-    if (res.ok) {
-      const serverProducts = await res.json();
-      if (Array.isArray(serverProducts) && serverProducts.length > 0) {
-        const cleaned = serverProducts.map(cleanProductItem).filter((p): p is Product => p !== null);
-        if (cleaned.length > 0) {
-          authoritativeList = cleaned;
-        }
+    const { data: configData, error: configError } = await supabase
+      .from('chats')
+      .select('messages, last_updated')
+      .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+      .maybeSingle();
+
+    if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
+      const cleaned = configData.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
+      if (cleaned.length > 0) {
+        authoritativeList = cleaned;
+        // Keep server disk in sync with latest cloud data
+        try {
+          fetch('/api/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cleaned),
+          }).catch(() => {});
+        } catch {}
       }
     }
-  } catch (err) {
-    console.warn('Check /api/products notice:', err);
+  } catch (e) {
+    console.warn('Check SYSTEM_CONFIG_PRODUCTS notice:', e);
   }
 
-  // 2. Layer 2: Primary Cloud Check - Supabase SYSTEM_CONFIG_PRODUCTS in chats table
+  // 2. Layer 2: Server Disk Storage (/api/products) fallback
   if (!authoritativeList || authoritativeList.length === 0) {
     try {
-      const { data: configData, error: configError } = await supabase
-        .from('chats')
-        .select('messages')
-        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
-        .maybeSingle();
-
-      if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
-        const cleaned = configData.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
-        if (cleaned.length > 0) {
-          authoritativeList = cleaned;
+      const res = await fetch('/api/products');
+      if (res.ok) {
+        const serverProducts = await res.json();
+        if (Array.isArray(serverProducts) && serverProducts.length > 0) {
+          const cleaned = serverProducts.map(cleanProductItem).filter((p): p is Product => p !== null);
+          if (cleaned.length > 0) {
+            authoritativeList = cleaned;
+          }
         }
       }
-    } catch (e) {
-      console.warn('Check SYSTEM_CONFIG_PRODUCTS notice:', e);
+    } catch (err) {
+      console.warn('Check /api/products notice:', err);
     }
   }
 
@@ -445,6 +453,61 @@ export const saveLocalOrdersStore = (orders: Order[]) => {
   }
 };
 
+export const parseOrderTimestamp = (order: Partial<Order>): number => {
+  if (!order) return 0;
+  if (order.createdAt) {
+    const t = new Date(order.createdAt).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  if (order.paidAt) {
+    const t = new Date(order.paidAt).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  if (order.id) {
+    const numMatch = order.id.match(/(\d{10,13})/);
+    if (numMatch) {
+      const num = Number(numMatch[1]);
+      if (num > 1500000000 && num < 2500000000) return num * 1000;
+      if (num > 1500000000000 && num < 2500000000000) return num;
+    }
+  }
+  if (order.date) {
+    const persianNumbers = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+    const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    let d = String(order.date);
+    for (let i = 0; i < 10; i++) {
+      d = d.replace(new RegExp(persianNumbers[i], 'g'), String(i));
+      d = d.replace(new RegExp(arabicNumbers[i], 'g'), String(i));
+    }
+    const months: Record<string, number> = {
+      'فروردین': 1, 'اردیبهشت': 2, 'خرداد': 3, 'تیر': 4, 'مرداد': 5, 'شهریور': 6,
+      'مهر': 7, 'آبان': 8, 'آذر': 9, 'دی': 10, 'بهمن': 11, 'اسفند': 12
+    };
+    const mMatch = d.match(/(\d{1,2})\s+([^\s\d]+)\s+(\d{4})(?:\s+ساعت\s+(\d{1,2}):(\d{1,2}))?/);
+    if (mMatch) {
+      const day = parseInt(mMatch[1], 10);
+      const mName = mMatch[2].trim();
+      const year = parseInt(mMatch[3], 10);
+      const month = months[mName] || 6;
+      const hour = mMatch[4] ? parseInt(mMatch[4], 10) : 12;
+      const minute = mMatch[5] ? parseInt(mMatch[5], 10) : 0;
+      return year * 100000000 + month * 1000000 + day * 10000 + hour * 100 + minute;
+    }
+    const slashMatch = d.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2}))?/);
+    if (slashMatch) {
+      const year = parseInt(slashMatch[1], 10);
+      const month = parseInt(slashMatch[2], 10);
+      const day = parseInt(slashMatch[3], 10);
+      const hour = slashMatch[4] ? parseInt(slashMatch[4], 10) : 12;
+      const minute = slashMatch[5] ? parseInt(slashMatch[5], 10) : 0;
+      return year * 100000000 + month * 1000000 + day * 10000 + hour * 100 + minute;
+    }
+    const standardDate = new Date(d).getTime();
+    if (!isNaN(standardDate) && standardDate > 0) return standardDate;
+  }
+  return 0;
+};
+
 export const fetchOrdersFromDb = async (): Promise<Order[]> => {
   const localOrders = getLocalOrdersStore();
   let serverDiskOrders: Order[] = [];
@@ -509,6 +572,9 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
           status: item.status || 'در حال بررسی',
           paymentGateway: item.payment_gateway || 'زیبال (Zibal)',
           date: item.date || new Date().toLocaleDateString('fa-IR'),
+          createdAt: item.created_at,
+          zibalTrackId: item.tracking_code || '',
+          zibalRefNumber: item.payment_ref_id || '',
           acceptedTerms: true,
         };
       });
@@ -526,23 +592,46 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
     if (!existing) {
       allOrdersMap.set(key, o);
     } else {
-      // Keep most complete order details
-      allOrdersMap.set(key, { ...existing, ...o });
+      // Keep most complete order details, preserve gateway fields
+      allOrdersMap.set(key, {
+        ...existing,
+        ...o,
+        trackingCode: o.trackingCode || existing.trackingCode || '',
+        paymentRefId: o.paymentRefId || existing.paymentRefId || '',
+        zibalTrackId: o.zibalTrackId || existing.zibalTrackId || o.trackingCode || existing.trackingCode,
+        zibalRefNumber: o.zibalRefNumber || existing.zibalRefNumber || o.paymentRefId || existing.paymentRefId,
+        cardNumber: o.cardNumber || existing.cardNumber,
+        paidAt: o.paidAt || existing.paidAt,
+        createdAt: o.createdAt || existing.createdAt,
+      });
     }
   };
 
-  serverDiskOrders.forEach(addOrderToMap);
-  chatConfigOrders.forEach(addOrderToMap);
   tableOrders.forEach(addOrderToMap);
+  chatConfigOrders.forEach(addOrderToMap);
+  serverDiskOrders.forEach(addOrderToMap);
   localOrders.forEach(addOrderToMap);
 
   const mergedOrders = Array.from(allOrdersMap.values());
+  // CRITICAL: Sort newest orders first (highest timestamp at index 0)
+  mergedOrders.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
   saveLocalOrdersStore(mergedOrders);
   return mergedOrders;
 };
 
 export const saveOrderToDb = async (order: Order): Promise<boolean> => {
-  // 1. Save locally & broadcast
+  // Ensure timestamps and gateway fields are populated
+  if (!order.createdAt) {
+    order.createdAt = new Date().toISOString();
+  }
+  if (!order.zibalTrackId && order.trackingCode) {
+    order.zibalTrackId = String(order.trackingCode);
+  }
+  if (!order.zibalRefNumber && order.paymentRefId) {
+    order.zibalRefNumber = String(order.paymentRefId);
+  }
+
+  // 1. Save locally & broadcast immediately
   let updatedList: Order[] = [];
   try {
     const currentLocal = getLocalOrdersStore();
@@ -555,6 +644,8 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
     } else {
       updatedList = [order, ...currentLocal];
     }
+    // Sort descending by newest
+    updatedList.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
     saveLocalOrdersStore(updatedList);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updatedList }));
@@ -574,14 +665,26 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
     console.warn('Persist order to /api/orders/save notice:', e);
   }
 
-  // 3. Primary Cloud: Save to Supabase SYSTEM_CONFIG_ORDERS in chats table (instant global sync across all devices)
+  // 3. Primary Cloud: Merge into Supabase SYSTEM_CONFIG_ORDERS in chats table (NEVER wipe other orders)
   try {
-    const fullStore = getLocalOrdersStore();
+    const { data: configData } = await supabase
+      .from('chats')
+      .select('messages')
+      .eq('user_id', 'SYSTEM_CONFIG_ORDERS')
+      .maybeSingle();
+
+    const existingCloudOrders: Order[] = (configData && Array.isArray(configData.messages)) ? configData.messages : [];
+    const filteredCloud = existingCloudOrders.filter(
+      (o) => o && o.id !== order.id && (!order.trackingCode || o.trackingCode !== order.trackingCode)
+    );
+    const mergedCloud = [order, ...filteredCloud];
+    mergedCloud.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
+
     await supabase.from('chats').upsert(
       {
         user_id: 'SYSTEM_CONFIG_ORDERS',
         user_name: 'لیست تمام سفارشات فروشگاه',
-        messages: fullStore,
+        messages: mergedCloud,
         last_updated: new Date().toISOString(),
         is_read_by_admin: true,
       },
@@ -595,19 +698,19 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
   try {
     const payload = {
       id: order.id,
-      tracking_code: order.trackingCode,
-      payment_ref_id: order.paymentRefId,
-      user_id: order.userId,
-      customer_name: order.customerName,
-      customer_phone: order.customerPhone,
-      customer_email: order.customerEmail,
-      requested_domain: order.requestedDomain,
-      client_notes: order.clientNotes,
-      total_amount: order.totalAmount,
+      tracking_code: order.trackingCode || order.zibalTrackId || '',
+      payment_ref_id: order.paymentRefId || order.zibalRefNumber || '',
+      user_id: order.userId || 'guest',
+      customer_name: order.customerName || 'مشتری',
+      customer_phone: order.customerPhone || '',
+      customer_email: order.customerEmail || '',
+      requested_domain: order.requestedDomain || '',
+      client_notes: order.clientNotes || '',
+      total_amount: order.totalAmount || 0,
       discount_amount: order.discountAmount || 0,
       applied_coupon_code: order.appliedCouponCode || '',
       status: order.status,
-      items: order.items,
+      items: order.items || [],
       date: order.date,
       payment_gateway: order.paymentGateway,
     };
@@ -929,14 +1032,32 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
             role: user.role,
           };
           localStorage.setItem('jahesh_current_user', JSON.stringify(updatedCurrent));
-          window.dispatchEvent(new CustomEvent('jahesh-user-updated', { detail: updatedCurrent }));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('jahesh-user-updated', { detail: updatedCurrent }));
+          }
         }
       }
     } catch (err) {
       console.warn('Error updating current user session:', err);
     }
 
-    // 3. Update in Supabase with multi-key fallback and upsert
+    // 3. Persist to server disk /api/users/update-role & /api/users/save
+    try {
+      await fetch('/api/users/update-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          username: user.username,
+          phone: user.phone,
+          role: user.role,
+        }),
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    // 4. Update in Supabase users table with multi-key fallback and upsert
     const payload = {
       full_name: user.fullName,
       phone: user.phone || '',
@@ -989,6 +1110,23 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       );
     }
 
+    // 5. Cloud fallback: Store users list in chats table SYSTEM_CONFIG_USERS for 100% cloud sync
+    try {
+      const allLocal = getLocalUsersStore();
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_USERS',
+          user_name: 'لیست کاربران سیستم جهش',
+          messages: allLocal,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch (chatErr) {
+      console.warn('SYSTEM_CONFIG_USERS sync notice:', chatErr);
+    }
+
     return true;
   } catch (err) {
     console.warn('Update user exception:', err);
@@ -1013,21 +1151,42 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     });
   }
 
-  // 2. Load from Supabase and merge
+  // 2. Load from server disk /api/users
+  try {
+    const res = await fetch('/api/users');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.users)) {
+        for (const u of data.users) {
+          if (!u) continue;
+          const key = u.id || u.username || u.phone;
+          const existing = usersMap.get(key);
+          usersMap.set(key, {
+            ...existing,
+            ...u,
+            role: u.role || existing?.role || 'user',
+          });
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 3. Load from Supabase users table (Cloud role takes precedence!)
   try {
     const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
     if (!error && data && Array.isArray(data)) {
       for (const matched of data) {
         const key = matched.id || matched.username || matched.phone;
         const existingLocal = usersMap.get(key);
-        // If local had a newer role change, merge properly
         usersMap.set(key, {
           id: matched.id,
           fullName: matched.full_name || existingLocal?.fullName || 'کاربر',
           phone: matched.phone || existingLocal?.phone || '',
           email: matched.email || existingLocal?.email || '',
           username: matched.username || existingLocal?.username || '',
-          role: existingLocal?.role ? existingLocal.role : ((matched.role as 'admin' | 'operator' | 'user') || 'user'),
+          role: (matched.role as 'admin' | 'operator' | 'user') || existingLocal?.role || 'user',
           createdAt: matched.created_at || existingLocal?.createdAt,
         });
       }
@@ -1036,7 +1195,57 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     console.warn('Fetch all users exception:', err);
   }
 
-  return Array.from(usersMap.values());
+  // 4. Load from SYSTEM_CONFIG_USERS in chats table
+  try {
+    const { data: configData } = await supabase
+      .from('chats')
+      .select('messages')
+      .eq('user_id', 'SYSTEM_CONFIG_USERS')
+      .maybeSingle();
+
+    if (configData && Array.isArray(configData.messages)) {
+      for (const u of configData.messages) {
+        if (!u) continue;
+        const key = u.id || u.username || u.phone;
+        const prev = usersMap.get(key);
+        usersMap.set(key, {
+          ...prev,
+          ...u,
+          role: u.role || prev?.role || 'user',
+        });
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  const result = Array.from(usersMap.values());
+  saveLocalUsersStore(result);
+
+  // If current logged-in user's role changed in cloud, auto-sync session immediately!
+  try {
+    const rawStored = localStorage.getItem('jahesh_current_user');
+    if (rawStored) {
+      const activeUser = JSON.parse(rawStored);
+      const matched = result.find(
+        (u) =>
+          u.id === activeUser.id ||
+          (activeUser.username && u.username?.toLowerCase() === activeUser.username.toLowerCase()) ||
+          (activeUser.phone && u.phone === activeUser.phone)
+      );
+      if (matched && matched.role && matched.role !== activeUser.role) {
+        const updated = { ...activeUser, role: matched.role };
+        localStorage.setItem('jahesh_current_user', JSON.stringify(updated));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('jahesh-user-updated', { detail: updated }));
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Auto sync current user role notice:', err);
+  }
+
+  return result;
 };
 
 // 4. COUPONS & DISCOUNT DB SERVICE

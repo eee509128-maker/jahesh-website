@@ -23,6 +23,7 @@ import {
   saveBannerToDb,
   saveAllBannersToDb,
   deleteBannerFromDb,
+  parseOrderTimestamp,
 } from './lib/dbService';
 import {
   verifyZibalPayment,
@@ -355,6 +356,11 @@ export default function App() {
           id: orderIdToUse,
           trackingCode: String(trackId),
           paymentRefId: refNum,
+          zibalTrackId: String(trackId),
+          zibalRefNumber: refNum,
+          cardNumber: verifyRes?.cardNumber || '',
+          paidAt: verifyRes?.paidAt || new Date().toISOString(),
+          createdAt: pendingOrder?.createdAt || new Date().toISOString(),
           userId: pendingOrder?.userId || activeUser?.id || 'guest',
           customerName: pendingOrder?.customerName || activeUser?.fullName || 'مشتری گرامی',
           customerPhone: pendingOrder?.customerPhone || activeUser?.phone || '',
@@ -365,7 +371,7 @@ export default function App() {
           totalAmount: calculatedTotal,
           discountAmount: pendingOrder?.discountAmount || 0,
           appliedCouponCode: pendingOrder?.appliedCouponCode || '',
-          status: 'در حال بررسی',
+          status: 'تایید شده / در حال آماده‌سازی',
           paymentGateway: gatewayLabel,
           acceptedTerms: true,
           date:
@@ -383,7 +389,7 @@ export default function App() {
           finalOrder.amlakLicense = pendingOrder?.amlakLicense || generateAmlakLicense(finalOrder, activeUser);
         }
 
-        // 1. Save to DB (Supabase cloud) and local storage
+        // 1. Save to DB (Supabase cloud), server disk and local storage
         await saveOrderToDb(finalOrder);
 
         if (finalOrder.customerPhone) {
@@ -392,12 +398,13 @@ export default function App() {
           } catch {}
         }
 
-        // 2. Update React state immediately
+        // 2. Update React state immediately with newest first sorting
         setOrders((prev) => {
           const filtered = prev.filter(
-            (o) => o.id !== finalOrder.id && o.trackingCode !== finalOrder.trackingCode
+            (o) => o.id !== finalOrder.id && (!finalOrder.trackingCode || o.trackingCode !== finalOrder.trackingCode)
           );
-          return [finalOrder, ...filtered];
+          const combined = [finalOrder, ...filtered];
+          return combined.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
         });
 
         // 3. Clear cart & pending order
@@ -411,6 +418,9 @@ export default function App() {
           refNumber: refNum,
           trackId: String(trackId),
         });
+
+        // Dispatch real-time event for any listening components
+        window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: finalOrder }));
 
         if (isVerifySuccess) {
           showToast('پرداخت با موفقیت انجام شد و سفارش شما با موفقیت ثبت گردید.');
@@ -1232,19 +1242,59 @@ export default function App() {
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
-    setUsersList((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-    if (currentUser && (currentUser.id === updatedUser.id || currentUser.username === updatedUser.username || currentUser.phone === updatedUser.phone)) {
-      const synced = { ...currentUser, ...updatedUser, role: updatedUser.role };
-      setCurrentUser(synced);
-      try {
-        localStorage.setItem('jahesh_current_user', JSON.stringify(synced));
-      } catch (err) {
-        console.warn(err);
+    // 1. Immediately update local state matching by id, username, or phone
+    setUsersList((prev) =>
+      prev.map((u) => {
+        const matchId = u.id && updatedUser.id && u.id === updatedUser.id;
+        const matchUName =
+          u.username && updatedUser.username && u.username.trim().toLowerCase() === updatedUser.username.trim().toLowerCase();
+        const matchPhone = u.phone && updatedUser.phone && u.phone.trim() === updatedUser.phone.trim();
+        if (matchId || matchUName || matchPhone) {
+          return { ...u, ...updatedUser, role: updatedUser.role };
+        }
+        return u;
+      })
+    );
+
+    // 2. Sync currentUser if target is current logged in account
+    if (currentUser) {
+      const matchCurId = currentUser.id && updatedUser.id && currentUser.id === updatedUser.id;
+      const matchCurUName =
+        currentUser.username &&
+        updatedUser.username &&
+        currentUser.username.trim().toLowerCase() === updatedUser.username.trim().toLowerCase();
+      const matchCurPhone =
+        currentUser.phone && updatedUser.phone && currentUser.phone.trim() === updatedUser.phone.trim();
+      if (matchCurId || matchCurUName || matchCurPhone) {
+        const synced = { ...currentUser, ...updatedUser, role: updatedUser.role };
+        setCurrentUser(synced);
+        try {
+          localStorage.setItem('jahesh_current_user', JSON.stringify(synced));
+        } catch (err) {
+          console.warn(err);
+        }
       }
     }
-    const { updateUserInDb } = await import('./lib/dbService');
+
+    // 3. Persist across multi-layered storage (Local, Server, Supabase)
+    const { updateUserInDb, fetchAllUsersFromDb } = await import('./lib/dbService');
     await updateUserInDb(updatedUser);
-    showToast(`نقش و اطلاعات کاربر «${updatedUser.fullName}» (${updatedUser.role === 'admin' ? 'مدیر سیستم' : 'کاربر عادی'}) با موفقیت به‌روزرسانی شد.`);
+
+    // 4. Refetch all users to make sure state is 100% in sync
+    try {
+      const freshUsers = await fetchAllUsersFromDb();
+      if (freshUsers && freshUsers.length > 0) {
+        setUsersList(freshUsers);
+      }
+    } catch {}
+
+    const roleTitle =
+      updatedUser.role === 'admin'
+        ? 'مدیر ارشد (Super Admin)'
+        : updatedUser.role === 'operator'
+        ? 'ادمین محدود (اپراتور)'
+        : 'کاربر عادی';
+    showToast(`نقش و اطلاعات کاربر «${updatedUser.fullName}» به «${roleTitle}» تغییر یافت و ذخیره شد.`);
   };
 
   const handleAddNewUser = async (newUser: User, initialPass: string = '123456') => {

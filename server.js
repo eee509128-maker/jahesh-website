@@ -26,8 +26,8 @@ if (!fs.existsSync(PRODUCTS_UPLOADS_DIR)) {
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Cloudflare AI Support Route for JaheshKala
-const CLOUDFLARE_ACCOUNT_ID = 'e8950358d5cf09f0f511b46172f65791';
-const CLOUDFLARE_AI_TOKEN = 'cfut_Dux4Ej0iGy3P0bowmnh5LevCZ0f1DaTDmr5a1lmR074a186e';
+const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID || 'e8950358d5cf09f0f511b46172f65791';
+const CLOUDFLARE_AI_TOKEN = process.env.CLOUDFLARE_AI_TOKEN || 'cfut_Dux4Ej0iGy3P0bowmnh5LevCZ0f1DaTDmr5a1lmR074a186e';
 const MODEL_NAME = '@cf/meta/llama-3.1-8b-instruct';
 
 app.post('/api/cloudflare-ai', async (req, res) => {
@@ -269,162 +269,22 @@ app.post('/api/banners', (req, res) => {
 // ==========================================
 const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
 
-const DEFAULT_SERVER_PRODUCTS = [
-  {
-    id: 'pkg-golden-jahesh',
-    title: 'پکیج طلایی طراحی سایت اختصاصی جهش',
-    category: 'طراحی سایت و خدمات وب',
-    brand: 'جهش‌آی‌تی (Jahesh IT)',
-    price: 7900000,
-    originalPrice: 11500000,
-    discountPercent: 31,
-    badge: 'پیشنهاد طلایی جهش',
-    isPopular: true,
-    isGolden: true,
-    isIncredible: true,
-    incredibleTimerDuration: '1month',
-    incredibleExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    rating: 5.0,
-    reviewsCount: 48,
-    deliveryDays: 'تحویل فوری ۳ تا ۷ روز کاری',
-    warranty: '۱ ماه پشتیبانی فنی رایگان + هاست و دامین رایگان',
-    couponCode: 'JAHESH20',
-    couponDiscountPercent: 20,
-    shortDescription: 'طراحی سایت مدرن، ریسپانسیو و پرسرعت متصل به درگاه پرداخت زیبال با امنیت کامل و پنل مدیریت اختصاصی.',
-    fullDescription: 'با پکیج طلایی طراحی وب‌سایت جهش، یک وب‌سایت فروشگاهی یا شرکتی تمام‌عیار با کدنویسی اختصاصی، رابط کاربری مدرن، سئو استاندارد، هاست پرسرعت و درگاه پرداخت آنلاین تحویل بگیرید.',
-    features: [
-      'طراحی کاملاً واکنش‌گرا (Responsive) سازگار با موبایل و تبلت',
-      'اتصال مستقیم به درگاه پرداخت اینترنتی زیبال (Zibal)',
-      'پنل اختصاصی مدیریت محصولات، سفارشات و مشتریان',
-      'هاست پرسرعت NVMe و دامنه رایگان',
-      '۱ ماه پشتیبانی فنی و آموزش کامل کاربری',
-    ],
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1000&q=80',
-  },
-  {
-    id: 'pkg-amlak-jahesh',
-    title: 'نرم‌افزار جامع مدیریت املاک جهش (اشتراک آنلاین و ابری)',
-    category: 'نرم‌افزار و سامانه‌های هوشمند',
-    brand: 'جهش کمپانی (Jahesh Company)',
-    price: 250000,
-    originalPrice: 350000,
-    discountPercent: 28,
-    badge: 'سامانه هوشمند املاک',
-    isPopular: true,
-    isGolden: true,
-    isSubscription: true,
-    pricePerDay: 250000,
-    rating: 5.0,
-    reviewsCount: 64,
-    deliveryDays: 'فعال‌سازی آنی و دسترسی فوری',
-    warranty: 'پشتیبانی فنی اختصاصی + اتصال دیتابیس ابری و پشتیبان‌گیری',
-    couponCode: 'AMLAK10',
-    couponDiscountPercent: 10,
-    shortDescription: 'سامانه پیشرفته مشاورین و مدیران املاک با قابلیت ثبت صوتی، هوش مصنوعی تطبیق مشتری، تور مجازی ۳۶۰ درجه و هماهنگ‌سازی چندکاربره.',
-    fullDescription: 'نرم‌افزار جامع مدیریت املاک جهش یک پلتفرم نسل جدید برای مشاورین و آژانس‌های املاک است.',
-    features: [
-      '🤖 دستیار هوشمند NLP و تایپ صوتی لایو برای ثبت سریع املاک و متقاضیان',
-      '🌐 نمایشگر و تور مجازی ۳۶۰ درجه پانوراما همراه با هات‌اسپات تعاملی',
-      '👥 سیستم پیشرفته Match Making (تطبیق هوشمند فایل و مشتری بر اساس بودجه و نیاز)',
-      '📥 قابلیت پشتیبان‌گیری، دانلود فایل و ادغام امن اطلاعات بین کامپیوتر و گوشی',
-      '⚡ امکان دسترسی آنلاین و مستقیم با حساب کاربری فعال جهش',
-      '💰 تعرفه منعطف: فقط ۲۵۰,۰۰۰ تومان به ازای هر روز اشتراک با تخفیف‌های دوره‌ای',
-    ],
-    image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1000&q=80',
-    gallery: [
-      'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1000&q=80',
-      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1000&q=80',
-      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1000&q=80',
-    ]
-  },
-  {
-    id: 'pkg-ads-smart',
-    title: 'پکیج‌های تبلیغات هوشمند جهش (تعرفه‌های ویژه کمپین)',
-    category: 'خدمات و تبلیغات دیجیتال',
-    brand: 'جهش دیجیتال مارکتینگ (Jahesh Marketing)',
-    price: 9900000,
-    originalPrice: 36500000,
-    discountPercent: 30,
-    badge: 'تعرفه‌های ویژه تبلیغاتی',
-    isPopular: true,
-    isGolden: true,
-    hasCustomPlans: true,
-    customPlansTitle: 'پکیج‌های تبلیغات هوشمند',
-    customPlansSubtitle: 'انتخاب کنید و کمپین خود را به سطح بالاتری ببرید',
-    rating: 5.0,
-    reviewsCount: 39,
-    deliveryDays: 'شروع فوری کمپین در کمتر از ۲۴ ساعت',
-    warranty: 'تضمین بازدهی + گزارش دقیق لحظه‌ای با داشبورد اختصاصی',
-    shortDescription: 'پکیج جامع تبلیغات هوشمند و هدفمند ویژه کسب‌وکارها با ۳ تعرفه پایه، طلایی و پلاتینیوم همراه با تیزر هوش مصنوعی، محتوا و گزارش تحلیلی.',
-    fullDescription: 'کمپین تبلیغاتی هوشمند جهش با بهره‌گیری از هوش مصنوعی، دیتابیس دقیق مشاغل، سناریونویسی حرفه‌ای، تولید تیزر و پوستر اختصاصی و اجرای هدفمند به شما کمک می‌کند مخاطبان واقعی کسب‌وکارتان را جذب نمایید.',
-    features: [
-      'تبلیغات هدفمند منطقه‌ای و استانی بر اساس اصناف و مشاغل',
-      'طراحی پوسترها و استوری‌های تبلیغاتی فوق‌العاده باکیفیت',
-      'تولید تیزر و موشن‌گرافیک با هوش مصنوعی',
-      'گزارش‌گیری تحلیلی و داشبورد لحظه‌ای بازخورد کمپین',
-    ],
-    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1000&q=80',
-    gallery: [
-      'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1000&q=80',
-      'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1000&q=80',
-    ],
-    subscriptionPlans: [
-      {
-        id: 'plan-starter',
-        name: 'پایه (استارتر)',
-        badge: 'مناسب شروع',
-        price: 9900000,
-        originalPrice: 14000000,
-        durationDays: 30,
-        durationLabel: 'دوره ۱ ماهه',
-        shortDescription: 'مناسب کسب‌وکارهای نوپا و تست اولیه بازار',
-        features: [
-          'لیست تا ۲,۰۰۰ شماره هدفمند',
-          '۲۰ پوستر حرفه‌ای',
-          '۱ تیزر تبلیغاتی',
-          'گزارش ساده از عملکرد کمپین',
-        ],
-        isPopular: false,
-      },
-      {
-        id: 'plan-golden',
-        name: 'طلایی (پیشنهادی ویژه)',
-        badge: '🔥 پیشنهادی ویژه',
-        price: 25500000,
-        originalPrice: 36500000,
-        durationDays: 30,
-        durationLabel: 'دوره ۱ ماهه طلایی',
-        shortDescription: '۳۰٪ تخفیف ویژه اولین همکاری',
-        features: [
-          'تمام امکانات پیشرفته و تحلیلی',
-          '۵۰۰۰ + فیلتر حرفه‌ای مخاطبان',
-          'تیزر و ویدیو با هوش مصنوعی',
-          '۵۰ پوستر و محتوای اختصاصی',
-          'پشتیبانی مستقیم و مشاوره کمپین',
-        ],
-        isPopular: true,
-      },
-      {
-        id: 'plan-vip',
-        name: 'پلاتینیوم (VIP)',
-        badge: 'VIP پلاتینیوم',
-        price: 490000000,
-        originalPrice: 590000000,
-        durationDays: 365,
-        durationLabel: 'کمپین جامع سالانه VIP',
-        shortDescription: 'بالاترین سطح دسترسی و مدیریت اختصاصی',
-        features: [
-          'همه امکانات طلایی + محتوای اختصاصی نامحدود',
-          'کمپین ویژه برای هر شهرستان به تفکیک',
-          'شناسایی و هماهنگی اینفلوئنسرها',
-          'پشتیبانی ۲۴ ساعته اختصاصی VIP',
-          'مدیریت صفر تا صد مارکتینگ و لایو',
-        ],
-        isPopular: false,
-      },
-    ],
-  },
-];
+function getDefaultProducts() {
+  try {
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading products.json:', e);
+  }
+  return [];
+}
+
+const DEFAULT_SERVER_PRODUCTS = getDefaultProducts();
 
 // Endpoint to upload product image file directly to server (returns a permanent, lightweight URL)
 app.post('/api/upload-product-image', (req, res) => {
@@ -595,12 +455,24 @@ app.post('/api/products/delete', (req, res) => {
 // ==========================================
 const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
 
+function sortOrdersNewestFirst(orders) {
+  if (!Array.isArray(orders)) return [];
+  return orders.sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.paidAt ? new Date(a.paidAt).getTime() : 0);
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.paidAt ? new Date(b.paidAt).getTime() : 0);
+    if (timeA && timeB) return timeB - timeA;
+    if (timeB) return 1;
+    if (timeA) return -1;
+    return String(b.id || '').localeCompare(String(a.id || ''));
+  });
+}
+
 function readOrdersFromDisk() {
   if (fs.existsSync(ORDERS_FILE)) {
     try {
       const raw = fs.readFileSync(ORDERS_FILE, 'utf8');
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) return sortOrdersNewestFirst(parsed);
     } catch (e) {
       console.warn('Error reading orders.json:', e);
     }
@@ -614,7 +486,8 @@ function writeOrdersToDisk(orders) {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
+    const sorted = sortOrdersNewestFirst(orders);
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(sorted, null, 2), 'utf8');
   } catch (e) {
     console.error('Error writing orders.json:', e);
   }
@@ -633,14 +506,22 @@ app.get('/api/orders', (_req, res) => {
 // POST /api/orders
 app.post('/api/orders', (req, res) => {
   try {
-    const incoming = req.body;
+    let incoming = req.body;
+    if (incoming && Array.isArray(incoming.orders)) {
+      incoming = incoming.orders;
+    } else if (incoming && incoming.id && !Array.isArray(incoming)) {
+      incoming = [incoming];
+    }
     if (!Array.isArray(incoming)) {
-      return res.status(400).json({ error: 'Expected array of orders' });
+      return res.status(400).json({ error: 'Expected array of orders or single order object' });
     }
     const current = readOrdersFromDisk();
     const existingMap = new Map(current.map((o) => [o.id, o]));
     incoming.forEach((o) => {
       if (o && o.id) {
+        if (!o.createdAt) {
+          o.createdAt = new Date().toISOString();
+        }
         existingMap.set(o.id, { ...existingMap.get(o.id), ...o });
       }
     });
@@ -658,6 +539,9 @@ app.post('/api/orders/save', (req, res) => {
     const order = req.body;
     if (!order || !order.id) {
       return res.status(400).json({ error: 'Invalid order object' });
+    }
+    if (!order.createdAt) {
+      order.createdAt = new Date().toISOString();
     }
     const current = readOrdersFromDisk();
     const idx = current.findIndex(
@@ -715,6 +599,131 @@ app.post('/api/orders/clear', (_req, res) => {
   try {
     writeOrdersToDisk([]);
     return res.json({ success: true, count: 0, orders: [] });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// Users & Roles Persistence API
+// ==========================================
+const USERS_FILE = path.join(__dirname, 'data', 'users.json');
+
+function readUsersFromDisk() {
+  if (fs.existsSync(USERS_FILE)) {
+    try {
+      const raw = fs.readFileSync(USERS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn('Error reading users.json:', e);
+    }
+  }
+  return [];
+}
+
+function writeUsersToDisk(users) {
+  try {
+    const dataDir = path.dirname(USERS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error writing users.json:', e);
+  }
+}
+
+// GET /api/users
+app.get('/api/users', (_req, res) => {
+  try {
+    const users = readUsersFromDisk();
+    return res.json({ success: true, users });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/users/update-role
+app.post('/api/users/update-role', (req, res) => {
+  try {
+    const { id, username, phone, role } = req.body || {};
+    if (!role) {
+      return res.status(400).json({ error: 'Role is required' });
+    }
+    const current = readUsersFromDisk();
+    const idx = current.findIndex(
+      (u) => (id && u.id === id) || (username && u.username === username) || (phone && u.phone === phone)
+    );
+    if (idx >= 0) {
+      current[idx].role = role;
+    } else if (username || phone || id) {
+      current.push({
+        id: id || `usr-${Date.now()}`,
+        username: username || '',
+        phone: phone || '',
+        role: role,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    writeUsersToDisk(current);
+    console.log(`[Users] Updated role to ${role} for user ${username || phone || id}`);
+    return res.json({ success: true, count: current.length, users: current });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/users (bulk or single user save/update)
+app.post('/api/users', (req, res) => {
+  try {
+    let incoming = req.body;
+    if (incoming && Array.isArray(incoming.users)) {
+      incoming = incoming.users;
+    } else if (incoming && !Array.isArray(incoming)) {
+      incoming = [incoming];
+    }
+    if (!Array.isArray(incoming)) {
+      return res.status(400).json({ error: 'Expected array of users or single user' });
+    }
+    const current = readUsersFromDisk();
+    incoming.forEach((user) => {
+      if (user && (user.id || user.username || user.phone)) {
+        const idx = current.findIndex(
+          (u) => (user.id && u.id === user.id) || (user.username && u.username === user.username) || (user.phone && u.phone === user.phone)
+        );
+        if (idx >= 0) {
+          current[idx] = { ...current[idx], ...user };
+        } else {
+          current.unshift(user);
+        }
+      }
+    });
+    writeUsersToDisk(current);
+    return res.json({ success: true, count: current.length, users: current });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/users/save
+app.post('/api/users/save', (req, res) => {
+  try {
+    const user = req.body;
+    if (!user || (!user.id && !user.username && !user.phone)) {
+      return res.status(400).json({ error: 'Invalid user payload' });
+    }
+    const current = readUsersFromDisk();
+    const idx = current.findIndex(
+      (u) => (user.id && u.id === user.id) || (user.username && u.username === user.username) || (user.phone && u.phone === user.phone)
+    );
+    if (idx >= 0) {
+      current[idx] = { ...current[idx], ...user };
+    } else {
+      current.unshift(user);
+    }
+    writeUsersToDisk(current);
+    return res.json({ success: true, user, count: current.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -808,6 +817,28 @@ app.post('/api/zibal-request', async (req, res) => {
     }
 
     if (data.result === 100) {
+      // Auto-save pending order directly to server orders disk
+      if (req.body?.orderData) {
+        try {
+          const currentOrders = readOrdersFromDisk();
+          const pOrder = { ...req.body.orderData };
+          pOrder.trackingCode = String(data.trackId);
+          pOrder.zibalTrackId = String(data.trackId);
+          pOrder.status = pOrder.status || 'در حال بررسی';
+          pOrder.createdAt = pOrder.createdAt || new Date().toISOString();
+          const pIdx = currentOrders.findIndex((o) => o.id === pOrder.id);
+          if (pIdx >= 0) {
+            currentOrders[pIdx] = { ...currentOrders[pIdx], ...pOrder };
+          } else {
+            currentOrders.unshift(pOrder);
+          }
+          writeOrdersToDisk(currentOrders);
+          console.log(`[Orders] Auto-saved pending order ${pOrder.id} with trackId ${data.trackId}`);
+        } catch (saveErr) {
+          console.warn('[Orders] Could not auto-save pending order on request:', saveErr);
+        }
+      }
+
       return res.json({
         success: true,
         result: data.result,
@@ -880,12 +911,42 @@ app.post('/api/zibal-verify', async (req, res) => {
     }
 
     if (data.result === 100 || data.result === 201) {
+      const refNum = data.refNumber ? String(data.refNumber) : String(trackId);
+
+      // Auto-update order on disk immediately upon successful verification!
+      try {
+        const currentOrders = readOrdersFromDisk();
+        const oIdx = currentOrders.findIndex(
+          (o) =>
+            (o.trackingCode && String(o.trackingCode) === String(trackId)) ||
+            (o.zibalTrackId && String(o.zibalTrackId) === String(trackId)) ||
+            (data.orderId && o.id === data.orderId)
+        );
+        if (oIdx >= 0) {
+          currentOrders[oIdx] = {
+            ...currentOrders[oIdx],
+            status: 'تایید شده / در حال آماده‌سازی',
+            trackingCode: String(trackId),
+            paymentRefId: refNum,
+            zibalTrackId: String(trackId),
+            zibalRefNumber: refNum,
+            cardNumber: data.cardNumber || currentOrders[oIdx].cardNumber || '',
+            paidAt: data.paidAt || new Date().toISOString(),
+            paymentGateway: 'زیبال (Zibal - پرداخت موفق شاپرک)',
+          };
+          writeOrdersToDisk(currentOrders);
+          console.log(`[Zibal Verify] Updated order ${currentOrders[oIdx].id} on disk to confirmed!`);
+        }
+      } catch (diskErr) {
+        console.warn('[Zibal Verify] Could not auto-update order on disk:', diskErr);
+      }
+
       return res.json({
         success: true,
         result: data.result,
         status: data.status,
         isSandboxFallback,
-        refNumber: data.refNumber ? String(data.refNumber) : String(trackId),
+        refNumber: refNum,
         amountInRials: data.amount,
         amountInTomans: data.amount ? Math.round(data.amount / 10) : 0,
         paidAt: data.paidAt,

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { CartItem, User, Order } from '../types';
 import { requestZibalPayment, savePendingOrder } from '../lib/zibalService';
+import { saveOrderToDb } from '../lib/dbService';
 import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
 
 interface PaymentGatewayModalProps {
@@ -178,6 +179,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
       status: 'در حال بررسی',
       paymentGateway: 'زیبال (Zibal)',
       acceptedTerms: true,
+      createdAt: new Date().toISOString(),
       date: new Date().toLocaleDateString('fa-IR', {
         year: 'numeric',
         month: 'long',
@@ -191,8 +193,15 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
       pendingOrder.amlakLicense = generateAmlakLicense(pendingOrder, currentUser);
     }
 
-    // Save locally
+    // Save locally to localStorage and sessionStorage
     savePendingOrder(pendingOrder);
+
+    // Also persist immediately to database and server disk
+    try {
+      await saveOrderToDb(pendingOrder);
+    } catch (e) {
+      console.warn('Initial pending order save notice:', e);
+    }
 
     // Call API to request Zibal payment session
     const res = await requestZibalPayment({
@@ -203,9 +212,18 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
       customerEmail: currentUser.email,
       description: `خرید از فروشگاه جهش کالا - فاکتور ${orderId}`,
       merchant: zibalMerchant,
+      orderData: pendingOrder,
     });
 
     if (res.success && res.paymentUrl) {
+      if (res.trackId) {
+        pendingOrder.trackingCode = String(res.trackId);
+        pendingOrder.zibalTrackId = String(res.trackId);
+        savePendingOrder(pendingOrder);
+        try {
+          await saveOrderToDb(pendingOrder);
+        } catch {}
+      }
       // Direct redirect to real Shaparak / Zibal gateway
       window.location.href = res.paymentUrl;
     } else {
@@ -241,10 +259,10 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
         }
       }}
     >
-      <div className="relative w-full max-w-lg bg-[#0e0a22] border border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-4 max-h-[95vh] flex flex-col">
+      <div className="relative w-full max-w-xl bg-[#0e0a22] border border-purple-700/70 rounded-3xl shadow-2xl overflow-hidden my-2 sm:my-4 max-h-[94vh] flex flex-col">
         
         {/* Top Header - Shaparak & Zibal Trust Indicators */}
-        <div className="bg-gradient-to-r from-[#180e3b] via-[#241352] to-[#180e3b] p-4 sm:p-5 border-b border-purple-900/60 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-[#180e3b] via-[#241352] to-[#180e3b] p-4 sm:p-5 border-b border-purple-900/60 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-950/50 text-white shrink-0">
               <ShieldCheck className="w-5 h-5" />
@@ -402,50 +420,53 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 sm:p-5 bg-[#140c31] border-t border-purple-900/50 flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="p-4 sm:p-5 bg-[#140c31] border-t border-purple-900/60 shrink-0 flex flex-col gap-3">
+          {/* Main Primary Action: Pay & Connect to Bank */}
+          <button
+            type="button"
+            onClick={handleStartPayment}
+            disabled={isProcessing}
+            className="w-full h-13 sm:h-14 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer active:scale-[0.98] shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin text-slate-950 shrink-0" />
+                <span className="font-bold">{isAdmin ? 'در حال ثبت سفارش رایگان مدیریت...' : 'در حال اتصال امن به درگاه شاپرک...'}</span>
+              </>
+            ) : isAdmin ? (
+              <>
+                <Gift className="w-5 h-5 text-slate-950 shrink-0" />
+                <span>تکمیل و ثبت رایگان سفارش (حساب مدیریت VIP)</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-5 h-5 shrink-0 text-slate-950" />
+                <span>اتصال به درگاه و پرداخت {formatPrice(payableTotal)}</span>
+                <ExternalLink className="w-4 h-4 opacity-80 shrink-0" />
+              </>
+            )}
+          </button>
+
+          {/* Secondary Actions: Back to cart & Close */}
+          <div className="grid grid-cols-2 gap-2.5 w-full">
             <button
               type="button"
               onClick={handleCloseBack}
-              className="h-11 sm:h-12 px-4 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-purple-950/80 hover:bg-purple-900 border border-purple-800/50 transition-all flex-1 sm:flex-none text-center cursor-pointer whitespace-nowrap flex items-center justify-center shadow-sm active:scale-95"
+              className="h-11 px-3 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-purple-950/70 hover:bg-purple-900 border border-purple-800/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95 text-center"
               title="بازگشت به سبد خرید"
             >
-              بازگشت به سبد
+              <span>بازگشت به سبد خرید</span>
             </button>
             <button
               type="button"
               onClick={handleCloseEntirely}
-              className="h-11 sm:h-12 px-4 rounded-xl text-xs font-bold text-rose-300 hover:text-rose-200 bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/40 transition-all flex-1 sm:flex-none text-center cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm active:scale-95"
+              className="h-11 px-3 rounded-xl text-xs font-bold text-rose-300 hover:text-rose-200 bg-rose-950/30 hover:bg-rose-900/40 border border-rose-800/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95 text-center"
               title="بستن کامل و بازگشت به صفحه فروشگاه"
             >
               <Store className="w-3.5 h-3.5 shrink-0" />
-              <span>بستن و بازگشت</span>
+              <span>انصراف و بستن</span>
             </button>
           </div>
-
-          <button
-            onClick={handleStartPayment}
-            disabled={isProcessing}
-            className="h-11 sm:h-12 flex-1 w-full sm:w-auto flex items-center justify-center gap-2 font-black px-5 rounded-xl shadow-xl transition-all text-xs whitespace-nowrap bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-600/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-slate-950 shrink-0" />
-                <span>{isAdmin ? 'در حال ثبت سفارش رایگان مدیریت...' : 'در حال اتصال به شاپرک...'}</span>
-              </>
-            ) : isAdmin ? (
-              <>
-                <Gift className="w-4 h-4 text-slate-950 shrink-0" />
-                <span>تکمیل و ثبت رایگان سفارش (حساب مدیریت)</span>
-              </>
-            ) : (
-              <>
-                <ShieldCheck className="w-4 h-4 shrink-0" />
-                <span>اتصال به درگاه و پرداخت {formatPrice(payableTotal)}</span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-70 shrink-0" />
-              </>
-            )}
-          </button>
         </div>
 
       </div>

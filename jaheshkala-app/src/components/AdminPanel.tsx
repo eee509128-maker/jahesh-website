@@ -7,13 +7,14 @@ import {
   Sliders, ExternalLink, Code2, Server, HelpCircle, Layers, Tag, Sparkles,
   Flame, Percent, Truck, Check, Ticket, ToggleLeft, ToggleRight, ArrowDownRight, Calculator, Users, MessageCircle, ArrowLeft, Reply, Paperclip, Image as ImageIcon, CornerUpRight, Download,
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
-  ChevronRight, ChevronLeft, Gift
+  ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan } from '../types';
-import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS } from '../data/initialData';
+import { renderFormattedBannerTitle } from '../lib/bannerUtils';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -90,6 +91,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bannerImage, setBannerImage] = useState('');
   const [bannerImageLoading, setBannerImageLoading] = useState(false);
   const [bannerSuccessMessage, setBannerSuccessMessage] = useState('');
+
+  // ویژگی‌های پیشرفته گرافیکی متن و پس‌زمینه بنر
+  const [bannerTitleColor, setBannerTitleColor] = useState<string>('#ffffff');
+  const [bannerSubtitleColor, setBannerSubtitleColor] = useState<string>('#e2e8f0');
+  const [bannerHighlightText, setBannerHighlightText] = useState<string>('');
+  const [bannerHighlightColor, setBannerHighlightColor] = useState<string>('#fbbf24');
+  const [bannerTextBackdropEnabled, setBannerTextBackdropEnabled] = useState<boolean>(false);
+  const [bannerTextBackdropTheme, setBannerTextBackdropTheme] = useState<'dark' | 'purple' | 'navy' | 'light'>('dark');
+  const [bannerTextBackdropOpacity, setBannerTextBackdropOpacity] = useState<number>(65);
+  const [bannerTitleFontSize, setBannerTitleFontSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('lg');
+  const [bannerSubtitleFontSize, setBannerSubtitleFontSize] = useState<'sm' | 'md' | 'lg'>('md');
+  const [bannerSingleLineTitle, setBannerSingleLineTitle] = useState<boolean>(true);
+  const [bannerSingleLineSubtitle, setBannerSingleLineSubtitle] = useState<boolean>(false);
+  const [bannerPreviewDevice, setBannerPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [isRefreshingOrders, setIsRefreshingOrders] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
 
@@ -235,6 +250,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBannerHideTextOverlay(!!b.hideTextOverlay);
     setBannerTargetGuild(b.targetGuild || '');
     setBannerImage(b.image || '');
+    setBannerTitleColor(b.titleColor || '#ffffff');
+    setBannerSubtitleColor(b.subtitleColor || '#e2e8f0');
+    setBannerHighlightText(b.highlightText || '');
+    setBannerHighlightColor(b.highlightColor || '#fbbf24');
+    setBannerTextBackdropEnabled(!!b.textBackdropEnabled);
+    setBannerTextBackdropTheme(b.textBackdropTheme || 'dark');
+    setBannerTextBackdropOpacity(b.textBackdropOpacity !== undefined ? b.textBackdropOpacity : 65);
+    setBannerTitleFontSize(b.titleFontSize || 'lg');
+    setBannerSubtitleFontSize(b.subtitleFontSize || 'md');
+    setBannerSingleLineTitle(b.singleLineTitle !== undefined ? b.singleLineTitle : true);
+    setBannerSingleLineSubtitle(!!b.singleLineSubtitle);
     setBannerSuccessMessage('');
   };
 
@@ -253,6 +279,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBannerHideTextOverlay(false);
     setBannerTargetGuild('');
     setBannerImage('');
+    setBannerTitleColor('#ffffff');
+    setBannerSubtitleColor('#e2e8f0');
+    setBannerHighlightText('');
+    setBannerHighlightColor('#fbbf24');
+    setBannerTextBackdropEnabled(false);
+    setBannerTextBackdropTheme('dark');
+    setBannerTextBackdropOpacity(65);
+    setBannerTitleFontSize('lg');
+    setBannerSubtitleFontSize('md');
+    setBannerSingleLineTitle(true);
+    setBannerSingleLineSubtitle(false);
     setBannerSuccessMessage('');
     if (bannerFileInputRef.current) bannerFileInputRef.current.value = '';
   };
@@ -279,6 +316,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       hideTextOverlay: bannerHideTextOverlay,
       targetGuild: bannerTargetGuild.trim() || undefined,
       image: bannerImage,
+      titleColor: bannerTitleColor,
+      subtitleColor: bannerSubtitleColor,
+      highlightText: bannerHighlightText.trim() || undefined,
+      highlightColor: bannerHighlightColor,
+      textBackdropEnabled: bannerTextBackdropEnabled,
+      textBackdropTheme: bannerTextBackdropTheme,
+      textBackdropOpacity: bannerTextBackdropOpacity,
+      titleFontSize: bannerTitleFontSize,
+      subtitleFontSize: bannerSubtitleFontSize,
+      singleLineTitle: bannerSingleLineTitle,
+      singleLineSubtitle: bannerSingleLineSubtitle,
       isActive: true,
       order: editingBannerId
         ? (bannersList.find((b) => b.id === editingBannerId)?.order ?? 0)
@@ -1210,11 +1258,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-purple-900/30 text-slate-200">
-                      {orders.map((order) => (
+                      {[...orders]
+                        .sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a))
+                        .map((order) => (
                         <tr key={order.id} className="hover:bg-purple-950/40 transition-colors">
                           <td className="p-3.5 font-mono font-bold text-purple-300">
                             {order.id}
                             <div className="text-[10px] text-slate-400 font-normal">{order.date}</div>
+                            {(order.trackingCode || order.paymentRefId || order.zibalTrackId) && (
+                              <div className="text-[10px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
+                                <span className="text-slate-400 font-sans">پیگیری:</span>
+                                <span>{order.trackingCode || order.paymentRefId || order.zibalTrackId}</span>
+                              </div>
+                            )}
                           </td>
                           <td className="p-3.5">
                             <span className="font-bold text-white">{order.customerName}</span>
@@ -2988,16 +3044,357 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           اگر عکس بنر شما قبلاً توسط گرافیست طراحی شده و خودش متن و تیتر دارد، این گزینه را تیک بزنید تا نوشته‌ها روی عکس قرار نگیرند.
                         </span>
                       </div>
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0 mr-3">
-                        <input
-                          type="checkbox"
-                          checked={bannerHideTextOverlay}
-                          onChange={(e) => setBannerHideTextOverlay(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                      </label>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={bannerHideTextOverlay}
+                        onClick={() => setBannerHideTextOverlay(!bannerHideTextOverlay)}
+                        dir="ltr"
+                        className={`w-12 h-6.5 rounded-full transition-colors duration-200 flex items-center px-1 focus:outline-none shrink-0 border mr-3 ${
+                          bannerHideTextOverlay
+                            ? 'bg-amber-500 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.4)] justify-end'
+                            : 'bg-slate-800 border-slate-700 justify-start'
+                        }`}
+                      >
+                        <span className="block w-4.5 h-4.5 rounded-full bg-white shadow-md transition-all duration-200" />
+                      </button>
                     </div>
+
+                    {/* Text Graphics, Font Sizes, Highlight Word, Backdrop Blur Box & Single Line Controls */}
+                    {!bannerHideTextOverlay && (
+                      <div className="md:col-span-2 p-4 bg-[#140b2b] border border-purple-700/60 rounded-2xl space-y-4">
+                        <div className="flex items-center gap-2 text-amber-300 font-black text-xs border-b border-purple-800/60 pb-2">
+                          <Palette className="w-4 h-4 text-amber-400" />
+                          <span>تنظیمات گرافیکی متن، سایز قلم، رنگ‌ها و باکس محوکننده پس‌زمینه</span>
+                        </div>
+
+                        {/* Font Sizes & Single-Line No-Wrap Controls */}
+                        <div className="p-3.5 bg-purple-950/50 border border-purple-800/70 rounded-xl space-y-3.5">
+                          <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                            <Type className="w-4 h-4 text-amber-400" />
+                            <span>سایز قلم و کنترل چیدمان خطوط (جلوگیری از شکستن متن به دو خط)</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Title Font Size */}
+                            <div>
+                              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                                سایز عنوان اصلی بنر:
+                              </label>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {[
+                                  { id: 'sm', label: 'کوچک', desc: 'مناسب تیترهای بلند' },
+                                  { id: 'md', label: 'متوسط', desc: 'سایز متوازن و استاندارد' },
+                                  { id: 'lg', label: 'بزرگ', desc: 'پیش‌فرض برجسته' },
+                                  { id: 'xl', label: 'خیلی‌بزرگ', desc: 'تیتر بسیار درشت' },
+                                ].map((s) => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => setBannerTitleFontSize(s.id as any)}
+                                    className={`py-2 px-1 rounded-xl text-center border transition-all ${
+                                      bannerTitleFontSize === s.id
+                                        ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-md scale-102'
+                                        : 'bg-black/50 text-slate-300 hover:text-white border-purple-800/60 hover:border-purple-600'
+                                    }`}
+                                  >
+                                    <span className="block text-xs">{s.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Subtitle Font Size */}
+                            <div>
+                              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                                سایز متن زیرعنوان:
+                              </label>
+                              <div className="grid grid-cols-3 gap-1.5">
+                                {[
+                                  { id: 'sm', label: 'ریز' },
+                                  { id: 'md', label: 'متوسط' },
+                                  { id: 'lg', label: 'بزرگ' },
+                                ].map((s) => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => setBannerSubtitleFontSize(s.id as any)}
+                                    className={`py-2 px-1 rounded-xl text-center border transition-all ${
+                                      bannerSubtitleFontSize === s.id
+                                        ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-md scale-102'
+                                        : 'bg-black/50 text-slate-300 hover:text-white border-purple-800/60 hover:border-purple-600'
+                                    }`}
+                                  >
+                                    <span className="block text-xs">{s.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Single Line Title & Subtitle Toggles */}
+                          <div className="pt-2.5 border-t border-purple-800/40 space-y-2.5">
+                            {/* Force Single Line Title */}
+                            <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-purple-800/40">
+                              <div>
+                                <span className="text-xs font-bold text-slate-200 block">
+                                  قفل کردن عنوان در یک سطر (Single-Line / No-Wrap)
+                                </span>
+                                <span className="text-[10px] sm:text-[11px] text-slate-400">
+                                  با فعال بودن این گزینه، کلمات عنوان بنر در تمام دستگاه‌ها (موبایل و کامپیوتر) در یک خط قرار می‌گیرند و به خط دوم نمی‌شکنند.
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={bannerSingleLineTitle}
+                                onClick={() => setBannerSingleLineTitle(!bannerSingleLineTitle)}
+                                dir="ltr"
+                                className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-1 focus:outline-none shrink-0 border mr-2 ${
+                                  bannerSingleLineTitle
+                                    ? 'bg-amber-500 border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.35)] justify-end'
+                                    : 'bg-slate-800 border-slate-700 justify-start'
+                                }`}
+                              >
+                                <span className="block w-4 h-4 rounded-full bg-white shadow-md transition-all duration-200" />
+                              </button>
+                            </div>
+
+                            {/* Force Single Line Subtitle */}
+                            <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/40 border border-purple-800/40">
+                              <div>
+                                <span className="text-xs font-bold text-slate-200 block">
+                                  قفل کردن متن توضیحات در یک سطر
+                                </span>
+                                <span className="text-[10px] sm:text-[11px] text-slate-400">
+                                  جلوگیری از شکستن زیرعنوان به دو سطر.
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={bannerSingleLineSubtitle}
+                                onClick={() => setBannerSingleLineSubtitle(!bannerSingleLineSubtitle)}
+                                dir="ltr"
+                                className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-1 focus:outline-none shrink-0 border mr-2 ${
+                                  bannerSingleLineSubtitle
+                                    ? 'bg-amber-500 border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.35)] justify-end'
+                                    : 'bg-slate-800 border-slate-700 justify-start'
+                                }`}
+                              >
+                                <span className="block w-4 h-4 rounded-full bg-white shadow-md transition-all duration-200" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Title Color */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+                              <span>رنگ عنوان اصلی بنر</span>
+                              <span className="text-[10px] text-slate-400 font-mono" dir="ltr">{bannerTitleColor}</span>
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={bannerTitleColor}
+                                onChange={(e) => setBannerTitleColor(e.target.value)}
+                                className="w-9 h-9 rounded-xl border border-purple-600 bg-transparent cursor-pointer p-0.5 shrink-0"
+                                title="انتخاب رنگ دلخواه"
+                              />
+                              <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                                {[
+                                  { label: 'سفید', color: '#ffffff' },
+                                  { label: 'طلایی', color: '#fbbf24' },
+                                  { label: 'فیروزه‌ای', color: '#38bdf8' },
+                                  { label: 'زمردی', color: '#4ade80' },
+                                  { label: 'سرخابی', color: '#f43f5e' },
+                                  { label: 'ارغوانی', color: '#c084fc' },
+                                ].map((c) => (
+                                  <button
+                                    key={c.color}
+                                    type="button"
+                                    onClick={() => setBannerTitleColor(c.color)}
+                                    className={`w-6 h-6 rounded-lg border transition-all ${
+                                      bannerTitleColor.toLowerCase() === c.color.toLowerCase()
+                                        ? 'ring-2 ring-amber-400 scale-110 border-white'
+                                        : 'border-white/20 hover:scale-105'
+                                    }`}
+                                    style={{ backgroundColor: c.color }}
+                                    title={c.label}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Subtitle Color */}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+                              <span>رنگ متن توضیحات</span>
+                              <span className="text-[10px] text-slate-400 font-mono" dir="ltr">{bannerSubtitleColor}</span>
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={bannerSubtitleColor}
+                                onChange={(e) => setBannerSubtitleColor(e.target.value)}
+                                className="w-9 h-9 rounded-xl border border-purple-600 bg-transparent cursor-pointer p-0.5 shrink-0"
+                                title="انتخاب رنگ دلخواه"
+                              />
+                              <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                                {[
+                                  { label: 'سفید ملایم', color: '#e2e8f0' },
+                                  { label: 'خاکستری روشن', color: '#cbd5e1' },
+                                  { label: 'طلایی ملایم', color: '#fde047' },
+                                  { label: 'آبی آسمانی', color: '#a5f3fc' },
+                                  { label: 'صورتی مهتابی', color: '#fbcfe8' },
+                                ].map((c) => (
+                                  <button
+                                    key={c.color}
+                                    type="button"
+                                    onClick={() => setBannerSubtitleColor(c.color)}
+                                    className={`w-6 h-6 rounded-lg border transition-all ${
+                                      bannerSubtitleColor.toLowerCase() === c.color.toLowerCase()
+                                        ? 'ring-2 ring-amber-400 scale-110 border-white'
+                                        : 'border-white/20 hover:scale-105'
+                                    }`}
+                                    style={{ backgroundColor: c.color }}
+                                    title={c.label}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Word / Phrase Highlight Feature */}
+                        <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl space-y-2.5">
+                          <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                            <Type className="w-4 h-4 text-amber-400" />
+                            <span>تغییر رنگ یک کلمه یا عبارت خاص در عنوان (هایلایت هوشمند)</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11px] text-slate-300 mb-1">
+                                کلمه یا عبارتی که می‌خواهید رنگ متمایز داشته باشد:
+                              </label>
+                              <input
+                                type="text"
+                                value={bannerHighlightText}
+                                onChange={(e) => setBannerHighlightText(e.target.value)}
+                                placeholder="مثلاً: وب‌سایت حرفه‌ای یا تخفیف ویژه"
+                                className="w-full bg-black/50 border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] text-slate-300 mb-1 flex items-center justify-between">
+                                <span>رنگ کلمه هایلایت‌شده:</span>
+                                <span className="text-[10px] text-slate-400 font-mono" dir="ltr">{bannerHighlightColor}</span>
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={bannerHighlightColor}
+                                  onChange={(e) => setBannerHighlightColor(e.target.value)}
+                                  className="w-8 h-8 rounded-xl border border-purple-600 bg-transparent cursor-pointer p-0.5 shrink-0"
+                                />
+                                <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                                  {[
+                                    { label: 'طلایی نئون', color: '#fbbf24' },
+                                    { label: 'فیروزه‌ای براق', color: '#06b6d4' },
+                                    { label: 'سبز درخشان', color: '#10b981' },
+                                    { label: 'قرمز مرجانی', color: '#f43f5e' },
+                                    { label: 'ارغوانی فسفری', color: '#e879f9' },
+                                  ].map((c) => (
+                                    <button
+                                      key={c.color}
+                                      type="button"
+                                      onClick={() => setBannerHighlightColor(c.color)}
+                                      className={`w-6 h-6 rounded-lg border transition-all ${
+                                        bannerHighlightColor.toLowerCase() === c.color.toLowerCase()
+                                          ? 'ring-2 ring-amber-400 scale-110 border-white'
+                                          : 'border-white/20 hover:scale-105'
+                                      }`}
+                                      style={{ backgroundColor: c.color }}
+                                      title={c.label}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-purple-300/80 leading-relaxed">
+                            💡 <strong className="text-amber-300 font-semibold">نکته حرفه‌ای:</strong> همچنین می‌توانید داخل متن عنوان، هر کلمه‌ای را داخل کروشه بگذارید تا مستقیماً رنگی شود. مثال: <code className="text-amber-300 bg-black/40 px-1 py-0.5 rounded font-sans">همین حالا، [وب‌سایت حرفه‌ای] خود را بسازید!</code>
+                          </p>
+                        </div>
+
+                        {/* Backdrop Blur Box Feature */}
+                        <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-bold text-amber-300 block">
+                                باکس شیشه‌ای بلور و محوکننده پشت متن (Backdrop Blur Glass Box)
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                با فعال‌سازی این گزینه، یک کادر مات و شیشه‌ای زیبا پشت متن‌ها قرار می‌گیرد تا روی هر نوع تصویر زمینه، شلوغی یا رنگ روشن، متن‌ها با نهایت وضوح و خوانایی دیده شوند.
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={bannerTextBackdropEnabled}
+                              onClick={() => setBannerTextBackdropEnabled(!bannerTextBackdropEnabled)}
+                              dir="ltr"
+                              className={`w-12 h-6.5 rounded-full transition-colors duration-200 flex items-center px-1 focus:outline-none shrink-0 border mr-3 ${
+                                bannerTextBackdropEnabled
+                                  ? 'bg-amber-500 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.4)] justify-end'
+                                  : 'bg-slate-800 border-slate-700 justify-start'
+                              }`}
+                            >
+                              <span className="block w-4.5 h-4.5 rounded-full bg-white shadow-md transition-all duration-200" />
+                            </button>
+                          </div>
+
+                          {bannerTextBackdropEnabled && (
+                            <div className="pt-2 border-t border-purple-800/40 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in">
+                              <div>
+                                <label className="block text-[11px] text-slate-300 mb-1">
+                                  تم رنگی کادر شیشه‌ای:
+                                </label>
+                                <select
+                                  value={bannerTextBackdropTheme}
+                                  onChange={(e) => setBannerTextBackdropTheme(e.target.value as any)}
+                                  className="w-full bg-black/60 border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400"
+                                >
+                                  <option value="dark">⬛ شیشه دودی تیره مات (پیش‌فرض مدرن و فوق‌العاده خوانا)</option>
+                                  <option value="purple">🔮 شیشه بنفش بلور سلطنتی (هماهنگ با هویت جهش‌کالا)</option>
+                                  <option value="navy">🌊 شیشه سرمه‌ای دیپ (کنتراست بالا و لوکس)</option>
+                                  <option value="light">❄️ شیشه یخی روشن مهتابی (برای پس‌زمینه‌های تیره)</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-1">
+                                  <span>درصد ماتی کادر شیشه‌ای:</span>
+                                  <span className="text-amber-400 font-mono" dir="ltr">{bannerTextBackdropOpacity}%</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="20"
+                                  max="95"
+                                  step="5"
+                                  value={bannerTextBackdropOpacity}
+                                  onChange={(e) => setBannerTextBackdropOpacity(Number(e.target.value))}
+                                  className="w-full h-2 bg-purple-900/80 rounded-lg appearance-none cursor-pointer accent-amber-400 mt-2"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Color Theme Preset */}
                     <div className="md:col-span-2">
@@ -3109,92 +3506,223 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                       {/* Live Banner Preview Box */}
                       {bannerImage && (
-                        <div className="mt-3 p-3 rounded-2xl bg-black/60 border border-purple-800/80 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-amber-300">
-                              پیش‌نمایش زنده در پلتفرم (حالت {bannerFitMode === 'contain' ? 'کامل بدون برش' : bannerFitMode === 'cover' ? 'کاور تمام‌عرض' : 'تنظیم خودکار هوشمند'}):
-                            </span>
-                            <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
-                              تطبیق ۱۰۰٪ با موبایل و وب
-                            </span>
+                        <div className="mt-3 p-3.5 rounded-2xl bg-black/70 border border-purple-800/80 space-y-3">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-amber-300">
+                                پیش‌نمایش زنده در پلتفرم (ابعاد ۲۱:۹ دقیق و تطابق کامل با موبایل و وب):
+                              </span>
+                              <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                                نسبت ثابت در تمام صفحه‌ها
+                              </span>
+                            </div>
+
+                            {/* Device Preview Toggle */}
+                            <div className="flex items-center gap-1 bg-purple-950/80 p-1 rounded-xl border border-purple-700/50">
+                              <button
+                                type="button"
+                                onClick={() => setBannerPreviewDevice('desktop')}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                                  bannerPreviewDevice === 'desktop'
+                                    ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+                                    : 'text-slate-300 hover:text-white'
+                                }`}
+                              >
+                                <Monitor className="w-3.5 h-3.5" />
+                                <span>نمای کامپیوتر</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setBannerPreviewDevice('mobile')}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                                  bannerPreviewDevice === 'mobile'
+                                    ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+                                    : 'text-slate-300 hover:text-white'
+                                }`}
+                              >
+                                <Smartphone className="w-3.5 h-3.5" />
+                                <span>نمای موبایل</span>
+                              </button>
+                            </div>
                           </div>
-                          <div className="relative h-44 sm:h-52 rounded-xl overflow-hidden border border-purple-700/50 flex flex-col justify-between p-4 text-right bg-[#0d071a]">
-                            
-                            {/* Ambient background blur for contain/auto modes to prevent black voids */}
-                            {(bannerFitMode === 'contain' || bannerFitMode === 'auto') && (
-                              <div
-                                className="absolute inset-0 scale-110 blur-xl opacity-40 pointer-events-none"
-                                style={{
-                                  backgroundImage: `url(${bannerImage})`,
-                                  backgroundPosition: 'center',
-                                  backgroundSize: 'cover',
+
+                          {/* Responsive Preview Frame */}
+                          <div className={`transition-all duration-300 ${bannerPreviewDevice === 'mobile' ? 'max-w-[360px] mx-auto' : 'w-full'}`}>
+                            <div className="relative w-full aspect-[21/9] rounded-2xl overflow-hidden border border-purple-600/70 shadow-2xl text-right bg-[#0d071a]">
+                              
+                              {/* Ambient background blur for contain/auto modes to prevent black voids */}
+                              {(bannerFitMode === 'contain' || bannerFitMode === 'auto') && (
+                                <div
+                                  className="absolute inset-0 scale-110 blur-xl opacity-40 pointer-events-none"
+                                  style={{
+                                    backgroundImage: `url(${bannerImage})`,
+                                    backgroundPosition: 'center',
+                                    backgroundSize: 'cover',
+                                  }}
+                                />
+                              )}
+
+                              {/* Main Banner Image with selected Fit Mode */}
+                              <img
+                                src={bannerImage}
+                                alt="پیش‌نمایش بنر"
+                                className={`absolute inset-0 w-full h-full transition-all duration-300 ${
+                                  bannerFitMode === 'contain'
+                                    ? 'object-contain relative z-[1]'
+                                    : bannerFitMode === 'auto'
+                                    ? 'object-contain sm:object-cover relative z-[1]'
+                                    : 'object-cover'
+                                }`}
+                                style={{ objectPosition: bannerImagePosition }}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80';
                                 }}
                               />
-                            )}
+                              
+                              {!bannerHideTextOverlay && (
+                                <div
+                                  className={`absolute inset-0 z-[2] bg-gradient-to-l ${bannerGradient} pointer-events-none`}
+                                  style={{ opacity: bannerOpacity / 100 }}
+                                />
+                              )}
 
-                            {/* Main Banner Image with selected Fit Mode */}
-                            <img
-                              src={bannerImage}
-                              alt="پیش‌نمایش بنر"
-                              className={`absolute inset-0 w-full h-full transition-all duration-300 ${
-                                bannerFitMode === 'contain'
-                                  ? 'object-contain'
-                                  : bannerFitMode === 'auto'
-                                  ? 'object-contain sm:object-cover'
-                                  : 'object-cover'
-                              }`}
-                              style={{ objectPosition: bannerImagePosition }}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80';
-                              }}
-                            />
-                            
-                            {!bannerHideTextOverlay && (
-                              <div
-                                className={`absolute inset-0 bg-gradient-to-r ${bannerGradient}`}
-                                style={{ opacity: bannerOpacity / 100 }}
-                              ></div>
-                            )}
-
-                            {/* Overlay Content (Only if hideTextOverlay is false) */}
-                            {!bannerHideTextOverlay ? (
-                              <>
-                                <div className="relative z-10 flex justify-between items-center">
+                              {/* Overlay Content Container */}
+                              <div className={`absolute inset-0 z-10 flex flex-col justify-between text-right pointer-events-none ${
+                                bannerPreviewDevice === 'mobile' ? 'p-2' : 'p-3 sm:p-5'
+                              }`}>
+                                {/* Top Badges */}
+                                <div className="flex justify-between items-center">
                                   {bannerBadge ? (
-                                    <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-bold border border-white/30 backdrop-blur-xs">
+                                    <span className={`rounded-full bg-black/60 text-white font-bold border border-white/25 backdrop-blur-md ${
+                                      bannerPreviewDevice === 'mobile' ? 'px-2 py-0.5 text-[8px]' : 'px-2.5 py-0.5 text-[9px] sm:text-xs'
+                                    }`}>
                                       {bannerBadge}
                                     </span>
                                   ) : <span />}
-                                  {bannerTargetGuild && (
-                                    <span className="px-2 py-0.5 rounded-full bg-amber-400/30 text-amber-300 text-[10px] font-bold border border-amber-400/40">
-                                      ویژه {bannerTargetGuild}
+                                  <div className="flex items-center gap-1.5">
+                                    {bannerHideTextOverlay && (
+                                      <span className={`rounded-full bg-amber-500/40 text-amber-200 font-bold border border-amber-400/50 backdrop-blur-md ${
+                                        bannerPreviewDevice === 'mobile' ? 'px-1.5 py-0.5 text-[7.5px]' : 'px-2 py-0.5 text-[8px] sm:text-[10px]'
+                                      }`}>
+                                        مخفی‌سازی متن فعال است
+                                      </span>
+                                    )}
+                                    {bannerTargetGuild && (
+                                      <span className={`rounded-full bg-amber-400/30 text-amber-300 font-bold border border-amber-400/40 backdrop-blur-md ${
+                                        bannerPreviewDevice === 'mobile' ? 'px-1.5 py-0.5 text-[8px]' : 'px-2 py-0.5 text-[9px] sm:text-xs'
+                                      }`}>
+                                        ویژه {bannerTargetGuild}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Title & Subtitle with optional frosted backdrop blur box */}
+                                {!bannerHideTextOverlay ? (
+                                  <div
+                                    className={`my-auto transition-all ${
+                                      bannerSingleLineTitle ? 'w-fit max-w-[94%]' : 'max-w-xl'
+                                    } ${
+                                      bannerTextBackdropEnabled
+                                        ? `${
+                                            bannerPreviewDevice === 'mobile'
+                                              ? 'p-1.5 rounded-lg border shadow-lg'
+                                              : 'p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border shadow-2xl'
+                                          } backdrop-blur-md ${
+                                            bannerTextBackdropTheme === 'purple'
+                                              ? 'bg-purple-950/75 border-purple-500/30'
+                                              : bannerTextBackdropTheme === 'navy'
+                                              ? 'bg-slate-950/80 border-cyan-500/25'
+                                              : bannerTextBackdropTheme === 'light'
+                                              ? 'bg-white/20 border-white/30 text-slate-900'
+                                              : 'bg-black/65 border-white/15'
+                                          }`
+                                        : 'space-y-0.5'
+                                    }`}
+                                    style={{
+                                      backgroundColor:
+                                        bannerTextBackdropEnabled && bannerTextBackdropOpacity !== undefined
+                                          ? `rgba(0, 0, 0, ${bannerTextBackdropOpacity / 100})`
+                                          : undefined,
+                                    }}
+                                  >
+                                    <h4
+                                      className={`font-black leading-snug drop-shadow-md transition-all ${
+                                        bannerSingleLineTitle
+                                          ? 'whitespace-nowrap overflow-hidden text-ellipsis'
+                                          : ''
+                                      } ${
+                                        bannerPreviewDevice === 'mobile'
+                                          ? bannerTitleFontSize === 'sm'
+                                            ? 'text-[10px]'
+                                            : bannerTitleFontSize === 'md'
+                                            ? 'text-[11px]'
+                                            : bannerTitleFontSize === 'xl'
+                                            ? 'text-[13px]'
+                                            : 'text-[12px]' // 'lg'
+                                          : bannerTitleFontSize === 'sm'
+                                          ? 'text-sm sm:text-base md:text-xl'
+                                          : bannerTitleFontSize === 'md'
+                                          ? 'text-base sm:text-lg md:text-2xl'
+                                          : bannerTitleFontSize === 'xl'
+                                          ? 'text-xl sm:text-2xl md:text-4xl'
+                                          : 'text-lg sm:text-xl md:text-3xl' // 'lg'
+                                      }`}
+                                      style={{ color: bannerTitleColor }}
+                                    >
+                                      {renderFormattedBannerTitle(
+                                        bannerTitle || 'عنوان بنر شما (جهش‌کالا)',
+                                        bannerHighlightText,
+                                        bannerHighlightColor,
+                                        bannerTitleColor
+                                      )}
+                                    </h4>
+                                    <p
+                                      className={`drop-shadow-sm font-normal transition-all ${
+                                        bannerSingleLineSubtitle
+                                          ? 'whitespace-nowrap overflow-hidden text-ellipsis'
+                                          : 'line-clamp-1 sm:line-clamp-2'
+                                      } ${
+                                        bannerPreviewDevice === 'mobile'
+                                          ? bannerSubtitleFontSize === 'sm'
+                                            ? 'text-[7.5px]'
+                                            : bannerSubtitleFontSize === 'lg'
+                                            ? 'text-[9.5px]'
+                                            : 'text-[8.5px]'
+                                          : bannerSubtitleFontSize === 'sm'
+                                          ? 'text-xs'
+                                          : bannerSubtitleFontSize === 'lg'
+                                          ? 'text-sm'
+                                          : 'text-xs'
+                                      }`}
+                                      style={{ color: bannerSubtitleColor }}
+                                    >
+                                      {bannerSubtitle || 'توضیحات یا زیرعنوان بنر برای جلب توجه مخاطب'}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="my-auto py-1">
+                                    <span className="inline-block px-2.5 py-1 rounded-lg bg-black/75 text-amber-300 text-[9px] font-bold border border-amber-400/40 backdrop-blur-md shadow-lg">
+                                      بنر گرافیکی بدون متن پیش‌فرض (متن در خود عکس قرار دارد)
                                     </span>
-                                  )}
-                                </div>
-
-                                <div className="relative z-10 space-y-1">
-                                  <h4 className="text-white font-black text-sm sm:text-base drop-shadow-md">{bannerTitle || 'عنوان بنر شما'}</h4>
-                                  <p className="text-slate-200 text-xs line-clamp-1 drop-shadow-sm">{bannerSubtitle || 'توضیحات کوتاه بنر'}</p>
-                                </div>
-
-                                <div className="relative z-10 flex justify-end">
-                                  <span className="px-3 py-1 bg-amber-400 text-black font-black text-xs rounded-lg shadow-md">
-                                    {bannerCta || 'مشاهده'}
-                                  </span>
-                                </div>
-                              </>
-                            ) : (
-                              <div className="relative z-10 flex justify-between items-center">
-                                <span className="px-2 py-0.5 rounded bg-black/50 text-white text-[9px] font-bold border border-white/20 backdrop-blur-xs">
-                                  بنر بدون متن اضافی (متن در خود عکس قرار دارد)
-                                </span>
-                                {bannerTargetGuild && (
-                                  <span className="px-2 py-0.5 rounded-full bg-amber-400/30 text-amber-300 text-[10px] font-bold border border-amber-400/40">
-                                    ویژه {bannerTargetGuild}
-                                  </span>
+                                  </div>
                                 )}
+
+                                {/* Bottom CTA Button */}
+                                <div className="flex justify-end">
+                                  {!bannerHideTextOverlay ? (
+                                    <span className={`bg-gradient-to-r from-amber-400 to-amber-500 text-black font-black shadow-md flex items-center gap-1 ${
+                                      bannerPreviewDevice === 'mobile'
+                                        ? 'px-2 py-0.5 text-[8.5px] rounded'
+                                        : 'px-2.5 sm:px-3 py-1 text-[10px] sm:text-xs rounded-lg'
+                                    }`}>
+                                      <span>{bannerCta || 'مشاهده'}</span>
+                                      <ArrowLeft className={bannerPreviewDevice === 'mobile' ? 'w-2.5 h-2.5 text-slate-950' : 'w-3 h-3 text-slate-950'} />
+                                    </span>
+                                  ) : <span />}
+                                </div>
                               </div>
-                            )}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -3650,33 +4178,29 @@ on public.users for delete using (true);`;
                                   </div>
                                 )}
                               </td>
-                              <td className="p-3.5 text-center">
-                                <span
-                                  className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-bold border ${
+                               <td className="p-3.5 text-center">
+                                <select
+                                  value={user.role || 'user'}
+                                  disabled={isMaster || currentUser?.role === 'operator'}
+                                  onChange={(e) => {
+                                    const nextRole = e.target.value as 'admin' | 'operator' | 'user';
+                                    const updated = { ...user, role: nextRole };
+                                    onUpdateUser?.(updated);
+                                    const roleTitle = nextRole === 'admin' ? 'مدیر ارشد' : nextRole === 'operator' ? 'ادمین محدود (اپراتور)' : 'کاربر عادی';
+                                    setUserActionMessage(`نقش کاربر ${user.fullName} به «${roleTitle}» تغییر یافت.`);
+                                  }}
+                                  className={`text-[11px] px-2.5 py-1 rounded-full font-bold border cursor-pointer focus:outline-none transition-all ${
                                     user.role === 'admin'
-                                      ? 'bg-purple-950 text-purple-300 border-purple-500/50'
+                                      ? 'bg-purple-950 text-purple-300 border-purple-500/50 hover:border-purple-400'
                                       : user.role === 'operator'
-                                      ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50'
-                                      : 'bg-slate-900/80 text-slate-300 border-slate-700/50'
-                                  }`}
+                                      ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50 hover:border-cyan-400'
+                                      : 'bg-slate-900/90 text-slate-300 border-slate-700/50 hover:border-slate-500'
+                                  } ${isMaster || currentUser?.role === 'operator' ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 >
-                                  {user.role === 'admin' ? (
-                                    <>
-                                      <Shield className="w-3 h-3 text-purple-400" />
-                                      مدیر ارشد
-                                    </>
-                                  ) : user.role === 'operator' ? (
-                                    <>
-                                      <Shield className="w-3 h-3 text-cyan-400" />
-                                      ادمین محدود
-                                    </>
-                                  ) : (
-                                    <>
-                                      <UserCheck className="w-3 h-3 text-slate-400" />
-                                      کاربر عادی
-                                    </>
-                                  )}
-                                </span>
+                                  <option value="user" className="bg-[#130b2e] text-slate-200">👤 کاربر عادی</option>
+                                  <option value="operator" className="bg-[#130b2e] text-cyan-300">🛡️ ادمین محدود (اپراتور)</option>
+                                  <option value="admin" className="bg-[#130b2e] text-purple-300">👑 مدیر ارشد (Admin)</option>
+                                </select>
                               </td>
                               <td className="p-3.5 text-slate-400 font-sans">
                                 {user.createdAt || 'ثبت در سیستم'}
@@ -4315,6 +4839,41 @@ on public.users for delete using (true);`;
                     <option value="تحویل نهایی شده">تحویل نهایی شده</option>
                     <option value="لغو شده">لغو شده</option>
                   </select>
+                </div>
+
+                {/* اطلاعات درگاه پرداخت و کدهای رهگیری بانکی */}
+                <div className="bg-cyan-950/40 border border-cyan-500/40 rounded-xl p-3 text-right space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-cyan-300 font-bold border-b border-cyan-800/50 pb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-cyan-400" />
+                      اطلاعات تراکنش و درگاه پرداخت:
+                    </span>
+                    <span className="text-[11px] bg-cyan-500/20 text-cyan-200 px-2 py-0.5 rounded border border-cyan-500/40 font-mono">
+                      {selectedOrder.paymentGateway || 'زیبال (شاپرک)'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono text-slate-300 pt-1">
+                    <div>
+                      <span className="text-slate-400 font-sans block text-[10px]">کد پیگیری تراکنش زیبال (Track ID):</span>
+                      <span className="text-cyan-300 font-bold">{selectedOrder.zibalTrackId || selectedOrder.trackingCode || 'ثبت نشده'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-sans block text-[10px]">شماره مرجع بانکی / شاپرک (Ref No):</span>
+                      <span className="text-amber-300 font-bold">{selectedOrder.zibalRefNumber || selectedOrder.paymentRefId || selectedOrder.trackingCode || 'ثبت نشده'}</span>
+                    </div>
+                    {selectedOrder.cardNumber && (
+                      <div>
+                        <span className="text-slate-400 font-sans block text-[10px]">شماره کارت پرداخت‌کننده:</span>
+                        <span className="text-emerald-300 font-bold">{selectedOrder.cardNumber}</span>
+                      </div>
+                    )}
+                    {selectedOrder.paidAt && (
+                      <div>
+                        <span className="text-slate-400 font-sans block text-[10px]">زمان پرداخت شاپرک:</span>
+                        <span className="text-slate-200 font-bold">{selectedOrder.paidAt}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="pt-2">

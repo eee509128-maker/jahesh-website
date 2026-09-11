@@ -7,6 +7,7 @@ export interface ZibalRequestParams {
   description?: string;
   merchant?: string;
   callbackUrl?: string;
+  orderData?: any;
 }
 
 export interface ZibalRequestResponse {
@@ -20,6 +21,8 @@ export interface ZibalRequestResponse {
 
 export interface ZibalVerifyResponse {
   success: boolean;
+  result?: number;
+  status?: number;
   refNumber?: string;
   amountInTomans?: number;
   amountInRials?: number;
@@ -50,6 +53,7 @@ export async function requestZibalPayment(params: ZibalRequestParams): Promise<Z
     description: params.description || `سفارش شماره ${params.orderId} - فروشگاه آنلاین جهش کالا`,
     mobile: params.customerPhone,
     merchant: params.merchant || ZIBAL_DEFAULT_MERCHANT,
+    orderData: params.orderData,
   };
 
   try {
@@ -83,7 +87,7 @@ export async function verifyZibalPayment(trackId: string | number, merchant?: st
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        trackId,
+        trackId: String(trackId).trim(),
         merchant: merchant || ZIBAL_DEFAULT_MERCHANT,
       }),
     });
@@ -104,18 +108,27 @@ export async function verifyZibalPayment(trackId: string | number, merchant?: st
  */
 export function savePendingOrder(orderData: any) {
   try {
-    localStorage.setItem('jahesh_pending_payment_order', JSON.stringify(orderData));
+    const str = JSON.stringify(orderData);
+    localStorage.setItem('jahesh_pending_payment_order', str);
+    sessionStorage.setItem('jahesh_pending_payment_order', str);
+    if (orderData?.id) {
+      localStorage.setItem(`jahesh_order_${orderData.id}`, str);
+    }
   } catch (e) {
-    console.warn('Could not save pending order to localStorage:', e);
+    console.warn('Could not save pending order to storage:', e);
   }
 }
 
 /**
  * Helper to get pending order after returning from bank
  */
-export function getPendingOrder(): any | null {
+export function getPendingOrder(specificOrderId?: string): any | null {
   try {
-    const data = localStorage.getItem('jahesh_pending_payment_order');
+    if (specificOrderId) {
+      const byId = localStorage.getItem(`jahesh_order_${specificOrderId}`);
+      if (byId) return JSON.parse(byId);
+    }
+    const data = localStorage.getItem('jahesh_pending_payment_order') || sessionStorage.getItem('jahesh_pending_payment_order');
     return data ? JSON.parse(data) : null;
   } catch (e) {
     console.warn('Could not parse pending order:', e);
@@ -129,6 +142,7 @@ export function getPendingOrder(): any | null {
 export function clearPendingOrder() {
   try {
     localStorage.removeItem('jahesh_pending_payment_order');
+    sessionStorage.removeItem('jahesh_pending_payment_order');
   } catch (e) {
     // ignore
   }

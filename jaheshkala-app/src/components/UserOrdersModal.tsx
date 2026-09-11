@@ -21,7 +21,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Order, User, Product } from '../types';
-import { fetchOrdersFromDb } from '../lib/dbService';
+import { fetchOrdersFromDb, parseOrderTimestamp } from '../lib/dbService';
 import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
 
 interface UserOrdersModalProps {
@@ -112,29 +112,33 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   const cleanUserId = currentUser?.id?.trim();
   const searchPhone = normalizeDigits(manualPhoneSearch);
 
-  const userOrders = currentOrders.filter((o) => {
-    if (currentUser?.role === 'admin') return true;
+  const userOrders = currentOrders
+    .filter((o) => {
+      if (currentUser?.role === 'admin') return true;
 
-    const orderPhone = normalizeDigits(o.customerPhone);
-    const orderEmail = o.customerEmail?.trim().toLowerCase();
-    const orderUserId = o.userId?.trim();
+      const orderPhone = normalizeDigits(o.customerPhone);
+      const orderEmail = o.customerEmail?.trim().toLowerCase();
+      const orderUserId = o.userId?.trim();
 
-    // If manual phone or tracking code search entered
-    if (searchPhone) {
-      return (
-        orderPhone.includes(searchPhone) ||
-        o.trackingCode.includes(manualPhoneSearch.trim()) ||
-        o.id.toLowerCase().includes(manualPhoneSearch.trim().toLowerCase())
-      );
-    }
+      // If manual phone or tracking code search entered
+      if (searchPhone) {
+        return (
+          orderPhone.includes(searchPhone) ||
+          (o.trackingCode && o.trackingCode.includes(manualPhoneSearch.trim())) ||
+          (o.paymentRefId && o.paymentRefId.includes(manualPhoneSearch.trim())) ||
+          (o.zibalTrackId && o.zibalTrackId.includes(manualPhoneSearch.trim())) ||
+          o.id.toLowerCase().includes(manualPhoneSearch.trim().toLowerCase())
+        );
+      }
 
-    // Default logged in user match
-    if (cleanUserId && orderUserId === cleanUserId) return true;
-    if (cleanPhone && orderPhone && orderPhone === cleanPhone) return true;
-    if (cleanEmail && orderEmail && orderEmail === cleanEmail) return true;
+      // Default logged in user match
+      if (cleanUserId && orderUserId === cleanUserId) return true;
+      if (cleanPhone && orderPhone && orderPhone === cleanPhone) return true;
+      if (cleanEmail && orderEmail && orderEmail === cleanEmail) return true;
 
-    return false;
-  });
+      return false;
+    })
+    .sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
 
   const formatPrice = (num?: number) => {
     if (typeof num !== 'number' || isNaN(num)) return '۰ تومان';
@@ -511,8 +515,15 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                   {/* Details Footer */}
                   <div className="bg-white dark:bg-[#110926] p-3 rounded-xl border border-slate-200 dark:border-purple-900/40 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs shadow-xs">
                     <div>
-                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-medium">کد رهگیری بانکی (زیبال):</span>
-                      <span className="font-mono text-purple-800 dark:text-purple-300 font-black">{order.trackingCode}</span>
+                      <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-medium">کد رهگیری / مرجع بانکی:</span>
+                      <span className="font-mono text-purple-800 dark:text-purple-300 font-black">
+                        {order.zibalRefNumber || order.paymentRefId || order.trackingCode || 'ثبت شده'}
+                      </span>
+                      {order.zibalTrackId && order.zibalTrackId !== (order.paymentRefId || order.trackingCode) && (
+                        <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono block">
+                          شناسه تراکنش: {order.zibalTrackId}
+                        </span>
+                      )}
                     </div>
 
                     <div>
