@@ -81,6 +81,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // Live username availability check
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [usernameMessage, setUsernameMessage] = useState<string>('');
+
+  // Debounced live username availability check
+  useEffect(() => {
+    if (!isRegisterMode) {
+      setUsernameStatus('idle');
+      setUsernameMessage('');
+      return;
+    }
+
+    const clean = username.trim().toLowerCase();
+    if (!clean || clean.length < 2) {
+      setUsernameStatus('idle');
+      setUsernameMessage('');
+      return;
+    }
+
+    setUsernameStatus('checking');
+    const timer = setTimeout(async () => {
+      try {
+        const { checkUsernameAvailability } = await import('../lib/dbService');
+        const res = await checkUsernameAvailability(clean);
+        if (!res.available) {
+          setUsernameStatus('taken');
+          setUsernameMessage('این نام کاربری قبلاً در سایت انتخاب شده است. لطفاً نام کاربری دیگری وارد نمایید.');
+        } else {
+          setUsernameStatus('available');
+          setUsernameMessage('نام کاربری آزاد و قابل استفاده است.');
+        }
+      } catch (e) {
+        setUsernameStatus('idle');
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [username, isRegisterMode]);
+
   // Refresh math captcha challenge
   const refreshCaptcha = () => {
     const newCap = AntiBotGuard.generateMathCaptcha();
@@ -209,20 +248,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
 
         // Check if username or phone already exists in system across all devices
-        const { fetchAllUsersFromDb } = await import('../lib/dbService');
-        const allExistingUsers = await fetchAllUsersFromDb();
-        const phoneExists = allExistingUsers.some((u) => u.phone?.trim() === cleanPhone);
-        if (phoneExists) {
-          setErrorMsg('حساب کاربری با این شماره تماس قبلاً ثبت شده است. لطفاً وارد شوید.');
+        const { checkUsernameAvailability, checkPhoneAvailability } = await import('../lib/dbService');
+        
+        const usernameCheck = await checkUsernameAvailability(cleanUsername);
+        if (!usernameCheck.available) {
+          setErrorMsg('این نام کاربری قبلاً در سایت ثبت شده است. لطفاً نام کاربری دیگری وارد نمایید.');
+          setUsernameStatus('taken');
+          setUsernameMessage('این نام کاربری قبلاً در سایت ثبت شده است. لطفاً نام کاربری دیگری وارد نمایید.');
           setIsLoading(false);
           return;
         }
 
-        const usernameExists = allExistingUsers.some(
-          (u) => u.username?.trim().toLowerCase() === cleanUsername
-        );
-        if (usernameExists) {
-          setErrorMsg('این نام کاربری قبلاً توسط کاربر دیگری ثبت شده است. لطفاً نام کاربری دیگری انتخاب کنید.');
+        const phoneCheck = await checkPhoneAvailability(cleanPhone);
+        if (!phoneCheck.available) {
+          setErrorMsg('حساب کاربری با این شماره تماس قبلاً ثبت شده است. لطفاً وارد شوید.');
           setIsLoading(false);
           return;
         }
@@ -237,6 +276,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           guild: selectedGuild,
           customGuild: selectedGuild.includes('سایر مشاغل') ? customGuildName.trim() : undefined,
           createdAt: new Date().toLocaleDateString('fa-IR'),
+          timestamp: Date.now(),
         };
 
         const success = await registerUserInDb(newUser, password);
@@ -551,20 +591,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 {/* 4. USERNAME */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                    نام کاربری (انگلیسی):
-                    <span className="text-rose-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-300 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      نام کاربری (انگلیسی):
+                      <span className="text-rose-500">*</span>
+                    </label>
+                    {usernameStatus === 'checking' && (
+                      <span className="text-[10px] text-purple-600 dark:text-purple-400 animate-pulse font-medium">
+                        در حال بررسی...
+                      </span>
+                    )}
+                    {usernameStatus === 'available' && (
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5">
+                        ✓ آزاد
+                      </span>
+                    )}
+                    {usernameStatus === 'taken' && (
+                      <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold flex items-center gap-0.5">
+                        ⚠️ نام کاربری تکراری است
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     dir="ltr"
                     placeholder="erfan_123"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-left font-mono shadow-xs"
+                    className={`w-full bg-white dark:bg-black/50 border rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none text-left font-mono shadow-xs transition-colors ${
+                      usernameStatus === 'taken'
+                        ? 'border-rose-500 focus:border-rose-600 focus:ring-1 focus:ring-rose-500/30'
+                        : usernameStatus === 'available'
+                        ? 'border-emerald-500 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500/30'
+                        : 'border-purple-300 dark:border-purple-800/80 focus:border-purple-500'
+                    }`}
                     required
                   />
+                  {usernameStatus === 'taken' && (
+                    <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1 mt-1 leading-snug">
+                      <span>⚠️</span>
+                      <span>این نام کاربری قبلاً انتخاب شده است. لطفاً نام کاربری دیگری وارد نمایید.</span>
+                    </p>
+                  )}
+                  {usernameStatus === 'available' && (
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-1 leading-snug">
+                      <span>✓</span>
+                      <span>نام کاربری معتبر و قابل انتخاب است.</span>
+                    </p>
+                  )}
                 </div>
               </>
             ) : (

@@ -842,6 +842,134 @@ export const clearAllOrdersFromDb = async (): Promise<boolean> => {
 // 3. USERS DB SERVICE WITH HYBRID LOCAL & CLOUD SYNC
 const LOCAL_USERS_KEY = 'jahesh_users_store';
 
+// Helper to extract or calculate exact timestamp for a user so newer users are always sorted to the top (#1)
+export const getUserCreationTimestamp = (u: any): number => {
+  if (!u) return 0;
+  if (typeof u.timestamp === 'number' && u.timestamp > 0) return u.timestamp;
+
+  // 1. Extract numeric timestamp from ID (e.g. u-1789197087196, usr-1788866891163)
+  if (typeof u.id === 'string') {
+    const match = u.id.match(/\d{10,}/);
+    if (match) {
+      const num = parseInt(match[0], 10);
+      if (!isNaN(num) && num > 1000000000) return num;
+    }
+  }
+
+  // 2. Parse ISO date string (e.g. 2026-09-08T12:11:32.684Z)
+  const dStr = u.createdAt || u.created_at;
+  if (typeof dStr === 'string' && dStr.includes('-')) {
+    const parsed = Date.parse(dStr);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  // 3. Parse Persian date string (e.g. ۱۴۰۵/۶/۲۱ or 1405/6/21)
+  if (typeof dStr === 'string' && dStr.includes('/')) {
+    const enStr = dStr.replace(/[۰-۹]/g, (d: string) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+    const parts = enStr.split('/').map((p: string) => parseInt(p.trim(), 10));
+    if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+      return parts[0] * 100000000 + parts[1] * 1000000 + parts[2] * 10000;
+    }
+  }
+
+  return 0;
+};
+
+// Sorts any user array so newly registered users are GUARANTEED to appear at index 0 (Row #1)
+export const sortUsersNewestFirst = <T extends User>(users: T[]): T[] => {
+  if (!Array.isArray(users)) return [];
+  return [...users].sort((a, b) => {
+    const tB = getUserCreationTimestamp(b);
+    const tA = getUserCreationTimestamp(a);
+    if (tB !== tA) return tB - tA;
+    return 0;
+  });
+};
+
+// Check if a username is already taken anywhere in cloud or local db
+export const checkUsernameAvailability = async (
+  username: string,
+  excludeUserId?: string
+): Promise<{ available: boolean; reason?: string }> => {
+  const cleanU = username?.trim().toLowerCase();
+  if (!cleanU) return { available: false, reason: 'نام کاربری نمی‌تواند خالی باشد.' };
+
+  // 1. Direct query in Supabase users table
+  try {
+    const { data } = await supabase
+      .from('users')
+      .select('id, username')
+      .ilike('username', cleanU);
+    if (data && data.length > 0) {
+      const match = data.find(
+        (u) => u.id !== excludeUserId && u.username?.trim().toLowerCase() === cleanU
+      );
+      if (match) {
+        return {
+          available: false,
+          reason: 'این نام کاربری قبلاً توسط کاربر دیگری ثبت شده است. لطفاً نام کاربری دیگری انتخاب کنید.',
+        };
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 2. Direct check in SYSTEM_CONFIG_USERS & local cache
+  const allUsers = await fetchAllUsersFromDb();
+  const match = allUsers.find(
+    (u) => u.id !== excludeUserId && u.username?.trim().toLowerCase() === cleanU
+  );
+  if (match) {
+    return {
+      available: false,
+      reason: 'این نام کاربری قبلاً توسط کاربر دیگری ثبت شده است. لطفاً نام کاربری دیگری انتخاب کنید.',
+    };
+  }
+
+  return { available: true };
+};
+
+// Check if a phone number is already registered anywhere
+export const checkPhoneAvailability = async (
+  phone: string,
+  excludeUserId?: string
+): Promise<{ available: boolean; reason?: string }> => {
+  const cleanP = phone?.trim();
+  if (!cleanP || cleanP === 'ثبت نشده' || cleanP === 'test') return { available: true };
+
+  // 1. Direct query in Supabase users table
+  try {
+    const { data } = await supabase
+      .from('users')
+      .select('id, phone')
+      .eq('phone', cleanP);
+    if (data && data.length > 0) {
+      const match = data.find((u) => u.id !== excludeUserId && u.phone?.trim() === cleanP);
+      if (match) {
+        return {
+          available: false,
+          reason: 'حساب کاربری با این شماره موبایل قبلاً ثبت شده است. لطفاً وارد شوید.',
+        };
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 2. Check in all loaded users
+  const allUsers = await fetchAllUsersFromDb();
+  const match = allUsers.find((u) => u.id !== excludeUserId && u.phone?.trim() === cleanP);
+  if (match) {
+    return {
+      available: false,
+      reason: 'حساب کاربری با این شماره موبایل قبلاً در سیستم ثبت شده است.',
+    };
+  }
+
+  return { available: true };
+};
+
 const getLocalUsersStore = (): Array<User & { password?: string }> => {
   try {
     const raw = localStorage.getItem(LOCAL_USERS_KEY);
@@ -863,8 +991,10 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
   try {
     const cleanPhone = user.phone?.trim() || '';
     const cleanUsername = user.username?.trim().toLowerCase() || `u${Date.now()}`;
+    const nowTs = Date.now();
+
     const userWithPass: User & { password?: string } = {
-      id: user.id || `u-${Date.now()}`,
+      id: user.id || `u-${nowTs}`,
       fullName: user.fullName || 'کاربر جهش',
       phone: cleanPhone,
       email: user.email?.trim() || '',
@@ -873,10 +1003,11 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
       guild: user.guild,
       customGuild: user.customGuild,
       createdAt: user.createdAt || new Date().toLocaleDateString('fa-IR'),
+      timestamp: nowTs,
       password: passwordHash,
     };
 
-    // 1. Persist to Supabase users table (only valid table columns)
+    // 1. Persist to Supabase users table
     try {
       const payload = {
         id: userWithPass.id,
@@ -889,14 +1020,9 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
         created_at: userWithPass.createdAt,
       };
 
-      let insertRes = await supabase.from('users').upsert(payload, { onConflict: 'id' });
-      // If duplicate username constraint error (23505) occurs, make username column unique for DB row
-      if (insertRes.error && insertRes.error.code === '23505') {
-        const uniqueDbUsername = `${userWithPass.username}_${Math.floor(100 + Math.random() * 900)}`;
-        insertRes = await supabase.from('users').upsert({ ...payload, username: uniqueDbUsername }, { onConflict: 'id' });
-      }
+      const insertRes = await supabase.from('users').upsert(payload, { onConflict: 'id' });
       if (insertRes.error) {
-        console.warn('Supabase users table notice:', insertRes.error.message);
+        console.warn('Supabase users table insert notice:', insertRes.error.message);
       }
     } catch (e) {
       console.warn('Supabase users upsert exception:', e);
@@ -917,7 +1043,7 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
       // ignore
     }
 
-    // 3. Merge with local store
+    // 3. Merge and sort newest first
     const localUsers = getLocalUsersStore().filter(Boolean);
     const mergedMap = new Map<string, User & { password?: string }>();
 
@@ -929,6 +1055,7 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
       return `rand:${Math.random()}`;
     };
 
+    // Add existing
     for (const u of localUsers) {
       const k = getUKey(u);
       if (k) mergedMap.set(k, u);
@@ -938,7 +1065,7 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
       if (k) mergedMap.set(k, u);
     }
 
-    // Upsert the registering user
+    // Insert or update the new registering user
     const currentKey = getUKey(userWithPass);
     let matchedKey: string | null = null;
     for (const [k, ex] of mergedMap.entries()) {
@@ -957,7 +1084,8 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
       mergedMap.set(currentKey, userWithPass);
     }
 
-    const finalUsersList = Array.from(mergedMap.values());
+    // Sort so newly registered users are ALWAYS on top (Row #1)
+    const finalUsersList = sortUsersNewestFirst(Array.from(mergedMap.values()));
     saveLocalUsersStore(finalUsersList);
 
     // 4. Save full array to Supabase chats table (SYSTEM_CONFIG_USERS)
@@ -1395,7 +1523,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     // ignore
   }
 
-  const result = Array.from(usersMap.values());
+  const result = sortUsersNewestFirst(Array.from(usersMap.values()));
   saveLocalUsersStore(result);
 
   // If current logged-in user's role changed in cloud, auto-sync session immediately!

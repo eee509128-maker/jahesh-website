@@ -84,6 +84,7 @@ export interface User {
   guild?: string; // صنف و شغل کاربر (مثلاً: املاک و مستغلات، پزشکی، رستوران و...)
   customGuild?: string; // در صورت انتخاب سایر مشاغل
   createdAt: string;
+  timestamp?: number; // Exact millisecond timestamp for sorting newest users first
 }
 
 export type OrderStatus =

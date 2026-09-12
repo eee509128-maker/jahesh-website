@@ -10,7 +10,7 @@ import {
   ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan } from '../types';
-import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS } from '../data/initialData';
@@ -4160,16 +4160,18 @@ on public.users for delete using (true);`;
 
               {/* User List Table */}
               {(() => {
-                const filteredUsers = usersList.filter((u) => {
-                  const matchesSearch =
-                    !userSearchTerm.trim() ||
-                    u.fullName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-                    u.phone?.includes(userSearchTerm) ||
-                    u.username?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-                    u.email?.toLowerCase().includes(userSearchTerm.toLowerCase());
-                  const matchesRole = userRoleFilter === 'all' || u.role === userRoleFilter;
-                  return matchesSearch && matchesRole;
-                });
+                const filteredUsers = sortUsersNewestFirst(
+                  usersList.filter((u) => {
+                    const matchesSearch =
+                      !userSearchTerm.trim() ||
+                      u.fullName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                      u.phone?.includes(userSearchTerm) ||
+                      u.username?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                      u.email?.toLowerCase().includes(userSearchTerm.toLowerCase());
+                    const matchesRole = userRoleFilter === 'all' || u.role === userRoleFilter;
+                    return matchesSearch && matchesRole;
+                  })
+                );
 
                 if (filteredUsers.length === 0) {
                   return (
