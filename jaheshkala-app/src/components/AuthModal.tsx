@@ -208,10 +208,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
 
-        // Check if username already exists
-        const existing = await findUserInDb(cleanUsername, password);
-        if (existing) {
-          setErrorMsg('این نام کاربری یا شماره تماس قبلاً ثبت شده است.');
+        // Check if username or phone already exists in system across all devices
+        const { fetchAllUsersFromDb } = await import('../lib/dbService');
+        const allExistingUsers = await fetchAllUsersFromDb();
+        const phoneExists = allExistingUsers.some((u) => u.phone?.trim() === cleanPhone);
+        if (phoneExists) {
+          setErrorMsg('حساب کاربری با این شماره تماس قبلاً ثبت شده است. لطفاً وارد شوید.');
+          setIsLoading(false);
+          return;
+        }
+
+        const usernameExists = allExistingUsers.some(
+          (u) => u.username?.trim().toLowerCase() === cleanUsername
+        );
+        if (usernameExists) {
+          setErrorMsg('این نام کاربری قبلاً توسط کاربر دیگری ثبت شده است. لطفاً نام کاربری دیگری انتخاب کنید.');
           setIsLoading(false);
           return;
         }

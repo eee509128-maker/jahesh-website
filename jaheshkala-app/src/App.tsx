@@ -556,6 +556,14 @@ export default function App() {
     };
     window.addEventListener('jahesh-banners-updated', handleBannersUpdatedEvent);
 
+    // Listen for real-time users list updates via window events
+    const handleUsersUpdatedEvent = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setUsersList(e.detail);
+      }
+    };
+    window.addEventListener('jahesh-users-updated', handleUsersUpdatedEvent);
+
     // Periodic sync for banners every 5 seconds across all devices
     const bannerSyncInterval = setInterval(async () => {
       if (!isMounted) return;
@@ -566,6 +574,25 @@ export default function App() {
         }
       } catch (err) {}
     }, 5000);
+
+    // Instant Supabase Realtime channel for cloud users list config
+    const usersConfigChannel = supabase
+      .channel('public:chats:users')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chats', filter: 'user_id=eq.SYSTEM_CONFIG_USERS' },
+        async () => {
+          if (!isMounted) return;
+          try {
+            const { fetchAllUsersFromDb } = await import('./lib/dbService');
+            const freshUsers = await fetchAllUsersFromDb();
+            if (isMounted && freshUsers && freshUsers.length > 0) {
+              setUsersList(freshUsers);
+            }
+          } catch {}
+        }
+      )
+      .subscribe();
 
     // Instant Supabase Realtime channel for banners
     const bannersChannel = supabase
@@ -670,13 +697,20 @@ export default function App() {
           });
         }
 
-        // 2. Sync user roles
-        const rawStored = localStorage.getItem('jahesh_current_user');
-        if (rawStored) {
-          const activeUser: User = JSON.parse(rawStored);
-          const { fetchAllUsersFromDb } = await import('./lib/dbService');
-          const all = await fetchAllUsersFromDb();
-          if (isMounted && all) {
+        // 2. Sync user roles and users list
+        const { fetchAllUsersFromDb } = await import('./lib/dbService');
+        const all = await fetchAllUsersFromDb();
+        if (isMounted && all && all.length > 0) {
+          setUsersList((prev) => {
+            if (JSON.stringify(prev) !== JSON.stringify(all)) {
+              return all;
+            }
+            return prev;
+          });
+
+          const rawStored = localStorage.getItem('jahesh_current_user');
+          if (rawStored) {
+            const activeUser: User = JSON.parse(rawStored);
             const cleanUName = activeUser.username?.trim().toLowerCase();
             const cleanPhone = activeUser.phone?.trim();
             const found = all.find(
@@ -706,10 +740,12 @@ export default function App() {
     return () => {
       isMounted = false;
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
+      window.removeEventListener('jahesh-users-updated', handleUsersUpdatedEvent);
       window.removeEventListener('jahesh-products-updated', handleProductsUpdatedEvent);
       window.removeEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
       window.removeEventListener('jahesh-banners-updated', handleBannersUpdatedEvent);
       supabase.removeChannel(bannersChannel);
+      supabase.removeChannel(usersConfigChannel);
       supabase.removeChannel(productsConfigChannel);
       supabase.removeChannel(productsChannel);
       supabase.removeChannel(ordersConfigChannel);

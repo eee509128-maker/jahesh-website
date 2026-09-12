@@ -168,6 +168,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   });
   const [adminPurchaseSuccessNotice, setAdminPurchaseSuccessNotice] = useState<string | null>(null);
 
+  const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
+
+  const handleRefreshUsersList = async () => {
+    setIsRefreshingUsers(true);
+    try {
+      const { fetchAllUsersFromDb } = await import('../lib/dbService');
+      const fresh = await fetchAllUsersFromDb();
+      if (fresh && Array.isArray(fresh)) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: fresh }));
+        }
+        setUserActionMessage(`لیست کاربران با موفقیت همگام‌سازی شد (${fresh.length.toLocaleString('fa-IR')} کاربر)`);
+      }
+    } catch (err) {
+      console.warn('Error refreshing users:', err);
+    } finally {
+      setTimeout(() => {
+        setIsRefreshingUsers(false);
+      }, 500);
+      setTimeout(() => {
+        setUserActionMessage('');
+      }, 4000);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab === 'users') {
+      handleRefreshUsersList();
+    }
+  }, [activeTab]);
+
   const scrollTabs = (direction: 'left' | 'right') => {
     if (tabNavRef.current) {
       const scrollAmount = direction === 'left' ? -220 : 220;
@@ -4039,6 +4070,16 @@ on public.users for delete using (true);`;
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleRefreshUsersList}
+                    disabled={isRefreshingUsers}
+                    className="flex items-center gap-1.5 bg-purple-900/60 hover:bg-purple-800 border border-purple-700/50 text-purple-200 text-xs font-bold px-3 py-2.5 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                    title="بروزرسانی و دریافت کاربران ثبت نام شده جدید از تمام دستگاه‌ها و پایگاه ابری"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-purple-300 ${isRefreshingUsers ? 'animate-spin' : ''}`} />
+                    <span>{isRefreshingUsers ? 'در حال همگام‌سازی...' : 'بروزرسانی زنده لیست'}</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       setNewUserName('');
