@@ -76,7 +76,6 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
   const [headerGuildSearch, setHeaderGuildSearch] = useState('');
 
   const baseCategories = [
-    { title: 'همه کالاها و اصناف', icon: '🛍️', desc: 'مشاهده تمام خدمات و محصولات موجود در جهش‌کالا', value: '' },
     { title: 'پرفروش‌ترین‌ها', icon: '🔥', desc: 'محبوب‌ترین و پرفروش‌ترین محصولات کاربران', value: 'پرفروش' },
     { title: 'پیشنهادهای شگفت‌انگیز', icon: '⚡', desc: 'تخفیف‌های ویژه و روزانه جهش‌کالا', value: 'شگفت‌انگیز' },
   ];

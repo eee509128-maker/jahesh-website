@@ -33,6 +33,7 @@ import {
   ZIBAL_DEFAULT_MERCHANT,
 } from './lib/zibalService';
 import { hasAmlakInItems, generateAmlakLicense } from './lib/amlakLicenseService';
+import { isProductMatchingCategoryOrGuild, isProductMatchingSearchQuery } from './lib/guildMatcher';
 import confetti from 'canvas-confetti';
 
 // Digikala-styled Components
@@ -1394,18 +1395,7 @@ export default function App() {
   };
 
   const handleOpenProductDetail = (product: Product) => {
-    const currentViews = typeof product.viewsCount === 'number' ? product.viewsCount : 0;
-    const updatedViews = currentViews + 1;
-    const updatedProduct: Product = {
-      ...product,
-      viewsCount: updatedViews,
-      updatedAt: new Date().toISOString(),
-    };
-    setProducts((prev) => prev.map((p) => (p.id === product.id ? updatedProduct : p)));
-    setDetailModalProduct(updatedProduct);
-    try {
-      saveProductToDb(updatedProduct).catch(() => {});
-    } catch {}
+    setDetailModalProduct(product);
   };
 
   const handleSelectCategory = (cat: string) => {
@@ -1419,51 +1409,16 @@ export default function App() {
 
   // Filtered products by search AND category
   const filteredProducts = products.filter((p) => {
+    if (!p) return false;
+
     // 1. Category / Guild Filter
-    if (selectedCategory) {
-      if (selectedCategory === 'پرفروش') {
-        if (!p.isPopular && !p.badge?.includes('پرفروش')) return false;
-      } else if (selectedCategory === 'شگفت‌انگیز') {
-        if (!p.discountPercent || p.discountPercent <= 0) return false;
-      } else {
-        const catLower = selectedCategory.trim().toLowerCase();
-        const pCat = (p.category || '').toLowerCase();
-        const pGuild = ((p as any).guild || (p as any).targetGuild || '').toLowerCase();
-        const pTitle = (p.title || '').toLowerCase();
-        const pBrand = (p.brand || '').toLowerCase();
-        const pShortDesc = (p.shortDescription || '').toLowerCase();
-        const pFullDesc = (p.fullDescription || '').toLowerCase();
-        const pPain = ((p as any).painPointSolved || '').toLowerCase();
-        const pTags = Array.isArray(p.tags) ? p.tags.map((t) => t.toLowerCase()) : [];
-
-        const catMatch = pCat.includes(catLower) || catLower.includes(pCat);
-        const guildMatch = pGuild.includes(catLower) || catLower.includes(pGuild);
-        const titleMatch = pTitle.includes(catLower);
-        const brandMatch = pBrand.includes(catLower);
-        const tagsMatch = pTags.some((t) => t.includes(catLower) || catLower.includes(t));
-        const descMatch = pShortDesc.includes(catLower) || pFullDesc.includes(catLower) || pPain.includes(catLower);
-
-        if (!catMatch && !guildMatch && !titleMatch && !brandMatch && !tagsMatch && !descMatch) {
-          return false;
-        }
-      }
+    if (selectedCategory && !isProductMatchingCategoryOrGuild(p, selectedCategory)) {
+      return false;
     }
 
     // 2. Search query filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      const matchTitle = (p.title || '').toLowerCase().includes(q);
-      const matchDesc = (p.shortDescription || '').toLowerCase().includes(q) || (p.fullDescription || '').toLowerCase().includes(q);
-      const matchBrand = (p.brand || '').toLowerCase().includes(q);
-      const matchCat = (p.category || '').toLowerCase().includes(q);
-      const matchGuild = ((p as any).guild || (p as any).targetGuild || '').toLowerCase().includes(q);
-      const matchPain = ((p as any).painPointSolved || '').toLowerCase().includes(q);
-      const matchFeatures = Array.isArray(p.features) ? p.features.some((f) => f.toLowerCase().includes(q)) : false;
-      const matchTags = Array.isArray(p.tags) ? p.tags.some((t) => t.toLowerCase().includes(q)) : false;
-
-      if (!matchTitle && !matchDesc && !matchBrand && !matchCat && !matchGuild && !matchPain && !matchFeatures && !matchTags) {
-        return false;
-      }
+    if (searchQuery.trim() && !isProductMatchingSearchQuery(p, searchQuery)) {
+      return false;
     }
 
     return true;
@@ -1545,12 +1500,14 @@ export default function App() {
         />
 
         {/* 4. DIGIKALA INCREDIBLE OFFER (پیشنهاد شگفت‌انگیز with live countdown clock) */}
-        <DigikalaIncredibleOffer
-          products={products}
-          onAddToCart={handleAddToCart}
-          onInstantBuy={handleInstantBuy}
-          onViewDetails={handleOpenProductDetail}
-        />
+        {(!selectedCategory || selectedCategory === 'شگفت‌انگیز') && (
+          <DigikalaIncredibleOffer
+            products={products}
+            onAddToCart={handleAddToCart}
+            onInstantBuy={handleInstantBuy}
+            onViewDetails={handleOpenProductDetail}
+          />
+        )}
 
         {/* 5. DIGIKALA PRODUCTS CATALOG ROW */}
         <section id="all-products-section" className="space-y-4 scroll-mt-28">

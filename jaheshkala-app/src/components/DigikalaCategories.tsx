@@ -81,19 +81,8 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
     (g) => g.shortName === selectedCategory || g.name === selectedCategory
   );
 
-  // 4 Primary Clean Categories as requested by user
+  // 3 Primary Clean Categories (Incredible, Best Sellers, Guilds)
   const mainCategories = [
-    {
-      id: 'all',
-      name: 'همه کالاها',
-      badge: 'کامل',
-      value: '',
-      icon: Layers,
-      color: 'from-purple-600 via-indigo-600 to-purple-700',
-      activeColor: 'ring-2 ring-purple-400 bg-purple-100 dark:bg-purple-900/60',
-      action: () => onSelectCategory(''),
-      isActive: selectedCategory === '',
-    },
     {
       id: 'incredible',
       name: 'شگفت‌انگیز',
@@ -179,8 +168,8 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
         </div>
       </div>
 
-      {/* 4 Clean Primary Categories Grid (All, Incredible, Best Sellers, Guilds) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
+      {/* 3 Clean Primary Categories Grid (Incredible, Best Sellers, Guilds) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
         {mainCategories.map((cat) => {
           const Icon = cat.icon;
           return (

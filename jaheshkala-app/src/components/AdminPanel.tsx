@@ -499,22 +499,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  // Products Tab Categorization, Views & Filter States
+  // Products Tab Categorization & Filter States
   const [prodSearchQuery, setProdSearchQuery] = useState('');
-  const [prodFilterTab, setProdFilterTab] = useState<'all' | 'most_viewed' | 'guilds' | 'categories' | 'popular' | 'incredible' | 'subscription'>('all');
+  const [prodFilterTab, setProdFilterTab] = useState<'all' | 'guilds' | 'categories' | 'popular' | 'incredible' | 'subscription'>('all');
   const [prodSelectedGuild, setProdSelectedGuild] = useState<string>('all');
   const [prodSelectedCategory, setProdSelectedCategory] = useState<string>('all');
-  const [prodSortBy, setProdSortBy] = useState<'views_desc' | 'views_asc' | 'newest' | 'price_desc' | 'price_asc' | 'title'>('views_desc');
+  const [prodSortBy, setProdSortBy] = useState<'newest' | 'price_desc' | 'price_asc' | 'title'>('newest');
   const [quickViewEditModal, setQuickViewEditModal] = useState<{
     isOpen: boolean;
     product: Product | null;
-    viewsCount: number;
     category: string;
     guild: string;
   }>({
     isOpen: false,
     product: null,
-    viewsCount: 0,
     category: '',
     guild: '',
   });
@@ -1503,16 +1501,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              {/* 1. TOP ANALYTICS & VIEWED PRODUCTS STATS CARDS */}
+              {/* 1. PRODUCTS MANAGEMENT & FILTERING */}
               {(() => {
-                // 100% REAL views count tracking directly from database / state logs
-                const getProductViews = (p: Product): number => {
-                  if (typeof p.viewsCount === 'number' && p.viewsCount >= 0) {
-                    return p.viewsCount;
-                  }
-                  return 0;
-                };
-
                 const uniqueGuilds = Array.from(
                   new Set(
                     products
@@ -1529,13 +1519,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   )
                 );
 
-                const totalViews = products.reduce((acc, p) => acc + getProductViews(p), 0);
-                const sortedByViews = [...products].sort((a, b) => getProductViews(b) - getProductViews(a));
-                const topViewedProduct = sortedByViews[0];
-                const totalIncredible = products.filter(p => p.isIncredible || (p.discountPercent && p.discountPercent > 0)).length;
-
                 const processedProducts = products
-                  .map((p) => ({ ...p, viewsCount: getProductViews(p) }))
                   .filter((prod) => {
                     // Search query
                     if (prodSearchQuery.trim()) {
@@ -1573,8 +1557,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     return true;
                   })
                   .sort((a, b) => {
-                    if (prodSortBy === 'views_desc') return (b.viewsCount || 0) - (a.viewsCount || 0);
-                    if (prodSortBy === 'views_asc') return (a.viewsCount || 0) - (b.viewsCount || 0);
                     if (prodSortBy === 'price_desc') return b.price - a.price;
                     if (prodSortBy === 'price_asc') return a.price - b.price;
                     if (prodSortBy === 'title') return a.title.localeCompare(b.title, 'fa');
@@ -1583,63 +1565,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 return (
                   <div className="space-y-4">
-                    {/* Real Data Transparency Indicator */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-[11px] text-emerald-300">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                        <span>✅ آمار ۱۰۰٪ واقعی و زنده: محاسبه‌شده مستقیماً از لاگ بازدیدها، کلیک کاربران و دیتابیس ابری</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono">Real-time DB Sync</span>
-                    </div>
-
-                    {/* KPI Analytics Cards */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
-                      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-purple-950/70 via-[#180e38] to-[#120a2a] border border-purple-800/60 shadow-lg flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-300 flex items-center justify-center shrink-0">
-                          <Eye className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] sm:text-xs text-purple-300 font-bold truncate">کل بازدیدهای واقعی</p>
-                          <h4 className="text-sm sm:text-lg font-black text-white mt-0.5">{totalViews.toLocaleString('fa-IR')} <span className="text-[10px] font-normal text-purple-300">بازدید واقعی</span></h4>
-                        </div>
-                      </div>
-
-                      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-amber-950/70 via-[#23150c] to-[#140b2f] border border-amber-500/40 shadow-lg flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0">
-                          <Flame className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] sm:text-xs text-amber-300 font-bold truncate">پربازدیدترین محصول (واقعی)</p>
-                          <h4 className="text-xs sm:text-sm font-black text-white mt-0.5 truncate" title={topViewedProduct?.title}>
-                            {topViewedProduct ? topViewedProduct.title : 'هنوز بازدیدی ثبت نشده'}
-                          </h4>
-                          <span className="text-[10px] text-amber-400 font-bold">
-                            {getProductViews(topViewedProduct).toLocaleString('fa-IR')} بازدید ثبت‌شده
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-cyan-950/70 via-[#0d2238] to-[#140b2f] border border-cyan-500/40 shadow-lg flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0">
-                          <Layers className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] sm:text-xs text-cyan-300 font-bold truncate">اصناف تخصصی</p>
-                          <h4 className="text-sm sm:text-lg font-black text-white mt-0.5">{uniqueGuilds.length} <span className="text-[10px] font-normal text-cyan-300">صنف فعال</span></h4>
-                        </div>
-                      </div>
-
-                      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-rose-950/70 via-[#280e22] to-[#140b2f] border border-rose-500/40 shadow-lg flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center justify-center shrink-0">
-                          <Sparkles className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[10px] sm:text-xs text-rose-300 font-bold truncate">طرح‌های شگفت‌انگیز</p>
-                          <h4 className="text-sm sm:text-lg font-black text-white mt-0.5">{totalIncredible} <span className="text-[10px] font-normal text-rose-300">کالا با تخفیف</span></h4>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* 2. ADVANCED CATEGORIZATION & FILTER CONTROL PANEL */}
                     <div className="p-4 rounded-2xl bg-[#150d33] border border-purple-900/60 shadow-xl space-y-3.5">
                       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-purple-900/40">
@@ -1647,7 +1572,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <div className="w-7 h-7 rounded-lg bg-purple-600/30 text-purple-300 flex items-center justify-center">
                             <Filter className="w-4 h-4" />
                           </div>
-                          <h3 className="text-xs sm:text-sm font-black text-white">دسته‌بندی و فیلتر محصولات دیده‌شده</h3>
+                          <h3 className="text-xs sm:text-sm font-black text-white">دسته‌بندی و مدیریت محصولات</h3>
                           <span className="text-[10px] bg-purple-950 px-2 py-0.5 rounded-full text-purple-300 border border-purple-800/50 font-bold">
                             {processedProducts.length} از {products.length} کالا
                           </span>
@@ -1660,7 +1585,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               setProdFilterTab('all');
                               setProdSelectedGuild('all');
                               setProdSelectedCategory('all');
-                              setProdSortBy('views_desc');
+                              setProdSortBy('newest');
                             }}
                             className="text-[11px] text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 transition-colors flex items-center gap-1 cursor-pointer"
                             title="پاک کردن تمام فیلترها"
@@ -1684,7 +1609,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <button
                           onClick={() => {
                             setProdFilterTab('all');
-                            setProdSortBy('views_desc');
+                            setProdSortBy('newest');
                           }}
                           className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                             prodFilterTab === 'all'
@@ -1694,21 +1619,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         >
                           <Package className="w-3.5 h-3.5" />
                           <span>همه کالاها ({products.length})</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setProdFilterTab('most_viewed');
-                            setProdSortBy('views_desc');
-                          }}
-                          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-                            prodFilterTab === 'most_viewed'
-                              ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-900/50'
-                              : 'bg-[#1c1145] text-amber-300 hover:bg-[#251759] border border-amber-500/30'
-                          }`}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>پربازدیدترین و دیده‌شده‌ها 🔥</span>
                         </button>
 
                         <button
@@ -1828,8 +1738,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             onChange={(e) => setProdSortBy(e.target.value as any)}
                             className="w-full px-3 py-2 bg-[#1b103e] border border-purple-900/60 rounded-xl text-xs text-purple-200 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
                           >
-                            <option value="views_desc">👁️ بیشترین بازدید (دیده شده‌ترین)</option>
-                            <option value="views_asc">⬇️ کمترین بازدید</option>
                             <option value="newest">⏱️ جدیدترین به‌روزرسانی</option>
                             <option value="price_desc">💰 بالاترین قیمت</option>
                             <option value="price_asc">🏷️ مناسب‌ترین قیمت</option>
@@ -1839,11 +1747,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* 3. PRODUCTS GRID WITH VIEWS COUNT & QUICK ACTIONS */}
+                    {/* 3. PRODUCTS GRID */}
                     {processedProducts.length === 0 ? (
                       <div className="p-8 text-center bg-[#150d33] border border-purple-900/50 rounded-2xl space-y-3">
                         <div className="w-12 h-12 rounded-full bg-purple-900/40 text-purple-400 flex items-center justify-center mx-auto">
-                          <Eye className="w-6 h-6" />
+                          <Package className="w-6 h-6" />
                         </div>
                         <h4 className="text-sm font-black text-white">کالایی با فیلترهای انتخابی یافت نشد</h4>
                         <p className="text-xs text-slate-400">می‌توانید فیلترها را تغییر داده یا جستجو را بازنشانی کنید.</p>
@@ -1899,28 +1807,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   <h4 className="text-xs font-bold text-white line-clamp-2" title={prod.title}>{prod.title}</h4>
                                   <p className="text-xs text-amber-300 font-black mt-1">{formatPrice(prod.price)}</p>
 
-                                  {/* Dedicated Views Badge with Quick Edit Button */}
-                                  <div className="flex items-center gap-1.5 mt-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setQuickViewEditModal({
-                                          isOpen: true,
-                                          product: prod,
-                                          viewsCount: prod.viewsCount || getProductViews(prod),
-                                          category: prod.category || 'کالای دیجیتال',
-                                          guild: (prod as any).guild || (prod as any).targetGuild || '',
-                                        });
-                                      }}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-950 border border-purple-700/60 hover:border-amber-400/80 text-[10px] text-purple-200 hover:text-amber-300 transition-all cursor-pointer font-bold shadow-inner"
-                                      title="کلیک برای تنظیم و ویرایش سریع تعداد بازدید و دسته‌بندی"
-                                    >
-                                      <Eye className="w-3 h-3 text-cyan-400" />
-                                      <span>بازدید: <strong className="text-white font-mono">{prod.viewsCount?.toLocaleString('fa-IR')}</strong></span>
-                                      <Edit3 className="w-2.5 h-2.5 text-slate-400" />
-                                    </button>
-                                  </div>
-
                                   {prod.couponCode && (
                                     <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30 w-fit">
                                       <Ticket className="w-3 h-3" />
@@ -1947,13 +1833,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                       setQuickViewEditModal({
                                         isOpen: true,
                                         product: prod,
-                                        viewsCount: prod.viewsCount || getProductViews(prod),
                                         category: prod.category || 'کالای دیجیتال',
                                         guild: (prod as any).guild || (prod as any).targetGuild || '',
                                       });
                                     }}
                                     className="p-1.5 text-slate-400 hover:text-cyan-300 transition-colors rounded-lg hover:bg-purple-900/40"
-                                    title="دسته‌بندی و تنظیم سریع بازدید"
+                                    title="تنظیم سریع دسته‌بندی و صنف"
                                   >
                                     <Sliders className="w-4 h-4" />
                                   </button>
@@ -2019,22 +1904,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 );
               })()}
 
-              {/* Quick View & Category Edit Modal */}
+              {/* Quick Category & Guild Edit Modal */}
               {quickViewEditModal.isOpen && quickViewEditModal.product && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-sm animate-in fade-in">
                   <div className="relative w-full max-w-md bg-[#120a2a] border border-purple-600/70 rounded-3xl p-5 sm:p-6 text-right space-y-4 shadow-2xl">
                     <div className="flex items-center justify-between pb-3 border-b border-purple-900/50">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center">
-                          <Eye className="w-4 h-4" />
+                          <Sliders className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-black text-white">مدیریت دسته‌بندی و بازدید محصول</h3>
+                          <h3 className="text-sm font-black text-white">تنظیم دسته‌بندی و صنف محصول</h3>
                           <span className="text-[10px] text-purple-300">تنظیمات سریع کالا در پنل مدیریت</span>
                         </div>
                       </div>
                       <button
-                        onClick={() => setQuickViewEditModal({ isOpen: false, product: null, viewsCount: 0, category: '', guild: '' })}
+                        onClick={() => setQuickViewEditModal({ isOpen: false, product: null, category: '', guild: '' })}
                         className="w-7 h-7 rounded-full bg-purple-900/50 hover:bg-purple-800 text-slate-300 flex items-center justify-center cursor-pointer"
                       >
                         <X className="w-4 h-4" />
@@ -2059,7 +1944,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         if (!quickViewEditModal.product) return;
                         const updated: Product = {
                           ...quickViewEditModal.product,
-                          viewsCount: Math.max(0, quickViewEditModal.viewsCount || 0),
                           category: quickViewEditModal.category.trim() || quickViewEditModal.product.category,
                           guild: quickViewEditModal.guild.trim() || undefined,
                           updatedAt: new Date().toISOString(),
@@ -2067,25 +1951,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         if (onUpdateProduct) {
                           onUpdateProduct(updated);
                         }
-                        setQuickViewEditModal({ isOpen: false, product: null, viewsCount: 0, category: '', guild: '' });
+                        setQuickViewEditModal({ isOpen: false, product: null, category: '', guild: '' });
                       }}
                       className="space-y-3.5"
                     >
-                      <div>
-                        <label className="block text-xs text-slate-300 font-bold mb-1.5">تعداد بازدیدهای دیده‌شده (Views Count):</label>
-                        <div className="relative">
-                          <Eye className="w-4 h-4 text-cyan-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                          <input
-                            type="number"
-                            min="0"
-                            value={quickViewEditModal.viewsCount}
-                            onChange={(e) => setQuickViewEditModal({ ...quickViewEditModal, viewsCount: parseInt(e.target.value, 10) || 0 })}
-                            className="w-full pl-3 pr-9 py-2.5 bg-[#180e38] border border-purple-800 rounded-xl text-xs text-white font-mono font-bold focus:outline-none focus:border-amber-400"
-                            placeholder="مثلاً ۱۲۵۰"
-                          />
-                        </div>
-                      </div>
-
                       <div>
                         <label className="block text-xs text-slate-300 font-bold mb-1.5">دسته‌بندی موضوعی:</label>
                         <input
@@ -2118,7 +1987,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setQuickViewEditModal({ isOpen: false, product: null, viewsCount: 0, category: '', guild: '' })}
+                          onClick={() => setQuickViewEditModal({ isOpen: false, product: null, category: '', guild: '' })}
                           className="px-4 py-2.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-slate-300 font-bold text-xs transition-all cursor-pointer"
                         >
                           انصراف
