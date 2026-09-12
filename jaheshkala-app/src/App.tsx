@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X
+  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
@@ -1424,6 +1424,41 @@ export default function App() {
     return true;
   });
 
+  // Responsive pagination: 10 items for mobile, 25 items for desktop/system view
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : false));
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = isMobile ? 10 : 25;
+
+  // Reset to first page whenever filtering or screen-size mode changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, searchQuery, itemsPerPage]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
+  const paginatedProducts = filteredProducts.slice(
+    (safeCurrentPage - 1) * itemsPerPage,
+    safeCurrentPage * itemsPerPage
+  );
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    const el = document.getElementById('all-products-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   // Dynamically resolve product details (e.g. edited price, title, image) inside the cart
   const resolvedCartItems = cartItems.map((item) => {
     const latestProd = products.find((p) => p.id === item.product?.id);
@@ -1511,16 +1546,17 @@ export default function App() {
 
         {/* 5. DIGIKALA PRODUCTS CATALOG ROW */}
         <section id="all-products-section" className="space-y-4 scroll-mt-28">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-purple-900/40 pb-3 gap-3">
-            <div className="text-right">
-              <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-500" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-purple-900/40 pb-3 gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-white flex items-center gap-1.5 whitespace-nowrap">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 shrink-0" />
                 <span>
-                  {selectedCategory ? `کالاهای دسته‌بندی «${selectedCategory}»` : 'ویترین برگزیده کالاهای دیجیتال و خدمات جهش‌کالا'}
+                  {selectedCategory ? `کالاهای «${selectedCategory}»` : 'ویترین محصولات و خدمات جهش‌کالا'}
                 </span>
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                تضمین اصالت کالا، بهترین قیمت بازار، ارسال سریع به سراسر کشور و گارانتی معتبر شرکتی
+              <span className="hidden sm:inline text-slate-500 dark:text-slate-400 font-bold">•</span>
+              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
+                ضمانت اصالت کالا، بهترین قیمت بازار و تحویل سریع
               </p>
             </div>
 
@@ -1555,31 +1591,73 @@ export default function App() {
             </div>
           ) : (
             <>
-              {filteredProducts.length > 1 && (
-                <div className="sm:hidden flex items-center justify-between mb-2.5 px-2">
-                  <span className="text-[11px] font-black text-amber-300 bg-amber-400/15 px-3 py-1 rounded-full border border-amber-400/40 shadow-sm flex items-center gap-1.5 animate-pulse">
-                    <span>👈</span>
-                    <span>برای مشاهده سایر محصولات، به چپ بکشید</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    {filteredProducts.length} کالا
-                  </span>
-                </div>
-              )}
-              <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 overflow-x-auto sm:overflow-visible pb-4 sm:pb-0 scrollbar-none snap-x snap-mandatory items-stretch">
-                {filteredProducts.map((product) => (
-                  <div key={product.id} className="w-[85vw] sm:w-auto shrink-0 snap-center sm:snap-align-none flex flex-col h-full">
-                    <div className="w-full h-full flex flex-col">
-                      <ProductCard
-                        product={product}
-                        onAddToCart={handleAddToCart}
-                        onInstantBuy={handleInstantBuy}
-                        onViewDetails={handleOpenProductDetail}
-                      />
-                    </div>
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 items-stretch">
+                {paginatedProducts.map((product) => (
+                  <div key={product.id} className="flex flex-col h-full w-full">
+                    <ProductCard
+                      product={product}
+                      onAddToCart={handleAddToCart}
+                      onInstantBuy={handleInstantBuy}
+                      onViewDetails={handleOpenProductDetail}
+                    />
                   </div>
                 ))}
               </div>
+
+              {/* Digikala Style Pagination Bar (10 on mobile / 25 on desktop) */}
+              {totalPages > 1 && (
+                <div className="mt-8 pt-6 border-t border-purple-900/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  {/* Results count text */}
+                  <div className="text-xs text-slate-400 font-medium text-center sm:text-right">
+                    نمایش {(((safeCurrentPage - 1) * itemsPerPage) + 1).toLocaleString('fa-IR')} تا {Math.min(safeCurrentPage * itemsPerPage, filteredProducts.length).toLocaleString('fa-IR')} از {filteredProducts.length.toLocaleString('fa-IR')} کالا (صفحه {safeCurrentPage.toLocaleString('fa-IR')} از {totalPages.toLocaleString('fa-IR')})
+                  </div>
+
+                  {/* Pagination Buttons */}
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    {/* Previous Button (Right arrow in RTL) */}
+                    <button
+                      onClick={() => handlePageChange(safeCurrentPage - 1)}
+                      disabled={safeCurrentPage <= 1}
+                      className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all border disabled:opacity-40 disabled:cursor-not-allowed bg-purple-950/40 hover:bg-purple-900/60 border-purple-800/50 text-slate-200 cursor-pointer"
+                      title="صفحه قبلی"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                      <span className="hidden sm:inline">قبلی</span>
+                    </button>
+
+                    {/* Page Numbers */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                        const isActive = pageNum === safeCurrentPage;
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`min-w-[36px] sm:min-w-[40px] h-[36px] sm:h-[40px] px-2 flex items-center justify-center rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                              isActive
+                                ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 shadow-md scale-105 border border-amber-300'
+                                : 'bg-purple-950/40 hover:bg-purple-900/60 text-slate-300 border border-purple-800/40'
+                            }`}
+                          >
+                            {pageNum.toLocaleString('fa-IR')}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Next Button (Left arrow in RTL) */}
+                    <button
+                      onClick={() => handlePageChange(safeCurrentPage + 1)}
+                      disabled={safeCurrentPage >= totalPages}
+                      className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all border disabled:opacity-40 disabled:cursor-not-allowed bg-purple-950/40 hover:bg-purple-900/60 border-purple-800/50 text-slate-200 cursor-pointer"
+                      title="صفحه بعدی"
+                    >
+                      <span className="hidden sm:inline">بعدی</span>
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </section>

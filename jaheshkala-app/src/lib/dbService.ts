@@ -136,6 +136,18 @@ export function cleanProductItem(p: any): Product | null {
 export const fetchProductsFromDb = async (): Promise<Product[]> => {
   let authoritativeList: Product[] | null = null;
 
+  // 0. Read current local products cache
+  let localProducts: Product[] = [];
+  try {
+    const rawLocal = localStorage.getItem('jahesh_products');
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal);
+      if (Array.isArray(parsed)) {
+        localProducts = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
+      }
+    }
+  } catch {}
+
   // 1. Layer 1: Primary Cloud Check - Supabase SYSTEM_CONFIG_PRODUCTS (shared across all devices & Vercel)
   try {
     const { data: configData, error: configError } = await supabase
@@ -148,14 +160,6 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
       const cleaned = configData.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
       if (cleaned.length > 0) {
         authoritativeList = cleaned;
-        // Keep server disk in sync with latest cloud data
-        try {
-          fetch('/api/products', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(cleaned),
-          }).catch(() => {});
-        } catch {}
       }
     }
   } catch (e) {
@@ -185,19 +189,49 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     ? authoritativeList
     : INITIAL_PRODUCTS.map(cleanProductItem).filter((p): p is Product => p !== null);
 
-  const existingIds = new Set(baseProducts.map((p) => p.id));
-  const missingGuildSolutions = GUILD_SOLUTIONS_PRODUCTS.filter((p) => !existingIds.has(p.id));
-  const finalProducts = missingGuildSolutions.length > 0
-    ? [...baseProducts, ...missingGuildSolutions]
-    : baseProducts;
+  const existingMap = new Map<string, Product>();
+  for (const p of baseProducts) {
+    if (p && p.id) {
+      existingMap.set(p.id, p);
+    }
+  }
 
-  // Synchronize localStorage with clean authoritative data (clears any old corrupted/dummy products)
+  // 4. Smart Local Merge: If user recently edited a product locally, DO NOT overwrite it with stale cloud data!
+  let hasNewerLocalEdits = false;
+  if (localProducts.length > 0) {
+    for (const lp of localProducts) {
+      if (!lp || !lp.id) continue;
+      const existing = existingMap.get(lp.id);
+      if (existing) {
+        const merged = mergeTwoProducts(existing, lp);
+        existingMap.set(lp.id, merged);
+        if (merged !== existing) {
+          hasNewerLocalEdits = true;
+        }
+      } else {
+        // Product was created locally
+        existingMap.set(lp.id, lp);
+        hasNewerLocalEdits = true;
+      }
+    }
+  }
+
+  // 5. Ensure missing official guild solutions are present
+  for (const gp of GUILD_SOLUTIONS_PRODUCTS) {
+    if (gp && gp.id && !existingMap.has(gp.id)) {
+      existingMap.set(gp.id, gp);
+    }
+  }
+
+  const finalProducts = Array.from(existingMap.values());
+
+  // Synchronize localStorage with clean authoritative data
   try {
     localStorage.setItem('jahesh_products', JSON.stringify(finalProducts));
   } catch {}
 
-  // If missing guild solutions were just merged, asynchronously persist to Supabase & server
-  if (missingGuildSolutions.length > 0) {
+  // If local had newer edits or missing items, push back to cloud in background
+  if (hasNewerLocalEdits || !authoritativeList || authoritativeList.length === 0) {
     try {
       saveAllProductsToDb(finalProducts).catch(() => {});
     } catch {}
@@ -1297,7 +1331,7 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
   try {
     // 1. Update in local users store
     const localUsers = getLocalUsersStore();
-    const userIndex = localUsers.findIndex((u) => u.id === user.id || u.username === user.username || u.phone === user.phone);
+    const userIndex = localUsers.findIndex((u) => (user.id && u.id === user.id) || (user.username && u.username === user.username) || (user.phone && u.phone === user.phone));
     if (userIndex >= 0) {
       localUsers[userIndex] = {
         ...localUsers[userIndex],
@@ -1309,12 +1343,16 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
     }
     saveLocalUsersStore(localUsers);
 
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: localUsers }));
+    }
+
     // 2. If this user is currently logged in on the browser, update current session immediately
     try {
       const rawCurrent = localStorage.getItem('jahesh_current_user');
       if (rawCurrent) {
         const currentParsed: User = JSON.parse(rawCurrent);
-        if (currentParsed.id === user.id || currentParsed.username === user.username || currentParsed.phone === user.phone) {
+        if (currentParsed.id === user.id || currentParsed.username === user.username || (currentParsed.phone && currentParsed.phone === user.phone)) {
           const updatedCurrent = {
             ...currentParsed,
             ...user,
@@ -1330,23 +1368,7 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       console.warn('Error updating current user session:', err);
     }
 
-    // 3. Persist to server disk /api/users/update-role & /api/users/save
-    try {
-      await fetch('/api/users/update-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.id,
-          username: user.username,
-          phone: user.phone,
-          role: user.role,
-        }),
-      });
-    } catch (e) {
-      // ignore
-    }
-
-    // 4. Update in Supabase users table with multi-key fallback and upsert
+    // 3. Multi-layer background persistence (Server disk + Supabase)
     const payload = {
       full_name: user.fullName,
       phone: user.phone || '',
@@ -1355,37 +1377,25 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       role: user.role,
     };
 
-    let hasUpdated = false;
-    if (user.id) {
-      const { error: idErr, data: idData } = await supabase
-        .from('users')
-        .update(payload)
-        .eq('id', user.id)
-        .select();
-      if (!idErr && idData && idData.length > 0) hasUpdated = true;
-    }
-
-    if (!hasUpdated && user.username) {
-      const { error: userErr, data: userData } = await supabase
-        .from('users')
-        .update(payload)
-        .eq('username', user.username)
-        .select();
-      if (!userErr && userData && userData.length > 0) hasUpdated = true;
-    }
-
-    if (!hasUpdated && user.phone) {
-      const { error: phoneErr, data: phoneData } = await supabase
-        .from('users')
-        .update(payload)
-        .eq('phone', user.phone)
-        .select();
-      if (!phoneErr && phoneData && phoneData.length > 0) hasUpdated = true;
-    }
-
-    // If row did not exist or wasn't updated yet in Supabase, create it with upsert!
-    if (!hasUpdated) {
-      await supabase.from('users').upsert(
+    Promise.allSettled([
+      // Server disk
+      fetch('/api/users/update-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          username: user.username,
+          phone: user.phone,
+          role: user.role,
+        }),
+      }),
+      fetch('/api/users/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user),
+      }),
+      // Supabase users table upsert
+      supabase.from('users').upsert(
         {
           id: user.id || `usr-${Date.now()}`,
           full_name: user.fullName,
@@ -1396,25 +1406,19 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
           created_at: user.createdAt || new Date().toISOString(),
         },
         { onConflict: 'id' }
-      );
-    }
-
-    // 5. Cloud fallback: Store users list in chats table SYSTEM_CONFIG_USERS for 100% cloud sync
-    try {
-      const allLocal = getLocalUsersStore();
-      await supabase.from('chats').upsert(
+      ),
+      // Supabase chats table backup
+      supabase.from('chats').upsert(
         {
           user_id: 'SYSTEM_CONFIG_USERS',
           user_name: 'لیست کاربران سیستم جهش',
-          messages: allLocal,
+          messages: localUsers,
           last_updated: new Date().toISOString(),
           is_read_by_admin: true,
         },
         { onConflict: 'user_id' }
-      );
-    } catch (chatErr) {
-      console.warn('SYSTEM_CONFIG_USERS sync notice:', chatErr);
-    }
+      ),
+    ]).catch(() => {});
 
     return true;
   } catch (err) {
@@ -1434,7 +1438,16 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     return `rand:${Math.random()}`;
   };
 
-  // 1. Load from SYSTEM_CONFIG_USERS in chats table (Multi-device cloud store)
+  // 1. Load from local cache first to ensure recent local changes are never lost
+  const localUsers = getLocalUsersStore();
+  for (const lu of localUsers) {
+    if (!lu) continue;
+    const key = getUKey(lu);
+    if (!key) continue;
+    usersMap.set(key, { ...lu });
+  }
+
+  // 2. Load from SYSTEM_CONFIG_USERS in chats table (Multi-device cloud store)
   try {
     const { data: configData } = await supabase
       .from('chats')
@@ -1447,16 +1460,17 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
         if (!u) continue;
         const key = getUKey(u);
         if (!key) continue;
+        const localUser = usersMap.get(key);
         usersMap.set(key, {
-          id: u.id,
-          fullName: u.fullName || u.full_name || 'کاربر جهش',
-          phone: u.phone || '',
-          email: u.email || '',
-          username: u.username || '',
-          role: u.role || 'user',
-          guild: u.guild,
-          customGuild: u.customGuild || u.custom_guild,
-          createdAt: u.createdAt || u.created_at,
+          id: u.id || localUser?.id,
+          fullName: u.fullName || u.full_name || localUser?.fullName || 'کاربر جهش',
+          phone: u.phone || localUser?.phone || '',
+          email: u.email || localUser?.email || '',
+          username: u.username || localUser?.username || '',
+          role: localUser?.role || u.role || 'user',
+          guild: u.guild || localUser?.guild,
+          customGuild: u.customGuild || u.custom_guild || localUser?.customGuild,
+          createdAt: u.createdAt || u.created_at || localUser?.createdAt,
         });
       }
     }
@@ -1464,7 +1478,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     // ignore
   }
 
-  // 2. Load from Supabase users table (Cloud role & users)
+  // 3. Load from Supabase users table (Cloud role & users)
   try {
     const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
     if (!error && data && Array.isArray(data)) {
@@ -1478,7 +1492,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
           phone: matched.phone || existing?.phone || '',
           email: matched.email || existing?.email || '',
           username: matched.username || existing?.username || '',
-          role: (matched.role as 'admin' | 'operator' | 'user') || existing?.role || 'user',
+          role: existing?.role || (matched.role as 'admin' | 'operator' | 'user') || 'user',
           guild: matched.guild || existing?.guild,
           customGuild: matched.custom_guild || existing?.customGuild,
           createdAt: matched.created_at || existing?.createdAt,
@@ -1487,31 +1501,6 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     }
   } catch (err) {
     console.warn('Fetch all users exception:', err);
-  }
-
-  // 3. Load from local cache
-  const localUsers = getLocalUsersStore();
-  for (const lu of localUsers) {
-    if (!lu) continue;
-    const key = getUKey(lu);
-    if (!key) continue;
-    if (!usersMap.has(key)) {
-      usersMap.set(key, {
-        id: lu.id,
-        fullName: lu.fullName,
-        phone: lu.phone,
-        email: lu.email || '',
-        username: lu.username,
-        role: lu.role || 'user',
-        guild: lu.guild,
-        customGuild: lu.customGuild,
-        createdAt: lu.createdAt,
-      });
-    } else {
-      const existing = usersMap.get(key)!;
-      if (lu.guild && !existing.guild) existing.guild = lu.guild;
-      if (lu.customGuild && !existing.customGuild) existing.customGuild = lu.customGuild;
-    }
   }
 
   // 4. Load from server disk /api/users
@@ -1528,7 +1517,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
           usersMap.set(key, {
             ...existing,
             ...u,
-            role: u.role || existing?.role || 'user',
+            role: existing?.role || u.role || 'user',
           });
         }
       }
