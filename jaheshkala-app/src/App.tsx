@@ -5,6 +5,7 @@ import {
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from './data/initialData';
+import { GUILD_SOLUTIONS_PRODUCTS } from './data/guildProducts';
 import {
   fetchProductsFromDb,
   saveProductToDb,
@@ -111,17 +112,22 @@ export default function App() {
   // 2. Products state (persisted so admin additions and edits appear immediately)
   const [products, setProducts] = useState<Product[]>(() => {
     try {
+      const allBase = [...INITIAL_PRODUCTS, ...GUILD_SOLUTIONS_PRODUCTS];
       const saved = localStorage.getItem('jahesh_products');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = parsed.map(sanitizeProduct).filter((p): p is Product => p !== null);
-          if (cleaned.length > 0) return cleaned;
+          if (cleaned.length > 0) {
+            const savedIds = new Set(cleaned.map((p) => p.id));
+            const missing = GUILD_SOLUTIONS_PRODUCTS.filter((p) => !savedIds.has(p.id));
+            return missing.length > 0 ? [...cleaned, ...missing] : cleaned;
+          }
         }
       }
-      return INITIAL_PRODUCTS;
+      return allBase;
     } catch {
-      return INITIAL_PRODUCTS;
+      return [...INITIAL_PRODUCTS, ...GUILD_SOLUTIONS_PRODUCTS];
     }
   });
 
@@ -1398,29 +1404,49 @@ export default function App() {
 
   // Filtered products by search AND category
   const filteredProducts = products.filter((p) => {
-    // 1. Category Filter
+    // 1. Category / Guild Filter
     if (selectedCategory) {
       if (selectedCategory === 'پرفروش') {
         if (!p.isPopular && !p.badge?.includes('پرفروش')) return false;
       } else if (selectedCategory === 'شگفت‌انگیز') {
         if (!p.discountPercent || p.discountPercent <= 0) return false;
       } else {
-        const catMatch = p.category.toLowerCase().includes(selectedCategory.toLowerCase());
-        const titleMatch = p.title.toLowerCase().includes(selectedCategory.toLowerCase());
-        const brandMatch = p.brand ? p.brand.toLowerCase().includes(selectedCategory.toLowerCase()) : false;
-        if (!catMatch && !titleMatch && !brandMatch) return false;
+        const catLower = selectedCategory.trim().toLowerCase();
+        const pCat = (p.category || '').toLowerCase();
+        const pGuild = ((p as any).guild || (p as any).targetGuild || '').toLowerCase();
+        const pTitle = (p.title || '').toLowerCase();
+        const pBrand = (p.brand || '').toLowerCase();
+        const pShortDesc = (p.shortDescription || '').toLowerCase();
+        const pFullDesc = (p.fullDescription || '').toLowerCase();
+        const pPain = ((p as any).painPointSolved || '').toLowerCase();
+        const pTags = Array.isArray(p.tags) ? p.tags.map((t) => t.toLowerCase()) : [];
+
+        const catMatch = pCat.includes(catLower) || catLower.includes(pCat);
+        const guildMatch = pGuild.includes(catLower) || catLower.includes(pGuild);
+        const titleMatch = pTitle.includes(catLower);
+        const brandMatch = pBrand.includes(catLower);
+        const tagsMatch = pTags.some((t) => t.includes(catLower) || catLower.includes(t));
+        const descMatch = pShortDesc.includes(catLower) || pFullDesc.includes(catLower) || pPain.includes(catLower);
+
+        if (!catMatch && !guildMatch && !titleMatch && !brandMatch && !tagsMatch && !descMatch) {
+          return false;
+        }
       }
     }
 
     // 2. Search query filter
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchTitle = p.title.toLowerCase().includes(q);
-      const matchDesc = p.shortDescription.toLowerCase().includes(q);
-      const matchBrand = p.brand ? p.brand.toLowerCase().includes(q) : false;
-      const matchCat = p.category.toLowerCase().includes(q);
-      const matchFeatures = p.features.some((f) => f.toLowerCase().includes(q));
-      if (!matchTitle && !matchDesc && !matchBrand && !matchCat && !matchFeatures) {
+      const q = searchQuery.trim().toLowerCase();
+      const matchTitle = (p.title || '').toLowerCase().includes(q);
+      const matchDesc = (p.shortDescription || '').toLowerCase().includes(q) || (p.fullDescription || '').toLowerCase().includes(q);
+      const matchBrand = (p.brand || '').toLowerCase().includes(q);
+      const matchCat = (p.category || '').toLowerCase().includes(q);
+      const matchGuild = ((p as any).guild || (p as any).targetGuild || '').toLowerCase().includes(q);
+      const matchPain = ((p as any).painPointSolved || '').toLowerCase().includes(q);
+      const matchFeatures = Array.isArray(p.features) ? p.features.some((f) => f.toLowerCase().includes(q)) : false;
+      const matchTags = Array.isArray(p.tags) ? p.tags.some((t) => t.toLowerCase().includes(q)) : false;
+
+      if (!matchTitle && !matchDesc && !matchBrand && !matchCat && !matchGuild && !matchPain && !matchFeatures && !matchTags) {
         return false;
       }
     }

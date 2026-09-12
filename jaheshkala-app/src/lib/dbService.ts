@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { Product, Order, User, Coupon, BannerSlide } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from '../data/initialData';
+import { GUILD_SOLUTIONS_PRODUCTS } from '../data/guildProducts';
 
 export const INITIAL_COUPONS: Coupon[] = [
   {
@@ -179,15 +180,28 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   }
 
-  // 3. Fallback: If nothing exists yet, use INITIAL_PRODUCTS
-  const finalProducts = (authoritativeList && authoritativeList.length > 0)
+  // 3. Fallback and Guild Solutions Merge: Ensure all 25 guild solutions are present
+  const baseProducts = (authoritativeList && authoritativeList.length > 0)
     ? authoritativeList
     : INITIAL_PRODUCTS.map(cleanProductItem).filter((p): p is Product => p !== null);
+
+  const existingIds = new Set(baseProducts.map((p) => p.id));
+  const missingGuildSolutions = GUILD_SOLUTIONS_PRODUCTS.filter((p) => !existingIds.has(p.id));
+  const finalProducts = missingGuildSolutions.length > 0
+    ? [...baseProducts, ...missingGuildSolutions]
+    : baseProducts;
 
   // Synchronize localStorage with clean authoritative data (clears any old corrupted/dummy products)
   try {
     localStorage.setItem('jahesh_products', JSON.stringify(finalProducts));
   } catch {}
+
+  // If missing guild solutions were just merged, asynchronously persist to Supabase & server
+  if (missingGuildSolutions.length > 0) {
+    try {
+      saveAllProductsToDb(finalProducts).catch(() => {});
+    } catch {}
+  }
 
   return finalProducts;
 };

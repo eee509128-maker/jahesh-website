@@ -79,6 +79,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 gap-1.5 h-5 min-h-[1.25rem]">
           <div className="flex items-center gap-1 truncate min-w-0 flex-1">
             <span className="text-purple-700 dark:text-purple-300 font-bold truncate">{product.category}</span>
+            {((product as any).guild || (product as any).targetGuild) && (
+              <>
+                <span className="shrink-0">•</span>
+                <span className="text-amber-600 dark:text-amber-300 font-bold truncate bg-amber-400/10 px-1 rounded">
+                  {(product as any).guild || (product as any).targetGuild}
+                </span>
+              </>
+            )}
             {product.brand && (
               <>
                 <span className="shrink-0">•</span>
