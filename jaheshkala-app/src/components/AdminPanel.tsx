@@ -157,17 +157,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const tabNavRef = React.useRef<HTMLDivElement>(null);
 
-  // Admin Free Purchase Modal & Notifications
-  const [adminFreePurchaseModal, setAdminFreePurchaseModal] = useState<{
-    isOpen: boolean;
-    product: Product | null;
-    quantity: number;
-  }>({
-    isOpen: false,
-    product: null,
-    quantity: 1,
-  });
-  const [adminPurchaseSuccessNotice, setAdminPurchaseSuccessNotice] = useState<string | null>(null);
+
 
   const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
 
@@ -1467,42 +1457,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* TAB 2: PRODUCTS LIST */}
           {activeTab === 'products' && (
             <div className="space-y-4">
-              {/* Admin Purchase Success Banner */}
-              {adminPurchaseSuccessNotice && (
-                <div className="p-3.5 bg-emerald-950/90 border border-emerald-500 rounded-2xl flex items-center justify-between gap-3 text-xs text-emerald-300 shadow-xl animate-in fade-in">
-                  <div className="flex items-center gap-2 font-bold">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>{adminPurchaseSuccessNotice}</span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setAdminPurchaseSuccessNotice(null);
-                      setActiveTab('orders');
-                    }}
-                    className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg transition-colors cursor-pointer text-[11px] shrink-0"
-                  >
-                    مشاهده در تب سفارشات
-                  </button>
-                </div>
-              )}
-
-              {/* VIP Admin Notice Banner */}
-              <div className="bg-gradient-to-r from-emerald-950/50 via-[#0a231c] to-teal-950/50 border border-emerald-500/40 rounded-2xl p-3 sm:p-4 flex items-center justify-between gap-3 text-xs text-emerald-300">
-                <div className="flex items-center gap-2.5 font-bold">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shrink-0">
-                    <Gift className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-black text-white">قابلیت خرید رایگان مدیریت فعال است:</span>
-                    <p className="text-[11px] text-emerald-200/80 font-normal mt-0.5">
-                      شما می‌توانید هر کدام از کالاها را با کلیک روی «خرید رایگان با حساب مدیریت» بدون نیاز به درگاه پرداخت بانکی شاپرک و به صورت ۱۰۰٪ رایگان ثبت فرمایید.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 1. PRODUCTS MANAGEMENT & FILTERING */}
+              {/* PRODUCTS MANAGEMENT & FILTERING */}
               {(() => {
+                const totalIncredible = products.filter(
+                  (p) => p.isIncredible || ((p.discountPercent || 0) > 0)
+                ).length;
+
                 const uniqueGuilds = Array.from(
                   new Set(
                     products
@@ -1870,31 +1830,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   )}
                                 </div>
                               </div>
-
-                              {/* Admin Free Instant Buy Button */}
-                              <div className="pt-2 mt-2 border-t border-purple-900/30 space-y-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => setAdminFreePurchaseModal({ isOpen: true, product: prod, quantity: 1 })}
-                                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black text-xs shadow-md shadow-emerald-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-                                  title="ثبت فوری سفارش این کالا به صورت کاملاً رایگان برای حساب مدیریت (بدون درگاه پرداخت)"
-                                >
-                                  <Gift className="w-3.5 h-3.5 text-amber-300" />
-                                  <span>خرید رایگان با حساب مدیریت</span>
-                                </button>
-
-                                {(prod.id === 'pkg-amlak-jahesh' || prod.title?.includes('املاک') || prod.isSubscription) && onOpenAmlakApp && (
-                                  <button
-                                    type="button"
-                                    onClick={onOpenAmlakApp}
-                                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md shadow-amber-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-                                    title="تست و باز کردن زنده محیط نرم‌افزار مدیریت املاک (ویژه مدیریت)"
-                                  >
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    <span>تست زنده سامانه املاک (مدیریت)</span>
-                                  </button>
-                                )}
-                              </div>
                             </div>
                           </div>
                         ))}
@@ -1994,99 +1929,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </button>
                       </div>
                     </form>
-                  </div>
-                </div>
-              )}
-
-              {/* Admin Free Purchase Confirmation Modal */}
-              {adminFreePurchaseModal.isOpen && adminFreePurchaseModal.product && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-sm animate-in fade-in">
-                  <div className="relative w-full max-w-md bg-[#120a2a] border border-emerald-500/60 rounded-3xl p-5 sm:p-6 text-right space-y-4 shadow-2xl">
-                    <div className="flex items-center justify-between pb-3 border-b border-purple-900/50">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                          <Gift className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-black text-white">ثبت خرید رایگان با حساب مدیریت</h3>
-                          <span className="text-[10px] text-emerald-400 font-bold">بدون انتقال به درگاه پرداخت بانکی (شاپرک)</span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setAdminFreePurchaseModal({ isOpen: false, product: null, quantity: 1 })}
-                        className="w-7 h-7 rounded-full bg-purple-900/50 hover:bg-purple-800 text-slate-300 flex items-center justify-center cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-3 p-3 bg-[#180e38] rounded-2xl border border-purple-900/60">
-                      <img
-                        src={adminFreePurchaseModal.product.image}
-                        alt={adminFreePurchaseModal.product.title}
-                        className="w-14 h-14 rounded-xl object-cover border border-purple-800 shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-black text-white truncate">{adminFreePurchaseModal.product.title}</h4>
-                        <p className="text-[11px] text-slate-400 mt-0.5">قیمت عادی: {formatPrice(adminFreePurchaseModal.product.price)}</p>
-                        <div className="text-xs font-black text-emerald-400 mt-1 flex items-center gap-1">
-                          <span>مبلغ پرداختی مدیریت:</span>
-                          <span className="bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">۰ تومان (۱۰۰٪ رایگان)</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quantity selector */}
-                    <div className="flex items-center justify-between p-3 bg-[#150d33] rounded-2xl border border-purple-900/40">
-                      <span className="text-xs text-slate-300 font-bold">تعداد سفارش:</span>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setAdminFreePurchaseModal(prev => ({ ...prev, quantity: Math.max(1, prev.quantity - 1) }))}
-                          className="w-7 h-7 rounded-lg bg-purple-900/60 hover:bg-purple-800 text-white flex items-center justify-center font-bold text-sm cursor-pointer"
-                        >
-                          -
-                        </button>
-                        <span className="font-mono font-black text-sm text-white px-2">{adminFreePurchaseModal.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => setAdminFreePurchaseModal(prev => ({ ...prev, quantity: prev.quantity + 1 }))}
-                          className="w-7 h-7 rounded-lg bg-purple-900/60 hover:bg-purple-800 text-white flex items-center justify-center font-bold text-sm cursor-pointer"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="bg-emerald-950/40 border border-emerald-500/30 p-3 rounded-2xl text-[11px] text-emerald-200/90 leading-relaxed font-medium">
-                      این سفارش با حساب مدیریت ثبت شده و مستقیماً در دیتابیس کلود و لیست سفارشات پنل ذخیره می‌شود. هیچ‌گونه انتقالی به درگاه پرداخت بانکی انجام نخواهد شد.
-                    </div>
-
-                    <div className="flex items-center gap-2.5 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const prod = adminFreePurchaseModal.product;
-                          const qty = adminFreePurchaseModal.quantity;
-                          if (prod && onAdminInstantPurchase) {
-                            onAdminInstantPurchase(prod, qty);
-                            setAdminPurchaseSuccessNotice(`سفارش «${prod.title}» (${qty} عدد) با موفقیت و به صورت ۱۰۰٪ رایگان با حساب مدیریت ثبت شد.`);
-                          }
-                          setAdminFreePurchaseModal({ isOpen: false, product: null, quantity: 1 });
-                        }}
-                        className="h-11 flex-1 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-950/60 transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap active:scale-95"
-                      >
-                        <Check className="w-4 h-4 shrink-0" />
-                        <span>ثبت نهایی خرید رایگان مدیریت</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAdminFreePurchaseModal({ isOpen: false, product: null, quantity: 1 })}
-                        className="h-11 px-5 rounded-xl bg-purple-950 hover:bg-purple-900 text-slate-300 hover:text-white text-xs font-bold transition-all cursor-pointer whitespace-nowrap border border-purple-800/40 active:scale-95 flex items-center justify-center"
-                      >
-                        انصراف
-                      </button>
-                    </div>
                   </div>
                 </div>
               )}
