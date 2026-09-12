@@ -15,6 +15,7 @@ import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS } from '../data/initialData';
 import { renderFormattedBannerTitle } from '../lib/bannerUtils';
+import { JAHESH_OFFICIAL_25_GUILDS } from '../data/guildProducts';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -528,6 +529,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [selectedExistingCategory, setSelectedExistingCategory] = useState<string>('کالای دیجیتال');
   const [customCategoryName, setCustomCategoryName] = useState<string>('');
 
+  // Guild & Innovation Selection Mode
+  const [selectedGuildMode, setSelectedGuildMode] = useState<'25guilds' | 'custom' | 'none'>('25guilds');
+  const [selectedOfficialGuild, setSelectedOfficialGuild] = useState<string>(JAHESH_OFFICIAL_25_GUILDS[0] || 'طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات');
+  const [customGuildInput, setCustomGuildInput] = useState<string>('');
+  const [newPainPointSolved, setNewPainPointSolved] = useState<string>('');
+
   const [newOriginalPrice, setNewOriginalPrice] = useState('');
   const [newDiscountPercent, setNewDiscountPercent] = useState('');
   const [newPrice, setNewPrice] = useState('');
@@ -844,6 +851,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setCustomPlansTitle('پکیج‌های تبلیغات هوشمند');
     setCustomPlansSubtitle('انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
     setCustomPlans([]);
+    setSelectedGuildMode('25guilds');
+    setSelectedOfficialGuild(JAHESH_OFFICIAL_25_GUILDS[0] || 'طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات');
+    setCustomGuildInput('');
+    setNewPainPointSolved('');
     setNewProductCouponCode('');
     setNewProductCouponPercent('');
     setFormSuccess('');
@@ -892,6 +903,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setCustomPlansTitle(prod.customPlansTitle || 'پکیج‌های تبلیغات هوشمند');
     setCustomPlansSubtitle(prod.customPlansSubtitle || 'انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
     setCustomPlans(prod.subscriptionPlans && prod.subscriptionPlans.length > 0 ? prod.subscriptionPlans : []);
+    
+    // Guild & Innovation Settings
+    const currentGuild = prod.guild || (prod as any).targetGuild || '';
+    if (!currentGuild) {
+      setSelectedGuildMode('none');
+      setSelectedOfficialGuild(JAHESH_OFFICIAL_25_GUILDS[0] || 'طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات');
+      setCustomGuildInput('');
+    } else if (JAHESH_OFFICIAL_25_GUILDS.includes(currentGuild)) {
+      setSelectedGuildMode('25guilds');
+      setSelectedOfficialGuild(currentGuild);
+      setCustomGuildInput('');
+    } else {
+      setSelectedGuildMode('custom');
+      setCustomGuildInput(currentGuild);
+      setSelectedOfficialGuild(JAHESH_OFFICIAL_25_GUILDS[0] || 'طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات');
+    }
+    setNewPainPointSolved((prod as any).painPointSolved || '');
+
     setNewProductCouponCode(prod.couponCode || '');
     setNewProductCouponPercent(prod.couponDiscountPercent ? prod.couponDiscountPercent.toString() : '');
     setFormSuccess('');
@@ -960,11 +989,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const finalImage = newImage.trim() || getFallbackProductImage(newTitle.trim(), finalCategory);
 
+    let finalGuild: string | undefined = undefined;
+    if (selectedGuildMode === '25guilds') {
+      finalGuild = selectedOfficialGuild.trim() || undefined;
+    } else if (selectedGuildMode === 'custom') {
+      finalGuild = customGuildInput.trim() || undefined;
+    }
+
     const productData: Product = {
       id: editingProductId || ('prod-' + Date.now()),
       title: newTitle.trim(),
       category: finalCategory,
       brand: newBrand.trim() || undefined,
+      guild: finalGuild,
+      targetGuilds: finalGuild ? [finalGuild] : undefined,
+      painPointSolved: newPainPointSolved.trim() || undefined,
       warranty: newWarranty.trim() || undefined,
       price: priceNum,
       originalPrice: calculatedOrig && calculatedOrig > priceNum ? calculatedOrig : undefined,
@@ -2301,6 +2340,114 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </option>
                       ))}
                     </select>
+                  )}
+                </div>
+
+                {/* 2.5 GUILD SPECIFICATION & INNOVATIVE SOLUTION SECTION */}
+                <div className="p-4 bg-gradient-to-br from-[#160c33] via-[#100726] to-[#0a0418] border border-amber-500/30 rounded-2xl space-y-3.5 shadow-md">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-purple-900/40 pb-2.5">
+                    <label className="text-xs font-bold text-amber-300 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>صنف شغلی محصول و طرح نوآورانه جهش (۲۵ صنف تخصصی):</span>
+                    </label>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGuildMode('25guilds')}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition-all text-[11px] ${
+                          selectedGuildMode === '25guilds'
+                            ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                            : 'bg-purple-950/50 text-slate-300 hover:text-white border border-purple-800/40'
+                        }`}
+                      >
+                        انتخاب از ۲۵ صنف تخصصی جهش
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGuildMode('custom')}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition-all text-[11px] ${
+                          selectedGuildMode === 'custom'
+                            ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                            : 'bg-purple-950/50 text-slate-300 hover:text-white border border-purple-800/40'
+                        }`}
+                      >
+                        + صنف سفارشی / جدید
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGuildMode('none')}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition-all text-[11px] ${
+                          selectedGuildMode === 'none'
+                            ? 'bg-slate-700 text-white font-bold'
+                            : 'bg-purple-950/50 text-slate-400 hover:text-white border border-purple-800/40'
+                        }`}
+                      >
+                        بدون صنف (کالای عمومی)
+                      </button>
+                    </div>
+                  </div>
+
+                  {selectedGuildMode === '25guilds' && (
+                    <div className="space-y-2 animate-in fade-in">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <span>صنف هدف این خدمت یا کالا را انتخاب کنید:</span>
+                        <span className="text-amber-400 font-bold">۲۵ صنف رسمی بازار</span>
+                      </div>
+                      <select
+                        value={selectedOfficialGuild}
+                        onChange={(e) => setSelectedOfficialGuild(e.target.value)}
+                        className="w-full bg-black/60 border border-amber-400/50 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-amber-400 focus:outline-none cursor-pointer"
+                      >
+                        {JAHESH_OFFICIAL_25_GUILDS.map((g, idx) => (
+                          <option key={idx} value={g} className="bg-[#120826] text-white py-1">
+                            {idx + 1}. {g}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {selectedGuildMode === 'custom' && (
+                    <div className="space-y-1.5 animate-in fade-in">
+                      <label className="text-[11px] text-amber-200">
+                        نام صنف دلخواه یا بازار هدف جدید:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="مثلاً: قنادی و شیرینی‌پزی، صرافی و ارز دیجیتال، خشکبار و آجیل..."
+                        value={customGuildInput}
+                        onChange={(e) => setCustomGuildInput(e.target.value)}
+                        className="w-full bg-black/60 border border-amber-400/70 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none"
+                      />
+                    </div>
+                  )}
+
+                  {selectedGuildMode === 'none' && (
+                    <div className="p-2.5 bg-black/30 rounded-xl border border-purple-900/40 text-[11px] text-slate-400">
+                      این محصول فاقد برچسب صنف بوده و در تمام بخش‌های عمومی فروشگاه قابل دسترسی است.
+                    </div>
+                  )}
+
+                  {/* Pain Point & Challenge Solved Input */}
+                  {selectedGuildMode !== 'none' && (
+                    <div className="space-y-1.5 pt-1 border-t border-purple-900/40">
+                      <label className="text-[11px] font-bold text-slate-200 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-rose-400">🚨</span>
+                          <span>چالش و معضل اصلی صنف قبل از این طرح (اختیاری):</span>
+                        </span>
+                        <span className="text-[10px] text-purple-300 font-normal">
+                          نمایش در کادر اختصاصی صفحه کالا
+                        </span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="مثلاً: بررسی مشکل نوسانات قیمت، معطلی مراجعان، خطاهای محاسباتی و اینکه چگونه این راهکار جهش آن را حل می‌کند..."
+                        value={newPainPointSolved}
+                        onChange={(e) => setNewPainPointSolved(e.target.value)}
+                        className="w-full bg-black/50 border border-purple-800/80 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:border-amber-400 focus:outline-none leading-relaxed"
+                      />
+                    </div>
                   )}
                 </div>
 

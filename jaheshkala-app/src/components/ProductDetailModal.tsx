@@ -344,37 +344,51 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {product.title}
                 </h2>
 
-                {/* Innovative Guild Solution & Pain Point Card */}
-                {((product as any).painPointSolved || (product as any).guild || (product as any).targetGuild) && (
-                  <div className="mb-4 bg-gradient-to-br from-[#1d1238] via-[#160c2d] to-[#0f0722] border-2 border-purple-500/40 rounded-2xl p-4 sm:p-5 space-y-3 shadow-lg text-right">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-purple-800/40 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300">
-                          <Sparkles className="w-4 h-4" />
+                {/* Innovative Guild Solution & Pain Point Card - Beautifully Crafted & Legible */}
+                {((product as any).painPointSolved || product.guild || (product as any).targetGuild) && (
+                  <div className="mb-5 bg-gradient-to-br from-[#1c0f38] via-[#140a2c] to-[#0c051f] border border-purple-500/40 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-xl text-right">
+                    
+                    {/* Header Row: Title & Status Badge */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-purple-800/40 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 shrink-0">
+                          <Sparkles className="w-4 h-4 text-amber-300" />
                         </div>
                         <div>
-                          <span className="text-xs sm:text-sm font-black text-purple-200">
-                            طرح و راهکار اختصاصی جهش برای صنف
+                          <h4 className="text-xs sm:text-sm font-black text-white">
+                            طرح و راهکار نوآورانه جهش
+                          </h4>
+                          <span className="text-[11px] text-purple-300">
+                            توسعه‌یافته بر اساس نیازمندی‌ها و چالش‌های بازار کار
                           </span>
-                          {((product as any).guild || (product as any).targetGuild) && (
-                            <span className="text-xs font-black text-amber-300 mr-1.5 px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30">
-                              {(product as any).guild || (product as any).targetGuild}
-                            </span>
-                          )}
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-800/50">
-                        حل ریشه‌ای چالش صنفی
+                      <span className="text-[11px] font-bold text-emerald-300 bg-emerald-950/70 px-3 py-1 rounded-full border border-emerald-500/40 flex items-center gap-1.5 shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>پاسخ اختصاصی به چالش صنفی</span>
                       </span>
                     </div>
 
-                    {(product as any).painPointSolved && (
-                      <div className="space-y-1 bg-black/40 p-3 rounded-xl border border-purple-900/40">
-                        <span className="text-xs font-black text-rose-400 flex items-center gap-1.5">
-                          <Info className="w-3.5 h-3.5 text-rose-400" />
-                          <span>چالش و معضل اصلی صنف قبل از این طرح:</span>
+                    {/* Dedicated Guild Target Badge (Clean, non-breaking, generous padding) */}
+                    {(product.guild || (product as any).targetGuild) && (
+                      <div className="flex items-center gap-2 p-2.5 bg-amber-950/30 border border-amber-500/30 rounded-xl">
+                        <span className="text-[11px] font-bold text-amber-400 whitespace-nowrap">
+                          🏢 صنف تحت پوشش:
                         </span>
-                        <p className="text-xs text-slate-300 leading-relaxed pr-5">
+                        <span className="text-xs sm:text-sm font-black text-amber-200">
+                          {product.guild || (product as any).targetGuild}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Pain Point Section */}
+                    {(product as any).painPointSolved && (
+                      <div className="space-y-1.5 bg-black/40 p-3.5 rounded-xl border border-rose-500/25">
+                        <div className="flex items-center gap-1.5 text-xs font-black text-rose-300">
+                          <Info className="w-4 h-4 text-rose-400 shrink-0" />
+                          <span>چالش و معضل اصلی فعالان این صنف قبل از این نوآوری:</span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed pr-5">
                           {(product as any).painPointSolved}
                         </p>
                       </div>
