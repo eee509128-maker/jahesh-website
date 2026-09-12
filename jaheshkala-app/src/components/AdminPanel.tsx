@@ -7,7 +7,7 @@ import {
   Sliders, ExternalLink, Code2, Server, HelpCircle, Layers, Tag, Sparkles,
   Flame, Percent, Truck, Check, Ticket, ToggleLeft, ToggleRight, ArrowDownRight, Calculator, Users, MessageCircle, ArrowLeft, Reply, Paperclip, Image as ImageIcon, CornerUpRight, Download,
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
-  ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette
+  ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette, BarChart3, TrendingUp, Filter, ArrowUpDown
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan } from '../types';
 import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst } from '../lib/dbService';
@@ -497,6 +497,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setSelectedChat(updatedChat);
   };
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Products Tab Categorization, Views & Filter States
+  const [prodSearchQuery, setProdSearchQuery] = useState('');
+  const [prodFilterTab, setProdFilterTab] = useState<'all' | 'most_viewed' | 'guilds' | 'categories' | 'popular' | 'incredible' | 'subscription'>('all');
+  const [prodSelectedGuild, setProdSelectedGuild] = useState<string>('all');
+  const [prodSelectedCategory, setProdSelectedCategory] = useState<string>('all');
+  const [prodSortBy, setProdSortBy] = useState<'views_desc' | 'views_asc' | 'newest' | 'price_desc' | 'price_asc' | 'title'>('views_desc');
+  const [quickViewEditModal, setQuickViewEditModal] = useState<{
+    isOpen: boolean;
+    product: Product | null;
+    viewsCount: number;
+    category: string;
+    guild: string;
+  }>({
+    isOpen: false,
+    product: null,
+    viewsCount: 0,
+    category: '',
+    guild: '',
+  });
 
   // Edit / New Product Form State
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -1444,118 +1464,620 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white">لیست کالاهای موجود در فروشگاه:</h3>
-                <button
-                  onClick={handleStartNew}
-                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>ثبت کالای جدید</span>
-                </button>
-              </div>
+              {/* 1. TOP ANALYTICS & VIEWED PRODUCTS STATS CARDS */}
+              {(() => {
+                const getProductViews = (p: Product): number => {
+                  if (typeof p.viewsCount === 'number' && p.viewsCount >= 0) return p.viewsCount;
+                  const base = (p.reviewsCount || 5) * 45 + (p.isPopular ? 650 : 220) + (p.isIncredible ? 480 : 110);
+                  return base;
+                };
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {products.map((prod) => (
-                  <div
-                    key={prod.id}
-                    className="p-4 rounded-2xl bg-[#140b2f] border border-purple-900/40 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] bg-purple-950 px-2 py-0.5 rounded text-purple-300 font-bold">
-                          {prod.category}
-                        </span>
-                        {prod.badge && (
-                          <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded">
-                            {prod.badge}
-                          </span>
-                        )}
+                const uniqueGuilds = Array.from(
+                  new Set(
+                    products
+                      .map((p) => ((p as any).guild || (p as any).targetGuild || '').trim())
+                      .filter((g) => Boolean(g))
+                  )
+                );
+
+                const uniqueCategories = Array.from(
+                  new Set(
+                    products
+                      .map((p) => p.category?.trim())
+                      .filter((c) => Boolean(c))
+                  )
+                );
+
+                const totalViews = products.reduce((acc, p) => acc + getProductViews(p), 0);
+                const sortedByViews = [...products].sort((a, b) => getProductViews(b) - getProductViews(a));
+                const topViewedProduct = sortedByViews[0];
+                const totalIncredible = products.filter(p => p.isIncredible || (p.discountPercent && p.discountPercent > 0)).length;
+
+                const processedProducts = products
+                  .map((p) => ({ ...p, viewsCount: getProductViews(p) }))
+                  .filter((prod) => {
+                    // Search query
+                    if (prodSearchQuery.trim()) {
+                      const q = prodSearchQuery.trim().toLowerCase();
+                      const matchTitle = (prod.title || '').toLowerCase().includes(q);
+                      const matchCat = (prod.category || '').toLowerCase().includes(q);
+                      const matchGuild = (((prod as any).guild || (prod as any).targetGuild) || '').toLowerCase().includes(q);
+                      const matchDesc = (prod.shortDescription || '').toLowerCase().includes(q) || (prod.fullDescription || '').toLowerCase().includes(q);
+                      const matchCode = (prod.couponCode || '').toLowerCase().includes(q);
+                      if (!matchTitle && !matchCat && !matchGuild && !matchDesc && !matchCode) return false;
+                    }
+
+                    // Tab filtering
+                    if (prodFilterTab === 'popular') {
+                      if (!prod.isPopular && !prod.badge?.includes('پرفروش') && !prod.badge?.includes('محبوب')) return false;
+                    } else if (prodFilterTab === 'incredible') {
+                      if (!prod.isIncredible && (!prod.discountPercent || prod.discountPercent <= 0)) return false;
+                    } else if (prodFilterTab === 'subscription') {
+                      if (!prod.isSubscription && !prod.hasCustomPlans && prod.id !== 'pkg-amlak-jahesh') return false;
+                    } else if (prodFilterTab === 'guilds') {
+                      if (!((prod as any).guild || (prod as any).targetGuild)) return false;
+                    }
+
+                    // Guild filtering
+                    if (prodSelectedGuild !== 'all') {
+                      const pGuild = ((prod as any).guild || (prod as any).targetGuild || '').toLowerCase();
+                      if (!pGuild.includes(prodSelectedGuild.toLowerCase())) return false;
+                    }
+
+                    // Category filtering
+                    if (prodSelectedCategory !== 'all') {
+                      if (prod.category?.toLowerCase() !== prodSelectedCategory.toLowerCase()) return false;
+                    }
+
+                    return true;
+                  })
+                  .sort((a, b) => {
+                    if (prodSortBy === 'views_desc') return (b.viewsCount || 0) - (a.viewsCount || 0);
+                    if (prodSortBy === 'views_asc') return (a.viewsCount || 0) - (b.viewsCount || 0);
+                    if (prodSortBy === 'price_desc') return b.price - a.price;
+                    if (prodSortBy === 'price_asc') return a.price - b.price;
+                    if (prodSortBy === 'title') return a.title.localeCompare(b.title, 'fa');
+                    return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+                  });
+
+                return (
+                  <div className="space-y-4">
+                    {/* KPI Analytics Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+                      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-purple-950/70 via-[#180e38] to-[#120a2a] border border-purple-800/60 shadow-lg flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-300 flex items-center justify-center shrink-0">
+                          <Eye className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] sm:text-xs text-purple-300 font-bold truncate">مجموع کل بازدیدها</p>
+                          <h4 className="text-sm sm:text-lg font-black text-white mt-0.5">{totalViews.toLocaleString('fa-IR')} <span className="text-[10px] font-normal text-purple-300">بازدید</span></h4>
+                        </div>
                       </div>
-                      <div className="flex gap-3 mb-2">
-                        <img
-                          src={prod.image}
-                          alt={prod.title}
-                          className="w-12 h-12 rounded-xl object-cover border border-purple-900/60 shrink-0"
-                        />
-                        <div>
-                          <h4 className="text-xs font-bold text-white line-clamp-2">{prod.title}</h4>
-                          <p className="text-xs text-amber-300 font-bold mt-1">{formatPrice(prod.price)}</p>
-                          {prod.couponCode && (
-                            <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30 w-fit">
-                              <Ticket className="w-3 h-3" />
-                              <span>کد تخفیف: <strong className="font-mono">{prod.couponCode}</strong> ({prod.couponDiscountPercent || 15}%)</span>
-                            </div>
-                          )}
-                          {prod.isIncredible && (
-                            <div className="flex items-center gap-1 mt-1 text-[10px] text-rose-300 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-500/30 w-fit">
-                              <Clock className="w-3 h-3 text-rose-400" />
-                              <span>تایمر شگفت‌انگیز: {formatRemainingTime(prod.incredibleExpiresAt)}</span>
-                            </div>
-                          )}
+
+                      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-amber-950/70 via-[#23150c] to-[#140b2f] border border-amber-500/40 shadow-lg flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0">
+                          <Flame className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] sm:text-xs text-amber-300 font-bold truncate">پربازدیدترین محصول</p>
+                          <h4 className="text-xs sm:text-sm font-black text-white mt-0.5 truncate" title={topViewedProduct?.title}>
+                            {topViewedProduct?.title || 'طراحی وب‌سایت'}
+                          </h4>
+                          <span className="text-[10px] text-amber-400 font-bold">
+                            {getProductViews(topViewedProduct).toLocaleString('fa-IR')} بازدید
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-cyan-950/70 via-[#0d2238] to-[#140b2f] border border-cyan-500/40 shadow-lg flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0">
+                          <Layers className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] sm:text-xs text-cyan-300 font-bold truncate">اصناف تخصصی</p>
+                          <h4 className="text-sm sm:text-lg font-black text-white mt-0.5">{uniqueGuilds.length} <span className="text-[10px] font-normal text-cyan-300">صنف فعال</span></h4>
+                        </div>
+                      </div>
+
+                      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-rose-950/70 via-[#280e22] to-[#140b2f] border border-rose-500/40 shadow-lg flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center justify-center shrink-0">
+                          <Sparkles className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] sm:text-xs text-rose-300 font-bold truncate">طرح‌های شگفت‌انگیز</p>
+                          <h4 className="text-sm sm:text-lg font-black text-white mt-0.5">{totalIncredible} <span className="text-[10px] font-normal text-rose-300">کالا با تخفیف</span></h4>
                         </div>
                       </div>
                     </div>
 
-                    <div>
-                      <div className="flex items-center justify-between pt-3 border-t border-purple-900/40 mt-2">
-                        <span className="text-[11px] text-slate-400 truncate max-w-[150px]">{prod.deliveryDays}</span>
-                        <div className="flex items-center gap-1">
+                    {/* 2. ADVANCED CATEGORIZATION & FILTER CONTROL PANEL */}
+                    <div className="p-4 rounded-2xl bg-[#150d33] border border-purple-900/60 shadow-xl space-y-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-purple-900/40">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-purple-600/30 text-purple-300 flex items-center justify-center">
+                            <Filter className="w-4 h-4" />
+                          </div>
+                          <h3 className="text-xs sm:text-sm font-black text-white">دسته‌بندی و فیلتر محصولات دیده‌شده</h3>
+                          <span className="text-[10px] bg-purple-950 px-2 py-0.5 rounded-full text-purple-300 border border-purple-800/50 font-bold">
+                            {processedProducts.length} از {products.length} کالا
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleStartEdit(prod)}
-                            className="p-1.5 text-slate-400 hover:text-amber-400 transition-colors"
-                            title="ویرایش این کالا"
+                            onClick={() => {
+                              setProdSearchQuery('');
+                              setProdFilterTab('all');
+                              setProdSelectedGuild('all');
+                              setProdSelectedCategory('all');
+                              setProdSortBy('views_desc');
+                            }}
+                            className="text-[11px] text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 transition-colors flex items-center gap-1 cursor-pointer"
+                            title="پاک کردن تمام فیلترها"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <RefreshCw className="w-3 h-3" />
+                            <span>بازنشانی فیلترها</span>
                           </button>
-                          {currentUser?.role === 'admin' ? (
-                            <button
-                              onClick={() => onDeleteProduct(prod.id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors"
-                              title="حذف این کالا"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              className="p-1.5 text-slate-600 opacity-40 cursor-not-allowed"
-                              title="حذف کالا نیازمند دسترسی مدیر ارشد است"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+
+                          <button
+                            onClick={handleStartNew}
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-purple-950/50 transition-all cursor-pointer"
+                          >
+                            <PlusCircle className="w-4 h-4" />
+                            <span>ثبت کالای جدید</span>
+                          </button>
                         </div>
                       </div>
 
-                      {/* Admin Free Instant Buy Button */}
-                      <div className="pt-2 mt-2 border-t border-purple-900/30 space-y-1.5">
+                      {/* Filter Tabs */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none text-xs">
                         <button
-                          type="button"
-                          onClick={() => setAdminFreePurchaseModal({ isOpen: true, product: prod, quantity: 1 })}
-                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black text-xs shadow-md shadow-emerald-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-                          title="ثبت فوری سفارش این کالا به صورت کاملاً رایگان برای حساب مدیریت (بدون درگاه پرداخت)"
+                          onClick={() => {
+                            setProdFilterTab('all');
+                            setProdSortBy('views_desc');
+                          }}
+                          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                            prodFilterTab === 'all'
+                              ? 'bg-purple-600 text-white shadow-md shadow-purple-900/50'
+                              : 'bg-[#1c1145] text-slate-300 hover:bg-[#251759] border border-purple-900/40'
+                          }`}
                         >
-                          <Gift className="w-3.5 h-3.5 text-amber-300" />
-                          <span>خرید رایگان با حساب مدیریت</span>
+                          <Package className="w-3.5 h-3.5" />
+                          <span>همه کالاها ({products.length})</span>
                         </button>
 
-                        {(prod.id === 'pkg-amlak-jahesh' || prod.title?.includes('املاک') || prod.isSubscription) && onOpenAmlakApp && (
-                          <button
-                            type="button"
-                            onClick={onOpenAmlakApp}
-                            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md shadow-amber-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
-                            title="تست و باز کردن زنده محیط نرم‌افزار مدیریت املاک (ویژه مدیریت)"
+                        <button
+                          onClick={() => {
+                            setProdFilterTab('most_viewed');
+                            setProdSortBy('views_desc');
+                          }}
+                          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                            prodFilterTab === 'most_viewed'
+                              ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-900/50'
+                              : 'bg-[#1c1145] text-amber-300 hover:bg-[#251759] border border-amber-500/30'
+                          }`}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>پربازدیدترین و دیده‌شده‌ها 🔥</span>
+                        </button>
+
+                        <button
+                          onClick={() => setProdFilterTab('guilds')}
+                          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                            prodFilterTab === 'guilds'
+                              ? 'bg-cyan-600 text-white shadow-md shadow-cyan-900/50'
+                              : 'bg-[#1c1145] text-cyan-300 hover:bg-[#251759] border border-cyan-500/30'
+                          }`}
+                        >
+                          <Layers className="w-3.5 h-3.5" />
+                          <span>طرح‌های اصناف ۲۵‌گانه ({uniqueGuilds.length})</span>
+                        </button>
+
+                        <button
+                          onClick={() => setProdFilterTab('popular')}
+                          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                            prodFilterTab === 'popular'
+                              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/50'
+                              : 'bg-[#1c1145] text-emerald-300 hover:bg-[#251759] border border-emerald-500/30'
+                          }`}
+                        >
+                          <Flame className="w-3.5 h-3.5" />
+                          <span>محبوب و پرفروش‌ها</span>
+                        </button>
+
+                        <button
+                          onClick={() => setProdFilterTab('incredible')}
+                          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                            prodFilterTab === 'incredible'
+                              ? 'bg-rose-600 text-white shadow-md shadow-rose-900/50'
+                              : 'bg-[#1c1145] text-rose-300 hover:bg-[#251759] border border-rose-500/30'
+                          }`}
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>شگفت‌انگیز با تایمر ({totalIncredible})</span>
+                        </button>
+
+                        <button
+                          onClick={() => setProdFilterTab('subscription')}
+                          className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                            prodFilterTab === 'subscription'
+                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
+                              : 'bg-[#1c1145] text-indigo-300 hover:bg-[#251759] border border-indigo-500/30'
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>پکیج‌های اشتراکی و SaaS</span>
+                        </button>
+                      </div>
+
+                      {/* Dropdowns, Search and Sort Row */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                        {/* Search Bar */}
+                        <div className="relative">
+                          <Search className="w-4 h-4 text-purple-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            value={prodSearchQuery}
+                            onChange={(e) => setProdSearchQuery(e.target.value)}
+                            placeholder="جستجو در نام، صنف، دسته، کد تخفیف..."
+                            className="w-full pl-8 pr-9 py-2 bg-[#1b103e] border border-purple-900/60 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                          />
+                          {prodSearchQuery && (
+                            <button
+                              onClick={() => setProdSearchQuery('')}
+                              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Guild Selector */}
+                        <div>
+                          <select
+                            value={prodSelectedGuild}
+                            onChange={(e) => setProdSelectedGuild(e.target.value)}
+                            className="w-full px-3 py-2 bg-[#1b103e] border border-purple-900/60 rounded-xl text-xs text-amber-300 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
                           >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span>تست زنده سامانه املاک (مدیریت)</span>
-                          </button>
-                        )}
+                            <option value="all">🏢 فیلتر صنف شغلی (همه ۲۵ صنف)</option>
+                            {uniqueGuilds.map((g) => {
+                              const count = products.filter(p => ((p as any).guild || (p as any).targetGuild || '') === g).length;
+                              return (
+                                <option key={g} value={g}>
+                                  {g} ({count} محصول)
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        {/* Category Selector */}
+                        <div>
+                          <select
+                            value={prodSelectedCategory}
+                            onChange={(e) => setProdSelectedCategory(e.target.value)}
+                            className="w-full px-3 py-2 bg-[#1b103e] border border-purple-900/60 rounded-xl text-xs text-cyan-300 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                          >
+                            <option value="all">🏷️ دسته‌بندی موضوعی (همه)</option>
+                            {uniqueCategories.map((c) => {
+                              const count = products.filter(p => p.category === c).length;
+                              return (
+                                <option key={c} value={c}>
+                                  {c} ({count} کالا)
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        {/* Sort Selector */}
+                        <div className="flex items-center gap-1.5">
+                          <ArrowUpDown className="w-4 h-4 text-purple-400 shrink-0" />
+                          <select
+                            value={prodSortBy}
+                            onChange={(e) => setProdSortBy(e.target.value as any)}
+                            className="w-full px-3 py-2 bg-[#1b103e] border border-purple-900/60 rounded-xl text-xs text-purple-200 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                          >
+                            <option value="views_desc">👁️ بیشترین بازدید (دیده شده‌ترین)</option>
+                            <option value="views_asc">⬇️ کمترین بازدید</option>
+                            <option value="newest">⏱️ جدیدترین به‌روزرسانی</option>
+                            <option value="price_desc">💰 بالاترین قیمت</option>
+                            <option value="price_asc">🏷️ مناسب‌ترین قیمت</option>
+                            <option value="title">🔤 بر اساس نام محصول</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
+
+                    {/* 3. PRODUCTS GRID WITH VIEWS COUNT & QUICK ACTIONS */}
+                    {processedProducts.length === 0 ? (
+                      <div className="p-8 text-center bg-[#150d33] border border-purple-900/50 rounded-2xl space-y-3">
+                        <div className="w-12 h-12 rounded-full bg-purple-900/40 text-purple-400 flex items-center justify-center mx-auto">
+                          <Eye className="w-6 h-6" />
+                        </div>
+                        <h4 className="text-sm font-black text-white">کالایی با فیلترهای انتخابی یافت نشد</h4>
+                        <p className="text-xs text-slate-400">می‌توانید فیلترها را تغییر داده یا جستجو را بازنشانی کنید.</p>
+                        <button
+                          onClick={() => {
+                            setProdSearchQuery('');
+                            setProdFilterTab('all');
+                            setProdSelectedGuild('all');
+                            setProdSelectedCategory('all');
+                          }}
+                          className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>مشاهده همه کالاها</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {processedProducts.map((prod) => (
+                          <div
+                            key={prod.id}
+                            className="p-4 rounded-2xl bg-[#140b2f] border border-purple-900/50 hover:border-purple-600/60 transition-all flex flex-col justify-between shadow-lg relative group"
+                          >
+                            <div>
+                              {/* Badges and Category Row */}
+                              <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2.5">
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <span className="text-[10px] bg-purple-950 border border-purple-800/40 px-2 py-0.5 rounded text-purple-300 font-bold">
+                                    {prod.category}
+                                  </span>
+                                  {((prod as any).guild || (prod as any).targetGuild) && (
+                                    <span className="text-[10px] bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold px-2 py-0.5 rounded">
+                                      🏢 {(prod as any).guild || (prod as any).targetGuild}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {prod.badge && (
+                                  <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded">
+                                    {prod.badge}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Product Info */}
+                              <div className="flex gap-3 mb-2.5">
+                                <img
+                                  src={prod.image}
+                                  alt={prod.title}
+                                  className="w-14 h-14 rounded-xl object-cover border border-purple-900/60 shrink-0 shadow-md"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-xs font-bold text-white line-clamp-2" title={prod.title}>{prod.title}</h4>
+                                  <p className="text-xs text-amber-300 font-black mt-1">{formatPrice(prod.price)}</p>
+
+                                  {/* Dedicated Views Badge with Quick Edit Button */}
+                                  <div className="flex items-center gap-1.5 mt-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setQuickViewEditModal({
+                                          isOpen: true,
+                                          product: prod,
+                                          viewsCount: prod.viewsCount || getProductViews(prod),
+                                          category: prod.category || 'کالای دیجیتال',
+                                          guild: (prod as any).guild || (prod as any).targetGuild || '',
+                                        });
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-950 border border-purple-700/60 hover:border-amber-400/80 text-[10px] text-purple-200 hover:text-amber-300 transition-all cursor-pointer font-bold shadow-inner"
+                                      title="کلیک برای تنظیم و ویرایش سریع تعداد بازدید و دسته‌بندی"
+                                    >
+                                      <Eye className="w-3 h-3 text-cyan-400" />
+                                      <span>بازدید: <strong className="text-white font-mono">{prod.viewsCount?.toLocaleString('fa-IR')}</strong></span>
+                                      <Edit3 className="w-2.5 h-2.5 text-slate-400" />
+                                    </button>
+                                  </div>
+
+                                  {prod.couponCode && (
+                                    <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30 w-fit">
+                                      <Ticket className="w-3 h-3" />
+                                      <span>کد تخفیف: <strong className="font-mono">{prod.couponCode}</strong> ({prod.couponDiscountPercent || 15}%)</span>
+                                    </div>
+                                  )}
+                                  {prod.isIncredible && (
+                                    <div className="flex items-center gap-1 mt-1 text-[10px] text-rose-300 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-500/30 w-fit">
+                                      <Clock className="w-3 h-3 text-rose-400" />
+                                      <span>تایمر شگفت‌انگیز: {formatRemainingTime(prod.incredibleExpiresAt)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              {/* Actions Bar */}
+                              <div className="flex items-center justify-between pt-2.5 border-t border-purple-900/40 mt-1">
+                                <span className="text-[11px] text-slate-400 truncate max-w-[130px]">{prod.deliveryDays}</span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => {
+                                      setQuickViewEditModal({
+                                        isOpen: true,
+                                        product: prod,
+                                        viewsCount: prod.viewsCount || getProductViews(prod),
+                                        category: prod.category || 'کالای دیجیتال',
+                                        guild: (prod as any).guild || (prod as any).targetGuild || '',
+                                      });
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-cyan-300 transition-colors rounded-lg hover:bg-purple-900/40"
+                                    title="دسته‌بندی و تنظیم سریع بازدید"
+                                  >
+                                    <Sliders className="w-4 h-4" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleStartEdit(prod)}
+                                    className="p-1.5 text-slate-400 hover:text-amber-400 transition-colors rounded-lg hover:bg-purple-900/40"
+                                    title="ویرایش کامل مشخصات این کالا"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+
+                                  {currentUser?.role === 'admin' ? (
+                                    <button
+                                      onClick={() => onDeleteProduct(prod.id)}
+                                      className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-purple-900/40"
+                                      title="حذف این کالا"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      disabled
+                                      className="p-1.5 text-slate-600 opacity-40 cursor-not-allowed"
+                                      title="حذف کالا نیازمند دسترسی مدیر ارشد است"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Admin Free Instant Buy Button */}
+                              <div className="pt-2 mt-2 border-t border-purple-900/30 space-y-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setAdminFreePurchaseModal({ isOpen: true, product: prod, quantity: 1 })}
+                                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-black text-xs shadow-md shadow-emerald-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                                  title="ثبت فوری سفارش این کالا به صورت کاملاً رایگان برای حساب مدیریت (بدون درگاه پرداخت)"
+                                >
+                                  <Gift className="w-3.5 h-3.5 text-amber-300" />
+                                  <span>خرید رایگان با حساب مدیریت</span>
+                                </button>
+
+                                {(prod.id === 'pkg-amlak-jahesh' || prod.title?.includes('املاک') || prod.isSubscription) && onOpenAmlakApp && (
+                                  <button
+                                    type="button"
+                                    onClick={onOpenAmlakApp}
+                                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md shadow-amber-950/40 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer"
+                                    title="تست و باز کردن زنده محیط نرم‌افزار مدیریت املاک (ویژه مدیریت)"
+                                  >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    <span>تست زنده سامانه املاک (مدیریت)</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
+
+              {/* Quick View & Category Edit Modal */}
+              {quickViewEditModal.isOpen && quickViewEditModal.product && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-sm animate-in fade-in">
+                  <div className="relative w-full max-w-md bg-[#120a2a] border border-purple-600/70 rounded-3xl p-5 sm:p-6 text-right space-y-4 shadow-2xl">
+                    <div className="flex items-center justify-between pb-3 border-b border-purple-900/50">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center">
+                          <Eye className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-black text-white">مدیریت دسته‌بندی و بازدید محصول</h3>
+                          <span className="text-[10px] text-purple-300">تنظیمات سریع کالا در پنل مدیریت</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setQuickViewEditModal({ isOpen: false, product: null, viewsCount: 0, category: '', guild: '' })}
+                        className="w-7 h-7 rounded-full bg-purple-900/50 hover:bg-purple-800 text-slate-300 flex items-center justify-center cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="p-3 bg-[#180e38] rounded-2xl border border-purple-900/60 flex items-center gap-3">
+                      <img
+                        src={quickViewEditModal.product.image}
+                        alt={quickViewEditModal.product.title}
+                        className="w-12 h-12 rounded-xl object-cover border border-purple-800 shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-bold text-white truncate">{quickViewEditModal.product.title}</h4>
+                        <p className="text-[11px] text-amber-300 mt-0.5">{formatPrice(quickViewEditModal.product.price)}</p>
+                      </div>
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!quickViewEditModal.product) return;
+                        const updated: Product = {
+                          ...quickViewEditModal.product,
+                          viewsCount: Math.max(0, quickViewEditModal.viewsCount || 0),
+                          category: quickViewEditModal.category.trim() || quickViewEditModal.product.category,
+                          guild: quickViewEditModal.guild.trim() || undefined,
+                          updatedAt: new Date().toISOString(),
+                        };
+                        if (onUpdateProduct) {
+                          onUpdateProduct(updated);
+                        }
+                        setQuickViewEditModal({ isOpen: false, product: null, viewsCount: 0, category: '', guild: '' });
+                      }}
+                      className="space-y-3.5"
+                    >
+                      <div>
+                        <label className="block text-xs text-slate-300 font-bold mb-1.5">تعداد بازدیدهای دیده‌شده (Views Count):</label>
+                        <div className="relative">
+                          <Eye className="w-4 h-4 text-cyan-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="number"
+                            min="0"
+                            value={quickViewEditModal.viewsCount}
+                            onChange={(e) => setQuickViewEditModal({ ...quickViewEditModal, viewsCount: parseInt(e.target.value, 10) || 0 })}
+                            className="w-full pl-3 pr-9 py-2.5 bg-[#180e38] border border-purple-800 rounded-xl text-xs text-white font-mono font-bold focus:outline-none focus:border-amber-400"
+                            placeholder="مثلاً ۱۲۵۰"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-slate-300 font-bold mb-1.5">دسته‌بندی موضوعی:</label>
+                        <input
+                          type="text"
+                          value={quickViewEditModal.category}
+                          onChange={(e) => setQuickViewEditModal({ ...quickViewEditModal, category: e.target.value })}
+                          className="w-full px-3 py-2.5 bg-[#180e38] border border-purple-800 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
+                          placeholder="مثلاً خدمات و طراحی سایت، نرم‌افزارها..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-slate-300 font-bold mb-1.5">صنف تخصصی مرتبط:</label>
+                        <input
+                          type="text"
+                          value={quickViewEditModal.guild}
+                          onChange={(e) => setQuickViewEditModal({ ...quickViewEditModal, guild: e.target.value })}
+                          className="w-full px-3 py-2.5 bg-[#180e38] border border-purple-800 rounded-xl text-xs text-amber-300 focus:outline-none focus:border-amber-400 font-bold"
+                          placeholder="مثلاً مشاوران املاک، رستوران‌ها، طلا و جواهر..."
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2">
+                        <button
+                          type="submit"
+                          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>ذخیره تغییرات</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQuickViewEditModal({ isOpen: false, product: null, viewsCount: 0, category: '', guild: '' })}
+                          className="px-4 py-2.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-slate-300 font-bold text-xs transition-all cursor-pointer"
+                        >
+                          انصراف
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
 
               {/* Admin Free Purchase Confirmation Modal */}
               {adminFreePurchaseModal.isOpen && adminFreePurchaseModal.product && (

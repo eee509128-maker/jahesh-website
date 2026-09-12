@@ -46,6 +46,7 @@ export interface Product {
   subscriptionPlans?: SubscriptionPlan[]; // Array of custom tiers
   guild?: string; // صنف مرتبط با این خدمت یا کالا (مثلاً: املاک و مستغلات، طراحی سایت، رستوران...)
   targetGuilds?: string[]; // صنف‌های مرتبط
+  viewsCount?: number; // تعداد کل بازدیدها و دیده‌شدن‌های محصول توسط مشتریان
   updatedAt?: string; // ISO date timestamp for conflict resolution and persistent updates
 }
 
