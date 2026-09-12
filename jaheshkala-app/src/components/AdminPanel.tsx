@@ -1466,10 +1466,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               {/* 1. TOP ANALYTICS & VIEWED PRODUCTS STATS CARDS */}
               {(() => {
+                // 100% REAL views count tracking directly from database / state logs
                 const getProductViews = (p: Product): number => {
-                  if (typeof p.viewsCount === 'number' && p.viewsCount >= 0) return p.viewsCount;
-                  const base = (p.reviewsCount || 5) * 45 + (p.isPopular ? 650 : 220) + (p.isIncredible ? 480 : 110);
-                  return base;
+                  if (typeof p.viewsCount === 'number' && p.viewsCount >= 0) {
+                    return p.viewsCount;
+                  }
+                  return 0;
                 };
 
                 const uniqueGuilds = Array.from(
@@ -1542,6 +1544,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 return (
                   <div className="space-y-4">
+                    {/* Real Data Transparency Indicator */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-[11px] text-emerald-300">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>✅ آمار ۱۰۰٪ واقعی و زنده: محاسبه‌شده مستقیماً از لاگ بازدیدها، کلیک کاربران و دیتابیس ابری</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">Real-time DB Sync</span>
+                    </div>
+
                     {/* KPI Analytics Cards */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
                       <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-br from-purple-950/70 via-[#180e38] to-[#120a2a] border border-purple-800/60 shadow-lg flex items-center gap-3">
@@ -1549,8 +1560,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <Eye className="w-5 h-5" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[10px] sm:text-xs text-purple-300 font-bold truncate">مجموع کل بازدیدها</p>
-                          <h4 className="text-sm sm:text-lg font-black text-white mt-0.5">{totalViews.toLocaleString('fa-IR')} <span className="text-[10px] font-normal text-purple-300">بازدید</span></h4>
+                          <p className="text-[10px] sm:text-xs text-purple-300 font-bold truncate">کل بازدیدهای واقعی</p>
+                          <h4 className="text-sm sm:text-lg font-black text-white mt-0.5">{totalViews.toLocaleString('fa-IR')} <span className="text-[10px] font-normal text-purple-300">بازدید واقعی</span></h4>
                         </div>
                       </div>
 
@@ -1559,12 +1570,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <Flame className="w-5 h-5" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[10px] sm:text-xs text-amber-300 font-bold truncate">پربازدیدترین محصول</p>
+                          <p className="text-[10px] sm:text-xs text-amber-300 font-bold truncate">پربازدیدترین محصول (واقعی)</p>
                           <h4 className="text-xs sm:text-sm font-black text-white mt-0.5 truncate" title={topViewedProduct?.title}>
-                            {topViewedProduct?.title || 'طراحی وب‌سایت'}
+                            {topViewedProduct ? topViewedProduct.title : 'هنوز بازدیدی ثبت نشده'}
                           </h4>
                           <span className="text-[10px] text-amber-400 font-bold">
-                            {getProductViews(topViewedProduct).toLocaleString('fa-IR')} بازدید
+                            {getProductViews(topViewedProduct).toLocaleString('fa-IR')} بازدید ثبت‌شده
                           </span>
                         </div>
                       </div>

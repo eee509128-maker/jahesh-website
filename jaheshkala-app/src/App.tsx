@@ -1393,6 +1393,21 @@ export default function App() {
     }
   };
 
+  const handleOpenProductDetail = (product: Product) => {
+    const currentViews = typeof product.viewsCount === 'number' ? product.viewsCount : 0;
+    const updatedViews = currentViews + 1;
+    const updatedProduct: Product = {
+      ...product,
+      viewsCount: updatedViews,
+      updatedAt: new Date().toISOString(),
+    };
+    setProducts((prev) => prev.map((p) => (p.id === product.id ? updatedProduct : p)));
+    setDetailModalProduct(updatedProduct);
+    try {
+      saveProductToDb(updatedProduct).catch(() => {});
+    } catch {}
+  };
+
   const handleSelectCategory = (cat: string) => {
     setSelectedCategory(cat);
     if (cat === 'شگفت‌انگیز') {
@@ -1534,7 +1549,7 @@ export default function App() {
           products={products}
           onAddToCart={handleAddToCart}
           onInstantBuy={handleInstantBuy}
-          onViewDetails={setDetailModalProduct}
+          onViewDetails={handleOpenProductDetail}
         />
 
         {/* 5. DIGIKALA PRODUCTS CATALOG ROW */}
@@ -1602,7 +1617,7 @@ export default function App() {
                         product={product}
                         onAddToCart={handleAddToCart}
                         onInstantBuy={handleInstantBuy}
-                        onViewDetails={setDetailModalProduct}
+                        onViewDetails={handleOpenProductDetail}
                       />
                     </div>
                   </div>
