@@ -907,7 +907,7 @@ export const checkUsernameAvailability = async (
       if (match) {
         return {
           available: false,
-          reason: 'این نام کاربری قبلاً توسط کاربر دیگری ثبت شده است. لطفاً نام کاربری دیگری انتخاب کنید.',
+          reason: 'نام کاربری توسط فرد دیگری استفاده شده',
         };
       }
     }
@@ -923,7 +923,7 @@ export const checkUsernameAvailability = async (
   if (match) {
     return {
       available: false,
-      reason: 'این نام کاربری قبلاً توسط کاربر دیگری ثبت شده است. لطفاً نام کاربری دیگری انتخاب کنید.',
+      reason: 'نام کاربری توسط فرد دیگری استفاده شده',
     };
   }
 

@@ -4187,7 +4187,7 @@ on public.users for delete using (true);`;
                   <div className="overflow-x-auto rounded-2xl border border-purple-900/40 bg-[#130b2e] shadow-xl">
                     <table className="w-full text-xs text-right">
                       <thead className="bg-[#190f38] text-slate-300 border-b border-purple-900/50">
-                        <tr>
+                        <tr className="whitespace-nowrap">
                           <th className="p-3.5">#</th>
                           <th className="p-3.5">نام و نام خانوادگی</th>
                           <th className="p-3.5">صنف و زمینه فعالیت</th>
@@ -4201,10 +4201,11 @@ on public.users for delete using (true);`;
                       <tbody className="divide-y divide-purple-900/30">
                         {filteredUsers.map((user, idx) => {
                           const isMaster = user.username === 'jahesh_admin' || user.phone === '09152331974';
+                          const fullGuildText = `${user.guild || (isMaster ? 'فناوری و مدیریت جهش' : 'ثبت نشده')}${user.customGuild ? ` (${user.customGuild})` : ''}`;
                           return (
-                            <tr key={user.id} className="hover:bg-purple-900/15 transition-colors">
+                            <tr key={user.id} className="hover:bg-purple-900/15 transition-colors whitespace-nowrap">
                               <td className="p-3.5 text-purple-300/60 font-mono">{idx + 1}</td>
-                              <td className="p-3.5">
+                              <td className="p-3.5 whitespace-nowrap">
                                 <div className="font-bold text-white flex items-center gap-1.5">
                                   {user.fullName || 'بدون نام'}
                                   {isMaster && (
@@ -4214,16 +4215,21 @@ on public.users for delete using (true);`;
                                   )}
                                 </div>
                               </td>
-                              <td className="p-3.5">
-                                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg bg-purple-950/80 text-amber-300 border border-purple-700/50 font-medium">
-                                  💼 {user.guild || (isMaster ? 'فناوری و مدیریت جهش' : 'ثبت نشده')}
-                                  {user.customGuild ? ` (${user.customGuild})` : ''}
-                                </span>
+                              <td className="p-3.5 whitespace-nowrap">
+                                <div
+                                  title={fullGuildText}
+                                  className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-purple-950/80 text-amber-300 border border-purple-700/50 font-medium whitespace-nowrap max-w-[200px] cursor-default shadow-xs"
+                                >
+                                  <span className="shrink-0 text-xs">💼</span>
+                                  <span className="truncate">
+                                    {fullGuildText}
+                                  </span>
+                                </div>
                               </td>
-                              <td className="p-3.5 text-slate-300 font-mono" dir="ltr">
+                              <td className="p-3.5 text-slate-300 font-mono whitespace-nowrap" dir="ltr">
                                 {user.phone}
                               </td>
-                              <td className="p-3.5">
+                              <td className="p-3.5 whitespace-nowrap">
                                 <div className="font-mono text-amber-300 text-[11px]" dir="ltr">
                                   @{user.username}
                                 </div>
@@ -4233,7 +4239,7 @@ on public.users for delete using (true);`;
                                   </div>
                                 )}
                               </td>
-                               <td className="p-3.5 text-center">
+                               <td className="p-3.5 text-center whitespace-nowrap">
                                 <select
                                   value={user.role || 'user'}
                                   disabled={isMaster || currentUser?.role === 'operator'}
@@ -4257,10 +4263,10 @@ on public.users for delete using (true);`;
                                   <option value="admin" className="bg-[#130b2e] text-purple-300">👑 مدیر ارشد (Admin)</option>
                                 </select>
                               </td>
-                              <td className="p-3.5 text-slate-400 font-sans">
+                              <td className="p-3.5 text-slate-400 font-sans whitespace-nowrap">
                                 {user.createdAt || 'ثبت در سیستم'}
                               </td>
-                              <td className="p-3.5 text-center">
+                              <td className="p-3.5 text-center whitespace-nowrap">
                                 <div className="flex items-center justify-center gap-2">
                                   {/* Edit button */}
                                   <button

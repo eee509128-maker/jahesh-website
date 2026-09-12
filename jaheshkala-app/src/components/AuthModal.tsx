@@ -107,7 +107,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const res = await checkUsernameAvailability(clean);
         if (!res.available) {
           setUsernameStatus('taken');
-          setUsernameMessage('این نام کاربری قبلاً در سایت انتخاب شده است. لطفاً نام کاربری دیگری وارد نمایید.');
+          setUsernameMessage('نام کاربری توسط فرد دیگری استفاده شده');
         } else {
           setUsernameStatus('available');
           setUsernameMessage('نام کاربری آزاد و قابل استفاده است.');
@@ -252,9 +252,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         
         const usernameCheck = await checkUsernameAvailability(cleanUsername);
         if (!usernameCheck.available) {
-          setErrorMsg('این نام کاربری قبلاً در سایت ثبت شده است. لطفاً نام کاربری دیگری وارد نمایید.');
+          setErrorMsg('نام کاربری توسط فرد دیگری استفاده شده');
           setUsernameStatus('taken');
-          setUsernameMessage('این نام کاربری قبلاً در سایت ثبت شده است. لطفاً نام کاربری دیگری وارد نمایید.');
+          setUsernameMessage('نام کاربری توسط فرد دیگری استفاده شده');
           setIsLoading(false);
           return;
         }
@@ -609,7 +609,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     )}
                     {usernameStatus === 'taken' && (
                       <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold flex items-center gap-0.5">
-                        ⚠️ نام کاربری تکراری است
+                        ⚠️ تکراری
                       </span>
                     )}
                   </div>
@@ -631,7 +631,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   {usernameStatus === 'taken' && (
                     <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1 mt-1 leading-snug">
                       <span>⚠️</span>
-                      <span>این نام کاربری قبلاً انتخاب شده است. لطفاً نام کاربری دیگری وارد نمایید.</span>
+                      <span>نام کاربری توسط فرد دیگری استفاده شده</span>
                     </p>
                   )}
                   {usernameStatus === 'available' && (
