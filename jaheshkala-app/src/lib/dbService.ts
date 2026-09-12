@@ -861,8 +861,49 @@ const saveLocalUsersStore = (users: Array<User & { password?: string }>) => {
 
 export const registerUserInDb = async (user: User, passwordHash: string): Promise<boolean> => {
   try {
-    // 1. Fetch latest users from cloud first to ensure we don't clobber any existing users from other devices
-    let existingUsers: Array<User & { password?: string }> = getLocalUsersStore();
+    const cleanPhone = user.phone?.trim() || '';
+    const cleanUsername = user.username?.trim().toLowerCase() || `u${Date.now()}`;
+    const userWithPass: User & { password?: string } = {
+      id: user.id || `u-${Date.now()}`,
+      fullName: user.fullName || 'کاربر جهش',
+      phone: cleanPhone,
+      email: user.email?.trim() || '',
+      username: cleanUsername,
+      role: user.role || 'user',
+      guild: user.guild,
+      customGuild: user.customGuild,
+      createdAt: user.createdAt || new Date().toLocaleDateString('fa-IR'),
+      password: passwordHash,
+    };
+
+    // 1. Persist to Supabase users table (only valid table columns)
+    try {
+      const payload = {
+        id: userWithPass.id,
+        full_name: userWithPass.fullName,
+        phone: userWithPass.phone,
+        email: userWithPass.email || '',
+        username: userWithPass.username,
+        password: passwordHash,
+        role: userWithPass.role || 'user',
+        created_at: userWithPass.createdAt,
+      };
+
+      let insertRes = await supabase.from('users').upsert(payload, { onConflict: 'id' });
+      // If duplicate username constraint error (23505) occurs, make username column unique for DB row
+      if (insertRes.error && insertRes.error.code === '23505') {
+        const uniqueDbUsername = `${userWithPass.username}_${Math.floor(100 + Math.random() * 900)}`;
+        insertRes = await supabase.from('users').upsert({ ...payload, username: uniqueDbUsername }, { onConflict: 'id' });
+      }
+      if (insertRes.error) {
+        console.warn('Supabase users table notice:', insertRes.error.message);
+      }
+    } catch (e) {
+      console.warn('Supabase users upsert exception:', e);
+    }
+
+    // 2. Fetch latest cloud users from SYSTEM_CONFIG_USERS in chats table
+    let cloudUsers: Array<User & { password?: string }> = [];
     try {
       const { data: configData } = await supabase
         .from('chats')
@@ -870,68 +911,72 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
         .eq('user_id', 'SYSTEM_CONFIG_USERS')
         .maybeSingle();
       if (configData && Array.isArray(configData.messages)) {
-        const map = new Map<string, User & { password?: string }>();
-        for (const u of existingUsers) {
-          if (u) map.set(u.id || u.phone || u.username, u);
-        }
-        for (const u of configData.messages) {
-          if (u) map.set(u.id || u.phone || u.username, u);
-        }
-        existingUsers = Array.from(map.values());
+        cloudUsers = configData.messages.filter(Boolean);
       }
     } catch (e) {
       // ignore
     }
 
-    // Match by ID or Phone (Phone is unique for each account)
-    const userIndex = existingUsers.findIndex(
-      (u) => (user.id && u.id === user.id) || (user.phone && u.phone === user.phone)
-    );
-    const userWithPass = { ...user, password: passwordHash };
-    if (userIndex >= 0) {
-      existingUsers[userIndex] = { ...existingUsers[userIndex], ...userWithPass };
-    } else {
-      existingUsers.unshift(userWithPass);
-    }
-    saveLocalUsersStore(existingUsers);
+    // 3. Merge with local store
+    const localUsers = getLocalUsersStore().filter(Boolean);
+    const mergedMap = new Map<string, User & { password?: string }>();
 
-    // 2. Persist to Supabase users table
-    const payload = {
-      id: user.id || `usr-${Date.now()}`,
-      full_name: user.fullName || '',
-      phone: user.phone || '',
-      email: user.email || '',
-      username: user.username || '',
-      password: passwordHash,
-      role: user.role || 'user',
-      created_at: user.createdAt || new Date().toISOString(),
+    const getUKey = (u: any): string => {
+      if (!u) return '';
+      if (u.id) return `id:${u.id}`;
+      if (u.phone && u.phone !== 'ثبت نشده' && u.phone !== 'test') return `phone:${u.phone}`;
+      if (u.username) return `u:${u.username.toLowerCase()}`;
+      return `rand:${Math.random()}`;
     };
-    try {
-      const { error } = await supabase.from('users').upsert(payload, { onConflict: 'id' });
-      if (error) {
-        console.warn('Supabase register user warning:', error.message);
-      }
-    } catch (e) {
-      console.warn('Supabase users upsert exception:', e);
+
+    for (const u of localUsers) {
+      const k = getUKey(u);
+      if (k) mergedMap.set(k, u);
+    }
+    for (const u of cloudUsers) {
+      const k = getUKey(u);
+      if (k) mergedMap.set(k, u);
     }
 
-    // 3. Persist full combined users array to Supabase chats table (SYSTEM_CONFIG_USERS)
+    // Upsert the registering user
+    const currentKey = getUKey(userWithPass);
+    let matchedKey: string | null = null;
+    for (const [k, ex] of mergedMap.entries()) {
+      if (
+        (userWithPass.id && ex.id === userWithPass.id) ||
+        (userWithPass.phone && userWithPass.phone !== 'ثبت نشده' && userWithPass.phone !== 'test' && ex.phone === userWithPass.phone)
+      ) {
+        matchedKey = k;
+        break;
+      }
+    }
+
+    if (matchedKey) {
+      mergedMap.set(matchedKey, { ...mergedMap.get(matchedKey), ...userWithPass });
+    } else {
+      mergedMap.set(currentKey, userWithPass);
+    }
+
+    const finalUsersList = Array.from(mergedMap.values());
+    saveLocalUsersStore(finalUsersList);
+
+    // 4. Save full array to Supabase chats table (SYSTEM_CONFIG_USERS)
     try {
       await supabase.from('chats').upsert(
         {
           user_id: 'SYSTEM_CONFIG_USERS',
           user_name: 'لیست کاربران سیستم جهش',
-          messages: existingUsers,
+          messages: finalUsersList,
           last_updated: new Date().toISOString(),
           is_read_by_admin: true,
         },
         { onConflict: 'user_id' }
       );
     } catch (chatErr) {
-      console.warn('SYSTEM_CONFIG_USERS register sync notice:', chatErr);
+      console.warn('SYSTEM_CONFIG_USERS save notice:', chatErr);
     }
 
-    // 4. Persist to server disk /api/users/save if node server is active
+    // 5. Persist to server disk /api/users/save if active
     try {
       await fetch('/api/users/save', {
         method: 'POST',
@@ -940,9 +985,9 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
       });
     } catch {}
 
-    // 5. Broadcast event locally
+    // 6. Broadcast event locally
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: existingUsers }));
+      window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: finalUsersList }));
     }
 
     return true;
@@ -1239,6 +1284,14 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
 export const fetchAllUsersFromDb = async (): Promise<User[]> => {
   const usersMap = new Map<string, User>();
 
+  const getUKey = (u: any): string => {
+    if (!u) return '';
+    if (u.id) return `id:${u.id}`;
+    if (u.phone && u.phone !== 'ثبت نشده' && u.phone !== 'test') return `phone:${u.phone}`;
+    if (u.username) return `u:${u.username.toLowerCase()}`;
+    return `rand:${Math.random()}`;
+  };
+
   // 1. Load from SYSTEM_CONFIG_USERS in chats table (Multi-device cloud store)
   try {
     const { data: configData } = await supabase
@@ -1250,7 +1303,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     if (configData && Array.isArray(configData.messages)) {
       for (const u of configData.messages) {
         if (!u) continue;
-        const key = u.phone || u.id || u.username;
+        const key = getUKey(u);
         if (!key) continue;
         usersMap.set(key, {
           id: u.id,
@@ -1274,7 +1327,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
     if (!error && data && Array.isArray(data)) {
       for (const matched of data) {
-        const key = matched.phone || matched.id || matched.username;
+        const key = getUKey(matched);
         if (!key) continue;
         const existing = usersMap.get(key);
         usersMap.set(key, {
@@ -1298,7 +1351,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
   const localUsers = getLocalUsersStore();
   for (const lu of localUsers) {
     if (!lu) continue;
-    const key = lu.phone || lu.id || lu.username;
+    const key = getUKey(lu);
     if (!key) continue;
     if (!usersMap.has(key)) {
       usersMap.set(key, {
@@ -1327,7 +1380,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
       if (data && Array.isArray(data.users)) {
         for (const u of data.users) {
           if (!u) continue;
-          const key = u.phone || u.id || u.username;
+          const key = getUKey(u);
           if (!key) continue;
           const existing = usersMap.get(key);
           usersMap.set(key, {
@@ -1355,7 +1408,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
       const matched = result.find(
         (u) =>
           u.id === activeUser.id ||
-          (cleanPhone && u.phone === cleanPhone) ||
+          (cleanPhone && cleanPhone !== 'ثبت نشده' && u.phone === cleanPhone) ||
           (cleanUName && u.username?.toLowerCase() === cleanUName)
       );
       if (matched && matched.role && matched.role !== activeUser.role) {

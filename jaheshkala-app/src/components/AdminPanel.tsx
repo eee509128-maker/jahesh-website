@@ -194,10 +194,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   React.useEffect(() => {
-    if (activeTab === 'users') {
+    if (isOpen && activeTab === 'users') {
       handleRefreshUsersList();
+      const interval = setInterval(async () => {
+        try {
+          const { fetchAllUsersFromDb } = await import('../lib/dbService');
+          const fresh = await fetchAllUsersFromDb();
+          if (fresh && Array.isArray(fresh)) {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: fresh }));
+            }
+          }
+        } catch (e) {}
+      }, 3000);
+      return () => clearInterval(interval);
     }
-  }, [activeTab]);
+  }, [isOpen, activeTab]);
 
   const scrollTabs = (direction: 'left' | 'right') => {
     if (tabNavRef.current) {

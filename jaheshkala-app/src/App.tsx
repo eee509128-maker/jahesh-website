@@ -594,6 +594,37 @@ export default function App() {
       )
       .subscribe();
 
+    // Instant Supabase Realtime channel for users table direct updates
+    const usersTableChannel = supabase
+      .channel('public:users:all')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'users' },
+        async () => {
+          if (!isMounted) return;
+          try {
+            const { fetchAllUsersFromDb } = await import('./lib/dbService');
+            const freshUsers = await fetchAllUsersFromDb();
+            if (isMounted && freshUsers && freshUsers.length > 0) {
+              setUsersList(freshUsers);
+            }
+          } catch {}
+        }
+      )
+      .subscribe();
+
+    // Periodic background sync for users list every 4 seconds
+    const usersSyncInterval = setInterval(async () => {
+      if (!isMounted) return;
+      try {
+        const { fetchAllUsersFromDb } = await import('./lib/dbService');
+        const freshUsers = await fetchAllUsersFromDb();
+        if (isMounted && freshUsers && freshUsers.length > 0) {
+          setUsersList(freshUsers);
+        }
+      } catch (err) {}
+    }, 4000);
+
     // Instant Supabase Realtime channel for banners
     const bannersChannel = supabase
       .channel('public:chats:banners')
@@ -746,12 +777,14 @@ export default function App() {
       window.removeEventListener('jahesh-banners-updated', handleBannersUpdatedEvent);
       supabase.removeChannel(bannersChannel);
       supabase.removeChannel(usersConfigChannel);
+      supabase.removeChannel(usersTableChannel);
       supabase.removeChannel(productsConfigChannel);
       supabase.removeChannel(productsChannel);
       supabase.removeChannel(ordersConfigChannel);
       supabase.removeChannel(ordersChannel);
       clearInterval(syncInterval);
       clearInterval(bannerSyncInterval);
+      clearInterval(usersSyncInterval);
     };
   }, []);
 
