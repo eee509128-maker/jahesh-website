@@ -62,66 +62,49 @@ export const INITIAL_COUPONS: Coupon[] = [
   },
 ];
 
+export function isRealCustomImage(img?: string): boolean {
+  if (!img || typeof img !== 'string') return false;
+  if (img.startsWith('data:image/svg+xml')) return false;
+  if (img.includes('images.unsplash.com')) return false;
+  if (img.includes('ascend-dashboard')) return false;
+  return true;
+}
+
 // 1. PRODUCTS DB SERVICE & SMART DATA MERGING
 export const mergeTwoProducts = (current: Product, incoming: Product): Product => {
   if (!current) return incoming;
   if (!incoming) return current;
 
-  // 1. Timestamp comparison: newer update always takes priority
+  // 1. Image preservation is paramount: real custom uploaded images NEVER get replaced by SVGs or stock photos
+  const currentHasRealImg = isRealCustomImage(current.image);
+  const incomingHasRealImg = isRealCustomImage(incoming.image);
+
+  let preferredImage = incoming.image || current.image;
+
+  if (currentHasRealImg && !incomingHasRealImg) {
+    preferredImage = current.image;
+  } else if (!currentHasRealImg && incomingHasRealImg) {
+    preferredImage = incoming.image;
+  } else if (currentHasRealImg && incomingHasRealImg) {
+    const incomingTime = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
+    const currentTime = current.updatedAt ? new Date(current.updatedAt).getTime() : 0;
+    preferredImage = (!isNaN(incomingTime) && !isNaN(currentTime) && incomingTime > currentTime)
+      ? incoming.image
+      : (current.image || incoming.image);
+  }
+
+  // 2. Timestamp comparison for other fields
+  let baseMerge = { ...current, ...incoming };
   if (incoming.updatedAt && current.updatedAt) {
     const incomingTime = new Date(incoming.updatedAt).getTime();
     const currentTime = new Date(current.updatedAt).getTime();
     if (!isNaN(incomingTime) && !isNaN(currentTime)) {
-      if (incomingTime > currentTime) {
-        return {
-          ...current,
-          ...incoming,
-          subscriptionPlans: (incoming.subscriptionPlans && incoming.subscriptionPlans.length > 0)
-            ? incoming.subscriptionPlans
-            : current.subscriptionPlans,
-          gallery: (incoming.gallery && incoming.gallery.length > 0) ? incoming.gallery : current.gallery,
-        };
-      } else {
-        return {
-          ...incoming,
-          ...current,
-          subscriptionPlans: (current.subscriptionPlans && current.subscriptionPlans.length > 0)
-            ? current.subscriptionPlans
-            : incoming.subscriptionPlans,
-          gallery: (current.gallery && current.gallery.length > 0) ? current.gallery : incoming.gallery,
-        };
+      if (currentTime > incomingTime) {
+        baseMerge = { ...incoming, ...current };
       }
     }
   }
 
-  // 2. If only one has updatedAt, the explicitly updated one takes priority
-  if (incoming.updatedAt && !current.updatedAt) {
-    return {
-      ...current,
-      ...incoming,
-      subscriptionPlans: (incoming.subscriptionPlans && incoming.subscriptionPlans.length > 0)
-        ? incoming.subscriptionPlans
-        : current.subscriptionPlans,
-      gallery: (incoming.gallery && incoming.gallery.length > 0) ? incoming.gallery : current.gallery,
-    };
-  }
-  if (!incoming.updatedAt && current.updatedAt) {
-    return {
-      ...incoming,
-      ...current,
-      subscriptionPlans: (current.subscriptionPlans && current.subscriptionPlans.length > 0)
-        ? current.subscriptionPlans
-        : incoming.subscriptionPlans,
-      gallery: (current.gallery && current.gallery.length > 0) ? current.gallery : incoming.gallery,
-    };
-  }
-
-  // 3. Image preservation: custom images (e.g. /uploads/ or /jaheshkala/ or data: or custom URLs) never get overwritten by default stock unsplash photos
-  const isIncomingStockUnsplash = incoming.image && incoming.image.includes('images.unsplash.com');
-  const isCurrentCustom = current.image && (current.image.startsWith('/uploads/') || current.image.startsWith('/jaheshkala/') || current.image.startsWith('data:') || !current.image.includes('images.unsplash.com'));
-  const preferredImage = (isCurrentCustom && isIncomingStockUnsplash) ? current.image : (incoming.image || current.image);
-
-  // 4. Incredibility & custom plans preservation
   const preferredIsIncredible = incoming.isIncredible !== undefined ? Boolean(incoming.isIncredible) : Boolean(current.isIncredible);
   const preferredPlans = (incoming.subscriptionPlans && incoming.subscriptionPlans.length > 0)
     ? incoming.subscriptionPlans
@@ -131,8 +114,7 @@ export const mergeTwoProducts = (current: Product, incoming: Product): Product =
     : current.gallery;
 
   return {
-    ...current,
-    ...incoming,
+    ...baseMerge,
     image: preferredImage,
     isIncredible: preferredIsIncredible,
     subscriptionPlans: preferredPlans,
@@ -361,46 +343,78 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       console.warn('Persist to /api/products/save notice:', e);
     }
 
-    // 2. Load current list from local cache / store - protect against empty list truncating full catalog
-    let currentList: Product[] = [];
+    // 2. Fetch authoritative cloud list first to prevent overwriting other products with stale local data
+    let masterList: Product[] = [];
+    try {
+      const { data: cloudRow } = await supabase
+        .from('chats')
+        .select('messages')
+        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+        .maybeSingle();
+      if (cloudRow && Array.isArray(cloudRow.messages) && cloudRow.messages.length > 0) {
+        masterList = cloudRow.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
+      }
+    } catch (e) {
+      console.warn('Fetch cloud in saveProductToDb notice:', e);
+    }
+
+    // Merge with local storage if cloud list was empty or missing some products
+    let localList: Product[] = [];
     try {
       const saved = localStorage.getItem('jahesh_products');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          currentList = parsed;
+          localList = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
         }
       }
     } catch {}
 
-    if (currentList.length === 0) {
-      currentList = [...INITIAL_PRODUCTS];
+    if (masterList.length === 0) {
+      masterList = localList.length > 0 ? localList : [...INITIAL_PRODUCTS];
+    } else if (localList.length > 0) {
+      // Merge local real images into masterList if local had something newer
+      const masterMap = new Map<string, Product>();
+      for (const item of masterList) {
+        if (item && item.id) masterMap.set(item.id, item);
+      }
+      for (const lItem of localList) {
+        if (!lItem || !lItem.id) continue;
+        const existing = masterMap.get(lItem.id);
+        if (existing) {
+          masterMap.set(lItem.id, mergeTwoProducts(existing, lItem));
+        } else {
+          masterMap.set(lItem.id, lItem);
+        }
+      }
+      masterList = Array.from(masterMap.values());
     }
 
-    const idx = currentList.findIndex((p) => p.id === product.id);
+    // Update ONLY the specified product in the master list
+    const idx = masterList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
-      currentList[idx] = { ...currentList[idx], ...product };
+      masterList[idx] = { ...masterList[idx], ...product };
     } else {
-      currentList = [product, ...currentList];
+      masterList = [product, ...masterList];
     }
 
     // 3. Update local storage & broadcast event immediately
     try {
-      safeSetLocalStorage('jahesh_products', JSON.stringify(currentList));
+      safeSetLocalStorage('jahesh_products', JSON.stringify(masterList));
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: currentList }));
+        window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: masterList }));
       }
     } catch (err) {
       console.warn('LocalStorage save product warning:', err);
     }
 
-    // 4. Primary: Save full updated products list to Supabase cloud JSON store (bulletproof across all browsers & mobiles)
+    // 4. Primary: Save full updated products list to Supabase cloud JSON store (bulletproof across all devices & browsers)
     try {
       await supabase.from('chats').upsert(
         {
           user_id: 'SYSTEM_CONFIG_PRODUCTS',
           user_name: 'تنظیمات محصولات فروشگاه',
-          messages: currentList,
+          messages: masterList,
           last_updated: new Date().toISOString(),
           is_read_by_admin: true,
         },
