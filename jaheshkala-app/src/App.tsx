@@ -45,18 +45,19 @@ import { DigikalaFooter } from './components/DigikalaFooter';
 import { ProductCard } from './components/ProductCard';
 
 // Modals
-import { CartModal } from './components/CartModal';
+const CartModal = lazy(() => import('./components/CartModal').then(module => ({ default: module.CartModal })));
 import { TermsModal } from './components/TermsModal';
-import { PaymentGatewayModal } from './components/PaymentGatewayModal';
-import { AuthModal } from './components/AuthModal';
-import { AdminPanel } from './components/AdminPanel';
-import { UserOrdersModal } from './components/UserOrdersModal';
-import { UserProfileModal } from './components/UserProfileModal';
-import { ProductDetailModal } from './components/ProductDetailModal';
-import { LiveChatWidget } from './components/LiveChatWidget';
-import { FooterInfoModal } from './components/FooterInfoModal';
-import { AmlakAppModal } from './components/AmlakAppModal';
-import { SubscriptionDurationModal } from './components/SubscriptionDurationModal';
+const PaymentGatewayModal = lazy(() => import('./components/PaymentGatewayModal').then(module => ({ default: module.PaymentGatewayModal })));
+const AuthModal = lazy(() => import('./components/AuthModal').then(module => ({ default: module.AuthModal })));
+import { Suspense, lazy } from 'react';
+const AdminPanel = lazy(() => import('./components/AdminPanel').then(module => ({ default: module.AdminPanel })));
+const UserOrdersModal = lazy(() => import('./components/UserOrdersModal').then(module => ({ default: module.UserOrdersModal })));
+const UserProfileModal = lazy(() => import('./components/UserProfileModal').then(module => ({ default: module.UserProfileModal })));
+const ProductDetailModal = lazy(() => import('./components/ProductDetailModal').then(module => ({ default: module.ProductDetailModal })));
+const LiveChatWidget = lazy(() => import('./components/LiveChatWidget').then(module => ({ default: module.LiveChatWidget })));
+const FooterInfoModal = lazy(() => import('./components/FooterInfoModal').then(module => ({ default: module.FooterInfoModal })));
+const AmlakAppModal = lazy(() => import('./components/AmlakAppModal').then(module => ({ default: module.AmlakAppModal })));
+const SubscriptionDurationModal = lazy(() => import('./components/SubscriptionDurationModal').then(module => ({ default: module.SubscriptionDurationModal })));
 import { ProductPlansModal } from './components/ProductPlansModal';
 
 export function sanitizeProduct(p: any): Product | null {
@@ -1267,6 +1268,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen flex flex-col font-['Vazirmatn',sans-serif] transition-colors duration-200 ${theme === 'light' ? 'theme-light bg-[#fbf9ff] text-slate-800' : 'theme-dark bg-[#0b0819] text-slate-100'}`}>
+      <Suspense fallback={null}>
       
       {/* Toast popup */}
       {toastMessage && (
@@ -1453,7 +1455,7 @@ export default function App() {
       </main>
 
       {/* 7. DIGIKALA FLOATING HEADSET SUPPORT CHAT (Icon on bottom-left) */}
-      <LiveChatWidget currentUser={currentUser} />
+      <Suspense fallback={null}><LiveChatWidget currentUser={currentUser} /></Suspense>
 
       {/* 8. DIGIKALA FOOTER */}
       <DigikalaFooter
@@ -1481,7 +1483,7 @@ export default function App() {
       />
 
       {/* Digikala Cart Modal */}
-      <CartModal
+      <Suspense fallback={null}><CartModal
         isOpen={cartModalOpen}
         onClose={() => setCartModalOpen(false)}
         cartItems={resolvedCartItems}
@@ -1503,7 +1505,7 @@ export default function App() {
           setPaymentModalOpen(true);
         }}
         coupons={coupons}
-      />
+      /></Suspense>
 
       {/* Terms Modal (Rules protecting Team Jahesh) */}
       <TermsModal
@@ -1652,7 +1654,7 @@ export default function App() {
       />
 
       {/* Admin Panel (Orders, New Product Form, Zibal Settings, Coupons, Users, Banners) */}
-      <AdminPanel
+      <Suspense fallback={<div className="p-8 text-center text-white">در حال بارگذاری پنل مدیریت...</div>}><AdminPanel
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
         currentUser={currentUser}
@@ -1679,7 +1681,7 @@ export default function App() {
         banners={banners}
         onSaveBanner={handleSaveBanner}
         onDeleteBanner={handleDeleteBanner}
-      />
+      /></Suspense>
 
       {/* User Orders Modal */}
       {/* User Profile Modal */}
@@ -1747,6 +1749,7 @@ export default function App() {
         />
       )}
 
+      </Suspense>
     </div>
   );
 }
