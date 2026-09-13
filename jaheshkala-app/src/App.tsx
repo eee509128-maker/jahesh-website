@@ -23,7 +23,10 @@ import {
   saveBannerToDb,
   saveAllBannersToDb,
   deleteBannerFromDb,
-  parseOrderTimestamp, safeSetLocalStorage} from './lib/dbService';
+  parseOrderTimestamp,
+  safeSetLocalStorage,
+  subscribeToProductsRealtime,
+} from './lib/dbService';
 import {
   verifyZibalPayment,
   getPendingOrder,
@@ -521,6 +524,14 @@ export default function App() {
 
     loadCloudData();
 
+    // Subscribe to Supabase real-time cloud changes for instant multi-user synchronization
+    const unsubscribeRealtimeProducts = subscribeToProductsRealtime((updatedList) => {
+      if (isMounted && Array.isArray(updatedList) && updatedList.length > 0) {
+        const cleaned = sanitizeProductsList(updatedList);
+        setProducts(cleaned);
+      }
+    });
+
     // Listen for real-time role updates via window events (Zero network overhead)
     const handleUserUpdatedEvent = (e: any) => {
       if (e.detail) {
@@ -570,6 +581,9 @@ export default function App() {
 
     return () => {
       isMounted = false;
+      if (typeof unsubscribeRealtimeProducts === 'function') {
+        unsubscribeRealtimeProducts();
+      }
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
       window.removeEventListener('jahesh-users-updated', handleUsersUpdatedEvent);
       window.removeEventListener('jahesh-products-updated', handleProductsUpdatedEvent);

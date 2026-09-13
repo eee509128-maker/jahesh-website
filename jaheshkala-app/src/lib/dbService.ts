@@ -206,53 +206,89 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   }
 
-  // 3. Base Products List
-  const baseProducts = (authoritativeList && authoritativeList.length > 0)
-    ? authoritativeList
+  // 3. Base Products List: Cloud authoritative list is the source of truth
+  if (authoritativeList && authoritativeList.length > 0) {
+    // If we have authoritative cloud/server data, respect its exact set of products (including deletions)
+    const localMap = new Map<string, Product>();
+    for (const lp of localProducts) {
+      if (lp && lp.id) localMap.set(lp.id, lp);
+    }
+
+    const finalProducts = authoritativeList.map((p) => {
+      const localItem = localMap.get(p.id);
+      if (localItem) {
+        return mergeTwoProducts(p, localItem);
+      }
+      return p;
+    });
+
+    // Update local storage so deleted items are removed from visitor's cache
+    try {
+      safeSetLocalStorage('jahesh_products', JSON.stringify(finalProducts));
+    } catch {}
+
+    return finalProducts;
+  }
+
+  // Fallback if cloud was offline/empty
+  const fallbackList = localProducts.length > 0
+    ? localProducts
     : INITIAL_PRODUCTS.map(cleanProductItem).filter((p): p is Product => p !== null);
 
-  const existingMap = new Map<string, Product>();
-  for (const p of baseProducts) {
-    if (p && p.id) {
-      existingMap.set(p.id, p);
-    }
-  }
-
-  // 4. Smart Local Merge: NEVER lose user-edited or newly added products from local cache
-  let hasNewerLocalEdits = false;
-  if (localProducts.length > 0) {
-    for (const lp of localProducts) {
-      if (!lp || !lp.id) continue;
-      const existing = existingMap.get(lp.id);
-      if (existing) {
-        const merged = mergeTwoProducts(existing, lp);
-        existingMap.set(lp.id, merged);
-        if (merged !== existing) {
-          hasNewerLocalEdits = true;
-        }
-      } else {
-        // User created a new product locally that is not yet in cloud snapshot - DO NOT DROP IT!
-        existingMap.set(lp.id, lp);
-        hasNewerLocalEdits = true;
-      }
-    }
-  }
-
-  const finalProducts = Array.from(existingMap.values());
-
-  // Synchronize localStorage with clean authoritative data
   try {
-    safeSetLocalStorage('jahesh_products', JSON.stringify(finalProducts));
+    safeSetLocalStorage('jahesh_products', JSON.stringify(fallbackList));
   } catch {}
 
-  // Only push back to cloud if there were explicit unsaved local edits
-  if (hasNewerLocalEdits) {
-    try {
-      saveAllProductsToDb(finalProducts).catch(() => {});
-    } catch {}
-  }
+  return fallbackList;
+};
 
-  return finalProducts;
+// Real-time subscription to products across all clients and devices
+export const subscribeToProductsRealtime = (callback: (products: Product[]) => void) => {
+  const channel = supabase
+    .channel('jahesh-products-sync')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'chats',
+        filter: 'user_id=eq.SYSTEM_CONFIG_PRODUCTS',
+      },
+      (payload: any) => {
+        if (payload?.new && Array.isArray(payload.new.messages)) {
+          const cleaned = payload.new.messages.map(cleanProductItem).filter((p: any): p is Product => p !== null);
+          if (cleaned.length > 0) {
+            safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
+            callback(cleaned);
+          }
+        }
+      }
+    )
+    .on('broadcast', { event: 'products_updated' }, (payload: any) => {
+      if (payload?.payload && Array.isArray(payload.payload)) {
+        const cleaned = payload.payload.map(cleanProductItem).filter((p: any): p is Product => p !== null);
+        if (cleaned.length > 0) {
+          safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
+          callback(cleaned);
+        }
+      }
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+export const broadcastProductsUpdate = (products: Product[]) => {
+  try {
+    const channel = supabase.channel('jahesh-products-sync');
+    channel.send({
+      type: 'broadcast',
+      event: 'products_updated',
+      payload: products,
+    });
+  } catch {}
 };
 
 export const saveAllProductsToDb = async (products: Product[]): Promise<boolean> => {
@@ -420,6 +456,7 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
         },
         { onConflict: 'user_id' }
       );
+      broadcastProductsUpdate(masterList);
     } catch (err) {
       console.warn('Supabase save product to SYSTEM_CONFIG_PRODUCTS notice:', err);
     }
@@ -527,6 +564,7 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
         },
         { onConflict: 'user_id' }
       );
+      broadcastProductsUpdate(updated);
     } catch (err) {
       console.warn('Delete product from SYSTEM_CONFIG_PRODUCTS notice:', err);
     }
