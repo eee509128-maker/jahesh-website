@@ -113,13 +113,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsRefreshingOrders(true);
     setRefreshNotice(null);
     try {
-      // 1. Recover any pending order in localStorage
-      const pending = getPendingOrder();
-      if (pending && pending.id) {
-        await saveOrderToDb(pending);
-      }
-
-      // 2. Sync all orders across server disk, Supabase chats config, orders table, and localStorage
+      // Sync all valid orders across server disk, Supabase chats config, orders table, and localStorage
       const fresh = await fetchOrdersFromDb();
       if (fresh && Array.isArray(fresh)) {
         if (typeof window !== 'undefined') {

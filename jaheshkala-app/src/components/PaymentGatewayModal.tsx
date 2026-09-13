@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { CartItem, User, Order } from '../types';
 import { requestZibalPayment, savePendingOrder } from '../lib/zibalService';
-import { saveOrderToDb } from '../lib/dbService';
 import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
 
 interface PaymentGatewayModalProps {
@@ -193,15 +192,8 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
       pendingOrder.amlakLicense = generateAmlakLicense(pendingOrder, currentUser);
     }
 
-    // Save locally to localStorage and sessionStorage
+    // Save pending draft temporarily only in client storage (will only be saved to database AFTER successful bank verification)
     savePendingOrder(pendingOrder);
-
-    // Also persist immediately to database and server disk
-    try {
-      await saveOrderToDb(pendingOrder);
-    } catch (e) {
-      console.warn('Initial pending order save notice:', e);
-    }
 
     // Call API to request Zibal payment session
     const res = await requestZibalPayment({
@@ -220,9 +212,6 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
         pendingOrder.trackingCode = String(res.trackId);
         pendingOrder.zibalTrackId = String(res.trackId);
         savePendingOrder(pendingOrder);
-        try {
-          await saveOrderToDb(pendingOrder);
-        } catch {}
       }
       // Direct redirect to real Shaparak / Zibal gateway
       window.location.href = res.paymentUrl;
