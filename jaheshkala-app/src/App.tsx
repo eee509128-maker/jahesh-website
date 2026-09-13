@@ -454,7 +454,7 @@ export default function App() {
     setFooterInfoModalOpen(true);
   };
 
-  // Sync state to localStorage & load initial data from Supabase
+  // Sync state & load initial data once on mount (no continuous background network polling)
   const [usersList, setUsersList] = useState<User[]>([]);
   useEffect(() => {
     let isMounted = true;
@@ -490,41 +490,42 @@ export default function App() {
           } catch {}
         }
         
-        // Dynamic import to avoid errors if function doesn't exist yet in dbService
+        // Load users list once
         const { fetchAllUsersFromDb } = await import('./lib/dbService');
         if (fetchAllUsersFromDb) {
-           const allUsers = await fetchAllUsersFromDb();
-           if (isMounted && allUsers) {
-             setUsersList(allUsers);
+          const allUsers = await fetchAllUsersFromDb();
+          if (isMounted && allUsers) {
+            setUsersList(allUsers);
 
-             // Auto synchronize current logged in user's role from cloud
-             const rawStored = localStorage.getItem('jahesh_current_user');
-             const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
-             if (activeUser) {
-               const cleanUName = activeUser.username?.trim().toLowerCase();
-               const cleanPhone = activeUser.phone?.trim();
-               const cloudUser = allUsers.find(
-                 (u) =>
-                   u.id === activeUser.id ||
-                   (cleanUName && u.username?.trim().toLowerCase() === cleanUName) ||
-                   (cleanPhone && u.phone?.trim() === cleanPhone)
-               );
-               if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
-                 const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
-                 setCurrentUser(updated);
-                 localStorage.setItem('jahesh_current_user', JSON.stringify(updated));
-               }
-             }
-           }
+            // Auto synchronize current logged in user's role from cloud
+            const rawStored = localStorage.getItem('jahesh_current_user');
+            const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
+            if (activeUser) {
+              const cleanUName = activeUser.username?.trim().toLowerCase();
+              const cleanPhone = activeUser.phone?.trim();
+              const cloudUser = allUsers.find(
+                (u) =>
+                  u.id === activeUser.id ||
+                  (cleanUName && u.username?.trim().toLowerCase() === cleanUName) ||
+                  (cleanPhone && u.phone?.trim() === cleanPhone)
+              );
+              if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
+                const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
+                setCurrentUser(updated);
+                localStorage.setItem('jahesh_current_user', JSON.stringify(updated));
+              }
+            }
+          }
         }
 
       } catch (err) {
         console.warn('Initial cloud sync notice:', err);
       }
     };
+
     loadCloudData();
 
-    // Listen for real-time role updates
+    // Listen for real-time role updates via window events (Zero network overhead)
     const handleUserUpdatedEvent = (e: any) => {
       if (e.detail) {
         setCurrentUser(e.detail);
@@ -532,7 +533,7 @@ export default function App() {
     };
     window.addEventListener('jahesh-user-updated', handleUserUpdatedEvent);
 
-    // Listen for real-time products updates via local/broadcast events
+    // Listen for real-time products updates via window events
     const handleProductsUpdatedEvent = (e: any) => {
       if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
         const cleaned = sanitizeProductsList(e.detail);
@@ -571,210 +572,6 @@ export default function App() {
     };
     window.addEventListener('jahesh-users-updated', handleUsersUpdatedEvent);
 
-    // Periodic sync for banners every 5 seconds across all devices
-    const bannerSyncInterval = setInterval(async () => {
-      if (!isMounted) return;
-      try {
-        const freshBanners = await fetchBannersFromDb();
-        if (isMounted && freshBanners && Array.isArray(freshBanners) && freshBanners.length > 0) {
-          setBanners(freshBanners);
-        }
-      } catch (err) {}
-    }, 5000);
-
-    // Instant Supabase Realtime channel for cloud users list config
-    const usersConfigChannel = supabase
-      .channel('public:chats:users')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'chats', filter: 'user_id=eq.SYSTEM_CONFIG_USERS' },
-        async () => {
-          if (!isMounted) return;
-          try {
-            const { fetchAllUsersFromDb } = await import('./lib/dbService');
-            const freshUsers = await fetchAllUsersFromDb();
-            if (isMounted && freshUsers && freshUsers.length > 0) {
-              setUsersList(freshUsers);
-            }
-          } catch {}
-        }
-      )
-      .subscribe();
-
-    // Instant Supabase Realtime channel for users table direct updates
-    const usersTableChannel = supabase
-      .channel('public:users:all')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'users' },
-        async () => {
-          if (!isMounted) return;
-          try {
-            const { fetchAllUsersFromDb } = await import('./lib/dbService');
-            const freshUsers = await fetchAllUsersFromDb();
-            if (isMounted && freshUsers && freshUsers.length > 0) {
-              setUsersList(freshUsers);
-            }
-          } catch {}
-        }
-      )
-      .subscribe();
-
-    // Periodic background sync for users list every 4 seconds
-    const usersSyncInterval = setInterval(async () => {
-      if (!isMounted) return;
-      try {
-        const { fetchAllUsersFromDb } = await import('./lib/dbService');
-        const freshUsers = await fetchAllUsersFromDb();
-        if (isMounted && freshUsers && freshUsers.length > 0) {
-          setUsersList(freshUsers);
-        }
-      } catch (err) {}
-    }, 4000);
-
-    // Instant Supabase Realtime channel for banners
-    const bannersChannel = supabase
-      .channel('public:chats:banners')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'chats', filter: 'user_id=eq.SYSTEM_CONFIG_BANNERS' },
-        (payload: any) => {
-          if (payload.new && Array.isArray(payload.new.messages) && payload.new.messages.length > 0) {
-            if (isMounted) {
-              setBanners(payload.new.messages);
-              try {
-                localStorage.setItem('jahesh_banners', JSON.stringify(payload.new.messages));
-              } catch {}
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    // Instant Supabase Realtime channel for cloud products config
-    const productsConfigChannel = supabase
-      .channel('public:chats:products')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'chats', filter: 'user_id=eq.SYSTEM_CONFIG_PRODUCTS' },
-        (payload: any) => {
-          if (payload.new && Array.isArray(payload.new.messages) && payload.new.messages.length > 0) {
-            if (isMounted) {
-              const cleaned = sanitizeProductsList(payload.new.messages);
-              setProducts(cleaned);
-              try {
-                localStorage.setItem('jahesh_products', JSON.stringify(cleaned));
-              } catch {}
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    // Instant Supabase Realtime channel for products table
-    const productsChannel = supabase
-      .channel('public:products:realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
-        try {
-          const fresh = await fetchProductsFromDb();
-          if (isMounted && fresh && Array.isArray(fresh) && fresh.length > 0) {
-            const cleaned = sanitizeProductsList(fresh);
-            setProducts(cleaned);
-            try {
-              localStorage.setItem('jahesh_products', JSON.stringify(cleaned));
-            } catch {}
-          }
-        } catch (e) {}
-      })
-      .subscribe();
-
-    // Instant Supabase Realtime channel for cloud orders config
-    const ordersConfigChannel = supabase
-      .channel('public:chats:orders')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'chats', filter: 'user_id=eq.SYSTEM_CONFIG_ORDERS' },
-        (payload: any) => {
-          if (payload.new && Array.isArray(payload.new.messages)) {
-            if (isMounted) {
-              setOrders(payload.new.messages);
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    // Instant Supabase Realtime channel for orders table
-    const ordersChannel = supabase
-      .channel('public:orders:realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
-        try {
-          const fresh = await fetchOrdersFromDb();
-          if (isMounted && fresh && Array.isArray(fresh)) {
-            setOrders(fresh);
-          }
-        } catch (e) {}
-      })
-      .subscribe();
-
-    // Periodic check to pull fresh products, roles, and orders across devices (e.g. PC -> Mobile)
-    const syncInterval = setInterval(async () => {
-      try {
-        // 1. Sync fresh products and image changes from Supabase & server disk
-        const freshProducts = await fetchProductsFromDb();
-        if (isMounted && freshProducts && freshProducts.length > 0) {
-          const cleaned = sanitizeProductsList(freshProducts);
-          setProducts((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(cleaned)) {
-              try {
-                localStorage.setItem('jahesh_products', JSON.stringify(cleaned));
-              } catch {}
-              return cleaned;
-            }
-            return prev;
-          });
-        }
-
-        // 2. Sync user roles and users list
-        const { fetchAllUsersFromDb } = await import('./lib/dbService');
-        const all = await fetchAllUsersFromDb();
-        if (isMounted && all && all.length > 0) {
-          setUsersList((prev) => {
-            if (JSON.stringify(prev) !== JSON.stringify(all)) {
-              return all;
-            }
-            return prev;
-          });
-
-          const rawStored = localStorage.getItem('jahesh_current_user');
-          if (rawStored) {
-            const activeUser: User = JSON.parse(rawStored);
-            const cleanUName = activeUser.username?.trim().toLowerCase();
-            const cleanPhone = activeUser.phone?.trim();
-            const found = all.find(
-              (u) =>
-                u.id === activeUser.id ||
-                (cleanUName && u.username?.trim().toLowerCase() === cleanUName) ||
-                (cleanPhone && u.phone?.trim() === cleanPhone)
-            );
-            if (found && found.role && found.role !== activeUser.role) {
-              const updated = { ...activeUser, ...found, role: found.role };
-              setCurrentUser(updated);
-              localStorage.setItem('jahesh_current_user', JSON.stringify(updated));
-            }
-          }
-        }
-
-        // 3. Periodic orders sync
-        const freshOrders = await fetchOrdersFromDb();
-        if (isMounted && freshOrders) {
-          setOrders(freshOrders);
-        }
-      } catch (err) {
-        // silent
-      }
-    }, 5000);
-
     return () => {
       isMounted = false;
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
@@ -782,16 +579,6 @@ export default function App() {
       window.removeEventListener('jahesh-products-updated', handleProductsUpdatedEvent);
       window.removeEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
       window.removeEventListener('jahesh-banners-updated', handleBannersUpdatedEvent);
-      supabase.removeChannel(bannersChannel);
-      supabase.removeChannel(usersConfigChannel);
-      supabase.removeChannel(usersTableChannel);
-      supabase.removeChannel(productsConfigChannel);
-      supabase.removeChannel(productsChannel);
-      supabase.removeChannel(ordersConfigChannel);
-      supabase.removeChannel(ordersChannel);
-      clearInterval(syncInterval);
-      clearInterval(bannerSyncInterval);
-      clearInterval(usersSyncInterval);
     };
   }, []);
 
@@ -1607,9 +1394,9 @@ export default function App() {
               {/* Digikala Style Pagination Bar (10 on mobile / 25 on desktop) */}
               {totalPages > 1 && (
                 <div className="mt-8 pt-6 border-t border-purple-900/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  {/* Results count text */}
-                  <div className="text-xs text-slate-400 font-medium text-center sm:text-right">
-                    نمایش {(((safeCurrentPage - 1) * itemsPerPage) + 1).toLocaleString('fa-IR')} تا {Math.min(safeCurrentPage * itemsPerPage, filteredProducts.length).toLocaleString('fa-IR')} از {filteredProducts.length.toLocaleString('fa-IR')} کالا (صفحه {safeCurrentPage.toLocaleString('fa-IR')} از {totalPages.toLocaleString('fa-IR')})
+                  {/* Page indicator text */}
+                  <div className="text-xs sm:text-sm text-slate-400 font-bold text-center sm:text-right">
+                    صفحه {safeCurrentPage.toLocaleString('fa-IR')} از {totalPages.toLocaleString('fa-IR')}
                   </div>
 
                   {/* Pagination Buttons */}

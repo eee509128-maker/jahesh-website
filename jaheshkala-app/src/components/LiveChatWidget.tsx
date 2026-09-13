@@ -124,7 +124,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
 
     if (isOpen) {
       syncChat();
-      interval = setInterval(syncChat, 2500);
+      interval = setInterval(syncChat, 12000);
     }
 
     const handleCustomEvent = (e: any) => {

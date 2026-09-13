@@ -187,18 +187,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   React.useEffect(() => {
     if (isOpen && activeTab === 'users') {
       handleRefreshUsersList();
-      const interval = setInterval(async () => {
-        try {
-          const { fetchAllUsersFromDb } = await import('../lib/dbService');
-          const fresh = await fetchAllUsersFromDb();
-          if (fresh && Array.isArray(fresh)) {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: fresh }));
-            }
-          }
-        } catch (e) {}
-      }, 3000);
-      return () => clearInterval(interval);
     }
   }, [isOpen, activeTab]);
 
@@ -223,7 +211,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       };
       loadChats();
       loadBanners();
-      const interval = setInterval(loadChats, 3000);
 
       const handleChatsUpdated = () => {
         loadChats();
@@ -231,7 +218,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       window.addEventListener('jahesh-chats-updated', handleChatsUpdated);
 
       return () => {
-        clearInterval(interval);
         window.removeEventListener('jahesh-chats-updated', handleChatsUpdated);
       };
     }
