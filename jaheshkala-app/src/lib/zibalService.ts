@@ -1,0 +1,149 @@
+export interface ZibalRequestParams {
+  amountInTomans: number;
+  orderId: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  description?: string;
+  merchant?: string;
+  callbackUrl?: string;
+  orderData?: any;
+}
+
+export interface ZibalRequestResponse {
+  success: boolean;
+  trackId?: number | string;
+  paymentUrl?: string;
+  result?: number;
+  message?: string;
+  error?: string;
+}
+
+export interface ZibalVerifyResponse {
+  success: boolean;
+  result?: number;
+  status?: number;
+  refNumber?: string;
+  amountInTomans?: number;
+  amountInRials?: number;
+  paidAt?: string;
+  cardNumber?: string;
+  orderId?: string;
+  message?: string;
+  error?: string;
+}
+
+export const ZIBAL_DEFAULT_MERCHANT = '6a9db4410df8756c31ea5d00';
+
+/**
+ * Sends payment request to our backend API which forwards to Zibal
+ */
+export async function requestZibalPayment(params: ZibalRequestParams): Promise<ZibalRequestResponse> {
+  let defaultCallback = 'https://jaheshit.ir/jaheshkala';
+  if (typeof window !== 'undefined') {
+    const cleanPath = window.location.pathname.replace(/\/+$/, '');
+    defaultCallback = `${window.location.origin}${cleanPath || '/jaheshkala'}`;
+  }
+  const callbackUrl = params.callbackUrl || defaultCallback;
+
+  const payload = {
+    amountInTomans: params.amountInTomans,
+    orderId: params.orderId,
+    callbackUrl,
+    description: params.description || `سفارش شماره ${params.orderId} - فروشگاه آنلاین جهش کالا`,
+    mobile: params.customerPhone,
+    merchant: params.merchant || ZIBAL_DEFAULT_MERCHANT,
+    orderData: params.orderData,
+  };
+
+  try {
+    const res = await fetch('/api/zibal-request', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error('Error contacting /api/zibal-request:', err);
+    return {
+      success: false,
+      error: err.message || 'خطا در برقراری ارتباط با سرور پرداخت',
+    };
+  }
+}
+
+/**
+ * Verifies transaction with Zibal after customer returns from payment gateway
+ */
+export async function verifyZibalPayment(trackId: string | number, merchant?: string): Promise<ZibalVerifyResponse> {
+  try {
+    const res = await fetch('/api/zibal-verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        trackId: String(trackId).trim(),
+        merchant: merchant || ZIBAL_DEFAULT_MERCHANT,
+      }),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error('Error contacting /api/zibal-verify:', err);
+    return {
+      success: false,
+      error: err.message || 'خطا در استعلام وضعیت پرداخت از سرور',
+    };
+  }
+}
+
+/**
+ * Helper to save pending order before redirecting to bank
+ */
+export function savePendingOrder(orderData: any) {
+  try {
+    const str = JSON.stringify(orderData);
+    localStorage.setItem('jahesh_pending_payment_order', str);
+    sessionStorage.setItem('jahesh_pending_payment_order', str);
+    if (orderData?.id) {
+      localStorage.setItem(`jahesh_order_${orderData.id}`, str);
+    }
+  } catch (e) {
+    console.warn('Could not save pending order to storage:', e);
+  }
+}
+
+/**
+ * Helper to get pending order after returning from bank
+ */
+export function getPendingOrder(specificOrderId?: string): any | null {
+  try {
+    if (specificOrderId) {
+      const byId = localStorage.getItem(`jahesh_order_${specificOrderId}`);
+      if (byId) return JSON.parse(byId);
+    }
+    const data = localStorage.getItem('jahesh_pending_payment_order') || sessionStorage.getItem('jahesh_pending_payment_order');
+    return data ? JSON.parse(data) : null;
+  } catch (e) {
+    console.warn('Could not parse pending order:', e);
+    return null;
+  }
+}
+
+/**
+ * Helper to clear pending order
+ */
+export function clearPendingOrder() {
+  try {
+    localStorage.removeItem('jahesh_pending_payment_order');
+    sessionStorage.removeItem('jahesh_pending_payment_order');
+  } catch (e) {
+    // ignore
+  }
+}
