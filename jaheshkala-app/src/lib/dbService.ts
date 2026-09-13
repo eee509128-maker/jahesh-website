@@ -1,31 +1,46 @@
 import { supabase } from './supabase';
 import { Product, Order, User, Coupon, BannerSlide } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from '../data/initialData';
-import { GUILD_SOLUTIONS_PRODUCTS } from '../data/guildProducts';
 
 
-// Safe wrapper for safeSetLocalStorage to handle QuotaExceededError
+// Safe wrapper for safeSetLocalStorage to handle QuotaExceededError without ever losing core data
 export const safeSetLocalStorage = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
   } catch (e: any) {
-    console.error('LocalStorage SetItem Error for key:', key, e);
-    if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
-      console.warn('Clearing large unused data to free up localStorage space');
+    console.warn('LocalStorage SetItem Warning for key:', key, e);
+    // If quota exceeded, clean only non-critical temp caches and optimize large payloads
+    if (e.name === 'QuotaExceededError' || (e.message && e.message.toLowerCase().includes('quota'))) {
       try {
-        const keepKeys = ['jahesh_current_user', 'jahesh_zibal_merchant', 'jahesh_cart', 'jahesh_theme'];
-        const savedData: Record<string, string | null> = {};
-        for (const k of keepKeys) {
-          savedData[k] = localStorage.getItem(k);
+        const tempKeysToRemove = ['jahesh_pending_order', 'jahesh_last_search', 'jahesh_temp_crop', 'debug_logs'];
+        for (const k of tempKeysToRemove) {
+          localStorage.removeItem(k);
         }
-        localStorage.clear();
-        for (const k of keepKeys) {
-          if (savedData[k]) localStorage.setItem(k, savedData[k]);
+
+        // If storing large product/banner arrays with heavy base64 images, store a lightweight version locally
+        if (key === 'jahesh_products' || key === 'jahesh_banners') {
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+              const lightweight = parsed.map((item: any) => {
+                const cleaned = { ...item };
+                if (cleaned.image && typeof cleaned.image === 'string' && cleaned.image.length > 40000 && cleaned.image.startsWith('data:')) {
+                  cleaned.image = '/assets/ascend-dashboard_7euwiU1R0Bf04e0Jvhhd2.png';
+                }
+                if (Array.isArray(cleaned.gallery)) {
+                  cleaned.gallery = cleaned.gallery.filter((g: any) => typeof g === 'string' && g.length < 40000);
+                }
+                return cleaned;
+              });
+              localStorage.setItem(key, JSON.stringify(lightweight));
+              return;
+            }
+          } catch {}
         }
-        // Try setting the new key again
+
         localStorage.setItem(key, value);
       } catch (err) {
-        console.error('Failed to recover from QuotaExceededError:', err);
+        console.warn('LocalStorage save skipped (relying on cloud DB):', err);
       }
     }
   }
@@ -83,7 +98,14 @@ export const mergeTwoProducts = (current: Product, incoming: Product): Product =
           gallery: (incoming.gallery && incoming.gallery.length > 0) ? incoming.gallery : current.gallery,
         };
       } else {
-        return current;
+        return {
+          ...incoming,
+          ...current,
+          subscriptionPlans: (current.subscriptionPlans && current.subscriptionPlans.length > 0)
+            ? current.subscriptionPlans
+            : incoming.subscriptionPlans,
+          gallery: (current.gallery && current.gallery.length > 0) ? current.gallery : incoming.gallery,
+        };
       }
     }
   }
@@ -100,12 +122,19 @@ export const mergeTwoProducts = (current: Product, incoming: Product): Product =
     };
   }
   if (!incoming.updatedAt && current.updatedAt) {
-    return current;
+    return {
+      ...incoming,
+      ...current,
+      subscriptionPlans: (current.subscriptionPlans && current.subscriptionPlans.length > 0)
+        ? current.subscriptionPlans
+        : incoming.subscriptionPlans,
+      gallery: (current.gallery && current.gallery.length > 0) ? current.gallery : incoming.gallery,
+    };
   }
 
-  // 3. Image preservation: custom images (e.g. /uploads/ or data: or custom URLs) never get overwritten by default stock unsplash photos
+  // 3. Image preservation: custom images (e.g. /uploads/ or /jaheshkala/ or data: or custom URLs) never get overwritten by default stock unsplash photos
   const isIncomingStockUnsplash = incoming.image && incoming.image.includes('images.unsplash.com');
-  const isCurrentCustom = current.image && (current.image.startsWith('/uploads/') || current.image.startsWith('data:') || !current.image.includes('images.unsplash.com'));
+  const isCurrentCustom = current.image && (current.image.startsWith('/uploads/') || current.image.startsWith('/jaheshkala/') || current.image.startsWith('data:') || !current.image.includes('images.unsplash.com'));
   const preferredImage = (isCurrentCustom && isIncomingStockUnsplash) ? current.image : (incoming.image || current.image);
 
   // 4. Incredibility & custom plans preservation
@@ -131,7 +160,6 @@ export function cleanProductItem(p: any): Product | null {
   if (!p || typeof p !== 'object') return null;
   const title = (p.title || p.name || '').trim();
   if (!title) return null;
-  // Reject dummy fallback items
   if (title === 'محصول جهش کالا' && (!p.price || Number(p.price) === 0)) return null;
   const id = p.id ? String(p.id).trim() : '';
   if (!id || id.startsWith('prod-fallback')) return null;
@@ -212,7 +240,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   }
 
-  // 3. Fallback and Guild Solutions Merge: Ensure all 25 guild solutions are present
+  // 3. Base Products List
   const baseProducts = (authoritativeList && authoritativeList.length > 0)
     ? authoritativeList
     : INITIAL_PRODUCTS.map(cleanProductItem).filter((p): p is Product => p !== null);
@@ -224,7 +252,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   }
 
-  // 4. Smart Local Merge: If user recently edited a product locally, DO NOT overwrite it with stale cloud data!
+  // 4. Smart Local Merge: NEVER lose user-edited or newly added products from local cache
   let hasNewerLocalEdits = false;
   if (localProducts.length > 0) {
     for (const lp of localProducts) {
@@ -237,17 +265,10 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
           hasNewerLocalEdits = true;
         }
       } else {
-        // Product was created locally
+        // User created a new product locally that is not yet in cloud snapshot - DO NOT DROP IT!
         existingMap.set(lp.id, lp);
         hasNewerLocalEdits = true;
       }
-    }
-  }
-
-  // 5. Ensure missing official guild solutions are present
-  for (const gp of GUILD_SOLUTIONS_PRODUCTS) {
-    if (gp && gp.id && !existingMap.has(gp.id)) {
-      existingMap.set(gp.id, gp);
     }
   }
 
@@ -258,7 +279,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     safeSetLocalStorage('jahesh_products', JSON.stringify(finalProducts));
   } catch {}
 
-  // Only push back if there were explicit unsaved local edits
+  // Only push back to cloud if there were explicit unsaved local edits
   if (hasNewerLocalEdits) {
     try {
       saveAllProductsToDb(finalProducts).catch(() => {});
@@ -356,16 +377,25 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       console.warn('Persist to /api/products/save notice:', e);
     }
 
-    // 2. Load current list from local cache / store
+    // 2. Load current list from local cache / store - protect against empty list truncating full catalog
     let currentList: Product[] = [];
     try {
       const saved = localStorage.getItem('jahesh_products');
-      currentList = saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          currentList = parsed;
+        }
+      }
     } catch {}
+
+    if (currentList.length === 0) {
+      currentList = [...INITIAL_PRODUCTS];
+    }
 
     const idx = currentList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
-      currentList[idx] = product;
+      currentList[idx] = { ...currentList[idx], ...product };
     } else {
       currentList = [product, ...currentList];
     }

@@ -5,7 +5,6 @@ import {
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from './data/initialData';
-import { GUILD_SOLUTIONS_PRODUCTS } from './data/guildProducts';
 import {
   fetchProductsFromDb,
   saveProductToDb,
@@ -113,22 +112,19 @@ export default function App() {
   // 2. Products state (persisted so admin additions and edits appear immediately)
   const [products, setProducts] = useState<Product[]>(() => {
     try {
-      const allBase = [...INITIAL_PRODUCTS, ...GUILD_SOLUTIONS_PRODUCTS];
       const saved = localStorage.getItem('jahesh_products');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = parsed.map(sanitizeProduct).filter((p): p is Product => p !== null);
           if (cleaned.length > 0) {
-            const savedIds = new Set(cleaned.map((p) => p.id));
-            const missing = GUILD_SOLUTIONS_PRODUCTS.filter((p) => !savedIds.has(p.id));
-            return missing.length > 0 ? [...cleaned, ...missing] : cleaned;
+            return cleaned;
           }
         }
       }
-      return allBase;
+      return INITIAL_PRODUCTS;
     } catch {
-      return [...INITIAL_PRODUCTS, ...GUILD_SOLUTIONS_PRODUCTS];
+      return INITIAL_PRODUCTS;
     }
   });
 

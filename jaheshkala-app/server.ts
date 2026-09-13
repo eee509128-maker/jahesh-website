@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 
@@ -9,7 +10,175 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Directories for static uploads and persistence
+const ROOT_DIR = path.resolve(__dirname, '..');
+const DATA_DIR = path.join(ROOT_DIR, 'data');
+const UPLOADS_DIR = path.join(ROOT_DIR, 'uploads');
+const PRODUCTS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'products');
+const BANNERS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'banners');
+
+[DATA_DIR, UPLOADS_DIR, PRODUCTS_UPLOADS_DIR, BANNERS_UPLOADS_DIR].forEach((dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
+// Serve uploads statically
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
+const BANNERS_FILE = path.join(DATA_DIR, 'banners.json');
+const ORDERS_FILE = path.join(DATA_DIR, 'orders.json');
+const COUPONS_FILE = path.join(DATA_DIR, 'coupons.json');
+
+// --- Image Upload Endpoint ---
+app.post('/api/upload-product-image', (req, res) => {
+  try {
+    const { image, filename } = req.body || {};
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ error: 'داده تصویر الزامی است.' });
+    }
+
+    let ext = 'webp';
+    let buffer: Buffer;
+    const matches = image.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+    if (matches) {
+      const type = matches[1].toLowerCase();
+      if (type.includes('png')) ext = 'png';
+      else if (type.includes('jpeg') || type.includes('jpg')) ext = 'jpg';
+      else if (type.includes('svg')) ext = 'svg';
+      else if (type.includes('webp')) ext = 'webp';
+      buffer = Buffer.from(matches[2], 'base64');
+    } else if (image.startsWith('data:')) {
+      const parts = image.split(',');
+      buffer = Buffer.from(parts[1] || '', 'base64');
+    } else {
+      buffer = Buffer.from(image, 'base64');
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'فرمت تصویر نامعتبر است.' });
+    }
+
+    const safeName = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const filePath = path.join(PRODUCTS_UPLOADS_DIR, safeName);
+    fs.writeFileSync(filePath, buffer);
+
+    const publicUrl = `/uploads/products/${safeName}`;
+    return res.json({ success: true, url: publicUrl });
+  } catch (err: any) {
+    console.error('Error in /api/upload-product-image:', err);
+    return res.status(500).json({ error: err.message || 'خطا در ذخیره‌سازی تصویر محصول' });
+  }
+});
+
+// --- Banner Upload Endpoint ---
+app.post('/api/upload-banner', (req, res) => {
+  try {
+    const { image } = req.body || {};
+    if (!image || typeof image !== 'string') {
+      return res.status(400).json({ error: 'داده بنر الزامی است.' });
+    }
+    let ext = 'jpg';
+    let buffer: Buffer;
+    const matches = image.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+    if (matches) {
+      buffer = Buffer.from(matches[2], 'base64');
+    } else if (image.startsWith('data:')) {
+      buffer = Buffer.from(image.split(',')[1] || '', 'base64');
+    } else {
+      buffer = Buffer.from(image, 'base64');
+    }
+
+    const safeName = `banner_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    fs.writeFileSync(path.join(BANNERS_UPLOADS_DIR, safeName), buffer);
+    return res.json({ success: true, url: `/uploads/banners/${safeName}` });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Products Endpoints ---
+app.get('/api/products', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  try {
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return res.json(parsed);
+      }
+    }
+  } catch (err) {
+    console.error('Error reading products.json:', err);
+  }
+  return res.json([]);
+});
+
+app.post('/api/products', (req, res) => {
+  try {
+    const products = req.body;
+    if (!Array.isArray(products)) {
+      return res.status(400).json({ error: 'Expected array of products' });
+    }
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf8');
+    return res.json({ success: true, count: products.length });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/products/save', (req, res) => {
+  try {
+    const product = req.body;
+    if (!product || !product.id) {
+      return res.status(400).json({ error: 'Invalid product data' });
+    }
+    let list: any[] = [];
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      try {
+        const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch {}
+    }
+    const idx = list.findIndex((p: any) => p.id === product.id);
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...product };
+    } else {
+      list = [product, ...list];
+    }
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    return res.json({ success: true, products: list });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/products/delete', (req, res) => {
+  try {
+    const productId = req.body?.productId || req.body?.id;
+    if (!productId) {
+      return res.status(400).json({ error: 'productId or id required' });
+    }
+    let list: any[] = [];
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      try {
+        const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch {}
+    }
+    list = list.filter((p: any) => p.id !== productId);
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    return res.json({ success: true, products: list });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 const CLOUDFLARE_ACCOUNT_ID = 'e8950358d5cf09f0f511b46172f65791';
 const CLOUDFLARE_AI_TOKEN = 'cfut_Dux4Ej0iGy3P0bowmnh5LevCZ0f1DaTDmr5a1lmR074a186e';
