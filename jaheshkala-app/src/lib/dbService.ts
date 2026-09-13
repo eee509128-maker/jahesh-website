@@ -7,7 +7,7 @@ import { GUILD_SOLUTIONS_PRODUCTS } from '../data/guildProducts';
 // Safe wrapper for safeSetLocalStorage to handle QuotaExceededError
 export const safeSetLocalStorage = (key: string, value: string) => {
   try {
-    safeSetLocalStorage(key, value);
+    localStorage.setItem(key, value);
   } catch (e: any) {
     console.error('LocalStorage SetItem Error for key:', key, e);
     if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
@@ -20,10 +20,10 @@ export const safeSetLocalStorage = (key: string, value: string) => {
         }
         localStorage.clear();
         for (const k of keepKeys) {
-          if (savedData[k]) safeSetLocalStorage(k, savedData[k]);
+          if (savedData[k]) localStorage.setItem(k, savedData[k]);
         }
         // Try setting the new key again
-        safeSetLocalStorage(key, value);
+        localStorage.setItem(key, value);
       } catch (err) {
         console.error('Failed to recover from QuotaExceededError:', err);
       }
