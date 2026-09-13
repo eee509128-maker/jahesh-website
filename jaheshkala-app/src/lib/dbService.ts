@@ -230,8 +230,8 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     localStorage.setItem('jahesh_products', JSON.stringify(finalProducts));
   } catch {}
 
-  // If local had newer edits or missing items, push back to cloud in background
-  if (hasNewerLocalEdits || !authoritativeList || authoritativeList.length === 0) {
+  // Only push back if there were explicit unsaved local edits
+  if (hasNewerLocalEdits) {
     try {
       saveAllProductsToDb(finalProducts).catch(() => {});
     } catch {}

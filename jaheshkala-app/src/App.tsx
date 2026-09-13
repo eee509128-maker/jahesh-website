@@ -691,35 +691,34 @@ export default function App() {
   };
 
   // Banner Management Handlers
-  const handleSaveBanner = async (banner: BannerSlide) => {
-    let updated: BannerSlide[] = [];
-    setBanners((prev) => {
-      const index = prev.findIndex((b) => b.id === banner.id);
-      if (index >= 0) {
-        updated = [...prev];
-        updated[index] = banner;
+  const handleSaveBanner = async (banner: BannerSlide, fullList?: BannerSlide[]) => {
+    let nextList: BannerSlide[] = [];
+    if (fullList && Array.isArray(fullList) && fullList.length > 0) {
+      nextList = fullList;
+    } else {
+      const idx = banners.findIndex((b) => b.id === banner.id);
+      if (idx >= 0) {
+        nextList = [...banners];
+        nextList[idx] = banner;
       } else {
-        updated = [...prev, banner];
+        nextList = [...banners, banner];
       }
-      try {
-        localStorage.setItem('jahesh_banners', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-    await saveAllBannersToDb(updated.length > 0 ? updated : [banner]);
+    }
+    setBanners(nextList);
+    try {
+      localStorage.setItem('jahesh_banners', JSON.stringify(nextList));
+    } catch {}
+    await saveAllBannersToDb(nextList);
     showToast('بنر با موفقیت در سرور ذخیره و برای تمامی موبایل‌ها همگام‌سازی شد.');
   };
 
-  const handleDeleteBanner = async (bannerId: string) => {
-    let updated: BannerSlide[] = [];
-    setBanners((prev) => {
-      updated = prev.filter((b) => b.id !== bannerId);
-      try {
-        localStorage.setItem('jahesh_banners', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-    await saveAllBannersToDb(updated);
+  const handleDeleteBanner = async (bannerId: string, fullList?: BannerSlide[]) => {
+    const nextList = (fullList && Array.isArray(fullList)) ? fullList : banners.filter((b) => b.id !== bannerId);
+    setBanners(nextList);
+    try {
+      localStorage.setItem('jahesh_banners', JSON.stringify(nextList));
+    } catch {}
+    await saveAllBannersToDb(nextList);
     await deleteBannerFromDb(bannerId);
     showToast('بنر از اسلایدر حذف و تغییرات روی همه دستگاه‌ها اعمال شد.');
   };

@@ -39,8 +39,8 @@ interface AdminPanelProps {
   onUpdateUser?: (user: User) => void;
   onAddNewUser?: (user: User, initialPass?: string) => void;
   banners?: BannerSlide[];
-  onSaveBanner?: (banner: BannerSlide) => void;
-  onDeleteBanner?: (bannerId: string) => void;
+  onSaveBanner?: (banner: BannerSlide, fullList?: BannerSlide[]) => void;
+  onDeleteBanner?: (bannerId: string, fullList?: BannerSlide[]) => void;
   currentUser?: User | null;
   onAdminInstantPurchase?: (product: Product, quantity?: number) => void;
   onOpenAmlakApp?: () => void;
@@ -362,7 +362,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     setBannersList(updatedList);
     const ok = await saveAllBannersToDb(updatedList);
-    if (onSaveBanner) onSaveBanner(newBanner);
+    if (onSaveBanner) onSaveBanner(newBanner, updatedList);
 
     setBannerSuccessMessage(
       ok
@@ -378,7 +378,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const newList = bannersList.map((b) => (b.id === banner.id ? updated : b));
     setBannersList(newList);
     await saveAllBannersToDb(newList);
-    if (onSaveBanner) onSaveBanner(updated);
+    if (onSaveBanner) onSaveBanner(updated, newList);
   };
 
   const handleMoveBanner = async (index: number, direction: 'up' | 'down') => {
@@ -397,6 +397,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const ordered = newList.map((item, idx) => ({ ...item, order: idx }));
     setBannersList(ordered);
     await saveAllBannersToDb(ordered);
+    if (onSaveBanner && ordered.length > 0) onSaveBanner(ordered[0], ordered);
   };
 
   const handleDeleteBannerSlide = async (bannerId: string) => {
@@ -405,7 +406,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBannersList(newList);
     await saveAllBannersToDb(newList);
     await deleteBannerFromDb(bannerId);
-    if (onDeleteBanner) onDeleteBanner(bannerId);
+    if (onDeleteBanner) onDeleteBanner(bannerId, newList);
   };
 
   const handleAdminFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

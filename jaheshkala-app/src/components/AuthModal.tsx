@@ -325,9 +325,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     <div 
       className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm p-3 sm:p-4 flex min-h-full items-center justify-center animate-in fade-in" 
       dir="rtl"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       {/* Modal Container: Protected max height and safe viewport bounds */}
-      <div className="relative bg-white dark:bg-[#140c2e] border border-purple-200 dark:border-purple-800 rounded-2xl sm:rounded-3xl w-full max-w-lg shadow-2xl text-right flex flex-col max-h-[88vh] my-auto overflow-hidden">
+      <div 
+        className="relative bg-white dark:bg-[#140c2e] border border-purple-200 dark:border-purple-800 rounded-2xl sm:rounded-3xl w-full max-w-lg shadow-2xl text-right flex flex-col max-h-[88vh] my-auto overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Sticky Header: NEVER cuts off or gets pushed out */}
         <div className="sticky top-0 z-30 shrink-0 bg-purple-50/95 dark:bg-[#1a1139]/95 backdrop-blur-md p-3.5 sm:p-4 flex items-center justify-between border-b border-purple-200 dark:border-purple-900/60">

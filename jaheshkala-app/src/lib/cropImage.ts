@@ -10,7 +10,9 @@ export const createImage = (url: string): Promise<HTMLImageElement> =>
 export const getCroppedImg = async (
   imageSrc: string,
   pixelCrop: { x: number; y: number; width: number; height: number },
-  rotation = 0
+  rotation = 0,
+  maxWidth = 1280,
+  maxHeight = 600
 ): Promise<string> => {
   const image = await createImage(imageSrc);
   const canvas = document.createElement('canvas');
@@ -20,26 +22,56 @@ export const getCroppedImg = async (
     throw new Error('No 2d context');
   }
 
-  canvas.width = image.width;
-  canvas.height = image.height;
+  // Set temp canvas to capture rotation and crop
+  const safeArea = Math.max(image.width, image.height) * 2;
+  canvas.width = safeArea;
+  canvas.height = safeArea;
 
-  ctx.translate(image.width / 2, image.height / 2);
+  ctx.translate(safeArea / 2, safeArea / 2);
   ctx.rotate((rotation * Math.PI) / 180);
-  ctx.translate(-image.width / 2, -image.height / 2);
+  ctx.translate(-safeArea / 2, -safeArea / 2);
 
-  ctx.drawImage(image, 0, 0);
-
-  const data = ctx.getImageData(
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height
+  ctx.drawImage(
+    image,
+    safeArea / 2 - image.width * 0.5,
+    safeArea / 2 - image.height * 0.5
   );
 
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
+  // Calculate target dimensions capped at maxWidth / maxHeight for high performance & minimal data footprint
+  let targetWidth = pixelCrop.width;
+  let targetHeight = pixelCrop.height;
 
-  ctx.putImageData(data, 0, 0);
+  if (targetWidth > maxWidth || targetHeight > maxHeight) {
+    const ratio = Math.min(maxWidth / targetWidth, maxHeight / targetHeight);
+    targetWidth = Math.round(targetWidth * ratio);
+    targetHeight = Math.round(targetHeight * ratio);
+  }
 
-  return canvas.toDataURL('image/jpeg', 0.9);
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = targetWidth;
+  outCanvas.height = targetHeight;
+  const outCtx = outCanvas.getContext('2d');
+
+  if (!outCtx) {
+    throw new Error('No out 2d context');
+  }
+
+  // Smooth downsampling
+  outCtx.imageSmoothingEnabled = true;
+  outCtx.imageSmoothingQuality = 'high';
+
+  outCtx.drawImage(
+    canvas,
+    safeArea / 2 - image.width * 0.5 + pixelCrop.x,
+    safeArea / 2 - image.height * 0.5 + pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    targetWidth,
+    targetHeight
+  );
+
+  return outCanvas.toDataURL('image/jpeg', 0.82);
 };
+
