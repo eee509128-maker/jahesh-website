@@ -1350,75 +1350,54 @@ export const INITIAL_PRODUCTS: Product[] = [
   }
 ];
 
+export const INITIAL_COUPONS = [
+  {
+    "id": "c-jahesh1395",
+    "code": "jahesh1395",
+    "discountPercent": 68,
+    "description": "کد تخفیف سرّی مدیریت: اعمال قیمت ویژه ۲,۵۰۰,۰۰۰ تومان روی پکیج طراحی سایت",
+    "isActive": true
+  },
+  {
+    "id": "c-welcome20",
+    "code": "WELCOME20",
+    "discountPercent": 20,
+    "description": "تخفیف ۲۰ درصدی خرید اول از جهش‌کالا",
+    "isActive": true
+  },
+  {
+    "id": "c-golden10",
+    "code": "GOLDEN10",
+    "discountPercent": 10,
+    "description": "تخفیف ۱۰ درصدی پکیج‌های طلایی",
+    "isActive": true
+  },
+  {
+    "id": "c-vip30",
+    "code": "VIP30",
+    "discountPercent": 30,
+    "description": "تخفیف ۳۰ درصدی مشتریان ویژه",
+    "isActive": true
+  }
+];
+
 export const INITIAL_BANNERS: BannerSlide[] = [
   {
-    "id": "banner-2",
-    "cta": "مشاهده جزئیات و خرید",
-    "badge": "پیشنهاد طلایی جهش",
-    "image": "/jaheshkala/images/img_f07e268506.webp",
-    "order": 0,
-    "title": "پکیج طلایی طراحی سایت اختصاصی جهش",
-    "gradient": "from-[#172554] via-[#111827] to-[#080d1a]",
-    "isActive": true,
-    "subtitle": "کدنویسی اختصاصی، هاست و دامین رایگان، درگاه پرداخت زیبال و پشتیبانی کامل ۲۴ ساعته",
-    "actionType": "package",
-    "imagePosition": "center",
-    "overlayOpacity": 70
-  },
-  {
-    "id": "banner-3",
-    "cta": "مشاهده و ثبت‌نام",
-    "badge": "ویژه مشاوران املاک",
-    "image": "/jaheshkala/images/img_1d7eccb63c.jpg",
-    "order": 1,
-    "title": "سامانه مدیریت املاک جهش",
-    "fitMode": "auto",
-    "gradient": "from-[#172554] via-[#111827] to-[#080d1a]",
-    "isActive": true,
-    "subtitle": "نرم‌افزار جامع فایلینگ، مدیریت مشتریان و بایگانی هوشمند املاک",
-    "actionType": "category",
-    "targetGuild": "املاک و مستغلات",
-    "actionTarget": "املاک و مستغلات",
-    "imagePosition": "center",
-    "overlayOpacity": 65,
-    "hideTextOverlay": false
-  },
-  {
     "id": "banner-1",
-    "title": "تبلیغات هوشمند کاندیداهای شورای شهر",
-    "subtitle": "تولید تیزر با هوش مصنوعی، طراحی سایت و ربات رزومه",
-    "badge": "جشنواره تخفیف‌های ویژه",
-    "cta": "شروع کمپین انتخاباتی",
-    "actionType": "all",
-    "gradient": "from-[#172554] via-[#111827] to-[#080d1a]",
-    "overlayOpacity": 85,
-    "imagePosition": "center",
-    "fitMode": "auto",
-    "hideTextOverlay": false,
-    "image": "/jaheshkala/images/img_0009e931db.jpg",
-    "titleColor": "#ffffff",
-    "subtitleColor": "#e2e8f0",
-    "highlightColor": "#fbbf24",
-    "textBackdropEnabled": true,
-    "textBackdropTheme": "dark",
-    "textBackdropOpacity": 65,
-    "isActive": true,
-    "order": 2
+    "title": "جشنواره بزرگ هوشمندسازی اصناف جهش",
+    "subtitle": "تا ۶۸٪ تخفیف روی تمامی سامانه‌ها و پکیج‌های نرم‌افزاری اختصاصی",
+    "image": "/jaheshkala/images/user_img_29bc1c650c.jpg",
+    "buttonText": "مشاهده محصولات",
+    "link": "#products",
+    "isActive": true
   },
   {
-    "id": "banner_1789042491741",
-    "cta": "شروع کنید",
-    "badge": "ویژه",
-    "image": "/jaheshkala/images/img_bd0f444289.jpg",
-    "order": 3,
-    "title": "همین حالا، وب‌سایت حرفه‌ای خود را بسازید!",
-    "fitMode": "auto",
-    "gradient": "from-[#172554] via-[#111827] to-[#080d1a]",
-    "isActive": true,
-    "subtitle": "بدون نیاز به کدنویسی، با قالب‌های آماده و پشتیبانی کامل.",
-    "actionType": "incredible",
-    "imagePosition": "center",
-    "overlayOpacity": 85,
-    "hideTextOverlay": false
+    "id": "banner-2",
+    "title": "سامانه یکپارچه مدیریت مشاورین املاک جهش",
+    "subtitle": "هوش مصنوعی تطبیق مشتری، فایل‌یابی صوتی و تور ۳۶۰ درجه پانوراما",
+    "image": "/jaheshkala/images/user_img_801604dcaa.jpg",
+    "buttonText": "خرید آنلاین اشتراک",
+    "link": "#products",
+    "isActive": true
   }
 ];

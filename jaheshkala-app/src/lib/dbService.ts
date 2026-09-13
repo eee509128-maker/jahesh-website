@@ -473,25 +473,41 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
 
 export const deleteProductFromDb = async (productId: string): Promise<boolean> => {
   try {
-    // 1. Delete from server disk via /api/products/delete
+    // 1. Fetch authoritative cloud list first
+    let masterList: Product[] = [];
     try {
-      await fetch('/api/products/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId }),
-      });
+      const { data: cloudRow } = await supabase
+        .from('chats')
+        .select('messages')
+        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+        .maybeSingle();
+      if (cloudRow && Array.isArray(cloudRow.messages) && cloudRow.messages.length > 0) {
+        masterList = cloudRow.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
+      }
     } catch (e) {
-      console.warn('Delete from /api/products/delete notice:', e);
+      console.warn('Fetch cloud in deleteProductFromDb notice:', e);
     }
 
-    // 2. Remove from local store
-    let currentList: Product[] = [];
-    try {
-      const saved = localStorage.getItem('jahesh_products');
-      currentList = saved ? JSON.parse(saved) : [];
-    } catch {}
+    if (masterList.length === 0) {
+      try {
+        const saved = localStorage.getItem('jahesh_products');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            masterList = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
+          }
+        }
+      } catch {}
+    }
 
-    const updated = currentList.filter((p) => p.id !== productId);
+    if (masterList.length === 0) {
+      masterList = [...INITIAL_PRODUCTS];
+    }
+
+    // Filter out ONLY the specified product
+    const updated = masterList.filter((p) => p.id !== productId);
+
+    // 2. Update local storage & broadcast event immediately
     try {
       safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       if (typeof window !== 'undefined') {
@@ -515,7 +531,16 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
       console.warn('Delete product from SYSTEM_CONFIG_PRODUCTS notice:', err);
     }
 
-    // 4. Delete from relational products table
+    // 4. Delete from server disk via /api/products/delete
+    try {
+      await fetch('/api/products/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId }),
+      });
+    } catch (e) {}
+
+    // 5. Delete from relational products table
     try {
       await supabase.from('products').delete().eq('id', productId);
     } catch {}
