@@ -70,16 +70,121 @@ export function isRealCustomImage(img?: string): boolean {
   return true;
 }
 
+// ========================================================
+// DELETED PRODUCTS BLACKLIST (Tombstone synchronization)
+// Guarantees deleted products NEVER resurrect on any device
+// ========================================================
+export const getDeletedProductIds = async (): Promise<string[]> => {
+  let deletedIds: string[] = [];
+
+  // 1. Read from localStorage cache first
+  try {
+    const raw = localStorage.getItem('jahesh_deleted_products');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) deletedIds = parsed;
+    }
+  } catch {}
+
+  // 2. Fetch from Supabase SYSTEM_DELETED_PRODUCT_IDS
+  try {
+    const { data, error } = await supabase
+      .from('chats')
+      .select('messages')
+      .eq('user_id', 'SYSTEM_DELETED_PRODUCT_IDS')
+      .maybeSingle();
+    if (!error && data && Array.isArray(data.messages)) {
+      const cloudIds: string[] = data.messages.map((id: any) => String(id).trim()).filter(Boolean);
+      deletedIds = Array.from(new Set([...deletedIds, ...cloudIds]));
+    }
+  } catch {}
+
+  // 3. Fallback check server endpoint
+  try {
+    const res = await fetch('/api/products/deleted');
+    if (res.ok) {
+      const serverIds = await res.json();
+      if (Array.isArray(serverIds)) {
+        deletedIds = Array.from(new Set([...deletedIds, ...serverIds]));
+      }
+    }
+  } catch {}
+
+  try {
+    safeSetLocalStorage('jahesh_deleted_products', JSON.stringify(deletedIds));
+  } catch {}
+
+  return deletedIds;
+};
+
+export const markProductIdAsDeleted = async (productId: string): Promise<void> => {
+  if (!productId) return;
+  try {
+    const current = await getDeletedProductIds();
+    if (!current.includes(productId)) {
+      const updated = [...current, productId];
+      safeSetLocalStorage('jahesh_deleted_products', JSON.stringify(updated));
+
+      // Supabase
+      try {
+        await supabase.from('chats').upsert(
+          {
+            user_id: 'SYSTEM_DELETED_PRODUCT_IDS',
+            user_name: 'لیست سیاه محصولات حذف شده',
+            messages: updated,
+            last_updated: new Date().toISOString(),
+            is_read_by_admin: true,
+          },
+          { onConflict: 'user_id' }
+        );
+      } catch {}
+
+      // Server disk
+      try {
+        await fetch('/api/products/deleted', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId }),
+        });
+      } catch {}
+    }
+  } catch {}
+};
+
+export const unmarkProductIdAsDeleted = async (productId: string): Promise<void> => {
+  if (!productId) return;
+  try {
+    const current = await getDeletedProductIds();
+    if (current.includes(productId)) {
+      const updated = current.filter((id) => id !== productId);
+      safeSetLocalStorage('jahesh_deleted_products', JSON.stringify(updated));
+
+      try {
+        await supabase.from('chats').upsert(
+          {
+            user_id: 'SYSTEM_DELETED_PRODUCT_IDS',
+            user_name: 'لیست سیاه محصولات حذف شده',
+            messages: updated,
+            last_updated: new Date().toISOString(),
+            is_read_by_admin: true,
+          },
+          { onConflict: 'user_id' }
+        );
+      } catch {}
+    }
+  } catch {}
+};
+
 // 1. PRODUCTS DB SERVICE & SMART DATA MERGING
 export const mergeTwoProducts = (current: Product, incoming: Product): Product => {
   if (!current) return incoming;
   if (!incoming) return current;
 
-  // 1. Image preservation is paramount: real custom uploaded images NEVER get replaced by SVGs or stock photos
+  // 1. Image preservation: real custom uploaded images NEVER get replaced by SVGs or stock photos
   const currentHasRealImg = isRealCustomImage(current.image);
   const incomingHasRealImg = isRealCustomImage(incoming.image);
 
-  let preferredImage = incoming.image || current.image;
+  let preferredImage = current.image || incoming.image;
 
   if (currentHasRealImg && !incomingHasRealImg) {
     preferredImage = current.image;
@@ -93,25 +198,28 @@ export const mergeTwoProducts = (current: Product, incoming: Product): Product =
       : (current.image || incoming.image);
   }
 
-  // 2. Timestamp comparison for other fields
-  let baseMerge = { ...current, ...incoming };
+  // 2. Base merge: database 'current' is authoritative unless incoming is strictly newer
+  let baseMerge = { ...incoming, ...current };
   if (incoming.updatedAt && current.updatedAt) {
     const incomingTime = new Date(incoming.updatedAt).getTime();
     const currentTime = new Date(current.updatedAt).getTime();
-    if (!isNaN(incomingTime) && !isNaN(currentTime)) {
-      if (currentTime > incomingTime) {
-        baseMerge = { ...incoming, ...current };
-      }
+    if (!isNaN(incomingTime) && !isNaN(currentTime) && incomingTime > currentTime) {
+      baseMerge = { ...current, ...incoming };
     }
   }
 
-  const preferredIsIncredible = incoming.isIncredible !== undefined ? Boolean(incoming.isIncredible) : Boolean(current.isIncredible);
-  const preferredPlans = (incoming.subscriptionPlans && incoming.subscriptionPlans.length > 0)
-    ? incoming.subscriptionPlans
-    : current.subscriptionPlans;
-  const preferredGallery = (incoming.gallery && incoming.gallery.length > 0)
-    ? incoming.gallery
-    : current.gallery;
+  // Authoritative current properties always win
+  const preferredIsIncredible = current.isIncredible !== undefined
+    ? Boolean(current.isIncredible)
+    : Boolean(incoming.isIncredible);
+
+  const preferredPlans = (current.subscriptionPlans && current.subscriptionPlans.length > 0)
+    ? current.subscriptionPlans
+    : incoming.subscriptionPlans;
+
+  const preferredGallery = (current.gallery && current.gallery.length > 0)
+    ? current.gallery
+    : incoming.gallery;
 
   return {
     ...baseMerge,
@@ -152,10 +260,14 @@ export function cleanProductItem(p: any): Product | null {
     features: Array.isArray(p.features) ? p.features : [],
     inStock: p.inStock !== false,
     warranty: p.warranty || 'گارانتی اصالت و سلامت جهش',
+    isIncredible: Boolean(p.isIncredible),
   };
 }
 
 export const fetchProductsFromDb = async (): Promise<Product[]> => {
+  const deletedIdsList = await getDeletedProductIds();
+  const deletedIds = new Set(deletedIdsList);
+
   let authoritativeList: Product[] | null = null;
 
   // 0. Read current local products cache
@@ -165,7 +277,9 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     if (rawLocal) {
       const parsed = JSON.parse(rawLocal);
       if (Array.isArray(parsed)) {
-        localProducts = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
+        localProducts = parsed
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
       }
     }
   } catch {}
@@ -179,7 +293,9 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
       .maybeSingle();
 
     if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
-      const cleaned = configData.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
+      const cleaned = configData.messages
+        .map(cleanProductItem)
+        .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
       if (cleaned.length > 0) {
         authoritativeList = cleaned;
       }
@@ -195,7 +311,9 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
       if (res.ok) {
         const serverProducts = await res.json();
         if (Array.isArray(serverProducts) && serverProducts.length > 0) {
-          const cleaned = serverProducts.map(cleanProductItem).filter((p): p is Product => p !== null);
+          const cleaned = serverProducts
+            .map(cleanProductItem)
+            .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
           if (cleaned.length > 0) {
             authoritativeList = cleaned;
           }
@@ -206,23 +324,23 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   }
 
-  // 3. Base Products List: Cloud authoritative list is the source of truth
+  // 3. Base Products List: Cloud authoritative list is the 100% source of truth
   if (authoritativeList && authoritativeList.length > 0) {
-    // If we have authoritative cloud/server data, respect its exact set of products (including deletions)
     const localMap = new Map<string, Product>();
     for (const lp of localProducts) {
       if (lp && lp.id) localMap.set(lp.id, lp);
     }
 
+    // Only preserve local custom uploaded image if authoritative image is SVG/placeholder
     const finalProducts = authoritativeList.map((p) => {
       const localItem = localMap.get(p.id);
-      if (localItem) {
-        return mergeTwoProducts(p, localItem);
+      if (localItem && isRealCustomImage(localItem.image) && !isRealCustomImage(p.image)) {
+        return { ...p, image: localItem.image };
       }
       return p;
     });
 
-    // Update local storage so deleted items are removed from visitor's cache
+    // Update local storage so deleted items are removed and state is accurate
     try {
       safeSetLocalStorage('jahesh_products', JSON.stringify(finalProducts));
     } catch {}
@@ -232,8 +350,10 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
 
   // Fallback if cloud was offline/empty
   const fallbackList = localProducts.length > 0
-    ? localProducts
-    : INITIAL_PRODUCTS.map(cleanProductItem).filter((p): p is Product => p !== null);
+    ? localProducts.filter((p) => !deletedIds.has(p.id))
+    : INITIAL_PRODUCTS
+        .map(cleanProductItem)
+        .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
 
   try {
     safeSetLocalStorage('jahesh_products', JSON.stringify(fallbackList));
@@ -254,9 +374,12 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
         table: 'chats',
         filter: 'user_id=eq.SYSTEM_CONFIG_PRODUCTS',
       },
-      (payload: any) => {
+      async (payload: any) => {
         if (payload?.new && Array.isArray(payload.new.messages)) {
-          const cleaned = payload.new.messages.map(cleanProductItem).filter((p: any): p is Product => p !== null);
+          const deletedIds = new Set(await getDeletedProductIds());
+          const cleaned = payload.new.messages
+            .map(cleanProductItem)
+            .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
           if (cleaned.length > 0) {
             safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
             callback(cleaned);
@@ -264,9 +387,12 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
         }
       }
     )
-    .on('broadcast', { event: 'products_updated' }, (payload: any) => {
+    .on('broadcast', { event: 'products_updated' }, async (payload: any) => {
       if (payload?.payload && Array.isArray(payload.payload)) {
-        const cleaned = payload.payload.map(cleanProductItem).filter((p: any): p is Product => p !== null);
+        const deletedIds = new Set(await getDeletedProductIds());
+        const cleaned = payload.payload
+          .map(cleanProductItem)
+          .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
         if (cleaned.length > 0) {
           safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
           callback(cleaned);
@@ -292,10 +418,14 @@ export const broadcastProductsUpdate = (products: Product[]) => {
 };
 
 export const saveAllProductsToDb = async (products: Product[]): Promise<boolean> => {
-  const stampedProducts = products.map((p) => ({
-    ...p,
-    updatedAt: p.updatedAt || new Date().toISOString(),
-  }));
+  const deletedIds = new Set(await getDeletedProductIds());
+  const stampedProducts = products
+    .filter((p) => p && p.id && !deletedIds.has(p.id))
+    .map((p) => ({
+      ...p,
+      isIncredible: Boolean(p.isIncredible),
+      updatedAt: p.updatedAt || new Date().toISOString(),
+    }));
 
   // 1. Immediately cache locally & dispatch update event
   try {
@@ -340,6 +470,12 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
     if (!product.updatedAt) {
       product.updatedAt = new Date().toISOString();
     }
+    // Guarantee boolean status for isIncredible
+    product.isIncredible = Boolean(product.isIncredible);
+
+    // Unmark as deleted since admin is saving/updating this product
+    await unmarkProductIdAsDeleted(product.id);
+
     // 0. Automatically upload base64 images to server to avoid localStorage QuotaExceededError and database payload bloat
     if (product.image && product.image.startsWith('data:image')) {
       try {
@@ -379,7 +515,8 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       console.warn('Persist to /api/products/save notice:', e);
     }
 
-    // 2. Fetch authoritative cloud list first to prevent overwriting other products with stale local data
+    // 2. Fetch authoritative cloud list
+    const deletedIds = new Set(await getDeletedProductIds());
     let masterList: Product[] = [];
     try {
       const { data: cloudRow } = await supabase
@@ -388,45 +525,35 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
         .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
         .maybeSingle();
       if (cloudRow && Array.isArray(cloudRow.messages) && cloudRow.messages.length > 0) {
-        masterList = cloudRow.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
+        masterList = cloudRow.messages
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
       }
     } catch (e) {
       console.warn('Fetch cloud in saveProductToDb notice:', e);
     }
 
-    // Merge with local storage if cloud list was empty or missing some products
-    let localList: Product[] = [];
-    try {
-      const saved = localStorage.getItem('jahesh_products');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          localList = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
-        }
-      }
-    } catch {}
-
     if (masterList.length === 0) {
-      masterList = localList.length > 0 ? localList : [...INITIAL_PRODUCTS];
-    } else if (localList.length > 0) {
-      // Merge local real images into masterList if local had something newer
-      const masterMap = new Map<string, Product>();
-      for (const item of masterList) {
-        if (item && item.id) masterMap.set(item.id, item);
-      }
-      for (const lItem of localList) {
-        if (!lItem || !lItem.id) continue;
-        const existing = masterMap.get(lItem.id);
-        if (existing) {
-          masterMap.set(lItem.id, mergeTwoProducts(existing, lItem));
-        } else {
-          masterMap.set(lItem.id, lItem);
+      try {
+        const saved = localStorage.getItem('jahesh_products');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            masterList = parsed
+              .map(cleanProductItem)
+              .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+          }
         }
+      } catch {}
+
+      if (masterList.length === 0) {
+        masterList = INITIAL_PRODUCTS
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
       }
-      masterList = Array.from(masterMap.values());
     }
 
-    // Update ONLY the specified product in the master list
+    // Update ONLY the specified product in the master list - DO NOT resurrect deleted items
     const idx = masterList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
       masterList[idx] = { ...masterList[idx], ...product };
@@ -510,7 +637,10 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
 
 export const deleteProductFromDb = async (productId: string): Promise<boolean> => {
   try {
-    // 1. Fetch authoritative cloud list first
+    // 1. Immediately blacklist this product ID so it can NEVER be resurrected
+    await markProductIdAsDeleted(productId);
+
+    // 2. Fetch authoritative cloud list
     let masterList: Product[] = [];
     try {
       const { data: cloudRow } = await supabase
@@ -541,10 +671,10 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
       masterList = [...INITIAL_PRODUCTS];
     }
 
-    // Filter out ONLY the specified product
+    // Filter out the deleted product
     const updated = masterList.filter((p) => p.id !== productId);
 
-    // 2. Update local storage & broadcast event immediately
+    // 3. Update local storage & broadcast event immediately
     try {
       safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       if (typeof window !== 'undefined') {
@@ -552,7 +682,7 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
       }
     } catch {}
 
-    // 3. Persist updated list to Supabase SYSTEM_CONFIG_PRODUCTS
+    // 4. Persist updated list to Supabase SYSTEM_CONFIG_PRODUCTS
     try {
       await supabase.from('chats').upsert(
         {
@@ -569,7 +699,7 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
       console.warn('Delete product from SYSTEM_CONFIG_PRODUCTS notice:', err);
     }
 
-    // 4. Delete from server disk via /api/products/delete
+    // 5. Delete from server disk via /api/products/delete
     try {
       await fetch('/api/products/delete', {
         method: 'POST',
@@ -578,7 +708,7 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
       });
     } catch (e) {}
 
-    // 5. Delete from relational products table
+    // 6. Delete from relational products table
     try {
       await supabase.from('products').delete().eq('id', productId);
     } catch {}

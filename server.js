@@ -268,14 +268,59 @@ app.post('/api/banners', (req, res) => {
 // Products Persistence & Image Upload API
 // ==========================================
 const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
+const DELETED_PRODUCTS_FILE = path.join(__dirname, 'data', 'deleted_products.json');
+
+function getDeletedProductIds() {
+  try {
+    if (fs.existsSync(DELETED_PRODUCTS_FILE)) {
+      const raw = fs.readFileSync(DELETED_PRODUCTS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error('Error reading deleted_products.json:', e);
+  }
+  return [];
+}
+
+function addDeletedProductId(id) {
+  if (!id) return;
+  try {
+    const list = getDeletedProductIds();
+    if (!list.includes(id)) {
+      list.push(id);
+      const dataDir = path.dirname(DELETED_PRODUCTS_FILE);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    }
+  } catch (e) {
+    console.error('Error adding deleted product ID:', e);
+  }
+}
+
+function removeDeletedProductId(id) {
+  if (!id) return;
+  try {
+    let list = getDeletedProductIds();
+    if (list.includes(id)) {
+      list = list.filter((x) => x !== id);
+      fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    }
+  } catch (e) {
+    console.error('Error removing deleted product ID:', e);
+  }
+}
 
 function getDefaultProducts() {
   try {
+    const deletedIds = new Set(getDeletedProductIds());
     if (fs.existsSync(PRODUCTS_FILE)) {
       const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.filter((p) => p && p.id && !deletedIds.has(p.id));
       }
     }
   } catch (e) {
@@ -337,17 +382,35 @@ app.post('/api/upload-product-image', (req, res) => {
   }
 });
 
+// GET /api/products/deleted - returns blacklist of deleted product IDs
+app.get('/api/products/deleted', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  return res.json(getDeletedProductIds());
+});
+
+// POST /api/products/deleted - adds a product ID to blacklist
+app.post('/api/products/deleted', (req, res) => {
+  const productId = req.body?.productId || req.body?.id;
+  if (!productId) {
+    return res.status(400).json({ error: 'productId is required' });
+  }
+  addDeletedProductId(productId);
+  return res.json({ success: true, deleted: getDeletedProductIds() });
+});
+
 // GET /api/products - returns persisted products on disk
 app.get('/api/products', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+  const deletedIds = new Set(getDeletedProductIds());
   try {
     if (fs.existsSync(PRODUCTS_FILE)) {
       const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return res.json(parsed);
+        const filtered = parsed.filter((p) => p && p.id && !deletedIds.has(p.id));
+        return res.json(filtered);
       }
     }
   } catch (err) {
@@ -365,7 +428,7 @@ app.get('/api/products', (_req, res) => {
     console.warn('Could not initialize products.json:', e);
   }
 
-  return res.json(DEFAULT_SERVER_PRODUCTS);
+  return res.json(DEFAULT_SERVER_PRODUCTS.filter((p) => p && p.id && !deletedIds.has(p.id)));
 });
 
 // POST /api/products - replaces entire list on disk
@@ -375,13 +438,15 @@ app.post('/api/products', (req, res) => {
     if (!Array.isArray(products)) {
       return res.status(400).json({ error: 'Expected array of products' });
     }
+    const deletedIds = new Set(getDeletedProductIds());
+    const filtered = products.filter((p) => p && p.id && !deletedIds.has(p.id));
     const dataDir = path.dirname(PRODUCTS_FILE);
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf8');
-    console.log(`[Products] Successfully persisted ${products.length} products to disk.`);
-    return res.json({ success: true, count: products.length });
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+    console.log(`[Products] Successfully persisted ${filtered.length} products to disk.`);
+    return res.json({ success: true, count: filtered.length });
   } catch (err) {
     console.error('Error saving products.json:', err);
     return res.status(500).json({ error: err.message });
@@ -395,6 +460,9 @@ app.post('/api/products/save', (req, res) => {
     if (!product || !product.id) {
       return res.status(400).json({ error: 'Invalid product data' });
     }
+    // Since user is explicitly saving/updating this product, un-blacklist it
+    removeDeletedProductId(product.id);
+
     let list = [];
     if (fs.existsSync(PRODUCTS_FILE)) {
       try {
@@ -432,6 +500,9 @@ app.post('/api/products/delete', (req, res) => {
     if (!productId) {
       return res.status(400).json({ error: 'productId or id required' });
     }
+    // Add to deleted products blacklist
+    addDeletedProductId(productId);
+
     let list = [];
     if (fs.existsSync(PRODUCTS_FILE)) {
       try {
