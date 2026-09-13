@@ -122,8 +122,8 @@ export interface BannerSlide {
   title: string;
   subtitle: string;
   cta: string;
-  actionType: 'incredible' | 'category' | 'link' | 'all';
-  actionTarget?: string;
+  actionType: 'incredible' | 'category' | 'link' | 'all' | 'product';
+  actionTarget?: string; // Target URL, Category name, or Product ID
   gradient?: string;
   overlayOpacity?: number;
   image: string;

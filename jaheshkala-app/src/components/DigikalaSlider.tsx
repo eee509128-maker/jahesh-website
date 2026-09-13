@@ -8,12 +8,14 @@ interface DigikalaSliderProps {
   banners?: BannerSlide[];
   onSelectCategory: (category: string) => void;
   onScrollToIncredible: () => void;
+  onSelectProduct?: (productId: string) => void;
 }
 
 export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
   banners,
   onSelectCategory,
   onScrollToIncredible,
+  onSelectProduct,
 }) => {
   const activeBanners = (banners && banners.length > 0 ? banners : INITIAL_BANNERS).filter(
     (b) => b.isActive !== false
@@ -79,7 +81,11 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
 
   const handleAction = (slide: BannerSlide) => {
     if (!slide) return;
-    if (slide.actionType === 'incredible') {
+    if (slide.actionType === 'product' && slide.actionTarget) {
+      if (onSelectProduct) {
+        onSelectProduct(slide.actionTarget);
+      }
+    } else if (slide.actionType === 'incredible') {
       onScrollToIncredible();
     } else if (slide.actionType === 'package') {
       onSelectCategory('طراحی سایت و خدمات وب');

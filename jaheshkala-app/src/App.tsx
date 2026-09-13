@@ -1220,8 +1220,10 @@ export default function App() {
     return true;
   });
 
-  // Responsive pagination: 10 items for mobile, 25 items for desktop/system view
+  // Responsive pagination: Exactly divisible by columns (2 cols on mobile -> 12, 4 cols on desktop -> 24)
+  // to guarantee rows are always 100% full with NO awkward single overflowing cards!
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : false));
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -1232,12 +1234,13 @@ export default function App() {
   }, []);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = isMobile ? 10 : 25;
+  const baseItemsPerPage = isMobile ? 12 : 24;
+  const itemsPerPage = showAllProducts ? Math.max(filteredProducts.length, 1) : baseItemsPerPage;
 
   // Reset to first page whenever filtering or screen-size mode changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategory, searchQuery, itemsPerPage]);
+  }, [selectedCategory, searchQuery, itemsPerPage, showAllProducts]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / itemsPerPage));
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
@@ -1252,6 +1255,19 @@ export default function App() {
     const el = document.getElementById('all-products-section');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Banner-to-product direct linking: Opens product modal and scrolls to view
+  const handleBannerSelectProduct = (productId: string) => {
+    const prod = products.find((p) => p.id === productId || p.title === productId);
+    if (prod) {
+      setSelectedCategory('');
+      setSearchQuery('');
+      setDetailModalProduct(prod);
+    } else {
+      setSearchQuery(productId);
+      scrollToProducts();
     }
   };
 
@@ -1321,6 +1337,7 @@ export default function App() {
           banners={banners}
           onSelectCategory={handleSelectCategory}
           onScrollToIncredible={scrollToIncredible}
+          onSelectProduct={handleBannerSelectProduct}
         />
 
         {/* 3. DIGIKALA CIRCULAR CATEGORIES (Story-like circles row) */}
@@ -1357,7 +1374,27 @@ export default function App() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+              {filteredProducts.length > baseItemsPerPage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAllProducts((prev) => !prev);
+                    setCurrentPage(1);
+                  }}
+                  className={`text-xs px-3 py-1 rounded-xl border transition-all cursor-pointer font-bold ${
+                    showAllProducts
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-purple-950/40 hover:bg-purple-900/60 text-slate-300 border-purple-800/40'
+                  }`}
+                  title={showAllProducts ? 'نمایش در صفحات مرتب' : 'نمایش یکجای همه محصولات'}
+                >
+                  {showAllProducts
+                    ? `صفحه‌بندی مرتب (${baseItemsPerPage} تایی)`
+                    : `نمایش همه کالاها (${filteredProducts.length.toLocaleString('fa-IR')})`}
+                </button>
+              )}
+
               {(selectedCategory || searchQuery) && (
                 <button
                   onClick={() => {
@@ -1401,12 +1438,12 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Digikala Style Pagination Bar (10 on mobile / 25 on desktop) */}
-              {totalPages > 1 && (
+              {/* Digikala Style Pagination Bar (12 on mobile / 24 on desktop) */}
+              {!showAllProducts && totalPages > 1 && (
                 <div className="mt-8 pt-6 border-t border-purple-900/30 flex flex-col sm:flex-row items-center justify-between gap-4">
                   {/* Page indicator text */}
                   <div className="text-xs sm:text-sm text-slate-400 font-bold text-center sm:text-right">
-                    صفحه {safeCurrentPage.toLocaleString('fa-IR')} از {totalPages.toLocaleString('fa-IR')}
+                    نمایش {((safeCurrentPage - 1) * itemsPerPage + 1).toLocaleString('fa-IR')} تا {Math.min(safeCurrentPage * itemsPerPage, filteredProducts.length).toLocaleString('fa-IR')} از {filteredProducts.length.toLocaleString('fa-IR')} کالا • صفحه {safeCurrentPage.toLocaleString('fa-IR')} از {totalPages.toLocaleString('fa-IR')}
                   </div>
 
                   {/* Pagination Buttons */}

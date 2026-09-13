@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ImageCropperModal } from './ImageCropperModal';
 import {
   Crop,
@@ -81,8 +81,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bannerSubtitle, setBannerSubtitle] = useState('');
   const [bannerBadge, setBannerBadge] = useState('');
   const [bannerCta, setBannerCta] = useState('مشاهده تخفیف‌های شگفت‌انگیز');
-  const [bannerActionType, setBannerActionType] = useState<'incredible' | 'category' | 'link' | 'all'>('incredible');
+  const [bannerActionType, setBannerActionType] = useState<'incredible' | 'category' | 'link' | 'all' | 'product'>('incredible');
   const [bannerActionTarget, setBannerActionTarget] = useState('');
+  const [bannerProductSearch, setBannerProductSearch] = useState('');
   const [bannerGradient, setBannerGradient] = useState('from-[#3b1261] via-[#220d3d] to-[#0d071a]');
   const [bannerOpacity, setBannerOpacity] = useState<number>(90);
   const [bannerImagePosition, setBannerImagePosition] = useState('center');
@@ -105,6 +106,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bannerSubtitleFontSize, setBannerSubtitleFontSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [bannerSingleLineTitle, setBannerSingleLineTitle] = useState<boolean>(true);
   const [bannerSingleLineSubtitle, setBannerSingleLineSubtitle] = useState<boolean>(false);
+
+  // محصول انتخاب شده برای اتصال به بنر
+  const selectedProductForBanner = useMemo(() => {
+    if (bannerActionType !== 'product' || !bannerActionTarget) return null;
+    return products.find((p) => p.id === bannerActionTarget);
+  }, [products, bannerActionType, bannerActionTarget]);
+
+  // لیست کالاهای منطبق با جستجو در ویرایش بنر
+  const matchingProductsForBanner = useMemo(() => {
+    if (bannerActionType !== 'product') return [];
+    const q = bannerProductSearch.trim().toLowerCase();
+    if (!q) {
+      return products.slice(0, 10);
+    }
+    return products.filter((p) =>
+      (p.title && p.title.toLowerCase().includes(q)) ||
+      (p.brand && p.brand.toLowerCase().includes(q)) ||
+      (p.category && p.category.toLowerCase().includes(q)) ||
+      (p.id && p.id.toLowerCase().includes(q))
+    ).slice(0, 25);
+  }, [products, bannerActionType, bannerProductSearch]);
   const [bannerPreviewDevice, setBannerPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [isRefreshingOrders, setIsRefreshingOrders] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
@@ -257,6 +279,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBannerCta(b.cta || 'مشاهده و خرید');
     setBannerActionType(b.actionType || 'incredible');
     setBannerActionTarget(b.actionTarget || '');
+    setBannerProductSearch('');
     setBannerGradient(b.gradient || 'from-[#3b1261] via-[#220d3d] to-[#0d071a]');
     setBannerOpacity(b.overlayOpacity !== undefined ? b.overlayOpacity : 90);
     setBannerImagePosition(b.imagePosition || 'center');
@@ -286,6 +309,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBannerCta('مشاهده تخفیف‌های شگفت‌انگیز');
     setBannerActionType('incredible');
     setBannerActionTarget('');
+    setBannerProductSearch('');
     setBannerGradient('from-[#3b1261] via-[#220d3d] to-[#0d071a]');
     setBannerOpacity(90);
     setBannerImagePosition('center');
@@ -3384,11 +3408,147 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         className="w-full bg-black/50 border border-purple-700/60 rounded-xl px-3.5 py-2.5 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400"
                       >
                         <option value="incredible">هدایت به لیست شگفت‌انگیزها (تخفیف‌دارها)</option>
-                        <option value="all">نمایش تمام کالاها</option>
+                        <option value="product">🎯 هدایت به یک محصول / کالای خاص (جستجو و انتخاب کالا)</option>
                         <option value="category">انتخاب دسته‌بندی خاص</option>
+                        <option value="all">نمایش تمام کالاها</option>
                         <option value="link">باز کردن لینک اینترنتی خارجی</option>
                       </select>
                     </div>
+
+                    {/* Action Target (if product) */}
+                    {bannerActionType === 'product' && (
+                      <div className="space-y-2.5 p-3.5 rounded-xl bg-purple-950/50 border border-purple-600/60 shadow-inner">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-black text-amber-300 flex items-center gap-1.5">
+                            <Package className="w-3.5 h-3.5 text-amber-400" />
+                            <span>انتخاب یا جستجوی کالای هدف برای بنر</span>
+                          </label>
+                          {selectedProductForBanner && (
+                            <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <span>کالا متصل شد</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Selected Product Card */}
+                        {selectedProductForBanner ? (
+                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-900/70 border border-amber-400/50 gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <img
+                                src={selectedProductForBanner.image}
+                                alt={selectedProductForBanner.title}
+                                className="w-12 h-12 rounded-lg object-cover bg-black/50 border border-purple-500/50 shrink-0"
+                              />
+                              <div className="min-w-0 text-right">
+                                <h4 className="text-xs font-bold text-white truncate">
+                                  {selectedProductForBanner.title}
+                                </h4>
+                                <div className="flex items-center gap-2 text-[10px] text-slate-300 mt-1">
+                                  <span className="text-amber-300 font-bold font-mono">
+                                    {selectedProductForBanner.price.toLocaleString('fa-IR')} تومان
+                                  </span>
+                                  {selectedProductForBanner.category && (
+                                    <span className="text-purple-300">({selectedProductForBanner.category})</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!bannerTitle || bannerTitle === 'عنوان بنر شما') {
+                                    setBannerTitle(selectedProductForBanner.title);
+                                  }
+                                  if (!bannerImage) {
+                                    setBannerImage(selectedProductForBanner.image);
+                                  }
+                                }}
+                                title="استفاده از عکس و نام این کالا در بنر"
+                                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold border border-amber-500/40 transition-all cursor-pointer"
+                              >
+                                همگام‌سازی نام و عکس
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBannerActionTarget('');
+                                  setBannerProductSearch('');
+                                }}
+                                className="p-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 transition-all cursor-pointer"
+                                title="حذف اتصال این کالا"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-amber-300/80 bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg">
+                            لطفاً از کادر زیر نام یا کد کالای مورد نظر را جستجو نموده و دکمه «انتخاب کالا» را بزنید.
+                          </div>
+                        )}
+
+                        {/* Search Input */}
+                        <div className="relative">
+                          <Search className="w-4 h-4 text-purple-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={bannerProductSearch}
+                            onChange={(e) => setBannerProductSearch(e.target.value)}
+                            placeholder="جستجوی نام، برند، صنف یا کد محصول..."
+                            className="w-full bg-black/70 border border-purple-700/70 rounded-xl pr-9 pl-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+
+                        {/* Matching Products Scroll Area */}
+                        {matchingProductsForBanner.length > 0 && (
+                          <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl bg-black/80 border border-purple-800/60 p-1.5 custom-scrollbar">
+                            {matchingProductsForBanner.map((p) => {
+                              const isChosen = bannerActionTarget === p.id;
+                              return (
+                                <div
+                                  key={p.id}
+                                  onClick={() => {
+                                    setBannerActionTarget(p.id);
+                                    setBannerProductSearch('');
+                                  }}
+                                  className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${
+                                    isChosen
+                                      ? 'bg-amber-500/20 border border-amber-400 text-amber-300'
+                                      : 'hover:bg-purple-900/50 text-slate-200'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <img
+                                      src={p.image}
+                                      alt={p.title}
+                                      className="w-8 h-8 rounded-md object-cover bg-black/40 shrink-0"
+                                    />
+                                    <div className="min-w-0 text-right">
+                                      <p className="text-xs font-bold truncate">{p.title}</p>
+                                      <p className="text-[10px] text-slate-400 font-mono">
+                                        {p.price.toLocaleString('fa-IR')} تومان {p.category ? `• ${p.category}` : ''}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg shrink-0 transition-all ${
+                                      isChosen
+                                        ? 'bg-amber-400 text-slate-950'
+                                        : 'bg-purple-800/80 hover:bg-amber-400 hover:text-slate-950 text-white'
+                                    }`}
+                                  >
+                                    {isChosen ? 'انتخاب شده' : 'انتخاب'}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Action Target (if category or link) */}
                     {(bannerActionType === 'category' || bannerActionType === 'link') && (
@@ -4217,9 +4377,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           {banner.subtitle && (
                             <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{banner.subtitle}</p>
                           )}
-                          <div className="flex items-center gap-2 mt-1 text-[10px] text-amber-300/80">
+                          <div className="flex items-center gap-2 mt-1 text-[10px] text-amber-300/80 flex-wrap">
                             <span>دکمه: {banner.cta || 'مشاهده'}</span>
                             <span>•</span>
+                            {banner.actionType === 'product' && banner.actionTarget && (
+                              <>
+                                <span className="text-cyan-300 font-bold">
+                                  🎯 متصل به کالا: {products.find((p) => p.id === banner.actionTarget)?.title || banner.actionTarget}
+                                </span>
+                                <span>•</span>
+                              </>
+                            )}
                             <span>وضعیت: {banner.isActive === false ? 'غیرفعال' : 'در حال نمایش'}</span>
                           </div>
                         </div>
