@@ -1,3 +1,4 @@
+import { safeSetLocalStorage } from './dbService';
 export interface ZibalRequestParams {
   amountInTomans: number;
   orderId: string;
@@ -109,10 +110,10 @@ export async function verifyZibalPayment(trackId: string | number, merchant?: st
 export function savePendingOrder(orderData: any) {
   try {
     const str = JSON.stringify(orderData);
-    localStorage.setItem('jahesh_pending_payment_order', str);
+    safeSetLocalStorage('jahesh_pending_payment_order', str);
     sessionStorage.setItem('jahesh_pending_payment_order', str);
     if (orderData?.id) {
-      localStorage.setItem(`jahesh_order_${orderData.id}`, str);
+      safeSetLocalStorage(`jahesh_order_${orderData.id}`, str);
     }
   } catch (e) {
     console.warn('Could not save pending order to storage:', e);

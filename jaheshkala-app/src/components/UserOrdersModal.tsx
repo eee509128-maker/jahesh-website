@@ -1,3 +1,4 @@
+import { safeSetLocalStorage } from '../lib/dbService';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -288,7 +289,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
             onChange={(e) => {
               setManualPhoneSearch(e.target.value);
               try {
-                localStorage.setItem('jahesh_last_customer_phone', e.target.value);
+                safeSetLocalStorage('jahesh_last_customer_phone', e.target.value);
               } catch {}
             }}
             placeholder="جستجوی سفارش با شماره موبایل، نام یا کد رهگیری (مثلاً 09881234345)..."

@@ -24,8 +24,7 @@ import {
   saveBannerToDb,
   saveAllBannersToDb,
   deleteBannerFromDb,
-  parseOrderTimestamp,
-} from './lib/dbService';
+  parseOrderTimestamp, safeSetLocalStorage} from './lib/dbService';
 import {
   verifyZibalPayment,
   getPendingOrder,
@@ -240,7 +239,7 @@ export default function App() {
     setTheme((prev) => {
       const nextTheme = prev === 'dark' ? 'light' : 'dark';
       try {
-        localStorage.setItem('jahesh_theme', nextTheme);
+        safeSetLocalStorage('jahesh_theme', nextTheme);
       } catch (err) {
         console.warn('Failed to save theme in localStorage', err);
       }
@@ -401,7 +400,7 @@ export default function App() {
 
         if (finalOrder.customerPhone) {
           try {
-            localStorage.setItem('jahesh_last_customer_phone', finalOrder.customerPhone);
+            safeSetLocalStorage('jahesh_last_customer_phone', finalOrder.customerPhone);
           } catch {}
         }
 
@@ -465,7 +464,7 @@ export default function App() {
         if (cloudProducts && cloudProducts.length > 0) {
           setProducts(cloudProducts);
           try {
-            localStorage.setItem('jahesh_products', JSON.stringify(cloudProducts));
+            safeSetLocalStorage('jahesh_products', JSON.stringify(cloudProducts));
           } catch {}
         }
 
@@ -486,7 +485,7 @@ export default function App() {
         if (cloudBanners && cloudBanners.length > 0) {
           setBanners(cloudBanners);
           try {
-            localStorage.setItem('jahesh_banners', JSON.stringify(cloudBanners));
+            safeSetLocalStorage('jahesh_banners', JSON.stringify(cloudBanners));
           } catch {}
         }
         
@@ -512,7 +511,7 @@ export default function App() {
               if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
                 const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
                 setCurrentUser(updated);
-                localStorage.setItem('jahesh_current_user', JSON.stringify(updated));
+                safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
               }
             }
           }
@@ -539,7 +538,7 @@ export default function App() {
         const cleaned = sanitizeProductsList(e.detail);
         setProducts(cleaned);
         try {
-          localStorage.setItem('jahesh_products', JSON.stringify(cleaned));
+          safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
         } catch {}
       }
     };
@@ -558,7 +557,7 @@ export default function App() {
       if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
         setBanners(e.detail);
         try {
-          localStorage.setItem('jahesh_banners', JSON.stringify(e.detail));
+          safeSetLocalStorage('jahesh_banners', JSON.stringify(e.detail));
         } catch {}
       }
     };
@@ -584,30 +583,30 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('jahesh_current_user', JSON.stringify(currentUser));
+      safeSetLocalStorage('jahesh_current_user', JSON.stringify(currentUser));
     } else {
       localStorage.removeItem('jahesh_current_user');
     }
   }, [currentUser]);
 
   useEffect(() => {
-    localStorage.setItem('jahesh_products', JSON.stringify(products));
+    safeSetLocalStorage('jahesh_products', JSON.stringify(products));
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem('jahesh_orders', JSON.stringify(orders));
+    safeSetLocalStorage('jahesh_orders', JSON.stringify(orders));
   }, [orders]);
 
   useEffect(() => {
-    localStorage.setItem('jahesh_cart', JSON.stringify(cartItems));
+    safeSetLocalStorage('jahesh_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
   useEffect(() => {
-    localStorage.setItem('jahesh_coupons', JSON.stringify(coupons));
+    safeSetLocalStorage('jahesh_coupons', JSON.stringify(coupons));
   }, [coupons]);
 
   useEffect(() => {
-    localStorage.setItem('jahesh_banners', JSON.stringify(banners));
+    safeSetLocalStorage('jahesh_banners', JSON.stringify(banners));
   }, [banners]);
 
   const showToast = (msg: string) => {
@@ -706,7 +705,7 @@ export default function App() {
     }
     setBanners(nextList);
     try {
-      localStorage.setItem('jahesh_banners', JSON.stringify(nextList));
+      safeSetLocalStorage('jahesh_banners', JSON.stringify(nextList));
     } catch {}
     await saveAllBannersToDb(nextList);
     showToast('بنر با موفقیت در سرور ذخیره و برای تمامی موبایل‌ها همگام‌سازی شد.');
@@ -716,7 +715,7 @@ export default function App() {
     const nextList = (fullList && Array.isArray(fullList)) ? fullList : banners.filter((b) => b.id !== bannerId);
     setBanners(nextList);
     try {
-      localStorage.setItem('jahesh_banners', JSON.stringify(nextList));
+      safeSetLocalStorage('jahesh_banners', JSON.stringify(nextList));
     } catch {}
     await saveAllBannersToDb(nextList);
     await deleteBannerFromDb(bannerId);
@@ -982,7 +981,7 @@ export default function App() {
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
     try {
-      localStorage.setItem('jahesh_current_user', JSON.stringify(user));
+      safeSetLocalStorage('jahesh_current_user', JSON.stringify(user));
     } catch (e) {
       console.error(e);
     }
@@ -1031,7 +1030,7 @@ export default function App() {
       const filtered = prev.filter((p) => p.id !== newProduct.id);
       const updated = [newProduct, ...filtered];
       try {
-        localStorage.setItem('jahesh_products', JSON.stringify(updated));
+        safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -1043,7 +1042,7 @@ export default function App() {
     setProducts((prev) => {
       const updated = prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p));
       try {
-        localStorage.setItem('jahesh_products', JSON.stringify(updated));
+        safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -1056,7 +1055,7 @@ export default function App() {
       setProducts((prev) => {
         const updated = prev.filter((p) => p.id !== productId);
         try {
-          localStorage.setItem('jahesh_products', JSON.stringify(updated));
+          safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
         } catch {}
         return updated;
       });
@@ -1091,7 +1090,7 @@ export default function App() {
 
   const handleUpdateZibalMerchant = (merchant: string) => {
     setZibalMerchant(merchant);
-    localStorage.setItem('jahesh_zibal_merchant', merchant);
+    safeSetLocalStorage('jahesh_zibal_merchant', merchant);
     showToast('مرچنت زیبال ذخیره شد.');
   };
 
@@ -1131,7 +1130,7 @@ export default function App() {
         const synced = { ...currentUser, ...updatedUser, role: updatedUser.role };
         setCurrentUser(synced);
         try {
-          localStorage.setItem('jahesh_current_user', JSON.stringify(synced));
+          safeSetLocalStorage('jahesh_current_user', JSON.stringify(synced));
         } catch (err) {
           console.warn(err);
         }

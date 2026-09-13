@@ -1,3 +1,4 @@
+import { safeSetLocalStorage } from './dbService';
 import { CartItem, Order, User, AmlakSubscriptionLicense } from '../types';
 
 const STORAGE_KEY = 'jahesh_amlak_licenses';
@@ -161,7 +162,7 @@ export function saveAmlakLicenseLocally(license: AmlakSubscriptionLicense): void
     } else {
       list.unshift(license);
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    safeSetLocalStorage(STORAGE_KEY, JSON.stringify(list));
   } catch (err) {
     console.warn('Error saving amlak license locally:', err);
   }

@@ -3,6 +3,34 @@ import { Product, Order, User, Coupon, BannerSlide } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from '../data/initialData';
 import { GUILD_SOLUTIONS_PRODUCTS } from '../data/guildProducts';
 
+
+// Safe wrapper for safeSetLocalStorage to handle QuotaExceededError
+export const safeSetLocalStorage = (key: string, value: string) => {
+  try {
+    safeSetLocalStorage(key, value);
+  } catch (e: any) {
+    console.error('LocalStorage SetItem Error for key:', key, e);
+    if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
+      console.warn('Clearing large unused data to free up localStorage space');
+      try {
+        const keepKeys = ['jahesh_current_user', 'jahesh_zibal_merchant', 'jahesh_cart', 'jahesh_theme'];
+        const savedData: Record<string, string | null> = {};
+        for (const k of keepKeys) {
+          savedData[k] = localStorage.getItem(k);
+        }
+        localStorage.clear();
+        for (const k of keepKeys) {
+          if (savedData[k]) safeSetLocalStorage(k, savedData[k]);
+        }
+        // Try setting the new key again
+        safeSetLocalStorage(key, value);
+      } catch (err) {
+        console.error('Failed to recover from QuotaExceededError:', err);
+      }
+    }
+  }
+};
+
 export const INITIAL_COUPONS: Coupon[] = [
   {
     id: 'c-jahesh1395',
@@ -227,7 +255,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
 
   // Synchronize localStorage with clean authoritative data
   try {
-    localStorage.setItem('jahesh_products', JSON.stringify(finalProducts));
+    safeSetLocalStorage('jahesh_products', JSON.stringify(finalProducts));
   } catch {}
 
   // Only push back if there were explicit unsaved local edits
@@ -248,7 +276,7 @@ export const saveAllProductsToDb = async (products: Product[]): Promise<boolean>
 
   // 1. Immediately cache locally & dispatch update event
   try {
-    localStorage.setItem('jahesh_products', JSON.stringify(stampedProducts));
+    safeSetLocalStorage('jahesh_products', JSON.stringify(stampedProducts));
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: stampedProducts }));
     }
@@ -344,7 +372,7 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
 
     // 3. Update local storage & broadcast event immediately
     try {
-      localStorage.setItem('jahesh_products', JSON.stringify(currentList));
+      safeSetLocalStorage('jahesh_products', JSON.stringify(currentList));
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: currentList }));
       }
@@ -437,7 +465,7 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
 
     const updated = currentList.filter((p) => p.id !== productId);
     try {
-      localStorage.setItem('jahesh_products', JSON.stringify(updated));
+      safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: updated }));
       }
@@ -494,8 +522,8 @@ export const getLocalOrdersStore = (): Order[] => {
 
 export const saveLocalOrdersStore = (orders: Order[]) => {
   try {
-    localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(orders));
-    localStorage.setItem('jahesh_orders', JSON.stringify(orders));
+    safeSetLocalStorage(LOCAL_ORDERS_KEY, JSON.stringify(orders));
+    safeSetLocalStorage('jahesh_orders', JSON.stringify(orders));
   } catch (e) {
     console.warn('Error saving local orders store:', e);
   }
@@ -1029,7 +1057,7 @@ const getLocalUsersStore = (): Array<User & { password?: string }> => {
 
 const saveLocalUsersStore = (users: Array<User & { password?: string }>) => {
   try {
-    localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+    safeSetLocalStorage(LOCAL_USERS_KEY, JSON.stringify(users));
   } catch (err) {
     console.warn('Could not save users to local store:', err);
   }
@@ -1281,7 +1309,7 @@ export const findUserInDb = async (usernameOrPhone: string, passwordAttempt: str
   // 5. Update Current User cache in localStorage if matched
   if (matchedUser) {
     try {
-      localStorage.setItem('jahesh_current_user', JSON.stringify(matchedUser));
+      safeSetLocalStorage('jahesh_current_user', JSON.stringify(matchedUser));
     } catch {
       // ignore
     }
@@ -1358,7 +1386,7 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
             ...user,
             role: user.role,
           };
-          localStorage.setItem('jahesh_current_user', JSON.stringify(updatedCurrent));
+          safeSetLocalStorage('jahesh_current_user', JSON.stringify(updatedCurrent));
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('jahesh-user-updated', { detail: updatedCurrent }));
           }
@@ -1544,7 +1572,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
       );
       if (matched && matched.role && matched.role !== activeUser.role) {
         const updated = { ...activeUser, role: matched.role };
-        localStorage.setItem('jahesh_current_user', JSON.stringify(updated));
+        safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('jahesh-user-updated', { detail: updated }));
         }
@@ -1702,7 +1730,7 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
 
       // Cache merged result locally
       try {
-        localStorage.setItem('jahesh_all_chats', JSON.stringify(mergedList));
+        safeSetLocalStorage('jahesh_all_chats', JSON.stringify(mergedList));
       } catch {}
 
       return mergedList;
@@ -1725,8 +1753,8 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
     } else {
       chatsList.unshift(chat);
     }
-    localStorage.setItem('jahesh_all_chats', JSON.stringify(chatsList));
-    localStorage.setItem(`jahesh_chat_${chat.userId}`, JSON.stringify(chat.messages));
+    safeSetLocalStorage('jahesh_all_chats', JSON.stringify(chatsList));
+    safeSetLocalStorage(`jahesh_chat_${chat.userId}`, JSON.stringify(chat.messages));
     window.dispatchEvent(new CustomEvent('jahesh-chats-updated', { detail: chat }));
   } catch {}
 
@@ -1834,7 +1862,7 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
     if (!error && data && Array.isArray(data.messages) && data.messages.length > 0) {
       const banners: BannerSlide[] = data.messages;
       try {
-        localStorage.setItem('jahesh_banners', JSON.stringify(banners));
+        safeSetLocalStorage('jahesh_banners', JSON.stringify(banners));
       } catch {}
       return banners;
     }
@@ -1849,7 +1877,7 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
       const serverBanners = await res.json();
       if (Array.isArray(serverBanners) && serverBanners.length > 0) {
         try {
-          localStorage.setItem('jahesh_banners', JSON.stringify(serverBanners));
+          safeSetLocalStorage('jahesh_banners', JSON.stringify(serverBanners));
         } catch {}
         return serverBanners;
       }
@@ -1876,7 +1904,7 @@ export const saveAllBannersToDb = async (banners: BannerSlide[]): Promise<boolea
 
   // 1. Cache immediately in localStorage and trigger window event
   try {
-    localStorage.setItem('jahesh_banners', JSON.stringify(banners));
+    safeSetLocalStorage('jahesh_banners', JSON.stringify(banners));
     window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: banners }));
   } catch {}
 

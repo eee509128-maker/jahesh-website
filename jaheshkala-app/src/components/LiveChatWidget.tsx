@@ -1,3 +1,4 @@
+import { safeSetLocalStorage } from '../lib/dbService';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Headphones, X, Send, Bot, User, CornerUpRight, Paperclip, Download,
@@ -29,7 +30,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
     let guestId = localStorage.getItem('jahesh_guest_id');
     if (!guestId) {
       guestId = 'guest_' + Math.random().toString(36).substring(2, 9);
-      localStorage.setItem('jahesh_guest_id', guestId);
+      safeSetLocalStorage('jahesh_guest_id', guestId);
     }
     return guestId;
   };
@@ -40,7 +41,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
     let guestName = localStorage.getItem('jahesh_guest_name');
     if (!guestName) {
       guestName = 'کاربر مهمان #' + Math.floor(1000 + Math.random() * 9000);
-      localStorage.setItem('jahesh_guest_name', guestName);
+      safeSetLocalStorage('jahesh_guest_name', guestName);
     }
     return guestName;
   };
@@ -158,7 +159,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
 
   const persistChat = async (newMessages: ChatMessage[], humanSupportFlag: boolean) => {
     try {
-      localStorage.setItem(`jahesh_chat_${currentUserId}`, JSON.stringify(newMessages));
+      safeSetLocalStorage(`jahesh_chat_${currentUserId}`, JSON.stringify(newMessages));
     } catch {}
 
     const chatPayload: UserChat = {

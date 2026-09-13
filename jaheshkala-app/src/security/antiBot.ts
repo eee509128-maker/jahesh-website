@@ -1,3 +1,4 @@
+import { safeSetLocalStorage } from '../lib/dbService';
 // Anti-Bot & OTP Protection Engine (Free, Client + LocalStorage + Behavioral Guard)
 export interface SecurityCheckResult {
   allowed: boolean;
@@ -52,12 +53,12 @@ export class AntiBotGuard {
     // Save phone cooldown
     const cooldowns = this.getCooldowns();
     cooldowns[cleanId] = now;
-    localStorage.setItem(STORAGE_KEY_COOLDOWNS, JSON.stringify(cooldowns));
+    safeSetLocalStorage(STORAGE_KEY_COOLDOWNS, JSON.stringify(cooldowns));
 
     // Save attempt timestamp
     const attempts = this.getAttempts().filter(t => now - t < WINDOW_DURATION_MS);
     attempts.push(now);
-    localStorage.setItem(STORAGE_KEY_ATTEMPTS, JSON.stringify(attempts));
+    safeSetLocalStorage(STORAGE_KEY_ATTEMPTS, JSON.stringify(attempts));
   }
 
   // Generate dynamic captcha challenge
