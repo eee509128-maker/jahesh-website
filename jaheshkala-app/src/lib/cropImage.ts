@@ -11,8 +11,8 @@ export const getCroppedImg = async (
   imageSrc: string,
   pixelCrop: { x: number; y: number; width: number; height: number },
   rotation = 0,
-  maxWidth = 1280,
-  maxHeight = 600
+  maxWidth = 720,
+  maxHeight = 720
 ): Promise<string> => {
   const image = await createImage(imageSrc);
   const canvas = document.createElement('canvas');
@@ -60,6 +60,10 @@ export const getCroppedImg = async (
   outCtx.imageSmoothingEnabled = true;
   outCtx.imageSmoothingQuality = 'high';
 
+  // Fill dark neutral background if transparent PNG
+  outCtx.fillStyle = '#0e051f';
+  outCtx.fillRect(0, 0, targetWidth, targetHeight);
+
   outCtx.drawImage(
     canvas,
     safeArea / 2 - image.width * 0.5 + pixelCrop.x,
@@ -72,6 +76,14 @@ export const getCroppedImg = async (
     targetHeight
   );
 
-  return outCanvas.toDataURL('image/jpeg', 0.82);
+  // Use WebP with quality 0.78 for optimal crispness and ultra-low bytes (<25KB)
+  try {
+    const webpUrl = outCanvas.toDataURL('image/webp', 0.78);
+    if (webpUrl.startsWith('data:image/webp')) {
+      return webpUrl;
+    }
+  } catch {}
+
+  return outCanvas.toDataURL('image/jpeg', 0.75);
 };
 

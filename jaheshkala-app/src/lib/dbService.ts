@@ -3,44 +3,28 @@ import { Product, Order, User, Coupon, BannerSlide } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from '../data/initialData';
 
 
-// Safe wrapper for safeSetLocalStorage to handle QuotaExceededError without ever losing core data
+// Safe wrapper for safeSetLocalStorage to handle QuotaExceededError without ever losing or corrupting images
 export const safeSetLocalStorage = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
   } catch (e: any) {
     console.warn('LocalStorage SetItem Warning for key:', key, e);
-    // If quota exceeded, clean only non-critical temp caches and optimize large payloads
+    // If quota exceeded, clean only non-critical temp caches
     if (e.name === 'QuotaExceededError' || (e.message && e.message.toLowerCase().includes('quota'))) {
       try {
-        const tempKeysToRemove = ['jahesh_pending_order', 'jahesh_last_search', 'jahesh_temp_crop', 'debug_logs'];
+        const tempKeysToRemove = [
+          'jahesh_pending_order',
+          'jahesh_last_search',
+          'jahesh_temp_crop',
+          'jahesh_chat_cache',
+          'debug_logs'
+        ];
         for (const k of tempKeysToRemove) {
           localStorage.removeItem(k);
         }
-
-        // If storing large product/banner arrays with heavy base64 images, store a lightweight version locally
-        if (key === 'jahesh_products' || key === 'jahesh_banners') {
-          try {
-            const parsed = JSON.parse(value);
-            if (Array.isArray(parsed)) {
-              const lightweight = parsed.map((item: any) => {
-                const cleaned = { ...item };
-                if (cleaned.image && typeof cleaned.image === 'string' && cleaned.image.length > 40000 && cleaned.image.startsWith('data:')) {
-                  cleaned.image = '/assets/ascend-dashboard_7euwiU1R0Bf04e0Jvhhd2.png';
-                }
-                if (Array.isArray(cleaned.gallery)) {
-                  cleaned.gallery = cleaned.gallery.filter((g: any) => typeof g === 'string' && g.length < 40000);
-                }
-                return cleaned;
-              });
-              localStorage.setItem(key, JSON.stringify(lightweight));
-              return;
-            }
-          } catch {}
-        }
-
         localStorage.setItem(key, value);
       } catch (err) {
-        console.warn('LocalStorage save skipped (relying on cloud DB):', err);
+        console.warn('LocalStorage save skipped (relying on Supabase Cloud DB):', err);
       }
     }
   }
