@@ -8,13 +8,13 @@ import {
   Flame, Percent, Truck, Check, Ticket, ToggleLeft, ToggleRight, ArrowDownRight, Calculator, Users, MessageCircle, ArrowLeft, Reply, Paperclip, Image as ImageIcon, CornerUpRight, Download,
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
   ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette, BarChart3, TrendingUp, Filter, ArrowUpDown,
-  Cpu, Link2, Globe, Wrench, CheckSquare
+  Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool } from '../types';
 import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
-import { INITIAL_BANNERS } from '../data/initialData';
+import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { renderFormattedBannerTitle } from '../lib/bannerUtils';
 import { JAHESH_OFFICIAL_25_GUILDS } from '../data/guildProducts';
 
@@ -80,7 +80,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // ==========================================
   // Dashboard Tools Management State
   // ==========================================
-  const [toolsList, setToolsList] = useState<DashboardTool[]>([]);
+  const [toolsList, setToolsList] = useState<DashboardTool[]>(INITIAL_TOOLS || []);
   const [toolsLoading, setToolsLoading] = useState(false);
   const [toolSearchTerm, setToolSearchTerm] = useState('');
   const [toolFilter, setToolFilter] = useState<'all' | 'active' | 'inactive' | 'has_link'>('all');
@@ -362,12 +362,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   }, [isOpen, activeTab]);
 
+  const mainContentRef = React.useRef<HTMLDivElement>(null);
+  const [showScrollTop, setShowScrollTop] = React.useState(false);
+  const [showScrollBottom, setShowScrollBottom] = React.useState(true);
+
   const scrollTabs = (direction: 'left' | 'right') => {
     if (tabNavRef.current) {
-      const scrollAmount = direction === 'left' ? -220 : 220;
+      const scrollAmount = direction === 'left' ? -240 : 240;
       tabNavRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
+
+  const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const isAtTop = target.scrollTop < 100;
+    const isAtBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 100;
+    setShowScrollTop(!isAtTop);
+    setShowScrollBottom(!isAtBottom);
+  };
+
+  const scrollToTop = () => {
+    mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const scrollToBottom = () => {
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTo({ top: mainContentRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  };
+
+  React.useEffect(() => {
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTo({ top: 0, behavior: 'auto' });
+      setShowScrollTop(false);
+      setShowScrollBottom(true);
+    }
+  }, [activeTab]);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -387,6 +417,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           const data = await fetchToolsFromDb();
           if (data && data.length > 0) {
             setToolsList(data);
+          } else if (INITIAL_TOOLS && INITIAL_TOOLS.length > 0) {
+            setToolsList(INITIAL_TOOLS);
+          }
+        } catch {
+          if (INITIAL_TOOLS && INITIAL_TOOLS.length > 0) {
+            setToolsList(INITIAL_TOOLS);
           }
         } finally {
           setToolsLoading(false);
@@ -1252,8 +1288,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
-      <div className="relative w-full max-w-6xl bg-[#0f0924] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-2 sm:my-4 max-h-[94vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
+      <div className="relative w-full max-w-6xl bg-[#0f0924] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden h-[90vh] max-h-[90vh] flex flex-col">
         
         {/* Top Header */}
         <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4 border-b border-purple-900/60 bg-[#150d32]">
@@ -1322,7 +1358,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           <div
             ref={tabNavRef}
-            className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 pt-2.5 sm:pt-3.5 pb-2 overflow-x-auto admin-tabs-scrollbar smooth-scroll flex-1 w-full"
+            onWheel={(e) => {
+              if (tabNavRef.current && e.deltaY !== 0) {
+                tabNavRef.current.scrollLeft += e.deltaY;
+              }
+            }}
+            className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 pt-2.5 sm:pt-3.5 pb-2 overflow-x-auto admin-tabs-scrollbar smooth-scroll flex-1 w-full select-none"
           >
             <button
               onClick={() => setActiveTab('orders')}
@@ -1478,7 +1519,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
 
         {/* Tab Contents */}
-        <div className="p-6 overflow-y-auto flex-1 text-right">
+        <div
+          ref={mainContentRef}
+          onScroll={handleContentScroll}
+          className="p-4 sm:p-6 overflow-y-auto min-h-0 flex-1 text-right modal-scrollbar overscroll-contain"
+        >
           
           {/* TAB 1: ORDERS */}
           {activeTab === 'orders' && (
@@ -5301,8 +5346,6 @@ on public.users for delete using (true);`;
             </div>
           )}
 
-        </div>
-
           {activeTab === 'chats' && (
             <div className="flex h-[500px] gap-4 bg-[#130b2e] rounded-2xl border border-purple-900/40 p-4 overflow-hidden">
               {/* Chat List */}
@@ -5638,6 +5681,35 @@ on public.users for delete using (true);`;
                     <span>افزودن طرح / ابزار جدید</span>
                   </button>
 
+                  <button
+                    type="button"
+                    onClick={scrollToBottom}
+                    className="px-3.5 py-2.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-cyan-300 border border-purple-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                    title="پرش مستقیم به انتهای لیست ابزارها"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                    <span>انتهای لیست</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm('آیا مایل به بازیابی تمام ۴۴ طرح پیش‌فرض داشبورد تکنولوژی جهش هستید؟')) {
+                        setToolsLoading(true);
+                        setToolsList(INITIAL_TOOLS);
+                        await saveAllToolsToDb(INITIAL_TOOLS);
+                        setToolsLoading(false);
+                        setToolActionMessage('تمام ۴۴ طرح اصلی داشبورد تکنولوژی با موفقیت بازیابی شدند.');
+                        setTimeout(() => setToolActionMessage(null), 3500);
+                      }
+                    }}
+                    className="px-3.5 py-2.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 text-cyan-300 border border-purple-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                    title="بازیابی تمام ۴۴ طرح اصلی داشبورد تکنولوژی"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>بازیابی ۴۴ طرح اصلی</span>
+                  </button>
+
                   <a
                     href="/abzar-jahesh"
                     target="_blank"
@@ -5653,7 +5725,11 @@ on public.users for delete using (true);`;
                     onClick={async () => {
                       setToolsLoading(true);
                       const reloaded = await fetchToolsFromDb();
-                      if (reloaded) setToolsList(reloaded);
+                      if (reloaded && reloaded.length > 0) {
+                        setToolsList(reloaded);
+                      } else if (INITIAL_TOOLS && INITIAL_TOOLS.length > 0) {
+                        setToolsList(INITIAL_TOOLS);
+                      }
                       setToolsLoading(false);
                       setToolActionMessage('لیست ابزارها با موفقیت به‌روزرسانی شد.');
                       setTimeout(() => setToolActionMessage(null), 2500);
@@ -5665,6 +5741,14 @@ on public.users for delete using (true);`;
                   </button>
                 </div>
               </div>
+
+              {/* Action Message Alert */}
+              {toolActionMessage && (
+                <div className="p-3 bg-emerald-950/80 border border-emerald-500/60 text-emerald-200 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{toolActionMessage}</span>
+                </div>
+              )}
 
               {/* Quick KPI Stat Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -5703,238 +5787,7 @@ on public.users for delete using (true);`;
                 </div>
               </div>
 
-              {/* Form Modal / Inline Panel for Add or Edit */}
-              {(isCreatingNewTool || editingTool) && (
-                <div className="p-5 md:p-6 bg-gradient-to-b from-[#180e3a] to-[#120a2b] border-2 border-cyan-500/50 rounded-2xl shadow-2xl space-y-4 animate-in fade-in">
-                  <div className="flex items-center justify-between border-b border-purple-800/60 pb-3">
-                    <div className="flex items-center gap-2 text-cyan-300 font-bold text-sm">
-                      <Edit3 className="w-4 h-4 text-cyan-400" />
-                      <span>{editingTool ? `ویرایش طرح: ${editingTool.title}` : 'افزودن طرح و ابزار جدید به داشبورد تکنولوژی'}</span>
-                    </div>
-                    <button
-                      onClick={handleCancelToolForm}
-                      className="text-slate-400 hover:text-white p-1 rounded"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Title */}
-                    <div className="space-y-1.5 md:col-span-2">
-                      <label className="text-xs font-bold text-slate-300">
-                        عنوان طرح / ابزار <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={toolTitle}
-                        onChange={(e) => setToolTitle(e.target.value)}
-                        placeholder="مثلاً: سامانه هوشمند تحلیل املاک و مستغلات"
-                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                      />
-                    </div>
-
-                    {/* Direct Link (Crucial User Requirement) */}
-                    <div className="space-y-1.5 md:col-span-2 p-3.5 bg-cyan-950/30 border border-cyan-500/40 rounded-xl">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
-                          <Link2 className="w-4 h-4 text-cyan-400" />
-                          <span>لینک مستقیم هدایت (وقتی کاربر کلیک کند)</span>
-                        </label>
-                        <span className="text-[10px] text-cyan-400/80">هدایت آنی کاربر با کلیک</span>
-                      </div>
-                      <input
-                        type="text"
-                        value={toolLink}
-                        onChange={(e) => setToolLink(e.target.value)}
-                        placeholder="مثلاً: /amlak.html یا https://yourlink.com"
-                        dir="ltr"
-                        className="w-full bg-[#0a0518] border border-cyan-500/50 rounded-xl px-3.5 py-2.5 text-xs font-mono text-cyan-300 placeholder-slate-500 focus:outline-none focus:border-cyan-300"
-                      />
-                      <p className="text-[11px] text-slate-400">
-                        کاربر در داشبورد تکنولوژی با کلیک بر روی این طرح یا دکمه آن، مستقیماً به نشانی فوق منتقل می‌شود.
-                      </p>
-                      {/* Quick link shortcuts */}
-                      <div className="flex items-center gap-2 pt-1 flex-wrap text-[10px]">
-                        <span className="text-slate-400">پیشنهادات سریع:</span>
-                        <button
-                          type="button"
-                          onClick={() => setToolLink('/amlak.html')}
-                          className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono"
-                        >
-                          /amlak.html
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setToolLink('/hwsh-msnway')}
-                          className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono"
-                        >
-                          /hwsh-msnway
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setToolLink('/jaheshkala')}
-                          className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono"
-                        >
-                          /jaheshkala
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setToolLink('https://t.me/+7eeuF5ZMpFRmYzg8')}
-                          className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono"
-                        >
-                          کانال تلگرام جهش
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Tag / Category */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-300">تگ / دسته‌بندی موضوعی</label>
-                      <input
-                        type="text"
-                        value={toolTag}
-                        onChange={(e) => setToolTag(e.target.value)}
-                        placeholder="مثلاً: پردازش ابری و داده‌کاوی"
-                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                      />
-                    </div>
-
-                    {/* Button Text */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-300">متن دکمه هدایت</label>
-                      <input
-                        type="text"
-                        value={toolBtnText}
-                        onChange={(e) => setToolBtnText(e.target.value)}
-                        placeholder="مثلاً: ورود به محیط سامانه"
-                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                      />
-                    </div>
-
-                    {/* Media Badge */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-300">نشان هدر کارت (Media Badge)</label>
-                      <input
-                        type="text"
-                        value={toolMediaBadge}
-                        onChange={(e) => setToolMediaBadge(e.target.value)}
-                        placeholder="مثلاً: 🚀 LAUNCH_BIG_DATA"
-                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                      />
-                    </div>
-
-                    {/* System Code / Version */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-300">کد سیستمی یا نسخه</label>
-                      <input
-                        type="text"
-                        value={toolCodeVer}
-                        onChange={(e) => setToolCodeVer(e.target.value)}
-                        placeholder="مثلاً: JHS_BIG_DATA_v1.0"
-                        dir="ltr"
-                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                      />
-                    </div>
-
-                    {/* Description */}
-                    <div className="space-y-1.5 md:col-span-2">
-                      <label className="text-xs font-bold text-slate-300">توضیحات و عملکرد طرح</label>
-                      <textarea
-                        rows={3}
-                        value={toolDesc}
-                        onChange={(e) => setToolDesc(e.target.value)}
-                        placeholder="شرح مختصری از امکانات و کاربرد این طرح در داشبورد تکنولوژی..."
-                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 resize-y"
-                      />
-                    </div>
-
-                    {/* Custom Image or Sticker */}
-                    <div className="space-y-1.5 md:col-span-2">
-                      <label className="text-xs font-bold text-slate-300">تصویر یا آیکون طرح</label>
-                      <div className="flex flex-col sm:flex-row items-center gap-3">
-                        <input
-                          type="text"
-                          value={toolImage}
-                          onChange={(e) => setToolImage(e.target.value)}
-                          placeholder="آدرس تصویر (URL) یا انتخاب فایل از کامپیوتر"
-                          dir="ltr"
-                          className="flex-1 w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                        />
-                        <label className="px-4 py-2.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 border border-purple-700 text-purple-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0">
-                          <Upload className="w-4 h-4" />
-                          <span>{toolUploadingImage ? 'در حال آپلود...' : 'انتخاب تصویر'}</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleToolImageFileChange}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-                      {toolImage && (
-                        <div className="mt-2 flex items-center gap-3 p-2 bg-black/40 rounded-xl border border-purple-900/40 w-fit">
-                          <img
-                            src={toolImage}
-                            alt="Preview"
-                            className="w-12 h-12 object-contain rounded-lg border border-purple-700/50 bg-[#0f0824]"
-                          />
-                          <span className="text-[11px] text-slate-300">پیش‌نمایش تصویر تنظیم شده</span>
-                          <button
-                            type="button"
-                            onClick={() => setToolImage('')}
-                            className="text-rose-400 hover:text-rose-300 text-xs px-1.5"
-                          >
-                            حذف تصویر
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Toggle Options */}
-                    <div className="md:col-span-2 flex items-center gap-6 pt-2 border-t border-purple-900/40">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={toolIsActive}
-                          onChange={(e) => setToolIsActive(e.target.checked)}
-                          className="rounded border-purple-700 text-cyan-500 focus:ring-cyan-500"
-                        />
-                        <span className="text-xs text-white font-bold">نمایش فعال در صفحه داشبورد</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={toolCardClickable}
-                          onChange={(e) => setToolCardClickable(e.target.checked)}
-                          className="rounded border-purple-700 text-cyan-500 focus:ring-cyan-500"
-                        />
-                        <span className="text-xs text-white font-bold">هدایت به لینک با کلیک بر روی تمام سطح کارت</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Form Action Buttons */}
-                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-purple-900/50">
-                    <button
-                      type="button"
-                      onClick={handleCancelToolForm}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all"
-                    >
-                      انصراف
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveToolSubmit}
-                      className="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs rounded-xl shadow-lg shadow-cyan-900/50 transition-all flex items-center gap-1.5"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>{editingTool ? 'ذخیره و اعمال تغییرات طرح' : 'ثبت طرح در داشبورد'}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Search & Filter Bar */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#130b2e] p-3 rounded-xl border border-purple-900/40">
@@ -6192,6 +6045,41 @@ on public.users for delete using (true);`;
             </div>
           )}
 
+        </div>
+
+        {/* Floating Quick Scroll Controls for Smooth Navigation */}
+        <div className="absolute bottom-4 left-6 z-40 flex items-center gap-1 bg-[#120a2d]/95 backdrop-blur-md p-1.5 rounded-2xl border border-purple-700/80 shadow-2xl transition-all select-none">
+          <button
+            type="button"
+            onClick={scrollToTop}
+            disabled={!showScrollTop}
+            className={`px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1 text-xs font-bold ${
+              showScrollTop
+                ? 'bg-purple-900/90 hover:bg-purple-800 text-cyan-300 border border-purple-600/70 shadow-md cursor-pointer hover:scale-105 active:scale-95'
+                : 'opacity-30 text-slate-500 cursor-not-allowed'
+            }`}
+            title="پرش به بالای صفحه (ابتدای لیست)"
+          >
+            <ChevronUp className="w-4 h-4 text-cyan-400" />
+            <span className="hidden sm:inline text-[11px]">بالا</span>
+          </button>
+          <div className="w-[1px] h-4 bg-purple-800/60"></div>
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            disabled={!showScrollBottom}
+            className={`px-2.5 py-1.5 rounded-xl transition-all flex items-center gap-1 text-xs font-bold ${
+              showScrollBottom
+                ? 'bg-purple-900/90 hover:bg-purple-800 text-cyan-300 border border-purple-600/70 shadow-md cursor-pointer hover:scale-105 active:scale-95'
+                : 'opacity-30 text-slate-500 cursor-not-allowed'
+            }`}
+            title="پرش به انتهای صفحه (پایین لیست)"
+          >
+            <ChevronDown className="w-4 h-4 text-cyan-400" />
+            <span className="hidden sm:inline text-[11px]">پایین</span>
+          </button>
+        </div>
+
         {/* Selected Order Details Modal */}
         {selectedOrder && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -6408,6 +6296,269 @@ on public.users for delete using (true);`;
               setCropperModal((prev) => ({ ...prev, isOpen: false }));
             }}
           />
+        )}
+
+        {/* MODAL: ADD / EDIT DASHBOARD TOOL DIALOG */}
+        {(isCreatingNewTool || editingTool) && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in">
+            <div className="relative w-full max-w-3xl bg-[#120a2e] border-2 border-cyan-500/70 rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col text-right">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-purple-900/80 bg-[#190d3a] shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400 shrink-0">
+                    <Cpu className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-white">
+                      {editingTool ? `ویرایش طرح: ${editingTool.title}` : 'افزودن طرح و ابزار جدید به داشبورد تکنولوژی'}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      تنظیم مستقیم لینک هدایت هنگام کلیک، تصویر، تگ، متن دکمه و وضعیت نمایش
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelToolForm}
+                  className="w-8 h-8 rounded-full bg-purple-950 hover:bg-purple-900 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Body - Scrollable with custom scrollbar */}
+              <div className="p-5 sm:p-6 overflow-y-auto min-h-0 flex-1 space-y-4 modal-scrollbar text-right">
+                {/* Notice banner */}
+                <div className="p-3 bg-cyan-950/40 border border-cyan-800/60 rounded-xl text-xs text-cyan-200 flex items-start gap-2">
+                  <Link2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    <strong>نکته مهم لینک مستقیم:</strong> هر لینکی که در این قسمت وارد نمایید، به محض کلیک کاربر روی کارت یا دکمه در صفحه داشبورد تکنولوژی جهش، مستقیماً و بدون معطلی باز خواهد شد.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Title */}
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <span>عنوان کامل طرح یا ابزار</span>
+                      <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={toolTitle}
+                      onChange={(e) => setToolTitle(e.target.value)}
+                      placeholder="مثلاً: سامانه هوشمند تحلیل املاک و مستغلات"
+                      className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  {/* Direct Link */}
+                  <div className="space-y-1.5 md:col-span-2 p-3.5 bg-cyan-950/30 border border-cyan-500/40 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
+                        <Link2 className="w-4 h-4 text-cyan-400" />
+                        <span>لینک مستقیم هنگام کلیک (Direct Link):</span>
+                      </label>
+                      <span className="text-[10px] text-cyan-400/80">هدایت آنی کاربر با کلیک روی کارت یا دکمه</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={toolLink}
+                      onChange={(e) => setToolLink(e.target.value)}
+                      placeholder="مثلاً: /amlak.html یا /hwsh-msnway یا https://yourlink.com"
+                      dir="ltr"
+                      className="w-full bg-[#080415] border-2 border-cyan-500/60 rounded-xl px-3.5 py-2.5 text-xs font-mono text-cyan-200 placeholder-slate-500 focus:outline-none focus:border-cyan-300"
+                    />
+
+                    {/* Quick Link Helpers */}
+                    <div className="flex items-center gap-1.5 pt-1 flex-wrap text-[11px]">
+                      <span className="text-slate-400 text-[10px]">لینک‌های سریع:</span>
+                      <button
+                        type="button"
+                        onClick={() => setToolLink('/amlak.html')}
+                        className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono text-[10px]"
+                      >
+                        /amlak.html
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setToolLink('/hwsh-msnway')}
+                        className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono text-[10px]"
+                      >
+                        /hwsh-msnway
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setToolLink('/jaheshkala')}
+                        className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono text-[10px]"
+                      >
+                        /jaheshkala
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setToolLink('/akhbar')}
+                        className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono text-[10px]"
+                      >
+                        /akhbar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setToolLink('https://t.me/+7eeuF5ZMpFRmYzg8')}
+                        className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono text-[10px]"
+                      >
+                        کانال تلگرام جهش
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tag / Category */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300">تگ / دسته‌بندی موضوعی</label>
+                    <input
+                      type="text"
+                      value={toolTag}
+                      onChange={(e) => setToolTag(e.target.value)}
+                      placeholder="مثلاً: پردازش ابری و داده‌کاوی"
+                      className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  {/* Button Text */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300">متن دکمه هدایت</label>
+                    <input
+                      type="text"
+                      value={toolBtnText}
+                      onChange={(e) => setToolBtnText(e.target.value)}
+                      placeholder="مثلاً: ورود به محیط سامانه"
+                      className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  {/* Media Badge */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300">نشان هدر کارت (Media Badge)</label>
+                    <input
+                      type="text"
+                      value={toolMediaBadge}
+                      onChange={(e) => setToolMediaBadge(e.target.value)}
+                      placeholder="مثلاً: 🚀 LAUNCH_BIG_DATA"
+                      className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  {/* System Code / Version */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300">کد سیستمی یا نسخه</label>
+                    <input
+                      type="text"
+                      value={toolCodeVer}
+                      onChange={(e) => setToolCodeVer(e.target.value)}
+                      placeholder="مثلاً: JHS_BIG_DATA_v1.0"
+                      dir="ltr"
+                      className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-xs font-bold text-slate-300">توضیحات و عملکرد طرح</label>
+                    <textarea
+                      rows={3}
+                      value={toolDesc}
+                      onChange={(e) => setToolDesc(e.target.value)}
+                      placeholder="شرح مختصری از امکانات و کاربرد این طرح در داشبورد تکنولوژی..."
+                      className="w-full bg-[#0a0518] border border-purple-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 resize-y"
+                    />
+                  </div>
+
+                  {/* Custom Image or Sticker */}
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-xs font-bold text-slate-300">تصویر یا آیکون طرح</label>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <input
+                        type="text"
+                        value={toolImage}
+                        onChange={(e) => setToolImage(e.target.value)}
+                        placeholder="آدرس تصویر (URL) یا انتخاب فایل از کامپیوتر"
+                        dir="ltr"
+                        className="flex-1 w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                      <label className="px-4 py-2.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 border border-purple-700 text-purple-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0">
+                        <Upload className="w-4 h-4" />
+                        <span>{toolUploadingImage ? 'در حال آپلود...' : 'انتخاب تصویر'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleToolImageFileChange}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                    {toolImage && (
+                      <div className="mt-2 flex items-center gap-3 p-2 bg-black/40 rounded-xl border border-purple-900/40 w-fit">
+                        <img
+                          src={toolImage}
+                          alt="Preview"
+                          className="w-12 h-12 object-contain rounded-lg border border-purple-700/50 bg-[#0f0824]"
+                        />
+                        <span className="text-[11px] text-slate-300">پیش‌نمایش تصویر تنظیم شده</span>
+                        <button
+                          type="button"
+                          onClick={() => setToolImage('')}
+                          className="text-rose-400 hover:text-rose-300 text-xs px-1.5"
+                        >
+                          حذف تصویر
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Toggle Options */}
+                  <div className="md:col-span-2 flex items-center gap-6 pt-2 border-t border-purple-900/40">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={toolIsActive}
+                        onChange={(e) => setToolIsActive(e.target.checked)}
+                        className="rounded border-purple-700 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-xs text-white font-bold">نمایش فعال در صفحه داشبورد</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={toolCardClickable}
+                        onChange={(e) => setToolCardClickable(e.target.checked)}
+                        className="rounded border-purple-700 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <span className="text-xs text-white font-bold">هدایت به لینک با کلیک بر روی تمام سطح کارت</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer - Fixed */}
+              <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 border-t border-purple-900/80 bg-[#160d34] shrink-0">
+                <button
+                  type="button"
+                  onClick={handleCancelToolForm}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveToolSubmit}
+                  className="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs rounded-xl shadow-lg shadow-cyan-900/50 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{editingTool ? 'ذخیره و اعمال تغییرات طرح' : 'ثبت طرح در داشبورد'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
       </div>

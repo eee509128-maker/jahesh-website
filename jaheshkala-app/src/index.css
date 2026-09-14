@@ -45,10 +45,20 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Globally disable scrollbar stepper arrows (removes ugly up/down triangles) */
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 /* Styled visible scrollbar for Admin Panel tabs */
 .admin-tabs-scrollbar::-webkit-scrollbar {
-  height: 6px !important;
+  height: 5px !important;
   display: block !important;
+}
+.admin-tabs-scrollbar::-webkit-scrollbar-button {
+  display: none !important;
 }
 .admin-tabs-scrollbar::-webkit-scrollbar-track {
   background: #110926 !important;
@@ -59,12 +69,68 @@
   border-radius: 9999px;
 }
 .admin-tabs-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #f59e0b !important;
+  background: #06b6d4 !important;
 }
 .admin-tabs-scrollbar {
   scrollbar-width: thin !important;
   scrollbar-color: #7c3aed #110926 !important;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Styled scrollbars for modals and long panels */
+.modal-scrollbar::-webkit-scrollbar {
+  width: 9px !important;
+  display: block !important;
+}
+.modal-scrollbar::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.modal-scrollbar::-webkit-scrollbar-track {
+  background: #0d0720 !important;
+  border-radius: 9999px;
+}
+.modal-scrollbar::-webkit-scrollbar-thumb {
+  background: #06b6d4 !important;
+  border-radius: 9999px;
+  border: 2px solid #0d0720 !important;
+}
+.modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #22d3ee !important;
+}
+.modal-scrollbar {
+  scrollbar-width: thin !important;
+  scrollbar-color: #06b6d4 #0d0720 !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+  display: block !important;
+}
+.custom-scrollbar::-webkit-scrollbar-button {
+  display: none !important;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #0d0720 !important;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #7c3aed !important;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a855f7 !important;
+}
+.custom-scrollbar {
+  scrollbar-width: thin !important;
+  scrollbar-color: #7c3aed #0d0720 !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* Hide scrollbar for carousels */

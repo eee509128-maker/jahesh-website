@@ -1,4 +1,5 @@
 import { Product, BannerSlide } from "../types";
+export { INITIAL_TOOLS } from "./initialTools";
 
 export const INITIAL_PRODUCTS: Product[] = [
   {

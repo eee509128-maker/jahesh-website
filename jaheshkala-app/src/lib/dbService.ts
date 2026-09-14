@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { Product, Order, User, Coupon, BannerSlide, DashboardTool } from '../types';
-import { INITIAL_PRODUCTS, INITIAL_BANNERS } from '../data/initialData';
+import { INITIAL_PRODUCTS, INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { areSameUser, normalizePhone, normalizeUsername, mergeUserRecords } from './userUtils';
 
 
@@ -2229,6 +2229,25 @@ export const fetchToolsFromDb = async (): Promise<DashboardTool[]> => {
     }
   } catch {}
 
+  // 4. Default authoritative fallback: INITIAL_TOOLS (all 44 tools from Jahesh Technology Dashboard)
+  if (Array.isArray(INITIAL_TOOLS) && INITIAL_TOOLS.length > 0) {
+    safeSetLocalStorage('jahesh_tools', JSON.stringify(INITIAL_TOOLS));
+    // Background seed to cloud / api
+    try {
+      supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_TOOLS',
+          user_name: 'تنظیمات ابزارهای داشبورد تکنولوژی جهش',
+          messages: INITIAL_TOOLS,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      ).then(() => {});
+    } catch {}
+    return INITIAL_TOOLS;
+  }
+
   return [];
 };
 
@@ -2277,7 +2296,7 @@ export const saveToolToDb = async (tool: DashboardTool, fullList?: DashboardTool
     if (!fullList) {
       try {
         const saved = localStorage.getItem('jahesh_tools');
-        currentList = saved ? JSON.parse(saved) : [];
+        currentList = saved ? JSON.parse(saved) : (Array.isArray(INITIAL_TOOLS) ? [...INITIAL_TOOLS] : []);
         const idx = currentList.findIndex((t) => String(t.id) === String(tool.id));
         if (idx >= 0) {
           currentList[idx] = tool;
@@ -2285,7 +2304,7 @@ export const saveToolToDb = async (tool: DashboardTool, fullList?: DashboardTool
           currentList.unshift(tool);
         }
       } catch {
-        currentList = [tool];
+        currentList = [tool, ...(Array.isArray(INITIAL_TOOLS) ? INITIAL_TOOLS : [])];
       }
     }
 
@@ -2303,10 +2322,10 @@ export const deleteToolFromDb = async (toolId: string, fullList?: DashboardTool[
       updatedList = fullList.filter((t) => String(t.id) !== String(toolId));
     } else {
       const saved = localStorage.getItem('jahesh_tools');
-      if (saved) {
-        const currentList: DashboardTool[] = JSON.parse(saved);
-        updatedList = currentList.filter((t) => String(t.id) !== String(toolId));
-      }
+      const currentList: DashboardTool[] = saved
+        ? JSON.parse(saved)
+        : (Array.isArray(INITIAL_TOOLS) ? [...INITIAL_TOOLS] : []);
+      updatedList = currentList.filter((t) => String(t.id) !== String(toolId));
     }
 
     // Call server delete endpoint
