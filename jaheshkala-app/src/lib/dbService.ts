@@ -2188,9 +2188,12 @@ export const deleteBannerFromDb = async (bannerId: string | number): Promise<boo
 // Jahesh Technology Dashboard Tools dbService
 // ==========================================
 export const fetchToolsFromDb = async (): Promise<DashboardTool[]> => {
-  // 1. First attempt: Server API endpoint /api/tools
+  // 1. First attempt: Server API endpoint /api/tools with cache-busting
   try {
-    const res = await fetch('/api/tools');
+    const res = await fetch(`/api/tools?t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' }
+    });
     if (res.ok) {
       const serverTools = await res.json();
       if (Array.isArray(serverTools) && serverTools.length > 0) {
@@ -2252,12 +2255,9 @@ export const fetchToolsFromDb = async (): Promise<DashboardTool[]> => {
 };
 
 export const saveAllToolsToDb = async (tools: DashboardTool[]): Promise<boolean> => {
-  // 1. Cache immediately in localStorage and trigger window event
+  // 1. Cache immediately in localStorage
   try {
     safeSetLocalStorage('jahesh_tools', JSON.stringify(tools));
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('jahesh-tools-updated', { detail: tools }));
-    }
   } catch {}
 
   // 2. Save directly to server API
@@ -2286,6 +2286,13 @@ export const saveAllToolsToDb = async (tools: DashboardTool[]): Promise<boolean>
   } catch (err) {
     console.warn('Supabase save tools error:', err);
   }
+
+  // 4. Trigger window event with full updated tools detail
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-tools-updated', { detail: tools }));
+    }
+  } catch {}
 
   return true;
 };

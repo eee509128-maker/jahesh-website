@@ -176,11 +176,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
 
     setToolsList(updatedList);
+    handleCancelToolForm();
     await saveAllToolsToDb(updatedList);
 
-    setToolActionMessage(editingTool ? 'طرح مورد نظر با موفقیت ویرایش و در دیتابیس ذخیره شد.' : 'طرح جدید با موفقیت به داشبورد تکنولوژی جهش اضافه شد.');
+    setToolActionMessage(editingTool ? 'طرح مورد نظر با موفقیت ویرایش و ذخیره شد.' : 'طرح جدید با موفقیت به داشبورد تکنولوژی جهش اضافه شد.');
     setTimeout(() => setToolActionMessage(null), 4000);
-    handleCancelToolForm();
   };
 
   const handleDeleteToolAction = async (toolId: string) => {
@@ -437,15 +437,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const handleChatsUpdated = () => {
         loadChats();
       };
-      const handleToolsUpdated = () => {
-        loadTools();
+      const handleToolsUpdated = (e: Event) => {
+        const customEvent = e as CustomEvent<DashboardTool[]>;
+        if (customEvent.detail && Array.isArray(customEvent.detail) && customEvent.detail.length > 0) {
+          setToolsList(customEvent.detail);
+        } else {
+          loadTools();
+        }
+      };
+      const handleBannersUpdated = (e: Event) => {
+        const customEvent = e as CustomEvent<BannerSlide[]>;
+        if (customEvent.detail && Array.isArray(customEvent.detail) && customEvent.detail.length > 0) {
+          setBannersList(customEvent.detail);
+        } else {
+          loadBanners();
+        }
       };
       window.addEventListener('jahesh-chats-updated', handleChatsUpdated);
-      window.addEventListener('jahesh-tools-updated', handleToolsUpdated);
+      window.addEventListener('jahesh-tools-updated', handleToolsUpdated as EventListener);
+      window.addEventListener('jahesh-banners-updated', handleBannersUpdated as EventListener);
 
       return () => {
         window.removeEventListener('jahesh-chats-updated', handleChatsUpdated);
-        window.removeEventListener('jahesh-tools-updated', handleToolsUpdated);
+        window.removeEventListener('jahesh-tools-updated', handleToolsUpdated as EventListener);
+        window.removeEventListener('jahesh-banners-updated', handleBannersUpdated as EventListener);
       };
     }
   }, [isOpen]);
