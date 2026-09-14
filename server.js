@@ -367,6 +367,127 @@ app.post('/api/banners', (req, res) => {
 });
 
 // ==========================================
+// Jahesh Technology Dashboard Tools API
+// ==========================================
+const TOOLS_FILE = path.join(__dirname, 'data', 'tools.json');
+const TOOLS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'tools');
+if (!fs.existsSync(TOOLS_UPLOADS_DIR)) {
+  fs.mkdirSync(TOOLS_UPLOADS_DIR, { recursive: true });
+}
+
+function getStoredTools() {
+  try {
+    if (fs.existsSync(TOOLS_FILE)) {
+      const raw = fs.readFileSync(TOOLS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.error('Error reading tools.json:', err);
+  }
+  return [];
+}
+
+app.get('/api/tools', (req, res) => {
+  try {
+    const tools = getStoredTools();
+    return res.json(tools);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tools', (req, res) => {
+  try {
+    const tools = req.body;
+    if (!Array.isArray(tools)) {
+      return res.status(400).json({ error: 'Expected array of tools' });
+    }
+    const dataDir = path.dirname(TOOLS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
+    console.log(`[Tools] Successfully persisted ${tools.length} dashboard tools.`);
+    return res.json({ success: true, count: tools.length });
+  } catch (err) {
+    console.error('Error saving tools.json:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tools/save', (req, res) => {
+  try {
+    const tool = req.body;
+    if (!tool || !tool.title) {
+      return res.status(400).json({ error: 'Tool title is required' });
+    }
+    let tools = getStoredTools();
+    const existingIndex = tools.findIndex(t => t.id === tool.id);
+    if (existingIndex >= 0) {
+      tools[existingIndex] = { ...tools[existingIndex], ...tool };
+    } else {
+      const newTool = {
+        ...tool,
+        id: tool.id || `tool_${Date.now()}`,
+        order: tools.length,
+        isActive: tool.isActive !== undefined ? tool.isActive : true
+      };
+      tools.push(newTool);
+    }
+    fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
+    return res.json({ success: true, tool });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tools/delete', (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: 'Tool id is required' });
+    let tools = getStoredTools();
+    tools = tools.filter(t => t.id !== id);
+    fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
+    return res.json({ success: true, remaining: tools.length });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/upload-tool-image', (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+    const matches = image.match(/^data:image\/([a-zA-Z0-9+-]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return res.status(400).json({ error: 'Invalid base64 image data' });
+    }
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const base64Data = matches[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    const safeName = `tool_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+    const filePath = path.join(TOOLS_UPLOADS_DIR, safeName);
+    fs.writeFileSync(filePath, buffer);
+
+    // Also copy to jaheshkala build directory if it exists
+    const distUploads = path.join(__dirname, 'jaheshkala', 'uploads', 'tools');
+    if (fs.existsSync(distUploads)) {
+      try {
+        fs.writeFileSync(path.join(distUploads, safeName), buffer);
+      } catch (e) {}
+    }
+
+    const publicUrl = `/uploads/tools/${safeName}`;
+    return res.json({ success: true, url: publicUrl });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
 // Products Persistence & Image Upload API
 // ==========================================
 const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');

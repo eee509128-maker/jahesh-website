@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Product, Order, User, Coupon, BannerSlide } from '../types';
+import { Product, Order, User, Coupon, BannerSlide, DashboardTool } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from '../data/initialData';
 import { areSameUser, normalizePhone, normalizeUsername, mergeUserRecords } from './userUtils';
 
@@ -2183,4 +2183,163 @@ export const deleteBannerFromDb = async (bannerId: string | number): Promise<boo
     return false;
   }
 };
+
+// ==========================================
+// Jahesh Technology Dashboard Tools dbService
+// ==========================================
+export const fetchToolsFromDb = async (): Promise<DashboardTool[]> => {
+  // 1. First attempt: Server API endpoint /api/tools
+  try {
+    const res = await fetch('/api/tools');
+    if (res.ok) {
+      const serverTools = await res.json();
+      if (Array.isArray(serverTools) && serverTools.length > 0) {
+        safeSetLocalStorage('jahesh_tools', JSON.stringify(serverTools));
+        return serverTools;
+      }
+    }
+  } catch (err) {
+    console.warn('Fetch /api/tools error:', err);
+  }
+
+  // 2. Second attempt: Supabase SYSTEM_CONFIG_TOOLS
+  try {
+    const { data, error } = await supabase
+      .from('chats')
+      .select('messages')
+      .eq('user_id', 'SYSTEM_CONFIG_TOOLS')
+      .maybeSingle();
+
+    if (!error && data?.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+      safeSetLocalStorage('jahesh_tools', JSON.stringify(data.messages));
+      return data.messages as DashboardTool[];
+    }
+  } catch (err) {
+    console.warn('Supabase fetch tools error:', err);
+  }
+
+  // 3. Third attempt: LocalStorage cache
+  try {
+    const cached = localStorage.getItem('jahesh_tools');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+
+  return [];
+};
+
+export const saveAllToolsToDb = async (tools: DashboardTool[]): Promise<boolean> => {
+  // 1. Cache immediately in localStorage and trigger window event
+  try {
+    safeSetLocalStorage('jahesh_tools', JSON.stringify(tools));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-tools-updated', { detail: tools }));
+    }
+  } catch {}
+
+  // 2. Save directly to server API
+  try {
+    await fetch('/api/tools', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tools),
+    });
+  } catch (err) {
+    console.warn('Save /api/tools error:', err);
+  }
+
+  // 3. Save to Supabase cloud database
+  try {
+    await supabase.from('chats').upsert(
+      {
+        user_id: 'SYSTEM_CONFIG_TOOLS',
+        user_name: 'تنظیمات ابزارهای داشبورد تکنولوژی جهش',
+        messages: tools,
+        last_updated: new Date().toISOString(),
+        is_read_by_admin: true,
+      },
+      { onConflict: 'user_id' }
+    );
+  } catch (err) {
+    console.warn('Supabase save tools error:', err);
+  }
+
+  return true;
+};
+
+export const saveToolToDb = async (tool: DashboardTool, fullList?: DashboardTool[]): Promise<boolean> => {
+  try {
+    let currentList: DashboardTool[] = fullList ? [...fullList] : [];
+    if (!fullList) {
+      try {
+        const saved = localStorage.getItem('jahesh_tools');
+        currentList = saved ? JSON.parse(saved) : [];
+        const idx = currentList.findIndex((t) => String(t.id) === String(tool.id));
+        if (idx >= 0) {
+          currentList[idx] = tool;
+        } else {
+          currentList.unshift(tool);
+        }
+      } catch {
+        currentList = [tool];
+      }
+    }
+
+    return await saveAllToolsToDb(currentList);
+  } catch (err) {
+    console.warn('Save tool exception:', err);
+    return false;
+  }
+};
+
+export const deleteToolFromDb = async (toolId: string, fullList?: DashboardTool[]): Promise<boolean> => {
+  try {
+    let updatedList: DashboardTool[] = [];
+    if (fullList) {
+      updatedList = fullList.filter((t) => String(t.id) !== String(toolId));
+    } else {
+      const saved = localStorage.getItem('jahesh_tools');
+      if (saved) {
+        const currentList: DashboardTool[] = JSON.parse(saved);
+        updatedList = currentList.filter((t) => String(t.id) !== String(toolId));
+      }
+    }
+
+    // Call server delete endpoint
+    try {
+      await fetch('/api/tools/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: toolId }),
+      });
+    } catch {}
+
+    return await saveAllToolsToDb(updatedList);
+  } catch (err) {
+    console.warn('Delete tool exception:', err);
+    return false;
+  }
+};
+
+export const uploadToolImage = async (base64Data: string): Promise<string> => {
+  try {
+    const res = await fetch('/api/upload-tool-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64Data }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) return data.url;
+    }
+  } catch (e) {
+    console.warn('Upload tool image server error, using data uri:', e);
+  }
+  return base64Data;
+};
+
 

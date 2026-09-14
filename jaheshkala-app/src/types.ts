@@ -221,3 +221,21 @@ export interface UserChat {
 }
 
 export type SupportMessage = ChatMessage;
+
+export interface DashboardTool {
+  id: string;
+  order: number;
+  title: string;
+  tag: string;
+  mediaBadge?: string;
+  codeVer?: string;
+  desc: string;
+  link: string;
+  btnText?: string;
+  image?: string;
+  stickerSvg?: string;
+  isActive?: boolean;
+  cardClickable?: boolean;
+  targetBlank?: boolean;
+  customBadgeColor?: string;
+}

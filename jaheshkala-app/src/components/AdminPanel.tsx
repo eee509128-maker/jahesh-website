@@ -7,10 +7,11 @@ import {
   Sliders, ExternalLink, Code2, Server, HelpCircle, Layers, Tag, Sparkles,
   Flame, Percent, Truck, Check, Ticket, ToggleLeft, ToggleRight, ArrowDownRight, Calculator, Users, MessageCircle, ArrowLeft, Reply, Paperclip, Image as ImageIcon, CornerUpRight, Download,
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
-  ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette, BarChart3, TrendingUp, Filter, ArrowUpDown
+  ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette, BarChart3, TrendingUp, Filter, ArrowUpDown,
+  Cpu, Link2, Globe, Wrench, CheckSquare
 } from 'lucide-react';
-import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan } from '../types';
-import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst } from '../lib/dbService';
+import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool } from '../types';
+import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS } from '../data/initialData';
@@ -74,7 +75,162 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onAdminInstantPurchase,
   onOpenAmlakApp,
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats' | 'dashboard-tools'>('orders');
+
+  // ==========================================
+  // Dashboard Tools Management State
+  // ==========================================
+  const [toolsList, setToolsList] = useState<DashboardTool[]>([]);
+  const [toolsLoading, setToolsLoading] = useState(false);
+  const [toolSearchTerm, setToolSearchTerm] = useState('');
+  const [toolFilter, setToolFilter] = useState<'all' | 'active' | 'inactive' | 'has_link'>('all');
+  const [editingTool, setEditingTool] = useState<DashboardTool | null>(null);
+  const [isCreatingNewTool, setIsCreatingNewTool] = useState(false);
+  const [toolActionMessage, setToolActionMessage] = useState<string | null>(null);
+  const [toolDeleteConfirmId, setToolDeleteConfirmId] = useState<string | null>(null);
+
+  // Form fields for adding/editing tool
+  const [toolTitle, setToolTitle] = useState('');
+  const [toolTag, setToolTag] = useState('');
+  const [toolMediaBadge, setToolMediaBadge] = useState('');
+  const [toolCodeVer, setToolCodeVer] = useState('');
+  const [toolDesc, setToolDesc] = useState('');
+  const [toolLink, setToolLink] = useState('');
+  const [toolBtnText, setToolBtnText] = useState('ورود به سامانه');
+  const [toolImage, setToolImage] = useState('');
+  const [toolIsActive, setToolIsActive] = useState(true);
+  const [toolCardClickable, setToolCardClickable] = useState(true);
+  const [toolUploadingImage, setToolUploadingImage] = useState(false);
+
+  const resetToolForm = () => {
+    setToolTitle('');
+    setToolTag('');
+    setToolMediaBadge('');
+    setToolCodeVer('');
+    setToolDesc('');
+    setToolLink('');
+    setToolBtnText('ورود به سامانه');
+    setToolImage('');
+    setToolIsActive(true);
+    setToolCardClickable(true);
+  };
+
+  const handleStartEditTool = (tool: DashboardTool) => {
+    setEditingTool(tool);
+    setIsCreatingNewTool(false);
+    setToolTitle(tool.title || '');
+    setToolTag(tool.tag || '');
+    setToolMediaBadge(tool.mediaBadge || '');
+    setToolCodeVer(tool.codeVer || '');
+    setToolDesc(tool.desc || '');
+    setToolLink(tool.link || '');
+    setToolBtnText(tool.btnText || 'ورود به سامانه');
+    setToolImage(tool.image || '');
+    setToolIsActive(tool.isActive !== false);
+    setToolCardClickable(tool.cardClickable !== false);
+  };
+
+  const handleStartNewTool = () => {
+    setEditingTool(null);
+    setIsCreatingNewTool(true);
+    resetToolForm();
+    setToolTag('فناوری و هوش مصنوعی');
+    setToolMediaBadge('🚀 JAHESH_TOOL');
+    setToolCodeVer(`JHS_TECH_${Date.now().toString().slice(-4)}`);
+    setToolBtnText('ورود به محیط سامانه');
+  };
+
+  const handleCancelToolForm = () => {
+    setEditingTool(null);
+    setIsCreatingNewTool(false);
+    resetToolForm();
+  };
+
+  const handleSaveToolSubmit = async () => {
+    if (!toolTitle.trim()) {
+      alert('لطفاً عنوان طرح یا ابزار را وارد نمایید.');
+      return;
+    }
+
+    const itemToSave: DashboardTool = {
+      id: editingTool ? editingTool.id : `tool_${Date.now()}`,
+      order: editingTool ? editingTool.order : toolsList.length,
+      title: toolTitle.trim(),
+      tag: toolTag.trim() || 'فناوری و هوش مصنوعی',
+      mediaBadge: toolMediaBadge.trim() || '🚀 JAHESH_TOOL',
+      codeVer: toolCodeVer.trim() || `JHS_${Date.now().toString().slice(-4)}`,
+      desc: toolDesc.trim(),
+      link: toolLink.trim() || '#',
+      btnText: toolBtnText.trim() || 'ورود به سامانه',
+      image: toolImage.trim(),
+      isActive: toolIsActive,
+      cardClickable: toolCardClickable,
+    };
+
+    let updatedList: DashboardTool[] = [];
+    if (editingTool) {
+      updatedList = toolsList.map(t => (t.id === editingTool.id ? itemToSave : t));
+    } else {
+      updatedList = [itemToSave, ...toolsList];
+    }
+
+    setToolsList(updatedList);
+    await saveToolToDb(itemToSave, updatedList);
+
+    setToolActionMessage(editingTool ? 'طرح مورد نظر با موفقیت ویرایش و لینک آن به‌روزرسانی شد.' : 'طرح جدید با موفقیت به داشبورد تکنولوژی جهش اضافه شد.');
+    setTimeout(() => setToolActionMessage(null), 4000);
+    handleCancelToolForm();
+  };
+
+  const handleDeleteToolAction = async (toolId: string) => {
+    const updatedList = toolsList.filter(t => t.id !== toolId);
+    setToolsList(updatedList);
+    setToolDeleteConfirmId(null);
+    await deleteToolFromDb(toolId, toolsList);
+    setToolActionMessage('طرح با موفقیت از لیست حذف شد.');
+    setTimeout(() => setToolActionMessage(null), 3000);
+  };
+
+  const handleToggleToolActive = async (tool: DashboardTool) => {
+    const updated = { ...tool, isActive: tool.isActive === false ? true : false };
+    const updatedList = toolsList.map(t => (t.id === tool.id ? updated : t));
+    setToolsList(updatedList);
+    await saveToolToDb(updated, updatedList);
+    setToolActionMessage(`وضعیت نمایش «${tool.title}» به ${updated.isActive ? 'فعال' : 'غیرفعال'} تغییر یافت.`);
+    setTimeout(() => setToolActionMessage(null), 3000);
+  };
+
+  const handleMoveTool = async (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= toolsList.length) return;
+    const reordered = [...toolsList];
+    const temp = reordered[index];
+    reordered[index] = reordered[targetIdx];
+    reordered[targetIdx] = temp;
+    const updated = reordered.map((t, idx) => ({ ...t, order: idx }));
+    setToolsList(updated);
+    await saveAllToolsToDb(updated);
+  };
+
+  const handleToolImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setToolUploadingImage(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const base64 = ev.target?.result as string;
+        if (base64) {
+          const uploadedUrl = await uploadToolImage(base64);
+          setToolImage(uploadedUrl || base64);
+        }
+        setToolUploadingImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setToolUploadingImage(false);
+    }
+  };
   const [bannersList, setBannersList] = useState<BannerSlide[]>(initialBannersProp || INITIAL_BANNERS);
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerTitle, setBannerTitle] = useState('');
@@ -225,16 +381,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           setBannersList(data);
         }
       };
+      const loadTools = async () => {
+        setToolsLoading(true);
+        try {
+          const data = await fetchToolsFromDb();
+          if (data && data.length > 0) {
+            setToolsList(data);
+          }
+        } finally {
+          setToolsLoading(false);
+        }
+      };
+
       loadChats();
       loadBanners();
+      loadTools();
 
       const handleChatsUpdated = () => {
         loadChats();
       };
+      const handleToolsUpdated = () => {
+        loadTools();
+      };
       window.addEventListener('jahesh-chats-updated', handleChatsUpdated);
+      window.addEventListener('jahesh-tools-updated', handleToolsUpdated);
 
       return () => {
         window.removeEventListener('jahesh-chats-updated', handleChatsUpdated);
+        window.removeEventListener('jahesh-tools-updated', handleToolsUpdated);
       };
     }
   }, [isOpen]);
@@ -1222,6 +1396,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span>بنرها و اسلایدر صفحه اول</span>
               <span className="bg-purple-900 text-purple-200 text-[10px] px-2 py-0.5 rounded-full">
                 {bannersList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('dashboard-tools')}
+              className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'dashboard-tools'
+                  ? 'border-cyan-400 text-cyan-300 font-black shadow-xs'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Cpu className="w-4 h-4 text-cyan-400" />
+              <span>داشبورد تکنولوژی جهش</span>
+              <span className="bg-cyan-950 text-cyan-300 border border-cyan-700/50 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                {toolsList.length}
               </span>
             </button>
 
@@ -5397,6 +5586,612 @@ on public.users for delete using (true);`;
               </div>
             </div>
           )}
+
+          {/* ======================================================== */}
+          {/* DASHBOARD TECHNOLOGY TOOLS MANAGEMENT (داشبورد تکنولوژی جهش) */}
+          {/* ======================================================== */}
+          {activeTab === 'dashboard-tools' && (
+            <div className="space-y-6 text-right">
+              {/* Notification Banner */}
+              {toolActionMessage && (
+                <div className="p-3 bg-cyan-950/80 border border-cyan-500/60 rounded-xl text-cyan-200 text-xs flex items-center justify-between shadow-lg animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span>{toolActionMessage}</span>
+                  </div>
+                  <button
+                    onClick={() => setToolActionMessage(null)}
+                    className="text-cyan-400 hover:text-white text-xs px-2 py-0.5 rounded"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {/* Main Header & Actions */}
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-[#190f38] via-[#120a2e] to-[#0d071f] p-5 rounded-2xl border border-purple-800/40 shadow-xl">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40">
+                      <Cpu className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-white flex items-center gap-2">
+                        <span>مدیریت داشبورد تکنولوژی جهش</span>
+                        <span className="text-[11px] bg-cyan-900/60 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-700/50 font-mono">
+                          {toolsList.length} طرح ثبت شده
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        مدیریت طرح‌ها، تنظیم مستقیم لینک کلیک هر کارت، افزودن ابزار فناورانه جدید و ویرایش محتوا
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    onClick={handleStartNewTool}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-900/40 transition-all cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>افزودن طرح / ابزار جدید</span>
+                  </button>
+
+                  <a
+                    href="/abzar-jahesh"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2.5 rounded-xl bg-purple-900/50 hover:bg-purple-800/70 border border-purple-700/60 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition-all"
+                    title="مشاهده صفحه زنده داشبورد تکنولوژی جهش در تب جدید"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>مشاهده صفحه داشبورد ↗</span>
+                  </a>
+
+                  <button
+                    onClick={async () => {
+                      setToolsLoading(true);
+                      const reloaded = await fetchToolsFromDb();
+                      if (reloaded) setToolsList(reloaded);
+                      setToolsLoading(false);
+                      setToolActionMessage('لیست ابزارها با موفقیت به‌روزرسانی شد.');
+                      setTimeout(() => setToolActionMessage(null), 2500);
+                    }}
+                    className="p-2.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-800 text-slate-300 hover:text-white transition-all cursor-pointer"
+                    title="بارگذاری مجدد"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${toolsLoading ? 'animate-spin text-cyan-400' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick KPI Stat Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-[#140b2e] border border-purple-900/50 p-4 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-slate-400 text-xs block">کل طرح‌ها و ابزارها</span>
+                    <span className="text-xl font-bold text-white font-mono">{toolsList.length}</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-lg bg-purple-900/30 border border-purple-800/40 flex items-center justify-center text-purple-300">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="bg-[#140b2e] border border-purple-900/50 p-4 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-slate-400 text-xs block">طرح‌های فعال در نمایش</span>
+                    <span className="text-xl font-bold text-emerald-400 font-mono">
+                      {toolsList.filter(t => t.isActive !== false).length}
+                    </span>
+                  </div>
+                  <div className="w-10 h-10 rounded-lg bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center text-emerald-400">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="bg-[#140b2e] border border-purple-900/50 p-4 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-slate-400 text-xs block">طرح‌های با لینک مستقیم</span>
+                    <span className="text-xl font-bold text-cyan-400 font-mono">
+                      {toolsList.filter(t => t.link && t.link !== '#').length}
+                    </span>
+                  </div>
+                  <div className="w-10 h-10 rounded-lg bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-center text-cyan-400">
+                    <Link2 className="w-5 h-5" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Modal / Inline Panel for Add or Edit */}
+              {(isCreatingNewTool || editingTool) && (
+                <div className="p-5 md:p-6 bg-gradient-to-b from-[#180e3a] to-[#120a2b] border-2 border-cyan-500/50 rounded-2xl shadow-2xl space-y-4 animate-in fade-in">
+                  <div className="flex items-center justify-between border-b border-purple-800/60 pb-3">
+                    <div className="flex items-center gap-2 text-cyan-300 font-bold text-sm">
+                      <Edit3 className="w-4 h-4 text-cyan-400" />
+                      <span>{editingTool ? `ویرایش طرح: ${editingTool.title}` : 'افزودن طرح و ابزار جدید به داشبورد تکنولوژی'}</span>
+                    </div>
+                    <button
+                      onClick={handleCancelToolForm}
+                      className="text-slate-400 hover:text-white p-1 rounded"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Title */}
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-xs font-bold text-slate-300">
+                        عنوان طرح / ابزار <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={toolTitle}
+                        onChange={(e) => setToolTitle(e.target.value)}
+                        placeholder="مثلاً: سامانه هوشمند تحلیل املاک و مستغلات"
+                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+
+                    {/* Direct Link (Crucial User Requirement) */}
+                    <div className="space-y-1.5 md:col-span-2 p-3.5 bg-cyan-950/30 border border-cyan-500/40 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
+                          <Link2 className="w-4 h-4 text-cyan-400" />
+                          <span>لینک مستقیم هدایت (وقتی کاربر کلیک کند)</span>
+                        </label>
+                        <span className="text-[10px] text-cyan-400/80">هدایت آنی کاربر با کلیک</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={toolLink}
+                        onChange={(e) => setToolLink(e.target.value)}
+                        placeholder="مثلاً: /amlak.html یا https://yourlink.com"
+                        dir="ltr"
+                        className="w-full bg-[#0a0518] border border-cyan-500/50 rounded-xl px-3.5 py-2.5 text-xs font-mono text-cyan-300 placeholder-slate-500 focus:outline-none focus:border-cyan-300"
+                      />
+                      <p className="text-[11px] text-slate-400">
+                        کاربر در داشبورد تکنولوژی با کلیک بر روی این طرح یا دکمه آن، مستقیماً به نشانی فوق منتقل می‌شود.
+                      </p>
+                      {/* Quick link shortcuts */}
+                      <div className="flex items-center gap-2 pt-1 flex-wrap text-[10px]">
+                        <span className="text-slate-400">پیشنهادات سریع:</span>
+                        <button
+                          type="button"
+                          onClick={() => setToolLink('/amlak.html')}
+                          className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono"
+                        >
+                          /amlak.html
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setToolLink('/hwsh-msnway')}
+                          className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono"
+                        >
+                          /hwsh-msnway
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setToolLink('/jaheshkala')}
+                          className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono"
+                        >
+                          /jaheshkala
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setToolLink('https://t.me/+7eeuF5ZMpFRmYzg8')}
+                          className="px-2 py-0.5 rounded bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-700/50 font-mono"
+                        >
+                          کانال تلگرام جهش
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Tag / Category */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300">تگ / دسته‌بندی موضوعی</label>
+                      <input
+                        type="text"
+                        value={toolTag}
+                        onChange={(e) => setToolTag(e.target.value)}
+                        placeholder="مثلاً: پردازش ابری و داده‌کاوی"
+                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+
+                    {/* Button Text */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300">متن دکمه هدایت</label>
+                      <input
+                        type="text"
+                        value={toolBtnText}
+                        onChange={(e) => setToolBtnText(e.target.value)}
+                        placeholder="مثلاً: ورود به محیط سامانه"
+                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+
+                    {/* Media Badge */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300">نشان هدر کارت (Media Badge)</label>
+                      <input
+                        type="text"
+                        value={toolMediaBadge}
+                        onChange={(e) => setToolMediaBadge(e.target.value)}
+                        placeholder="مثلاً: 🚀 LAUNCH_BIG_DATA"
+                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+
+                    {/* System Code / Version */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300">کد سیستمی یا نسخه</label>
+                      <input
+                        type="text"
+                        value={toolCodeVer}
+                        onChange={(e) => setToolCodeVer(e.target.value)}
+                        placeholder="مثلاً: JHS_BIG_DATA_v1.0"
+                        dir="ltr"
+                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-xs font-bold text-slate-300">توضیحات و عملکرد طرح</label>
+                      <textarea
+                        rows={3}
+                        value={toolDesc}
+                        onChange={(e) => setToolDesc(e.target.value)}
+                        placeholder="شرح مختصری از امکانات و کاربرد این طرح در داشبورد تکنولوژی..."
+                        className="w-full bg-[#0a0518] border border-purple-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 resize-y"
+                      />
+                    </div>
+
+                    {/* Custom Image or Sticker */}
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-xs font-bold text-slate-300">تصویر یا آیکون طرح</label>
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <input
+                          type="text"
+                          value={toolImage}
+                          onChange={(e) => setToolImage(e.target.value)}
+                          placeholder="آدرس تصویر (URL) یا انتخاب فایل از کامپیوتر"
+                          dir="ltr"
+                          className="flex-1 w-full bg-[#0a0518] border border-purple-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                        <label className="px-4 py-2.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 border border-purple-700 text-purple-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0">
+                          <Upload className="w-4 h-4" />
+                          <span>{toolUploadingImage ? 'در حال آپلود...' : 'انتخاب تصویر'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleToolImageFileChange}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                      {toolImage && (
+                        <div className="mt-2 flex items-center gap-3 p-2 bg-black/40 rounded-xl border border-purple-900/40 w-fit">
+                          <img
+                            src={toolImage}
+                            alt="Preview"
+                            className="w-12 h-12 object-contain rounded-lg border border-purple-700/50 bg-[#0f0824]"
+                          />
+                          <span className="text-[11px] text-slate-300">پیش‌نمایش تصویر تنظیم شده</span>
+                          <button
+                            type="button"
+                            onClick={() => setToolImage('')}
+                            className="text-rose-400 hover:text-rose-300 text-xs px-1.5"
+                          >
+                            حذف تصویر
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Toggle Options */}
+                    <div className="md:col-span-2 flex items-center gap-6 pt-2 border-t border-purple-900/40">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={toolIsActive}
+                          onChange={(e) => setToolIsActive(e.target.checked)}
+                          className="rounded border-purple-700 text-cyan-500 focus:ring-cyan-500"
+                        />
+                        <span className="text-xs text-white font-bold">نمایش فعال در صفحه داشبورد</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={toolCardClickable}
+                          onChange={(e) => setToolCardClickable(e.target.checked)}
+                          className="rounded border-purple-700 text-cyan-500 focus:ring-cyan-500"
+                        />
+                        <span className="text-xs text-white font-bold">هدایت به لینک با کلیک بر روی تمام سطح کارت</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Form Action Buttons */}
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-purple-900/50">
+                    <button
+                      type="button"
+                      onClick={handleCancelToolForm}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all"
+                    >
+                      انصراف
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveToolSubmit}
+                      className="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs rounded-xl shadow-lg shadow-cyan-900/50 transition-all flex items-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{editingTool ? 'ذخیره و اعمال تغییرات طرح' : 'ثبت طرح در داشبورد'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Search & Filter Bar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#130b2e] p-3 rounded-xl border border-purple-900/40">
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={toolSearchTerm}
+                    onChange={(e) => setToolSearchTerm(e.target.value)}
+                    placeholder="جستجو در عنوان، تگ یا لینک مستقیم..."
+                    className="w-full bg-[#0a0518] border border-purple-800 rounded-xl pr-9 pl-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                  <button
+                    onClick={() => setToolFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                      toolFilter === 'all'
+                        ? 'bg-cyan-500 text-black shadow-sm'
+                        : 'bg-purple-950/60 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    همه طرح‌ها ({toolsList.length})
+                  </button>
+                  <button
+                    onClick={() => setToolFilter('active')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                      toolFilter === 'active'
+                        ? 'bg-cyan-500 text-black shadow-sm'
+                        : 'bg-purple-950/60 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    فعال‌ها ({toolsList.filter(t => t.isActive !== false).length})
+                  </button>
+                  <button
+                    onClick={() => setToolFilter('has_link')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                      toolFilter === 'has_link'
+                        ? 'bg-cyan-500 text-black shadow-sm'
+                        : 'bg-purple-950/60 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    دارای لینک مستقیم ({toolsList.filter(t => t.link && t.link !== '#').length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Tools List */}
+              {(() => {
+                const filtered = toolsList.filter(t => {
+                  const s = toolSearchTerm.toLowerCase().trim();
+                  const matchesSearch = !s ||
+                    t.title?.toLowerCase().includes(s) ||
+                    t.tag?.toLowerCase().includes(s) ||
+                    t.desc?.toLowerCase().includes(s) ||
+                    t.link?.toLowerCase().includes(s);
+
+                  if (!matchesSearch) return false;
+                  if (toolFilter === 'active') return t.isActive !== false;
+                  if (toolFilter === 'inactive') return t.isActive === false;
+                  if (toolFilter === 'has_link') return Boolean(t.link && t.link !== '#');
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="p-12 text-center rounded-2xl bg-purple-950/20 border border-purple-900/30 space-y-3">
+                      <Cpu className="w-12 h-12 text-purple-500/40 mx-auto" />
+                      <p className="text-sm font-bold text-white">هیچ طرح یا ابزاری با این مشخصات یافت نشد.</p>
+                      <p className="text-xs text-slate-400">می‌توانید عبارت جستجو را تغییر دهید یا طرح جدیدی اضافه نمایید.</p>
+                      <button
+                        onClick={handleStartNewTool}
+                        className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>افزودن نخستین طرح جدید</span>
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {filtered.map((tool, idx) => (
+                      <div
+                        key={tool.id}
+                        className={`p-4 rounded-2xl border transition-all ${
+                          tool.isActive === false
+                            ? 'bg-[#100924]/60 border-slate-800/60 opacity-60'
+                            : 'bg-[#140b2e] border-purple-900/50 hover:border-cyan-500/50'
+                        } flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg`}
+                      >
+                        {/* Order & Icon & Details */}
+                        <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                          {/* Reorder controls & Index */}
+                          <div className="flex flex-col items-center gap-1 shrink-0 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveTool(idx, 'up')}
+                              disabled={idx === 0}
+                              className="p-1 rounded bg-purple-950 hover:bg-purple-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="انتقال به بالا"
+                            >
+                              ▲
+                            </button>
+                            <span className="text-[11px] font-mono font-bold text-cyan-300">
+                              #{idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveTool(idx, 'down')}
+                              disabled={idx === toolsList.length - 1}
+                              className="p-1 rounded bg-purple-950 hover:bg-purple-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="انتقال به پایین"
+                            >
+                              ▼
+                            </button>
+                          </div>
+
+                          {/* Image or Icon */}
+                          <div className="w-14 h-14 rounded-xl bg-[#190f38] border border-purple-700/60 flex items-center justify-center p-1.5 shrink-0 overflow-hidden">
+                            {tool.image ? (
+                              <img
+                                src={tool.image}
+                                alt={tool.title}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <Cpu className="w-7 h-7 text-cyan-400" />
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-black text-white truncate">{tool.title}</h4>
+                              {tool.tag && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700/50">
+                                  {tool.tag}
+                                </span>
+                              )}
+                              {tool.mediaBadge && (
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-purple-900/60 text-purple-200 border border-purple-700/40 font-mono">
+                                  {tool.mediaBadge}
+                                </span>
+                              )}
+                              {tool.codeVer && (
+                                <span className="text-[10px] text-slate-400 font-mono" dir="ltr">
+                                  {tool.codeVer}
+                                </span>
+                              )}
+                            </div>
+
+                            {tool.desc && (
+                              <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                                {tool.desc}
+                              </p>
+                            )}
+
+                            {/* Direct Link Info */}
+                            <div className="flex items-center gap-2 pt-1 flex-wrap">
+                              <div className="flex items-center gap-1 text-[11px] font-mono text-cyan-300 bg-cyan-950/70 border border-cyan-800/60 px-2.5 py-1 rounded-lg">
+                                <Link2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                <span className="text-slate-400 font-sans">لینک مستقیم:</span>
+                                <span className="truncate max-w-[280px]" dir="ltr">
+                                  {tool.link || '#'}
+                                </span>
+                              </div>
+
+                              {tool.link && tool.link !== '#' && (
+                                <a
+                                  href={tool.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] px-2 py-1 rounded bg-purple-900/40 hover:bg-purple-800 text-amber-300 border border-purple-700/50 flex items-center gap-1 font-bold transition-all"
+                                  title="تست مستقیم لینک"
+                                >
+                                  <span>تست لینک ↗</span>
+                                </a>
+                              )}
+
+                              <span className="text-[10px] text-slate-400">
+                                دکمه: «{tool.btnText || 'ورود به سامانه'}»
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                          {/* Toggle Active Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleToolActive(tool)}
+                            className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                              tool.isActive !== false
+                                ? 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/60'
+                                : 'bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}
+                            title={tool.isActive !== false ? 'غیرفعال کردن نمایش' : 'فعال کردن نمایش'}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">
+                              {tool.isActive !== false ? 'فعال' : 'مخفی'}
+                            </span>
+                          </button>
+
+                          {/* Edit Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditTool(tool)}
+                            className="px-3 py-2 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-cyan-300 border border-purple-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                            title="ویرایش اطلاعات و لینک مستقیم"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>ویرایش و لینک</span>
+                          </button>
+
+                          {/* Delete Button */}
+                          {toolDeleteConfirmId === tool.id ? (
+                            <div className="flex items-center gap-1 bg-rose-950/90 border border-rose-600 rounded-xl p-1">
+                              <span className="text-[10px] text-rose-200 px-1 font-bold">حذف؟</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteToolAction(tool.id)}
+                                className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10px] font-bold"
+                              >
+                                بله
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setToolDeleteConfirmId(null)}
+                                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px]"
+                              >
+                                خیر
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setToolDeleteConfirmId(tool.id)}
+                              className="p-2 rounded-xl bg-rose-950/30 hover:bg-rose-900/60 text-rose-400 border border-rose-900/50 transition-all cursor-pointer"
+                              title="حذف این طرح"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
         {/* Selected Order Details Modal */}
         {selectedOrder && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
