@@ -25,6 +25,39 @@ if (!fs.existsSync(PRODUCTS_UPLOADS_DIR)) {
 }
 app.use('/uploads', express.static(UPLOADS_DIR));
 
+// Favicon and Web App Manifest routes for Googlebot, Search Engine Crawlers, browsers and mobile
+const faviconFiles = [
+  'favicon.ico',
+  'favicon-48x48.png',
+  'favicon-96x96.png',
+  'favicon-144x144.png',
+  'favicon-192x192.png',
+  'favicon-512x512.png',
+  'favicon-32x32.png',
+  'favicon-16x16.png',
+  'favicon.svg',
+  'apple-touch-icon.png',
+  'apple-touch-icon-precomposed.png',
+  'site.webmanifest'
+];
+
+faviconFiles.forEach((file) => {
+  const handler = (req, res) => {
+    const target = path.join(__dirname, file);
+    if (fs.existsSync(target)) {
+      if (file.endsWith('.ico')) res.setHeader('Content-Type', 'image/x-icon');
+      else if (file.endsWith('.png')) res.setHeader('Content-Type', 'image/png');
+      else if (file.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
+      else if (file.endsWith('.webmanifest')) res.setHeader('Content-Type', 'application/manifest+json');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(target);
+    }
+    res.status(404).send('Not found');
+  };
+  app.get(`/${file}`, handler);
+  app.get(`/jaheshkala/${file}`, handler);
+});
+
 // Cloudflare AI Support Route for JaheshKala
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID || 'e8950358d5cf09f0f511b46172f65791';
 const CLOUDFLARE_AI_TOKEN = process.env.CLOUDFLARE_AI_TOKEN || 'cfut_Dux4Ej0iGy3P0bowmnh5LevCZ0f1DaTDmr5a1lmR074a186e';
@@ -124,43 +157,112 @@ const BANNERS_FILE = path.join(__dirname, 'data', 'banners.json');
 
 const DEFAULT_SERVER_BANNERS = [
   {
-    id: 'banner-1',
-    badge: 'جشنواره تخفیف‌های ویژه',
-    title: 'خرید آنلاین انواع کالاها و خدمات با بهترین قیمت',
-    subtitle: 'امکان خرید با درگاه امن بانکی، ضمانت اصالت و سلامت کالا و ارسال سریع به سراسر کشور',
-    cta: 'مشاهده تخفیف‌های شگفت‌انگیز',
-    actionType: 'incredible',
-    gradient: 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
-    overlayOpacity: 90,
-    image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80',
-    isActive: false,
-    order: 0,
-  },
-  {
     id: 'banner-2',
-    badge: 'پیشنهاد طلایی جهش',
-    title: 'پکیج طلایی طراحی سایت اختصاصی جهش',
-    subtitle: 'کدنویسی اختصاصی، هاست و دامین رایگان، درگاه پرداخت زیبال و پشتیبانی کامل ۲۴ ساعته',
     cta: 'مشاهده جزئیات و خرید',
-    actionType: 'package',
-    gradient: 'from-[#3b1261] via-[#220d3d] to-[#0d071a]',
-    overlayOpacity: 90,
-    image: '/assets/ascend-dashboard_7euwiU1R0Bf04e0Jvhhd2.png',
+    badge: 'پیشنهاد طلایی جهش',
+    image: '/uploads/banners/official_banner-2.jpg',
+    order: 0,
+    title: 'پکیج طلایی طراحی سایت اختصاصی جهش',
+    fitMode: 'auto',
+    gradient: 'from-[#172554] via-[#111827] to-[#080d1a]',
     isActive: true,
-    order: 1,
+    subtitle: 'کدنویسی و توسعه  اختصاصی وب‌سایت، به همراه هاست قدرتمند، دامین رایگان، امنیت بالا و پشتیبانی فنی',
+    actionType: 'product',
+    titleColor: '#ffffff',
+    actionTarget: 'pkg-golden-jahesh',
+    imagePosition: 'center',
+    subtitleColor: '#e2e8f0',
+    titleFontSize: 'lg',
+    highlightColor: '#fbbf24',
+    overlayOpacity: 70,
+    hideTextOverlay: false,
+    singleLineTitle: true,
+    subtitleFontSize: 'md',
+    textBackdropTheme: 'dark',
+    singleLineSubtitle: false,
+    textBackdropEnabled: true,
+    textBackdropOpacity: 25,
   },
   {
     id: 'banner-3',
-    badge: 'پیشنهادهای روزانه',
-    title: 'خرید سریع و مطمئن با درگاه امن شاپرک و زیبال',
-    subtitle: 'هر آنچه برای خرید اینترنتی نیاز دارید، با خیال راحت در فروشگاه جهش‌کالا تهیه کنید',
-    cta: 'شروع خرید در جهش‌کالا',
-    actionType: 'incredible',
-    gradient: 'from-[#1e1b4b] via-[#171239] to-[#0c081f]',
-    overlayOpacity: 90,
-    image: 'https://images.unsplash.com/photo-1526178613552-2b45c6c302f0?auto=format&fit=crop&w=1200&q=80',
+    cta: 'مشاهده و ثبت‌نام',
+    badge: 'ویژه مشاوران املاک',
+    image: '/uploads/banners/official_banner-3.jpg',
+    order: 1,
+    title: 'سامانه مدیریت املاک جهش',
+    fitMode: 'auto',
+    gradient: 'from-[#172554] via-[#111827] to-[#080d1a]',
     isActive: true,
+    subtitle: 'نرم‌افزار جامع فایلینگ، مدیریت مشتریان و بایگانی هوشمند املاک',
+    actionType: 'product',
+    titleColor: '#ffffff',
+    targetGuild: 'املاک و مستغلات',
+    actionTarget: 'pkg-amlak-jahesh',
+    imagePosition: 'center',
+    subtitleColor: '#e2e8f0',
+    titleFontSize: 'lg',
+    highlightColor: '#fbbf24',
+    overlayOpacity: 65,
+    hideTextOverlay: false,
+    singleLineTitle: true,
+    subtitleFontSize: 'md',
+    textBackdropTheme: 'dark',
+    singleLineSubtitle: false,
+    textBackdropEnabled: true,
+    textBackdropOpacity: 25,
+  },
+  {
+    id: 'banner-1',
+    cta: 'شروع کمپین انتخاباتی',
+    badge: 'جشنواره تخفیف‌های ویژه',
+    image: '/uploads/banners/official_banner-1.jpg',
     order: 2,
+    title: 'تبلیغات هوشمند کاندیداهای شورای شهر',
+    fitMode: 'auto',
+    gradient: 'from-[#172554] via-[#111827] to-[#080d1a]',
+    isActive: true,
+    subtitle: 'تولید تیزر با هوش مصنوعی، طراحی سایت و ربات رزومه',
+    actionType: 'all',
+    titleColor: '#ffffff',
+    imagePosition: 'center',
+    subtitleColor: '#e2e8f0',
+    titleFontSize: 'lg',
+    highlightColor: '#fbbf24',
+    overlayOpacity: 85,
+    hideTextOverlay: false,
+    singleLineTitle: true,
+    subtitleFontSize: 'md',
+    textBackdropTheme: 'dark',
+    singleLineSubtitle: false,
+    textBackdropEnabled: true,
+    textBackdropOpacity: 65,
+  },
+  {
+    id: 'banner_1789042491741',
+    cta: 'شروع کنید',
+    badge: 'ویژه',
+    image: '/uploads/banners/official_banner_1789042491741.jpg',
+    order: 3,
+    title: 'همین حالا، وب‌سایت حرفه‌ای خود را بسازید!',
+    fitMode: 'auto',
+    gradient: 'from-[#172554] via-[#111827] to-[#080d1a]',
+    isActive: true,
+    subtitle: 'کدنویسی و توسعه  اختصاصی وب‌سایت، به همراه هاست قدرتمند، دامین رایگان، امنیت بالا و پشتیبانی فنی جهش',
+    actionType: 'product',
+    titleColor: '#ffffff',
+    actionTarget: 'pkg-golden-jahesh',
+    imagePosition: 'center',
+    subtitleColor: '#e2e8f0',
+    titleFontSize: 'lg',
+    highlightColor: '#fbbf24',
+    overlayOpacity: 85,
+    hideTextOverlay: false,
+    singleLineTitle: true,
+    subtitleFontSize: 'md',
+    textBackdropTheme: 'dark',
+    singleLineSubtitle: false,
+    textBackdropEnabled: true,
+    textBackdropOpacity: 25,
   },
 ];
 
@@ -680,6 +782,40 @@ app.post('/api/orders/clear', (_req, res) => {
 // ==========================================
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 
+function normalizePhone(phone) {
+  if (!phone) return '';
+  let str = String(phone).trim();
+  if (!str || str === 'ثبت نشده' || str === 'test') return '';
+  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  for (let i = 0; i < 10; i++) {
+    str = str.replace(new RegExp(persianDigits[i], 'g'), String(i));
+    str = str.replace(new RegExp(arabicDigits[i], 'g'), String(i));
+  }
+  str = str.replace(/[^0-9]/g, '');
+  if (str.startsWith('0098') && str.length >= 12) str = '0' + str.slice(4);
+  else if (str.startsWith('98') && str.length === 12) str = '0' + str.slice(2);
+  else if (!str.startsWith('0') && str.length === 10 && str.startsWith('9')) str = '0' + str;
+  return str;
+}
+
+function normalizeUsername(username) {
+  if (!username) return '';
+  return String(username).trim().toLowerCase().replace(/^@+/, '').trim();
+}
+
+function matchUser(a, b) {
+  if (!a || !b) return false;
+  if (a.id && b.id && String(a.id).trim() === String(b.id).trim()) return true;
+  const u1 = normalizeUsername(a.username);
+  const u2 = normalizeUsername(b.username);
+  if (u1 && u2 && u1 === u2) return true;
+  const p1 = normalizePhone(a.phone);
+  const p2 = normalizePhone(b.phone);
+  if (p1 && p2 && p1 === p2 && p1.length >= 10) return true;
+  return false;
+}
+
 function readUsersFromDisk() {
   if (fs.existsSync(USERS_FILE)) {
     try {
@@ -723,22 +859,28 @@ app.post('/api/users/update-role', (req, res) => {
       return res.status(400).json({ error: 'Role is required' });
     }
     const current = readUsersFromDisk();
-    const idx = current.findIndex(
-      (u) => (id && u.id === id) || (username && u.username === username) || (phone && u.phone === phone)
-    );
-    if (idx >= 0) {
-      current[idx].role = role;
-    } else if (username || phone || id) {
+    const target = { id, username, phone };
+    let matchedCount = 0;
+
+    for (let i = 0; i < current.length; i++) {
+      if (matchUser(current[i], target)) {
+        current[i].role = role;
+        matchedCount++;
+      }
+    }
+
+    if (matchedCount === 0 && (username || phone || id)) {
       current.push({
         id: id || `usr-${Date.now()}`,
-        username: username || '',
-        phone: phone || '',
+        username: normalizeUsername(username) || username || '',
+        phone: normalizePhone(phone) || phone || '',
         role: role,
         createdAt: new Date().toISOString(),
       });
     }
+
     writeUsersToDisk(current);
-    console.log(`[Users] Updated role to ${role} for user ${username || phone || id}`);
+    console.log(`[Users] Updated role to ${role} for user ${username || phone || id} (matched: ${matchedCount})`);
     return res.json({ success: true, count: current.length, users: current });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -760,9 +902,7 @@ app.post('/api/users', (req, res) => {
     const current = readUsersFromDisk();
     incoming.forEach((user) => {
       if (user && (user.id || user.username || user.phone)) {
-        const idx = current.findIndex(
-          (u) => (user.id && u.id === user.id) || (user.username && u.username === user.username) || (user.phone && u.phone === user.phone)
-        );
+        const idx = current.findIndex((u) => matchUser(u, user));
         if (idx >= 0) {
           current[idx] = { ...current[idx], ...user };
         } else {
@@ -785,9 +925,7 @@ app.post('/api/users/save', (req, res) => {
       return res.status(400).json({ error: 'Invalid user payload' });
     }
     const current = readUsersFromDisk();
-    const idx = current.findIndex(
-      (u) => (user.id && u.id === user.id) || (user.username && u.username === user.username) || (user.phone && u.phone === user.phone)
-    );
+    const idx = current.findIndex((u) => matchUser(u, user));
     if (idx >= 0) {
       current[idx] = { ...current[idx], ...user };
     } else {

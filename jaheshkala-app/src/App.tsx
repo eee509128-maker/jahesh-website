@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
+import { areSameUser } from './lib/userUtils';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from './data/initialData';
 import {
   fetchProductsFromDb,
@@ -500,14 +501,7 @@ export default function App() {
             const rawStored = localStorage.getItem('jahesh_current_user');
             const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
             if (activeUser) {
-              const cleanUName = activeUser.username?.trim().toLowerCase();
-              const cleanPhone = activeUser.phone?.trim();
-              const cloudUser = allUsers.find(
-                (u) =>
-                  u.id === activeUser.id ||
-                  (cleanUName && u.username?.trim().toLowerCase() === cleanUName) ||
-                  (cleanPhone && u.phone?.trim() === cleanPhone)
-              );
+              const cloudUser = allUsers.find((u) => areSameUser(u, activeUser));
               if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
                 const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
                 setCurrentUser(updated);
@@ -1114,14 +1108,10 @@ export default function App() {
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
-    // 1. Immediately update local state matching by id, username, or phone
+    // 1. Immediately update local state matching via areSameUser
     setUsersList((prev) =>
       prev.map((u) => {
-        const matchId = u.id && updatedUser.id && u.id === updatedUser.id;
-        const matchUName =
-          u.username && updatedUser.username && u.username.trim().toLowerCase() === updatedUser.username.trim().toLowerCase();
-        const matchPhone = u.phone && updatedUser.phone && u.phone.trim() === updatedUser.phone.trim();
-        if (matchId || matchUName || matchPhone) {
+        if (areSameUser(u, updatedUser)) {
           return { ...u, ...updatedUser, role: updatedUser.role };
         }
         return u;
@@ -1129,22 +1119,13 @@ export default function App() {
     );
 
     // 2. Sync currentUser if target is current logged in account
-    if (currentUser) {
-      const matchCurId = currentUser.id && updatedUser.id && currentUser.id === updatedUser.id;
-      const matchCurUName =
-        currentUser.username &&
-        updatedUser.username &&
-        currentUser.username.trim().toLowerCase() === updatedUser.username.trim().toLowerCase();
-      const matchCurPhone =
-        currentUser.phone && updatedUser.phone && currentUser.phone.trim() === updatedUser.phone.trim();
-      if (matchCurId || matchCurUName || matchCurPhone) {
-        const synced = { ...currentUser, ...updatedUser, role: updatedUser.role };
-        setCurrentUser(synced);
-        try {
-          safeSetLocalStorage('jahesh_current_user', JSON.stringify(synced));
-        } catch (err) {
-          console.warn(err);
-        }
+    if (currentUser && areSameUser(currentUser, updatedUser)) {
+      const synced = { ...currentUser, ...updatedUser, role: updatedUser.role };
+      setCurrentUser(synced);
+      try {
+        safeSetLocalStorage('jahesh_current_user', JSON.stringify(synced));
+      } catch (err) {
+        console.warn(err);
       }
     }
 
@@ -1152,11 +1133,11 @@ export default function App() {
     const { updateUserInDb, fetchAllUsersFromDb } = await import('./lib/dbService');
     await updateUserInDb(updatedUser);
 
-    // 4. Refetch all users to make sure state is 100% in sync
+    // 4. Refetch all users to make sure state is 100% in sync without reverting the role
     try {
       const freshUsers = await fetchAllUsersFromDb();
       if (freshUsers && freshUsers.length > 0) {
-        setUsersList(freshUsers);
+        setUsersList(freshUsers.map((u) => (areSameUser(u, updatedUser) ? { ...u, role: updatedUser.role } : u)));
       }
     } catch {}
 

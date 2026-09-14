@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { Product, Order, User, Coupon, BannerSlide } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from '../data/initialData';
+import { areSameUser, normalizePhone, normalizeUsername, mergeUserRecords } from './userUtils';
 
 
 // Safe wrapper for safeSetLocalStorage to handle QuotaExceededError without ever losing or corrupting images
@@ -515,45 +516,47 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       console.warn('Persist to /api/products/save notice:', e);
     }
 
-    // 2. Fetch authoritative cloud list
+    // 2. Build authoritative list starting with the active local products
     const deletedIds = new Set(await getDeletedProductIds());
     let masterList: Product[] = [];
+    try {
+      const saved = localStorage.getItem('jahesh_products');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          masterList = parsed
+            .map(cleanProductItem)
+            .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+        }
+      }
+    } catch {}
+
+    // Merge in any other products from cloud without overriding existing items
     try {
       const { data: cloudRow } = await supabase
         .from('chats')
         .select('messages')
         .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
         .maybeSingle();
-      if (cloudRow && Array.isArray(cloudRow.messages) && cloudRow.messages.length > 0) {
-        masterList = cloudRow.messages
-          .map(cleanProductItem)
-          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+      if (cloudRow && Array.isArray(cloudRow.messages)) {
+        for (const cloudP of cloudRow.messages) {
+          const cleaned = cleanProductItem(cloudP);
+          if (cleaned && !deletedIds.has(cleaned.id) && !masterList.some((p) => p.id === cleaned.id)) {
+            masterList.push(cleaned);
+          }
+        }
       }
     } catch (e) {
       console.warn('Fetch cloud in saveProductToDb notice:', e);
     }
 
     if (masterList.length === 0) {
-      try {
-        const saved = localStorage.getItem('jahesh_products');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            masterList = parsed
-              .map(cleanProductItem)
-              .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-          }
-        }
-      } catch {}
-
-      if (masterList.length === 0) {
-        masterList = INITIAL_PRODUCTS
-          .map(cleanProductItem)
-          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-      }
+      masterList = INITIAL_PRODUCTS
+        .map(cleanProductItem)
+        .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
     }
 
-    // Update ONLY the specified product in the master list - DO NOT resurrect deleted items
+    // Update or insert ONLY the specified product in the master list
     const idx = masterList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
       masterList[idx] = { ...masterList[idx], ...product };
@@ -1580,15 +1583,19 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
   try {
     // 1. Update in local users store
     const localUsers = getLocalUsersStore();
-    const userIndex = localUsers.findIndex((u) => (user.id && u.id === user.id) || (user.username && u.username === user.username) || (user.phone && u.phone === user.phone));
+    const userIndex = localUsers.findIndex((u) => areSameUser(u, user));
     if (userIndex >= 0) {
       localUsers[userIndex] = {
         ...localUsers[userIndex],
         ...user,
         role: user.role, // Explicitly ensure role is updated
+        updatedAt: new Date().toISOString(),
       };
     } else {
-      localUsers.unshift(user);
+      localUsers.unshift({
+        ...user,
+        updatedAt: new Date().toISOString(),
+      });
     }
     saveLocalUsersStore(localUsers);
 
@@ -1596,12 +1603,12 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: localUsers }));
     }
 
-    // 2. If this user is currently logged in on the browser, update current session immediately
+    // 2. If this user is currently logged in on this browser, update current session immediately
     try {
       const rawCurrent = localStorage.getItem('jahesh_current_user');
       if (rawCurrent) {
         const currentParsed: User = JSON.parse(rawCurrent);
-        if (currentParsed.id === user.id || currentParsed.username === user.username || (currentParsed.phone && currentParsed.phone === user.phone)) {
+        if (areSameUser(currentParsed, user)) {
           const updatedCurrent = {
             ...currentParsed,
             ...user,
@@ -1617,27 +1624,23 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       console.warn('Error updating current user session:', err);
     }
 
-    // 3. Multi-layer background persistence (Server disk + Supabase)
-    const payload = {
-      full_name: user.fullName,
-      phone: user.phone || '',
-      email: user.email || '',
-      username: user.username,
-      role: user.role,
-    };
+    // 3. Multi-layer background persistence (Server disk + Supabase) - AWAITED to prevent race condition reversion
+    const cleanUName = normalizeUsername(user.username);
+    const cleanP = normalizePhone(user.phone);
 
-    Promise.allSettled([
-      // Server disk
+    await Promise.allSettled([
+      // Server disk role endpoint
       fetch('/api/users/update-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: user.id,
-          username: user.username,
-          phone: user.phone,
+          username: cleanUName || user.username,
+          phone: cleanP || user.phone,
           role: user.role,
         }),
       }),
+      // Server disk full user endpoint
       fetch('/api/users/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1647,16 +1650,16 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       supabase.from('users').upsert(
         {
           id: user.id || `usr-${Date.now()}`,
-          full_name: user.fullName,
-          phone: user.phone || '',
+          full_name: user.fullName || 'کاربر جهش',
+          phone: cleanP || user.phone || '',
           email: user.email || '',
-          username: user.username,
+          username: cleanUName || user.username,
           role: user.role,
           created_at: user.createdAt || new Date().toISOString(),
         },
         { onConflict: 'id' }
       ),
-      // Supabase chats table backup
+      // Supabase chats table backup (SYSTEM_CONFIG_USERS)
       supabase.from('chats').upsert(
         {
           user_id: 'SYSTEM_CONFIG_USERS',
@@ -1667,7 +1670,7 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
         },
         { onConflict: 'user_id' }
       ),
-    ]).catch(() => {});
+    ]);
 
     return true;
   } catch (err) {
@@ -1677,26 +1680,48 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
 };
 
 export const fetchAllUsersFromDb = async (): Promise<User[]> => {
-  const usersMap = new Map<string, User>();
+  const usersList: User[] = [];
 
-  const getUKey = (u: any): string => {
-    if (!u) return '';
-    if (u.id) return `id:${u.id}`;
-    if (u.phone && u.phone !== 'ثبت نشده' && u.phone !== 'test') return `phone:${u.phone}`;
-    if (u.username) return `u:${u.username.toLowerCase()}`;
-    return `rand:${Math.random()}`;
+  const upsertToMergedList = (incoming: User) => {
+    if (!incoming) return;
+    const existingIndex = usersList.findIndex((u) => areSameUser(u, incoming));
+    if (existingIndex >= 0) {
+      usersList[existingIndex] = mergeUserRecords(usersList[existingIndex], incoming);
+    } else {
+      usersList.push(incoming);
+    }
   };
 
   // 1. Load from local cache first to ensure recent local changes are never lost
   const localUsers = getLocalUsersStore();
   for (const lu of localUsers) {
-    if (!lu) continue;
-    const key = getUKey(lu);
-    if (!key) continue;
-    usersMap.set(key, { ...lu });
+    if (lu) upsertToMergedList(lu);
   }
 
-  // 2. Load from SYSTEM_CONFIG_USERS in chats table (Multi-device cloud store)
+  // 2. Load from Supabase users table (Authoritative cloud accounts & roles)
+  try {
+    const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+    if (!error && data && Array.isArray(data)) {
+      for (const matched of data) {
+        const uObj: User = {
+          id: matched.id,
+          fullName: matched.full_name || 'کاربر',
+          phone: matched.phone || '',
+          email: matched.email || '',
+          username: matched.username || '',
+          role: (matched.role as 'admin' | 'operator' | 'user') || 'user',
+          guild: matched.guild,
+          customGuild: matched.custom_guild,
+          createdAt: matched.created_at,
+        };
+        upsertToMergedList(uObj);
+      }
+    }
+  } catch (err) {
+    console.warn('Fetch Supabase users table exception:', err);
+  }
+
+  // 3. Load from SYSTEM_CONFIG_USERS in chats table (Multi-device cloud store)
   try {
     const { data: configData } = await supabase
       .from('chats')
@@ -1706,50 +1731,11 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
 
     if (configData && Array.isArray(configData.messages)) {
       for (const u of configData.messages) {
-        if (!u) continue;
-        const key = getUKey(u);
-        if (!key) continue;
-        const localUser = usersMap.get(key);
-        usersMap.set(key, {
-          id: u.id || localUser?.id,
-          fullName: u.fullName || u.full_name || localUser?.fullName || 'کاربر جهش',
-          phone: u.phone || localUser?.phone || '',
-          email: u.email || localUser?.email || '',
-          username: u.username || localUser?.username || '',
-          role: localUser?.role || u.role || 'user',
-          guild: u.guild || localUser?.guild,
-          customGuild: u.customGuild || u.custom_guild || localUser?.customGuild,
-          createdAt: u.createdAt || u.created_at || localUser?.createdAt,
-        });
+        if (u) upsertToMergedList(u);
       }
     }
   } catch (e) {
     // ignore
-  }
-
-  // 3. Load from Supabase users table (Cloud role & users)
-  try {
-    const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
-    if (!error && data && Array.isArray(data)) {
-      for (const matched of data) {
-        const key = getUKey(matched);
-        if (!key) continue;
-        const existing = usersMap.get(key);
-        usersMap.set(key, {
-          id: matched.id,
-          fullName: matched.full_name || existing?.fullName || 'کاربر',
-          phone: matched.phone || existing?.phone || '',
-          email: matched.email || existing?.email || '',
-          username: matched.username || existing?.username || '',
-          role: existing?.role || (matched.role as 'admin' | 'operator' | 'user') || 'user',
-          guild: matched.guild || existing?.guild,
-          customGuild: matched.custom_guild || existing?.customGuild,
-          createdAt: matched.created_at || existing?.createdAt,
-        });
-      }
-    }
-  } catch (err) {
-    console.warn('Fetch all users exception:', err);
   }
 
   // 4. Load from server disk /api/users
@@ -1759,15 +1745,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
       const data = await res.json();
       if (data && Array.isArray(data.users)) {
         for (const u of data.users) {
-          if (!u) continue;
-          const key = getUKey(u);
-          if (!key) continue;
-          const existing = usersMap.get(key);
-          usersMap.set(key, {
-            ...existing,
-            ...u,
-            role: existing?.role || u.role || 'user',
-          });
+          if (u) upsertToMergedList(u);
         }
       }
     }
@@ -1775,7 +1753,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     // ignore
   }
 
-  const result = sortUsersNewestFirst(Array.from(usersMap.values()));
+  const result = sortUsersNewestFirst(usersList);
   saveLocalUsersStore(result);
 
   // If current logged-in user's role changed in cloud, auto-sync session immediately!
@@ -1783,16 +1761,9 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     const rawStored = localStorage.getItem('jahesh_current_user');
     if (rawStored) {
       const activeUser = JSON.parse(rawStored);
-      const cleanPhone = activeUser.phone?.trim();
-      const cleanUName = activeUser.username?.trim().toLowerCase();
-      const matched = result.find(
-        (u) =>
-          u.id === activeUser.id ||
-          (cleanPhone && cleanPhone !== 'ثبت نشده' && u.phone === cleanPhone) ||
-          (cleanUName && u.username?.toLowerCase() === cleanUName)
-      );
+      const matched = result.find((u) => areSameUser(u, activeUser));
       if (matched && matched.role && matched.role !== activeUser.role) {
-        const updated = { ...activeUser, role: matched.role };
+        const updated = { ...activeUser, ...matched, role: matched.role };
         safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('jahesh-user-updated', { detail: updated }));
@@ -2154,11 +2125,11 @@ export const saveAllBannersToDb = async (banners: BannerSlide[]): Promise<boolea
 
   // 3. Secondary: Send to server API if available (Node.js dev server or Vercel serverless)
   try {
-    fetch('/api/banners', {
+    await fetch('/api/banners', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(banners),
-    }).catch(() => {});
+    });
   } catch {}
 
   return savedToSupabase || true;
