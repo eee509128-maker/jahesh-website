@@ -998,69 +998,175 @@
     }).observe(document.querySelector('head') || document.documentElement, { subtree: true, childList: true });
   }
 
-  // Dynamic Dashboard Tools Synchronization from Server API
+  // Dynamic Dashboard Tools Synchronization from Server API & Cloud
   (function initDynamicToolsSync() {
-    async function syncToolsWithDom() {
-      try {
-        const res = await fetch('/api/tools');
-        if (!res.ok) return;
-        const tools = await res.json();
-        if (!Array.isArray(tools) || tools.length === 0) return;
+    const SUPABASE_URL = 'https://qxoyvlcpkysucmezxwdn.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_DVRGP68TwGwXrZP5OzzuRQ_wLOHOLSB';
 
-        const cards = document.querySelectorAll('.jahesh-showcase-card');
-        if (cards && cards.length > 0) {
-          cards.forEach((card, idx) => {
-            const tool = tools[idx];
-            if (!tool) return;
-            card.setAttribute('data-tool-id', tool.id);
-            if (tool.isActive === false) {
-              card.style.display = 'none';
-              return;
-            } else {
-              card.style.display = '';
-            }
-            const titleEl = card.querySelector('.info-title');
-            if (titleEl && tool.title) titleEl.textContent = tool.title;
-            const descEl = card.querySelector('.info-desc');
-            if (descEl && tool.desc) descEl.textContent = tool.desc;
-            const tagEl = card.querySelector('.info-tag');
-            if (tagEl && tool.tag) tagEl.textContent = tool.tag;
-            const badgeEl = card.querySelector('.media-badge');
-            if (badgeEl && tool.mediaBadge) badgeEl.textContent = tool.mediaBadge;
-            const btnEl = card.querySelector('.jahesh-launch-btn');
-            if (btnEl && tool.link) {
-              btnEl.setAttribute('href', tool.link);
-              btnEl.setAttribute('target', '_blank');
-              const btnSpan = btnEl.querySelector('span');
-              if (btnSpan && tool.btnText) btnSpan.textContent = tool.btnText;
-            }
-            if (tool.image) {
-              const sticker = card.querySelector('.sticker-wrapper');
-              if (sticker && !sticker.querySelector('img')) {
-                sticker.innerHTML = `<img src="${tool.image}" alt="${tool.title}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:12px;" />`;
-              }
-            }
-            // Direct card click support so user can click anywhere on the card to open direct link
-            card.style.cursor = 'pointer';
-            card.onclick = (e) => {
-              if (e.target.closest('a')) return;
-              if (tool.link && tool.link !== '#') {
-                window.open(tool.link, '_blank');
-              }
-            };
-          });
+    function applyToolsToCards(tools) {
+      if (!Array.isArray(tools) || tools.length === 0) return;
+      const cards = document.querySelectorAll('.jahesh-showcase-card');
+      if (!cards || cards.length === 0) return;
+
+      cards.forEach((card, idx) => {
+        const tool = tools[idx];
+        if (!tool) return;
+        card.setAttribute('data-tool-id', tool.id);
+
+        if (tool.isActive === false) {
+          card.style.display = 'none';
+          return;
+        } else {
+          card.style.display = '';
         }
-      } catch (e) {
-        console.warn('Tools sync notice:', e);
-      }
+
+        const titleEl = card.querySelector('.info-title');
+        if (titleEl && tool.title && titleEl.textContent !== tool.title) {
+          titleEl.textContent = tool.title;
+        }
+
+        const descEl = card.querySelector('.info-desc');
+        if (descEl && tool.desc && descEl.textContent !== tool.desc) {
+          descEl.textContent = tool.desc;
+        }
+
+        const tagEl = card.querySelector('.info-tag');
+        if (tagEl && tool.tag && tagEl.textContent !== tool.tag) {
+          tagEl.textContent = tool.tag;
+        }
+
+        const badgeEl = card.querySelector('.media-badge');
+        if (badgeEl && tool.mediaBadge && badgeEl.textContent !== tool.mediaBadge) {
+          badgeEl.textContent = tool.mediaBadge;
+        }
+
+        const btnEl = card.querySelector('.jahesh-launch-btn');
+        if (btnEl) {
+          if (tool.link) {
+            btnEl.setAttribute('href', tool.link);
+            btnEl.setAttribute('target', '_blank');
+          }
+          const btnSpan = btnEl.querySelector('span');
+          if (btnSpan && tool.btnText && btnSpan.textContent !== tool.btnText) {
+            btnSpan.textContent = tool.btnText;
+          }
+        }
+
+        const sticker = card.querySelector('.sticker-wrapper');
+        if (sticker) {
+          if (tool.image) {
+            const existingImg = sticker.querySelector('img');
+            if (!existingImg || existingImg.src !== tool.image) {
+              sticker.innerHTML = `<img src="${tool.image}" alt="${tool.title || ''}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:12px;" />`;
+            }
+          } else if (tool.stickerSvg && !sticker.querySelector('img')) {
+            // Keep SVG updated if provided
+            if (sticker.innerHTML.trim() !== tool.stickerSvg.trim()) {
+              sticker.innerHTML = tool.stickerSvg;
+            }
+          }
+        }
+
+        // Direct card click support
+        if (tool.cardClickable !== false) {
+          card.style.cursor = 'pointer';
+          card.onclick = (e) => {
+            if (e.target.closest('a') || e.target.closest('button')) return;
+            if (tool.link && tool.link !== '#') {
+              window.open(tool.link, '_blank');
+            }
+          };
+        } else {
+          card.style.cursor = 'default';
+          card.onclick = null;
+        }
+      });
     }
+
+    async function syncToolsWithDom() {
+      // 1. Instant local storage cache check
+      try {
+        const cached = localStorage.getItem('jahesh_tools');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            applyToolsToCards(parsed);
+          }
+        }
+      } catch {}
+
+      // 2. Fetch from /api/tools
+      try {
+        const res = await fetch('/api/tools', { cache: 'no-store' });
+        if (res.ok) {
+          const tools = await res.json();
+          if (Array.isArray(tools) && tools.length > 0) {
+            try { localStorage.setItem('jahesh_tools', JSON.stringify(tools)); } catch {}
+            applyToolsToCards(tools);
+            return;
+          }
+        }
+      } catch {}
+
+      // 3. Fallback: Supabase direct query
+      try {
+        const supaRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/chats?user_id=eq.SYSTEM_CONFIG_TOOLS&select=messages`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+          }
+        );
+        if (supaRes.ok) {
+          const data = await supaRes.json();
+          if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0].messages)) {
+            try { localStorage.setItem('jahesh_tools', JSON.stringify(data[0].messages)); } catch {}
+            applyToolsToCards(data[0].messages);
+          }
+        }
+      } catch {}
+    }
+
+    // Live update listeners
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'jahesh_tools' && e.newValue) {
+        try {
+          applyToolsToCards(JSON.parse(e.newValue));
+        } catch {}
+      }
+    });
+
+    window.addEventListener('jahesh-tools-updated', (e) => {
+      if (e.detail) {
+        applyToolsToCards(e.detail);
+      }
+    });
 
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', syncToolsWithDom);
     } else {
-      setTimeout(syncToolsWithDom, 400);
+      syncToolsWithDom();
     }
-    setTimeout(syncToolsWithDom, 1200);
-    setTimeout(syncToolsWithDom, 2500);
+    setTimeout(syncToolsWithDom, 300);
+    setTimeout(syncToolsWithDom, 800);
+    setTimeout(syncToolsWithDom, 1800);
+    setTimeout(syncToolsWithDom, 3500);
+
+    // Watch for Vike container mount
+    const container = document.querySelector('.c1sfgest') || document.body;
+    if (container && typeof MutationObserver !== 'undefined') {
+      let syncTimeout = null;
+      new MutationObserver(() => {
+        if (syncTimeout) clearTimeout(syncTimeout);
+        syncTimeout = setTimeout(() => {
+          try {
+            const cached = localStorage.getItem('jahesh_tools');
+            if (cached) applyToolsToCards(JSON.parse(cached));
+          } catch {}
+        }, 100);
+      }).observe(container, { childList: true, subtree: false });
+    }
   })();
 </script></body></html>

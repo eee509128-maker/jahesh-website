@@ -165,19 +165,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       image: toolImage.trim(),
       isActive: toolIsActive,
       cardClickable: toolCardClickable,
+      stickerSvg: editingTool?.stickerSvg || '',
     };
 
     let updatedList: DashboardTool[] = [];
     if (editingTool) {
-      updatedList = toolsList.map(t => (t.id === editingTool.id ? itemToSave : t));
+      updatedList = toolsList.map(t => (t.id === editingTool.id ? { ...t, ...itemToSave } : t));
     } else {
       updatedList = [itemToSave, ...toolsList];
     }
 
     setToolsList(updatedList);
-    await saveToolToDb(itemToSave, updatedList);
+    await saveAllToolsToDb(updatedList);
 
-    setToolActionMessage(editingTool ? 'طرح مورد نظر با موفقیت ویرایش و لینک آن به‌روزرسانی شد.' : 'طرح جدید با موفقیت به داشبورد تکنولوژی جهش اضافه شد.');
+    setToolActionMessage(editingTool ? 'طرح مورد نظر با موفقیت ویرایش و در دیتابیس ذخیره شد.' : 'طرح جدید با موفقیت به داشبورد تکنولوژی جهش اضافه شد.');
     setTimeout(() => setToolActionMessage(null), 4000);
     handleCancelToolForm();
   };
