@@ -222,6 +222,7 @@ export default function App() {
   const [customPlansModalProduct, setCustomPlansModalProduct] = useState<{ product: Product; initialIsInstantBuy?: boolean; requestedDomain?: string } | null>(null);
   const [footerInfoModalOpen, setFooterInfoModalOpen] = useState(false);
   const [amlakModalOpen, setAmlakModalOpen] = useState(false);
+  const [guildsModalOpen, setGuildsModalOpen] = useState(false);
   const [activeFooterTopic, setActiveFooterTopic] = useState('terms');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -1308,6 +1309,7 @@ export default function App() {
         onOpenContact={() => handleOpenFooterTopic('contact-branch')}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onOpenGuildsModal={() => setGuildsModalOpen(true)}
       />
 
       {/* MAIN CONTAINER (Digikala Layout) */}
@@ -1327,6 +1329,8 @@ export default function App() {
           selectedCategory={selectedCategory}
           onSelectCategory={handleSelectCategory}
           onScrollToIncredible={scrollToIncredible}
+          isGuildsModalOpen={guildsModalOpen}
+          onToggleGuildsModal={setGuildsModalOpen}
         />
 
         {/* 4. DIGIKALA INCREDIBLE OFFER (پیشنهاد شگفت‌انگیز with live countdown clock) */}

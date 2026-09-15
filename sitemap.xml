@@ -14,12 +14,25 @@
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
-  <!-- 3. انجمن علمی جهش -->
+  <!-- 3. انجمن علمی جهش (تاسیس ۱۳۹۵) -->
   <url>
     <loc>https://jaheshit.ir/drbarh-anjmn/</loc>
-    <lastmod>2026-09-13</lastmod>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- 4. مستندات هوش مصنوعی (GEO / LLMs context) -->
+  <url>
+    <loc>https://jaheshit.ir/llms.txt</loc>
+    <lastmod>2026-09-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
+  </url>
+  <url>
+    <loc>https://jaheshit.ir/llms-full.txt</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
   </url>
   <!-- سایر بخش‌ها -->
   <url>

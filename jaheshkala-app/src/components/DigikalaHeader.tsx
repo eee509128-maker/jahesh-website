@@ -3,9 +3,10 @@ import {
   Search, ShoppingCart, User as UserIcon, Bell, Menu,
   ChevronDown, Flame, Percent, Sparkles, ShieldCheck, LogOut,
   Package, HelpCircle, PhoneCall, Gift, Layers, Box, Check, Tag,
-  Sun, Moon
+  Sun, Moon, Briefcase
 } from 'lucide-react';
 import { CartItem, Product, User } from '../types';
+import { IRANIAN_GUILDS } from '../data/guildsData';
 
 interface DigikalaHeaderProps {
   currentUser: User | null;
@@ -26,6 +27,7 @@ interface DigikalaHeaderProps {
   onOpenContact?: () => void;
   theme?: 'dark' | 'light';
   onToggleTheme?: () => void;
+  onOpenGuildsModal?: () => void;
 }
 
 export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
@@ -47,6 +49,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
   onOpenContact,
   theme = 'dark',
   onToggleTheme,
+  onOpenGuildsModal,
 }) => {
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -80,50 +83,70 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
     { title: 'پیشنهادهای شگفت‌انگیز', icon: '⚡', desc: 'تخفیف‌های ویژه و روزانه جهش‌کالا', value: 'شگفت‌انگیز' },
   ];
 
-  const guildCategories = [
-    { title: 'املاک و مستغلات', icon: '🏢', desc: 'سامانه‌ها و خدمات ویژه صنف مشاورین املاک و سازندگان', value: 'املاک و مستغلات' },
-    { title: 'طراحی سایت و آی‌تی', icon: '🌐', desc: 'پکیج‌های طلایی سایت، سئو، برنامه‌نویسی و وب‌سرویس', value: 'طراحی سایت و آی‌تی' },
-    { title: 'تبلیغات و مارکتینگ', icon: '📢', desc: 'کمپین‌های جذب مشتری، اینستاگرام، تیزر و تبلیغات', value: 'تبلیغات و مارکتینگ' },
-    { title: 'پزشکی و سلامت', icon: '🩺', desc: 'راهکارهای نوبت‌دهی و پرتال‌های پزشکی و کلینیک‌ها', value: 'پزشکی و سلامت' },
-    { title: 'سوپرمارکت و هایپر', icon: '🛒', desc: 'فروشگاه‌های زنجیره‌ای، هایپرمارکت و مواد غذایی', value: 'سوپرمارکت و هایپر' },
-    { title: 'رستوران و کافی‌شاپ', icon: '🍽️', desc: 'منوی دیجیتال، سفارش آنلاین و سیستم رستورانی', value: 'رستوران و کافی‌شاپ' },
-    { title: 'پوشاک و مد', icon: '👔', desc: 'فروشگاه آنلاین بوتیک، مزون و تولیدی‌های لباس', value: 'پوشاک و مد' },
-    { title: 'طلا و جواهرات', icon: '⌚', desc: 'پرتال‌های طلا، جواهر، ساعت و صرافی با نرخ لحظه‌ای', value: 'طلا و جواهرات' },
-    { title: 'خودرو و یدکی', icon: '🚗', desc: 'نمایشگاه‌های اتومبیل، قطعات یدکی و خدمات خودرویی', value: 'خودرو و یدکی' },
-    { title: 'وکالت و حقوقی', icon: '⚖️', desc: 'دفاتر وکالت، کارشناسان رسمی و مشاورین حقوقی', value: 'وکالت و حقوقی' },
-    { title: 'سایر مشاغل و اصناف', icon: '💼', desc: 'کسب‌وکارهای آزاد و خدمات اختصاصی اصناف', value: 'سایر مشاغل و اصناف' },
-  ];
-
-  const getCategoryEmoji = (name: string) => {
+  const getGuildEmoji = (name: string) => {
     const lower = name.toLowerCase();
-    if (lower.includes('سایت') || lower.includes('وب') || lower.includes('طراحی')) return '🌐';
-    if (lower.includes('کد') || lower.includes('برنامه') || lower.includes('نرم‌افزار')) return '💻';
-    if (lower.includes('موبایل') || lower.includes('گوشی')) return '📱';
-    if (lower.includes('لپ‌تاپ') || lower.includes('کامپیوتر')) return '🖥️';
-    if (lower.includes('هدفون') || lower.includes('صوت')) return '🎧';
-    if (lower.includes('ساعت')) return '⌚';
-    if (lower.includes('پوشاک') || lower.includes('لباس') || lower.includes('کفش')) return '👟';
-    if (lower.includes('خانه') || lower.includes('آشپزخانه')) return '☕';
-    if (lower.includes('کتاب')) return '📚';
-    if (lower.includes('زیبایی') || lower.includes('سلامت')) return '✨';
-    return '🏷️';
+    if (lower.includes('املاک') || lower.includes('مسکن') || lower.includes('ساختمان')) return '🏢';
+    if (lower.includes('سایت') || lower.includes('وب') || lower.includes('نرم‌افزار') || lower.includes('آی‌تی') || lower.includes('برنامه')) return '🌐';
+    if (lower.includes('تبلیغات') || lower.includes('مارکتینگ') || lower.includes('سئو')) return '📢';
+    if (lower.includes('پزشک') || lower.includes('سلامت') || lower.includes('کلینیک') || lower.includes('دارو')) return '🩺';
+    if (lower.includes('سوپرمارکت') || lower.includes('هایپر') || lower.includes('مواد غذایی')) return '🛒';
+    if (lower.includes('رستوران') || lower.includes('کافه') || lower.includes('غذا') || lower.includes('فست فود')) return '🍽️';
+    if (lower.includes('پوشاک') || lower.includes('لباس') || lower.includes('مد') || lower.includes('مزون')) return '👔';
+    if (lower.includes('طلا') || lower.includes('جواهر') || lower.includes('ساعت') || lower.includes('صرافی')) return '⌚';
+    if (lower.includes('خودرو') || lower.includes('یدکی') || lower.includes('ماشین') || lower.includes('مکانیک')) return '🚗';
+    if (lower.includes('وکالت') || lower.includes('حقوقی') || lower.includes('دادگستری')) return '⚖️';
+    if (lower.includes('کشاورز') || lower.includes('دامدار') || lower.includes('گلخانه')) return '🌾';
+    if (lower.includes('لوازم خانگی') || lower.includes('آشپزخانه') || lower.includes('فرش')) return '🍳';
+    if (lower.includes('آرایش') || lower.includes('زیبایی') || lower.includes('پیرایش')) return '💄';
+    if (lower.includes('آموزش') || lower.includes('مدرسه') || lower.includes('دانشگاه')) return '🎓';
+    if (lower.includes('چوب') || lower.includes('دکوراسیون') || lower.includes('مبلمان')) return '🪑';
+    if (lower.includes('چاپ') || lower.includes('بسته‌بندی') || lower.includes('کارتن')) return '📦';
+    if (lower.includes('تاسیسات') || lower.includes('ابزار') || lower.includes('لوله')) return '🔧';
+    if (lower.includes('ورزش') || lower.includes('بدنسازی') || lower.includes('باشگاه')) return '🏋️';
+    if (lower.includes('گردشگری') || lower.includes('هتل') || lower.includes('سفر') || lower.includes('تور')) return '✈️';
+    if (lower.includes('مجالس') || lower.includes('تشریفات') || lower.includes('تالار')) return '🎉';
+    if (lower.includes('آهن') || lower.includes('فلز') || lower.includes('صنعت') || lower.includes('فولاد')) return '🏗️';
+    if (lower.includes('کتاب') || lower.includes('تحریر') || lower.includes('نوشت‌افزار')) return '📚';
+    if (lower.includes('مالی') || lower.includes('بیمه') || lower.includes('حسابداری')) return '💰';
+    if (lower.includes('امنیت') || lower.includes('دوربین') || lower.includes('دزدگیر')) return '🎥';
+    return '💼';
   };
+
+  const guildCategories = IRANIAN_GUILDS.map((g) => ({
+    title: g.shortName,
+    fullName: g.name,
+    icon: getGuildEmoji(g.shortName),
+    desc: g.description,
+    value: g.shortName,
+    keywords: g.suggestedKeywords || [],
+  }));
 
   const dynamicCategories = productCategories
     .filter((catName) => !guildCategories.some((g) => g.value === catName || g.title === catName))
     .map((catName) => ({
       title: catName,
-      icon: getCategoryEmoji(catName),
-      desc: `مشاهده محصولات دسته ${catName}`,
+      fullName: catName,
+      icon: getGuildEmoji(catName),
+      desc: `مشاهده محصولات و خدمات دسته ${catName}`,
       value: catName,
+      keywords: [],
     }));
 
-  const allCategories = [...baseCategories, ...guildCategories, ...dynamicCategories];
+  const allCategories = [
+    ...baseCategories.map((b) => ({ ...b, fullName: b.title, keywords: [] })),
+    ...guildCategories,
+    ...dynamicCategories,
+  ];
 
   const filteredCategories = allCategories.filter((cat) => {
     if (!headerGuildSearch.trim()) return true;
     const q = headerGuildSearch.trim().toLowerCase();
-    return cat.title.toLowerCase().includes(q) || cat.desc.toLowerCase().includes(q);
+    return (
+      cat.title.toLowerCase().includes(q) ||
+      cat.fullName.toLowerCase().includes(q) ||
+      cat.desc.toLowerCase().includes(q) ||
+      (cat.keywords && cat.keywords.some((k: string) => k.toLowerCase().includes(q)))
+    );
   });
 
   return (
@@ -294,37 +317,45 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
       </div>
 
       {/* Secondary Digikala Menu Bar */}
-      <div className="border-t border-purple-200 dark:border-purple-900/30 bg-purple-50/90 dark:bg-[#0c081e]/90 text-xs relative transition-colors">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-10 sm:h-11 flex items-center overflow-x-auto scrollbar-none">
+      <div className="border-t border-purple-200 dark:border-purple-900/30 bg-purple-50/90 dark:bg-[#0c081e]/90 text-xs relative transition-colors z-30">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-10 sm:h-11 flex items-center justify-between gap-2 sm:gap-4 overflow-visible">
           
-          {/* Nav Items Row */}
-          <div className="flex items-center gap-3 sm:gap-6 whitespace-nowrap text-slate-800 dark:text-slate-300 overflow-visible py-1">
-            
-            {/* Guild & Category Dropdown Trigger */}
-            <div className="relative" ref={dropdownRef}>
-              <button
-                type="button"
-                onClick={() => setCategoryMenuOpen(!categoryMenuOpen)}
-                className={`flex items-center gap-1.5 font-bold transition-colors py-1 sm:py-1.5 px-2 sm:px-2.5 rounded-xl border shrink-0 cursor-pointer ${
-                  categoryMenuOpen || selectedCategory
-                    ? 'bg-purple-200 dark:bg-purple-900/60 border-purple-400 dark:border-amber-400/60 text-purple-950 dark:text-amber-300 shadow-sm'
-                    : 'bg-white/80 dark:bg-transparent border-purple-200 dark:border-transparent text-slate-900 dark:text-white hover:text-purple-700 dark:hover:text-amber-400 hover:bg-purple-100 dark:hover:bg-purple-950/40 shadow-xs'
-                }`}
-              >
-                <Menu className="w-4 h-4 text-purple-700 dark:text-amber-400 shrink-0" />
-                <span className="text-[11px] sm:text-xs">
-                  {selectedCategory ? `صنف: ${selectedCategory}` : 'صنف‌بندی و دسته‌بندی مشاغل'}
-                </span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform shrink-0 ${categoryMenuOpen ? 'rotate-180 text-purple-700 dark:text-amber-400' : ''}`} />
-              </button>
+          {/* Guild & Category Dropdown Trigger (isolated from horizontal scroll so it NEVER gets clipped in Windows) */}
+          <div className="relative shrink-0" ref={dropdownRef}>
+            <button
+              id="header-guilds-category-btn"
+              type="button"
+              onClick={() => setCategoryMenuOpen(!categoryMenuOpen)}
+              className={`flex items-center gap-1.5 font-bold transition-all py-1 sm:py-1.5 px-2.5 sm:px-3 rounded-xl border shrink-0 cursor-pointer select-none ${
+                categoryMenuOpen || selectedCategory
+                  ? 'bg-purple-200 dark:bg-purple-900/80 border-purple-400 dark:border-amber-400 text-purple-950 dark:text-amber-300 shadow-sm ring-1 ring-purple-400/50'
+                  : 'bg-white/90 dark:bg-[#181138] border-purple-200 dark:border-purple-800/60 text-slate-900 dark:text-white hover:text-purple-700 dark:hover:text-amber-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 shadow-xs'
+              }`}
+            >
+              <Menu className="w-4 h-4 text-purple-700 dark:text-amber-400 shrink-0" />
+              <span className="text-[11px] sm:text-xs">
+                {selectedCategory ? `صنف: ${selectedCategory}` : 'صنف‌بندی و دسته‌بندی مشاغل'}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${categoryMenuOpen ? 'rotate-180 text-purple-700 dark:text-amber-400' : ''}`} />
+            </button>
 
-              {/* Dropdown Menu Popup */}
-              {categoryMenuOpen && (
+            {/* Dropdown Menu Popup - Perfectly Positioned and Never Clipped in Windows & Mobile */}
+            {categoryMenuOpen && (
+              <>
+                {/* Backdrop overlay to close when clicking outside */}
                 <div
-                  className="fixed top-28 left-4 right-4 sm:absolute sm:top-full sm:right-0 sm:left-auto mt-2 sm:w-80 sm:max-w-[90vw] bg-white dark:bg-[#160f38] border border-purple-200 dark:border-purple-700/80 rounded-2xl shadow-2xl p-2.5 space-y-2 z-50 animate-in fade-in max-h-96 flex flex-col"
+                  className="fixed inset-0 z-40 bg-black/25 sm:bg-black/10"
+                  onClick={() => setCategoryMenuOpen(false)}
+                />
+
+                <div
+                  className="fixed top-24 sm:top-full right-3 sm:right-0 left-3 sm:left-auto sm:mt-2 sm:w-96 md:w-[420px] max-w-[95vw] bg-white dark:bg-[#150d30] border border-purple-200 dark:border-purple-700 rounded-2xl shadow-2xl p-3 space-y-2.5 z-50 animate-in fade-in flex flex-col max-h-[82vh] sm:max-h-[500px]"
                 >
-                  <div className="px-1 py-1 text-[11px] font-bold text-purple-900 dark:text-amber-400 border-b border-purple-100 dark:border-purple-900/50 flex items-center justify-between">
-                    <span>صنف‌بندی و تفکیک خدمات اصناف</span>
+                  <div className="px-1 pb-2 text-[11px] font-bold text-purple-950 dark:text-amber-300 border-b border-purple-100 dark:border-purple-900/60 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-purple-600 dark:text-amber-400" />
+                      <span>صنف‌بندی و تفکیک خدمات مشاغل ({filteredCategories.length})</span>
+                    </div>
                     {selectedCategory && (
                       <button
                         onClick={() => {
@@ -333,28 +364,37 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
                         }}
                         className="text-[10px] text-rose-600 dark:text-rose-300 hover:underline font-bold cursor-pointer"
                       >
-                        پاک کردن فیلتر
+                        ✕ حذف فیلتر
                       </button>
                     )}
                   </div>
 
                   {/* Quick Search inside Dropdown */}
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-purple-400 absolute right-2.5 top-2" />
+                    <Search className="w-3.5 h-3.5 text-purple-400 absolute right-2.5 top-2.5" />
                     <input
                       type="text"
                       dir="rtl"
                       value={headerGuildSearch}
                       onChange={(e) => setHeaderGuildSearch(e.target.value)}
-                      placeholder="جستجوی صنف (املاک، وب، پزشکی، غذا...)"
-                      className="w-full bg-purple-50/60 dark:bg-black/50 border border-purple-200 dark:border-purple-800 rounded-lg pr-8 pl-2.5 py-1 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500"
+                      placeholder="جستجوی صنف (املاک، وب، پزشکی، غذا، طلا، خودرو...)"
+                      className="w-full bg-purple-50/70 dark:bg-black/50 border border-purple-200 dark:border-purple-800 rounded-xl pr-8 pl-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
                     />
+                    {headerGuildSearch && (
+                      <button
+                        onClick={() => setHeaderGuildSearch('')}
+                        className="absolute left-2.5 top-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                        title="پاک کردن"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
 
                   {/* Scrollable list */}
-                  <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar max-h-64 pr-0.5">
+                  <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar max-h-64 sm:max-h-72 pr-0.5">
                     {filteredCategories.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-slate-500">
+                      <div className="p-4 text-center text-xs text-slate-500 dark:text-slate-400">
                         صنفی با این عنوان یافت نشد.
                       </div>
                     ) : (
@@ -369,7 +409,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
                             }}
                             className={`p-2 rounded-xl cursor-pointer flex items-center justify-between gap-2.5 transition-all text-right ${
                               isSelected
-                                ? 'bg-purple-100 dark:bg-amber-400/20 text-purple-950 dark:text-amber-200 border border-purple-300 dark:border-amber-400/40 font-bold'
+                                ? 'bg-purple-100 dark:bg-amber-400/20 text-purple-950 dark:text-amber-200 border border-purple-300 dark:border-amber-400/50 font-bold'
                                 : 'hover:bg-purple-50 dark:hover:bg-purple-900/60 text-slate-800 dark:text-slate-200'
                             }`}
                           >
@@ -386,13 +426,33 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
                       })
                     )}
                   </div>
+
+                  {/* Footer button to open the full modal */}
+                  {onOpenGuildsModal && (
+                    <div className="pt-2 border-t border-purple-100 dark:border-purple-900/60 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCategoryMenuOpen(false);
+                          onOpenGuildsModal();
+                        }}
+                        className="w-full py-1.5 px-3 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/50 dark:hover:bg-purple-900/80 text-purple-900 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-purple-200 dark:border-purple-800/60"
+                      >
+                        <Briefcase className="w-3.5 h-3.5" />
+                        <span>مشاهده همه ۲۵ صنف در پنجره کامل</span>
+                      </button>
+                    </div>
+                  )}
+
                 </div>
-              )}
-            </div>
+              </>
+            )}
+          </div>
 
-            <div className="h-4 w-px bg-purple-200 dark:bg-purple-900/60 hidden sm:block shrink-0"></div>
+          <div className="h-4 w-px bg-purple-200 dark:bg-purple-900/60 hidden sm:block shrink-0"></div>
 
-            {/* Quick Filter Buttons */}
+          {/* Quick Filter Buttons (isolated in horizontal scroll without affecting the category dropdown) */}
+          <div className="flex-1 flex items-center gap-3 sm:gap-6 whitespace-nowrap text-slate-800 dark:text-slate-300 overflow-x-auto scrollbar-none py-1 min-w-0">
             <button
               onClick={onScrollToIncredible}
               className="flex items-center gap-1 text-purple-900 dark:text-amber-300 hover:text-purple-700 dark:hover:text-amber-200 transition-colors font-bold cursor-pointer text-[11px] sm:text-xs shrink-0"
@@ -450,7 +510,6 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
               <span className="text-amber-600 dark:text-amber-400">←</span>
               <span>سایت اصلی جهش</span>
             </a>
-
           </div>
 
         </div>

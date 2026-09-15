@@ -14,6 +14,8 @@ interface DigikalaCategoriesProps {
   onSelectCategory: (category: string) => void;
   selectedCategory: string;
   onScrollToIncredible: () => void;
+  isGuildsModalOpen?: boolean;
+  onToggleGuildsModal?: (open: boolean) => void;
 }
 
 // Map guild/category name to appropriate Lucide icon
@@ -71,8 +73,12 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
   onSelectCategory,
   selectedCategory,
   onScrollToIncredible,
+  isGuildsModalOpen,
+  onToggleGuildsModal,
 }) => {
-  const [showAllGuildsModal, setShowAllGuildsModal] = useState(false);
+  const [internalShowModal, setInternalShowModal] = useState(false);
+  const showAllGuildsModal = isGuildsModalOpen !== undefined ? isGuildsModalOpen : internalShowModal;
+  const setShowAllGuildsModal = onToggleGuildsModal || setInternalShowModal;
   const [modalSearchQuery, setModalSearchQuery] = useState('');
 
   // Check if selected category is a specific guild
@@ -243,10 +249,15 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
       {/* All Guilds Modal Dialog (کدام صنف یا شغل مد نظر شماست؟) */}
       {showAllGuildsModal && (
         <div 
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm p-3 sm:p-4 flex min-h-full items-center justify-center animate-in fade-in"
+          className="fixed inset-0 z-[100] overflow-y-auto bg-black/80 backdrop-blur-sm p-3 sm:p-4 flex min-h-full items-center justify-center animate-in fade-in"
           dir="rtl"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAllGuildsModal(false);
+            }
+          }}
         >
-          <div className="relative bg-white dark:bg-[#150e33] border border-purple-200 dark:border-purple-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] my-auto">
+          <div className="relative bg-white dark:bg-[#150e33] border border-purple-200 dark:border-purple-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] my-auto animate-in zoom-in-95 duration-150">
             
             {/* Modal Header */}
             <div className="p-4 bg-purple-50 dark:bg-[#1a1139] border-b border-purple-200 dark:border-purple-900 flex items-center justify-between">
