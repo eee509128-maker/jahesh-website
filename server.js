@@ -1853,6 +1853,155 @@ app.post('/api/amlak/auth', (req, res) => {
   }
 });
 
+// ==========================================
+// Jahesh AI App License & Auth Engine API
+// ==========================================
+const APP_LICENSES_FILE = path.join(__dirname, 'data', 'app_licenses.json');
+
+function getStoredAppLicenses() {
+  try {
+    if (fs.existsSync(APP_LICENSES_FILE)) {
+      const raw = fs.readFileSync(APP_LICENSES_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error('Error reading app_licenses.json:', e);
+  }
+  return [];
+}
+
+function saveStoredAppLicenses(licenses) {
+  try {
+    const dir = path.dirname(APP_LICENSES_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(APP_LICENSES_FILE, JSON.stringify(licenses, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error writing app_licenses.json:', e);
+  }
+}
+
+app.post(['/api/app-auth/register-license', '/jaheshkala/api/app-auth/register-license'], (req, res) => {
+  try {
+    const license = req.body;
+    if (!license || !license.id || !license.username) {
+      return res.status(400).json({ success: false, error: 'Invalid license payload' });
+    }
+    const list = getStoredAppLicenses();
+    const idx = list.findIndex((l) => l.id === license.id || (l.username === license.username && l.productId === license.productId));
+    let updated;
+    if (idx >= 0) {
+      updated = [...list];
+      updated[idx] = { ...list[idx], ...license };
+    } else {
+      updated = [license, ...list];
+    }
+    saveStoredAppLicenses(updated);
+    return res.json({ success: true, count: updated.length, license });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post(['/api/app-auth', '/api/app-auth/verify', '/jaheshkala/api/app-auth', '/jaheshkala/api/app-auth/verify'], (req, res) => {
+  try {
+    const { username, password, productId, token } = req.body || {};
+    const cleanUser = String(username || '').trim();
+    const cleanPass = String(password || '').trim();
+    const cleanProd = String(productId || '').trim();
+
+    const list = getStoredAppLicenses();
+
+    // 1. Exact Match on THIS productId
+    const found = list.find((lic) => {
+      const uMatch = lic.username && (lic.username === cleanUser || lic.phone === cleanUser);
+      const pMatch = !cleanProd || lic.productId === cleanProd;
+      const passMatch = !cleanPass || lic.password === cleanPass || lic.licenseKey === cleanPass;
+      const tokenMatch = Boolean(token && (lic.id === token || lic.licenseKey === token));
+      return (uMatch || tokenMatch) && (passMatch || tokenMatch) && pMatch;
+    });
+
+    if (found) {
+      const now = new Date();
+      const expiry = new Date(found.expiresAt || now.toISOString());
+      const diffMs = expiry.getTime() - now.getTime();
+      const isExpired = diffMs <= 0;
+      const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+      if (isExpired) {
+        return res.json({
+          success: false,
+          authenticated: true,
+          expired: true,
+          status: 'expired',
+          daysRemaining: 0,
+          expiresAt: found.expiresAt,
+          productId: found.productId,
+          productTitle: found.productTitle || found.appName,
+          message: 'مدت زمان اشتراک شما به پایان رسیده است. جهت تمدید اشتراک به سایت جهش‌کالا مراجعه فرمایید.',
+          renewUrl: 'https://jaheshit.ir/jaheshkala',
+        });
+      }
+
+      return res.json({
+        success: true,
+        authenticated: true,
+        expired: false,
+        status: 'active',
+        token: found.licenseKey || found.id,
+        licenseKey: found.licenseKey,
+        daysRemaining,
+        startDate: found.startDate,
+        expiresAt: found.expiresAt,
+        productId: found.productId,
+        productTitle: found.productTitle || found.appName,
+        user: {
+          username: found.username,
+          fullName: found.buyerName,
+          phone: found.phone,
+        },
+        message: `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${daysRemaining} روز اعتبار فعال است.`,
+      });
+    }
+
+    // 2. Strict Product Isolation Check: Check if user exists for a DIFFERENT product
+    if (cleanProd) {
+      const crossProductMatch = list.find((lic) => {
+        const uMatch = lic.username && (lic.username === cleanUser || lic.phone === cleanUser);
+        const passMatch = !cleanPass || lic.password === cleanPass || lic.licenseKey === cleanPass;
+        return uMatch && passMatch && lic.productId !== cleanProd;
+      });
+
+      if (crossProductMatch) {
+        return res.status(401).json({
+          success: false,
+          authenticated: false,
+          expired: false,
+          productMismatch: true,
+          targetProductId: cleanProd,
+          ownedProductId: crossProductMatch.productId,
+          message: `این نام کاربری و رمز عبور برای «${crossProductMatch.productTitle || crossProductMatch.appName || 'محصول دیگری'}» خریداری شده است و اجازه ورود به این برنامه را ندارد.`,
+        });
+      }
+    }
+
+    // 3. Fallback: Invalid credentials
+    return res.status(401).json({
+      success: false,
+      authenticated: false,
+      expired: false,
+      message: 'نام کاربری یا رمز عبور اشتباه است.',
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get(['/api/app-auth', '/jaheshkala/api/app-auth'], (_req, res) => {
+  const list = getStoredAppLicenses();
+  return res.json({ success: true, count: list.length, licenses: list });
+});
+
 // Explicit handler for Real Estate Management App (مدیریت املاک جهش)
 app.get(['/amlak.html', '/amlak', '/jaheshkala/amlak.html', '/jaheshkala/amlak'], (_req, res) => {
   const candidates = [
