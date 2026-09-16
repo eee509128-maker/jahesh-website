@@ -1,0 +1,30 @@
+{
+  "outputDirectory": ".",
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/frwshgah",
+      "destination": "/jaheshkala",
+      "permanent": true
+    },
+    {
+      "source": "/frwshgah/:match*",
+      "destination": "/jaheshkala",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/47887509.txt",
+      "destination": "/assets/47887509.txt"
+    },
+    {
+      "source": "/jaheshkala",
+      "destination": "/jaheshkala/index.html"
+    },
+    {
+      "source": "/jaheshkala/:match*",
+      "destination": "/jaheshkala/index.html"
+    }
+  ]
+}
