@@ -1,0 +1,47 @@
+[
+  {
+    "id": "lic-admin-master",
+    "username": "jahesh",
+    "password": "jahesh1395",
+    "licenseKey": "JA-ADM-LIFETIME-VIP",
+    "productId": "pkg-amlak-jahesh",
+    "productTitle": "نرم‌افزار جامع مدیریت املاک جهش (اشتراک آنلاین و ابری)",
+    "appName": "سامانه مدیریت املاک جهش",
+    "buyerName": "مدیر ارشد فناوری جهش",
+    "phone": "09152331974",
+    "days": 3650,
+    "startDate": "2026-09-01T00:00:00.000Z",
+    "expiresAt": "2036-09-01T00:00:00.000Z",
+    "status": "active"
+  },
+  {
+    "id": "lic-jahesh-order-7739",
+    "username": "jahesh_admin",
+    "password": "JK-7739DKR6",
+    "licenseKey": "JA-APP-2026-PXGMZ8",
+    "productId": "pkg-amlak-jahesh",
+    "productTitle": "نرم‌افزار جامع مدیریت املاک جهش (اشتراک آنلاین و ابری)",
+    "appName": "سامانه مدیریت املاک جهش",
+    "buyerName": "مدیر سامانه املاک جهش",
+    "phone": "09152331974",
+    "days": 365,
+    "startDate": "2026-09-16T00:00:00.000Z",
+    "expiresAt": "2027-09-16T00:00:00.000Z",
+    "status": "active"
+  },
+  {
+    "id": "lic-jahesh-admin-amlak",
+    "username": "jahesh_admin",
+    "password": "JK-9722U67C",
+    "licenseKey": "JA-APP-2026-UC7B5M",
+    "productId": "pkg-amlak-jahesh",
+    "productTitle": "نرم‌افزار جامع مدیریت املاک جهش (اشتراک آنلاین و ابری)",
+    "appName": "سامانه مدیریت املاک جهش",
+    "buyerName": "مدیر سامانه املاک جهش",
+    "phone": "09152331974",
+    "days": 365,
+    "startDate": "2026-09-16T00:00:00.000Z",
+    "expiresAt": "2027-09-16T00:00:00.000Z",
+    "status": "active"
+  }
+]

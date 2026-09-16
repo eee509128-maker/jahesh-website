@@ -1253,6 +1253,13 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
 
     // 2. Search in dedicated app licenses
     const allLicenses = readLicensesFromDisk();
+    try {
+      const amlakLicenses = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'amlak_licenses.json'), 'utf8') || '[]');
+      if (Array.isArray(amlakLicenses)) {
+        allLicenses.push(...amlakLicenses.map(l => ({ ...l, productId: l.productId || 'pkg-amlak-jahesh' })));
+      }
+    } catch (e) {}
+
     let targetLicense = allLicenses.find((l) => {
       if (!l) return false;
       const lUser = String(l.username || '').trim().toLowerCase();
@@ -1363,10 +1370,16 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
 
     // 6. Evaluate expiration & days remaining dynamically
     const now = new Date();
-    const startDate = targetLicense.startDate ? new Date(targetLicense.startDate) : now;
-    let expiresAt = targetLicense.expiresAt
-      ? new Date(targetLicense.expiresAt)
-      : new Date(startDate.getTime() + (targetLicense.days || 7) * 24 * 60 * 60 * 1000);
+    let startDate = targetLicense.startDate ? new Date(targetLicense.startDate) : now;
+    if (isNaN(startDate.getTime())) {
+      startDate = targetLicense.createdAt ? new Date(targetLicense.createdAt) : now;
+      if (isNaN(startDate.getTime())) startDate = now;
+    }
+
+    let expiresAt = targetLicense.expiresAt ? new Date(targetLicense.expiresAt) : null;
+    if (!expiresAt || isNaN(expiresAt.getTime())) {
+      expiresAt = new Date(startDate.getTime() + (targetLicense.days || 7) * 24 * 60 * 60 * 1000);
+    }
 
     const diffMs = expiresAt.getTime() - now.getTime();
     const isExpired = diffMs <= 0;
@@ -1505,7 +1518,17 @@ app.post(['/api/app-auth/verify', '/jaheshkala/api/app-auth/verify'], (req, res)
     }
 
     const now = new Date();
-    const expiresAt = new Date(targetLicense.expiresAt);
+    let startDate = targetLicense.startDate ? new Date(targetLicense.startDate) : now;
+    if (isNaN(startDate.getTime())) {
+      startDate = targetLicense.createdAt ? new Date(targetLicense.createdAt) : now;
+      if (isNaN(startDate.getTime())) startDate = now;
+    }
+
+    let expiresAt = targetLicense.expiresAt ? new Date(targetLicense.expiresAt) : null;
+    if (!expiresAt || isNaN(expiresAt.getTime())) {
+      expiresAt = new Date(startDate.getTime() + (targetLicense.days || 7) * 24 * 60 * 60 * 1000);
+    }
+
     const diffMs = expiresAt.getTime() - now.getTime();
     const isExpired = diffMs <= 0;
     const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -1569,7 +1592,14 @@ app.get(['/api/app-auth', '/api/app-auth/licenses', '/jaheshkala/api/app-auth', 
     const licenses = readLicensesFromDisk();
     const now = new Date();
     const enriched = licenses.map((lic) => {
-      const expiresAt = lic.expiresAt ? new Date(lic.expiresAt) : null;
+      let startDate = lic.startDate ? new Date(lic.startDate) : now;
+      if (isNaN(startDate.getTime())) startDate = now;
+
+      let expiresAt = lic.expiresAt ? new Date(lic.expiresAt) : null;
+      if (!expiresAt || isNaN(expiresAt.getTime())) {
+        expiresAt = new Date(startDate.getTime() + (lic.days || 7) * 24 * 60 * 60 * 1000);
+      }
+
       const diffMs = expiresAt ? expiresAt.getTime() - now.getTime() : 0;
       const isExpired = !expiresAt || diffMs <= 0;
       const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));

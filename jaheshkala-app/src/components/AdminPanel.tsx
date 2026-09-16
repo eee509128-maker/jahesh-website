@@ -6560,7 +6560,7 @@ on public.users for delete using (true);`;
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-[11px] pt-1">
-                      <span className="text-slate-300">انقضا: {selectedOrder.amlakLicense.expiresAt}</span>
+                      <span className="text-slate-300">انقضا: {selectedOrder.amlakLicense.expiresAt ? (isNaN(new Date(selectedOrder.amlakLicense.expiresAt).getTime()) ? selectedOrder.amlakLicense.expiresAt : new Date(selectedOrder.amlakLicense.expiresAt).toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' })) : ''}</span>
                       <a
                         href={`/amlak.html?u=${encodeURIComponent(selectedOrder.amlakLicense.username)}&p=${encodeURIComponent(selectedOrder.amlakLicense.password)}`}
                         target="_blank"

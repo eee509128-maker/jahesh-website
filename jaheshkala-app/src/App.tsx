@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight
+  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, ExternalLink
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';

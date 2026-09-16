@@ -114,6 +114,13 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   const cleanUserId = currentUser?.id?.trim();
   const searchPhone = normalizeDigits(manualPhoneSearch);
 
+  const formatPersianDateSafe = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
   const userOrders = (currentOrders || [])
     .filter((o) => {
       if (currentUser?.role === 'admin') return true;
@@ -605,7 +612,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
                           <span className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">
-                            اعتبار اشتراک تا: <strong className="text-amber-800 dark:text-amber-300 font-bold">{license.expiresAt}</strong>
+                            اعتبار اشتراک تا: <strong className="text-amber-800 dark:text-amber-300 font-bold">{formatPersianDateSafe(license.expiresAt)}</strong>
                           </span>
 
                           <a

@@ -128,16 +128,8 @@ export function generateAmlakLicense(
     buyerName: order.customerName || user?.fullName || exactUsername,
     phone: order.customerPhone || user?.phone || '',
     days,
-    startDate: now.toLocaleDateString('fa-IR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }),
-    expiresAt: expireDate.toLocaleDateString('fa-IR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }),
+    startDate: now.toISOString(),
+    expiresAt: expireDate.toISOString(),
     status: 'active',
   };
 
