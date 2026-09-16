@@ -1257,7 +1257,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const prodCouponCode = newProductCouponCode.trim().toUpperCase() || undefined;
     const prodCouponPercent = newProductCouponPercent ? Math.min(100, Math.max(1, parseInt(newProductCouponPercent.replace(/[^0-9]/g, ''), 10) || 10)) : undefined;
 
-    const finalImage = newImage.trim() || getFallbackProductImage(newTitle.trim(), finalCategory);
+    const existingProduct = editingProductId ? products.find((p) => p.id === editingProductId) : undefined;
+    const finalImage = newImage.trim() || (existingProduct ? existingProduct.image : '') || getFallbackProductImage(newTitle.trim(), finalCategory);
 
     let finalGuild: string | undefined = undefined;
     if (selectedGuildMode === '25guilds') {
@@ -1267,6 +1268,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
 
     const productData: Product = {
+      ...(existingProduct || {}),
       id: editingProductId || ('prod-' + Date.now()),
       title: newTitle.trim(),
       category: finalCategory,

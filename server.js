@@ -23,7 +23,14 @@ const PRODUCTS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'products');
 if (!fs.existsSync(PRODUCTS_UPLOADS_DIR)) {
   fs.mkdirSync(PRODUCTS_UPLOADS_DIR, { recursive: true });
 }
+const JAHESH_IMAGES_DIR = path.join(__dirname, 'jaheshkala', 'images');
+if (!fs.existsSync(JAHESH_IMAGES_DIR)) {
+  fs.mkdirSync(JAHESH_IMAGES_DIR, { recursive: true });
+}
 app.use('/uploads', express.static(UPLOADS_DIR));
+app.use('/jaheshkala/uploads', express.static(UPLOADS_DIR));
+app.use('/jaheshkala/images', express.static(JAHESH_IMAGES_DIR));
+app.use('/images', express.static(JAHESH_IMAGES_DIR));
 
 // Favicon and Web App Manifest routes for Googlebot, Search Engine Crawlers, browsers and mobile
 const faviconFiles = [
