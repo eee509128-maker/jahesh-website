@@ -34,7 +34,7 @@ import {
   clearPendingOrder,
   ZIBAL_DEFAULT_MERCHANT,
 } from './lib/zibalService';
-import { hasAmlakInItems, generateAmlakLicense } from './lib/amlakLicenseService';
+import { hasAmlakInItems, generateAmlakLicense, hasAiAppGenerationInItems, generateAiAppLicense } from './lib/amlakLicenseService';
 import { isProductMatchingCategoryOrGuild, isProductMatchingSearchQuery } from './lib/guildMatcher';
 import confetti from 'canvas-confetti';
 
@@ -395,6 +395,10 @@ export default function App() {
 
         if (hasAmlakInItems(fallbackItems) && !finalOrder.amlakLicense) {
           finalOrder.amlakLicense = pendingOrder?.amlakLicense || generateAmlakLicense(finalOrder, activeUser);
+        }
+        
+        if (hasAiAppGenerationInItems(fallbackItems) && !finalOrder.aiAppLicense) {
+          finalOrder.aiAppLicense = pendingOrder?.aiAppLicense || generateAiAppLicense(finalOrder, activeUser);
         }
 
         // 1. Save to DB (Supabase cloud), server disk and local storage
@@ -848,6 +852,9 @@ export default function App() {
     if (hasAmlakInItems(newOrder.items) && !newOrder.amlakLicense) {
       newOrder.amlakLicense = generateAmlakLicense(newOrder, currentUser);
     }
+    if (hasAiAppGenerationInItems(newOrder.items) && !newOrder.aiAppLicense) {
+      newOrder.aiAppLicense = generateAiAppLicense(newOrder, currentUser);
+    }
     setOrders((prev) => [newOrder, ...prev]);
     setCartItems([]);
     setPaymentModalOpen(false);
@@ -911,6 +918,10 @@ export default function App() {
     if (isAmlakOrSub) {
       newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
     }
+    
+    if (product.hasAiAppGeneration) {
+      newAdminOrder.aiAppLicense = generateAiAppLicense(newAdminOrder, adminUser);
+    }
 
     setOrders((prev) => [newAdminOrder, ...prev]);
     await saveOrderToDb(newAdminOrder);
@@ -971,6 +982,10 @@ export default function App() {
 
     if (hasAmlakInItems(safeItems)) {
       newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
+    }
+    
+    if (hasAiAppGenerationInItems(safeItems)) {
+      newAdminOrder.aiAppLicense = generateAiAppLicense(newAdminOrder, adminUser);
     }
 
     setOrders((prev) => [newAdminOrder, ...prev]);
@@ -1654,6 +1669,59 @@ export default function App() {
                   <span>ورود به سامانه مدیریت املاک در تب جدید</span>
                   <ExternalLink className="w-4 h-4" />
                 </a>
+              </div>
+            )}
+
+            {/* کارت اختصاصی اطلاعات لایسنس اپلیکیشن هوش مصنوعی */}
+            {completedOrderReceipt.order.aiAppLicense && (
+              <div className="bg-gradient-to-br from-blue-500/15 to-indigo-600/10 border border-blue-500/40 rounded-2xl p-4 text-right space-y-3 shadow-lg text-xs mt-3">
+                <div className="flex items-center justify-between pb-2 border-b border-blue-500/30">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🤖</span>
+                    <span className="font-black text-blue-400">حساب کاربری اپلیکیشن هوش مصنوعی اختصاصی:</span>
+                  </div>
+                  <span className="bg-blue-500/20 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                    اشتراک {completedOrderReceipt.order.aiAppLicense.days} روزه فعال
+                  </span>
+                </div>
+
+                <div className="space-y-2 font-mono">
+                  <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                    <span className="text-slate-400 font-sans text-[11px]">نام کاربری ورود:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold text-xs">{completedOrderReceipt.order.aiAppLicense.username}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(completedOrderReceipt.order.aiAppLicense!.username);
+                          showToast('نام کاربری کپی شد.');
+                        }}
+                        className="text-[10px] text-blue-400 hover:text-blue-300 cursor-pointer font-sans bg-blue-500/20 px-1.5 py-0.5 rounded"
+                      >
+                        کپی
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                    <span className="text-slate-400 font-sans text-[11px]">رمز عبور اختصاصی:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-300 font-bold text-xs tracking-wider">{completedOrderReceipt.order.aiAppLicense.password}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(completedOrderReceipt.order.aiAppLicense!.password);
+                          showToast('رمز عبور کپی شد.');
+                        }}
+                        className="text-[10px] text-blue-400 hover:text-blue-300 cursor-pointer font-sans bg-blue-500/20 px-1.5 py-0.5 rounded"
+                      >
+                        کپی
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 w-full py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 font-medium text-[11px] shadow-inner text-center px-2">
+                  <span>لطفاً اپلیکیشن مربوطه را دانلود و نصب کنید و سپس از این نام کاربری و رمز عبور برای ورود استفاده کنید. وقتی اشتراک منقضی شود به صورت خودکار خارج می‌شوید و نیاز به تمدید دارید.</span>
+                </div>
               </div>
             )}
 

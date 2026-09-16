@@ -783,6 +783,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isSubscription, setIsSubscription] = useState(false);
   const [pricePerDayInput, setPricePerDayInput] = useState('250000');
 
+  // AI App Generation Flag & Prompt
+  const [hasAiAppGeneration, setHasAiAppGeneration] = useState(false);
+  const [aiAppPrompt, setAiAppPrompt] = useState('');
+
   // Custom Multi-Tier Subscription / Pricing Plans
   const [hasCustomPlans, setHasCustomPlans] = useState(false);
   const [customPlansTitle, setCustomPlansTitle] = useState('پکیج‌های تبلیغات هوشمند');
@@ -1066,6 +1070,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsInStock(true);
     setIsSubscription(false);
     setPricePerDayInput('250000');
+    setHasAiAppGeneration(false);
+    setAiAppPrompt('');
     setHasCustomPlans(false);
     setCustomPlansTitle('پکیج‌های تبلیغات هوشمند');
     setCustomPlansSubtitle('انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
@@ -1118,6 +1124,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsInStock(true);
     setIsSubscription(Boolean(prod.isSubscription || prod.id === 'pkg-amlak-jahesh'));
     setPricePerDayInput(prod.pricePerDay ? prod.pricePerDay.toString() : '250000');
+    setHasAiAppGeneration(Boolean(prod.hasAiAppGeneration));
+    setAiAppPrompt(prod.aiAppPrompt || '');
     setHasCustomPlans(Boolean(prod.hasCustomPlans));
     setCustomPlansTitle(prod.customPlansTitle || 'پکیج‌های تبلیغات هوشمند');
     setCustomPlansSubtitle(prod.customPlansSubtitle || 'انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
@@ -1249,6 +1257,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         : undefined,
       isSubscription: Boolean(isSubscription),
       pricePerDay: isSubscription ? (parseInt(pricePerDayInput.replace(/[^0-9]/g, ''), 10) || 250000) : undefined,
+      hasAiAppGeneration: Boolean(hasAiAppGeneration),
+      aiAppPrompt: hasAiAppGeneration ? (aiAppPrompt.trim() || '') : undefined,
       hasCustomPlans: Boolean(hasCustomPlans),
       customPlansTitle: hasCustomPlans ? (customPlansTitle.trim() || 'پکیج‌های تبلیغات هوشمند') : undefined,
       customPlansSubtitle: hasCustomPlans ? (customPlansSubtitle.trim() || 'انتخاب کنید و کمپین خود را به سطح بالاتری ببرید') : undefined,
@@ -2938,6 +2948,47 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </span>
                         )}
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 6.1 AI App Generation (Google AI Studio / Antigravity) */}
+                <div className="p-4 bg-gradient-to-r from-blue-950/70 via-indigo-950/70 to-blue-950/70 border border-blue-400/60 rounded-2xl space-y-3 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hasAiAppGeneration}
+                        onChange={(e) => setHasAiAppGeneration(e.target.checked)}
+                        className="w-4 h-4 rounded border-blue-400 text-blue-500 focus:ring-0 cursor-pointer"
+                      />
+                      <span className="text-xs sm:text-sm font-black text-blue-300 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-blue-400" />
+                        قابلیت ساخت اپلیکیشن با هوش مصنوعی (Google AI Studio / Antigravity)
+                      </span>
+                    </label>
+                    <span className="text-[10px] bg-blue-500 text-white font-black px-2.5 py-0.5 rounded-full">
+                      جدید
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    با فعال‌سازی این بخش، هنگام خرید این محصول یک اپلیکیشن توسط هوش مصنوعی بر اساس پرامپت شما ساخته می‌شود و نام کاربری و رمز ورود به کاربر داده می‌شود.
+                  </p>
+
+                  {hasAiAppGeneration && (
+                    <div className="p-3 bg-black/60 border border-blue-400/50 rounded-xl space-y-2 animate-in fade-in">
+                      <label className="text-xs font-bold text-blue-200 block">
+                        پرامپت ساخت اپلیکیشن (شامل API سایت):
+                      </label>
+                      <textarea
+                        placeholder="متن پرامپت دقیق را اینجا وارد کنید تا هوش مصنوعی بر اساس آن اپلیکیشن را توسعه دهد..."
+                        value={aiAppPrompt}
+                        onChange={(e) => setAiAppPrompt(e.target.value)}
+                        rows={4}
+                        className="w-full bg-[#0f0820] border border-blue-400/80 rounded-lg px-3 py-2 text-xs text-blue-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        dir="ltr"
+                      />
                     </div>
                   )}
                 </div>

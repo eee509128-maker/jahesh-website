@@ -44,6 +44,8 @@ export interface Product {
   customPlansTitle?: string; // e.g. "پکیج‌های تبلیغات هوشمند"
   customPlansSubtitle?: string; // e.g. "انتخاب کنید و کمپین خود را به سطح بالاتری ببرید"
   subscriptionPlans?: SubscriptionPlan[]; // Array of custom tiers
+  hasAiAppGeneration?: boolean; // دارای قابلیت ساخت اپلیکیشن با هوش مصنوعی
+  aiAppPrompt?: string; // پرامپت ساخت اپلیکیشن (حاوی API سایت)
   guild?: string; // صنف مرتبط با این خدمت یا کالا (مثلاً: املاک و مستغلات، طراحی سایت، رستوران...)
   targetGuilds?: string[]; // صنف‌های مرتبط
   painPointSolved?: string; // چالش و معضل اصلی صنف که این محصول حل می‌کند
@@ -189,6 +191,7 @@ export interface Order {
   acceptedTerms: boolean;
   adminNotes?: string;
   amlakLicense?: AmlakSubscriptionLicense;
+  aiAppLicense?: AmlakSubscriptionLicense; // لایسنس اپلیکیشن ساخته شده با هوش مصنوعی (استفاده از همون مدل لایسنس)
 }
 
 export interface ChatMessage {
