@@ -49,6 +49,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <span>{product.badge}</span>
             </span>
           )}
+          {(product.hasAppConnection || product.hasAiAppGeneration) && (
+            <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-cyan-600 text-white flex items-center gap-0.5 shadow-md">
+              <span>📱 اپ ویندوز/اندروید</span>
+            </span>
+          )}
           {galleryCount > 1 && (
             <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-black/60 text-purple-200 backdrop-blur-sm border border-white/15 flex items-center gap-1">
               <Images className="w-2.5 h-2.5 text-amber-300" />

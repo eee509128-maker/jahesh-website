@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { CartItem, User, Order } from '../types';
 import { requestZibalPayment, savePendingOrder } from '../lib/zibalService';
-import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
+import { hasAmlakInItems, generateAmlakLicense, hasAppConnectionInItems, generateAppSubscriptionCredential } from '../lib/amlakLicenseService';
 
 interface PaymentGatewayModalProps {
   isOpen: boolean;
@@ -142,6 +142,10 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
         adminOrder.amlakLicense = generateAmlakLicense(adminOrder, currentUser);
       }
 
+      if (hasAppConnectionInItems(safeCartItems)) {
+        adminOrder.appCredentials = generateAppSubscriptionCredential(adminOrder, currentUser);
+      }
+
       if (onPaymentSuccess) {
         onPaymentSuccess(adminOrder);
       }
@@ -190,6 +194,10 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
 
     if (hasAmlakInItems(safeCartItems)) {
       pendingOrder.amlakLicense = generateAmlakLicense(pendingOrder, currentUser);
+    }
+
+    if (hasAppConnectionInItems(safeCartItems)) {
+      pendingOrder.appCredentials = generateAppSubscriptionCredential(pendingOrder, currentUser);
     }
 
     // Save pending draft temporarily only in client storage (will only be saved to database AFTER successful bank verification)

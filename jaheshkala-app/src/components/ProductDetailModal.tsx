@@ -33,7 +33,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [showPlanDetails, setShowPlanDetails] = useState<boolean>(true);
 
-  const isAmlakOrSub = Boolean(product?.isSubscription || product?.id === 'pkg-amlak-jahesh' || product?.category === 'اشتراک نرم‌افزار');
+  const isAmlakOrSub = Boolean(product?.isSubscription || product?.hasAppConnection || product?.hasAiAppGeneration || product?.id === 'pkg-amlak-jahesh' || product?.category === 'اشتراک نرم‌افزار');
   const pricePerDay = product?.pricePerDay || 250000;
   const hasCustomPlans = Boolean(product?.hasCustomPlans && product?.subscriptionPlans && product.subscriptionPlans.length > 0);
   const currentPlan = hasCustomPlans ? (product?.subscriptionPlans?.find((p) => p.id === selectedPlanId) || product?.subscriptionPlans?.[0]) : null;
@@ -320,6 +320,31 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     onChange={(e) => setPreferredDomain(e.target.value)}
                     className="w-full bg-black/50 border border-purple-800 rounded-xl px-3 py-2 text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400"
                   />
+                </div>
+              )}
+
+              {/* App Support Card (Windows / Android) */}
+              {(product.hasAppConnection || product.hasAiAppGeneration) && (
+                <div className="bg-gradient-to-br from-cyan-950/60 to-blue-950/60 border border-cyan-500/40 rounded-2xl p-4 space-y-2.5 shadow-md">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📱</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-cyan-300">دارای اپلیکیشن اختصاصی ویندوز و اندروید</h4>
+                      <p className="text-[10px] text-slate-300">با خرید اشتراک، نام کاربری و رمز ورود اختصاصی به شما تحویل داده می‌شود.</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1 text-[11px]">
+                    {product.windowsDownloadUrl && (
+                      <span className="px-2.5 py-1 rounded-lg bg-cyan-900/40 text-cyan-200 border border-cyan-500/30 flex items-center gap-1">
+                        <span>💻 نسخه ویندوز</span>
+                      </span>
+                    )}
+                    {product.androidDownloadUrl && (
+                      <span className="px-2.5 py-1 rounded-lg bg-cyan-900/40 text-cyan-200 border border-cyan-500/30 flex items-center gap-1">
+                        <span>📱 نسخه اندروید</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -181,33 +181,52 @@ export const mergeTwoProducts = (current: Product, incoming: Product): Product =
   if (!current) return incoming;
   if (!incoming) return current;
 
-  // Compare timestamps
-  const incomingTime = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
-  const currentTime = current.updatedAt ? new Date(current.updatedAt).getTime() : 0;
-  const incomingIsNewer = !isNaN(incomingTime) && !isNaN(currentTime) && incomingTime > currentTime;
+  // 1. Image preservation: real custom uploaded images NEVER get replaced by SVGs or stock photos
+  const currentHasRealImg = isRealCustomImage(current.image);
+  const incomingHasRealImg = isRealCustomImage(incoming.image);
 
-  const primary = incomingIsNewer ? incoming : current;
-  const secondary = incomingIsNewer ? current : incoming;
+  let preferredImage = current.image || incoming.image;
 
-  // Image preservation: Never downgrade from a valid real image to an empty string or placeholder
-  let preferredImage = primary.image;
-  if (!preferredImage || preferredImage.trim() === '' || !isRealCustomImage(preferredImage)) {
-    if (secondary.image && isRealCustomImage(secondary.image)) {
-      preferredImage = secondary.image;
-    } else {
-      preferredImage = primary.image || secondary.image;
+  if (currentHasRealImg && !incomingHasRealImg) {
+    preferredImage = current.image;
+  } else if (!currentHasRealImg && incomingHasRealImg) {
+    preferredImage = incoming.image;
+  } else if (currentHasRealImg && incomingHasRealImg) {
+    const incomingTime = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
+    const currentTime = current.updatedAt ? new Date(current.updatedAt).getTime() : 0;
+    preferredImage = (!isNaN(incomingTime) && !isNaN(currentTime) && incomingTime > currentTime)
+      ? incoming.image
+      : (current.image || incoming.image);
+  }
+
+  // 2. Base merge: database 'current' is authoritative unless incoming is strictly newer
+  let baseMerge = { ...incoming, ...current };
+  if (incoming.updatedAt && current.updatedAt) {
+    const incomingTime = new Date(incoming.updatedAt).getTime();
+    const currentTime = new Date(current.updatedAt).getTime();
+    if (!isNaN(incomingTime) && !isNaN(currentTime) && incomingTime > currentTime) {
+      baseMerge = { ...current, ...incoming };
     }
   }
 
-  // Gallery preservation: keep rich gallery if present
-  const preferredGallery = (primary.gallery && primary.gallery.length > 0)
-    ? primary.gallery
-    : (secondary.gallery && secondary.gallery.length > 0 ? secondary.gallery : [preferredImage].filter(Boolean));
+  // Authoritative current properties always win
+  const preferredIsIncredible = current.isIncredible !== undefined
+    ? Boolean(current.isIncredible)
+    : Boolean(incoming.isIncredible);
+
+  const preferredPlans = (current.subscriptionPlans && current.subscriptionPlans.length > 0)
+    ? current.subscriptionPlans
+    : incoming.subscriptionPlans;
+
+  const preferredGallery = (current.gallery && current.gallery.length > 0)
+    ? current.gallery
+    : incoming.gallery;
 
   return {
-    ...secondary,
-    ...primary,
+    ...baseMerge,
     image: preferredImage,
+    isIncredible: preferredIsIncredible,
+    subscriptionPlans: preferredPlans,
     gallery: preferredGallery,
   };
 };
@@ -243,6 +262,13 @@ export function cleanProductItem(p: any): Product | null {
     inStock: p.inStock !== false,
     warranty: p.warranty || 'گارانتی اصالت و سلامت جهش',
     isIncredible: Boolean(p.isIncredible),
+    isSubscription: Boolean(p.isSubscription),
+    pricePerDay: typeof p.pricePerDay === 'number' ? p.pricePerDay : (p.pricePerDay ? Number(p.pricePerDay) : undefined),
+    hasAppConnection: Boolean(p.hasAppConnection || p.hasAiAppGeneration),
+    appIdentifier: p.appIdentifier || p.id,
+    windowsDownloadUrl: p.windowsDownloadUrl || '',
+    androidDownloadUrl: p.androidDownloadUrl || '',
+    aiAppPrompt: p.aiAppPrompt || '',
   };
 }
 
@@ -306,37 +332,23 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   }
 
-  // 3. Base Products List: Cloud authoritative list merged intelligently with local edits
+  // 3. Base Products List: Cloud authoritative list is the 100% source of truth
   if (authoritativeList && authoritativeList.length > 0) {
     const localMap = new Map<string, Product>();
     for (const lp of localProducts) {
       if (lp && lp.id) localMap.set(lp.id, lp);
     }
 
-    const mergedProductsMap = new Map<string, Product>();
-
-    // Start by merging each cloud product with any local counterpart
-    for (const cp of authoritativeList) {
-      if (!cp || !cp.id || deletedIds.has(cp.id)) continue;
-      const localItem = localMap.get(cp.id);
-      if (localItem) {
-        mergedProductsMap.set(cp.id, mergeTwoProducts(cp, localItem));
-      } else {
-        mergedProductsMap.set(cp.id, cp);
+    // Only preserve local custom uploaded image if authoritative image is SVG/placeholder
+    const finalProducts = authoritativeList.map((p) => {
+      const localItem = localMap.get(p.id);
+      if (localItem && isRealCustomImage(localItem.image) && !isRealCustomImage(p.image)) {
+        return { ...p, image: localItem.image };
       }
-    }
+      return p;
+    });
 
-    // Preserve any local products that are not yet in cloud
-    for (const lp of localProducts) {
-      if (!lp || !lp.id || deletedIds.has(lp.id)) continue;
-      if (!mergedProductsMap.has(lp.id)) {
-        mergedProductsMap.set(lp.id, lp);
-      }
-    }
-
-    const finalProducts = Array.from(mergedProductsMap.values());
-
-    // Update local storage so state is synchronized
+    // Update local storage so deleted items are removed and state is accurate
     try {
       safeSetLocalStorage('jahesh_products', JSON.stringify(finalProducts));
     } catch {}
@@ -551,16 +563,25 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
         .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
     }
 
-    // Update or insert the specified product in the master list using mergeTwoProducts
-    const productWithTimestamp: Product = {
-      ...product,
-      updatedAt: product.updatedAt || new Date().toISOString(),
-    };
+    // Update or insert ONLY the specified product in the master list
     const idx = masterList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
-      masterList[idx] = mergeTwoProducts(masterList[idx], productWithTimestamp);
+      const existing = masterList[idx];
+      // Keep existing real image if incoming image is empty or generic
+      const safeImage = (product.image && product.image.trim() && !product.image.includes('images.unsplash.com'))
+        ? product.image
+        : (existing.image || product.image);
+
+      masterList[idx] = {
+        ...existing,
+        ...product,
+        image: safeImage,
+        gallery: (Array.isArray(product.gallery) && product.gallery.length > 0) ? product.gallery : (existing.gallery || []),
+        features: (Array.isArray(product.features) && product.features.length > 0) ? product.features : (existing.features || []),
+        updatedAt: new Date().toISOString()
+      };
     } else {
-      masterList = [productWithTimestamp, ...masterList];
+      masterList = [product, ...masterList];
     }
 
     // 3. Update local storage & broadcast event immediately
