@@ -34,7 +34,10 @@ import {
   clearPendingOrder,
   ZIBAL_DEFAULT_MERCHANT,
 } from './lib/zibalService';
-import { hasAmlakInItems, generateAmlakLicense, hasAiAppGenerationInItems, generateAiAppLicense } from './lib/amlakLicenseService';
+import { hasAmlakInItems, generateAmlakLicense } from './lib/amlakLicenseService';
+import { hasAiAppInItems, generateAppLicense, registerAppLicenseOnServer, checkLicenseStatus } from './lib/appLicenseService';
+import { AppSubscriptionLicense } from './types';
+import { AppLicenseModal } from './components/AppLicenseModal';
 import { isProductMatchingCategoryOrGuild, isProductMatchingSearchQuery } from './lib/guildMatcher';
 import confetti from 'canvas-confetti';
 
@@ -223,6 +226,7 @@ export default function App() {
   const [footerInfoModalOpen, setFooterInfoModalOpen] = useState(false);
   const [amlakModalOpen, setAmlakModalOpen] = useState(false);
   const [guildsModalOpen, setGuildsModalOpen] = useState(false);
+  const [aiAppLicenseModalLicense, setAiAppLicenseModalLicense] = useState<AppSubscriptionLicense | null>(null);
   const [activeFooterTopic, setActiveFooterTopic] = useState('terms');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -396,9 +400,12 @@ export default function App() {
         if (hasAmlakInItems(fallbackItems) && !finalOrder.amlakLicense) {
           finalOrder.amlakLicense = pendingOrder?.amlakLicense || generateAmlakLicense(finalOrder, activeUser);
         }
-        
-        if (hasAiAppGenerationInItems(fallbackItems) && !finalOrder.aiAppLicense) {
-          finalOrder.aiAppLicense = pendingOrder?.aiAppLicense || generateAiAppLicense(finalOrder, activeUser);
+
+        if (hasAiAppInItems(fallbackItems) && !finalOrder.appLicense) {
+          const generatedAppLic = pendingOrder?.appLicense || generateAppLicense(finalOrder, activeUser);
+          finalOrder.appLicense = generatedAppLic;
+          registerAppLicenseOnServer(generatedAppLic).catch(() => {});
+          setAiAppLicenseModalLicense(generatedAppLic);
         }
 
         // 1. Save to DB (Supabase cloud), server disk and local storage
@@ -852,8 +859,11 @@ export default function App() {
     if (hasAmlakInItems(newOrder.items) && !newOrder.amlakLicense) {
       newOrder.amlakLicense = generateAmlakLicense(newOrder, currentUser);
     }
-    if (hasAiAppGenerationInItems(newOrder.items) && !newOrder.aiAppLicense) {
-      newOrder.aiAppLicense = generateAiAppLicense(newOrder, currentUser);
+    if (hasAiAppInItems(newOrder.items) && !newOrder.appLicense) {
+      const generatedAppLic = generateAppLicense(newOrder, currentUser);
+      newOrder.appLicense = generatedAppLic;
+      registerAppLicenseOnServer(generatedAppLic).catch(() => {});
+      setAiAppLicenseModalLicense(generatedAppLic);
     }
     setOrders((prev) => [newOrder, ...prev]);
     setCartItems([]);
@@ -918,9 +928,12 @@ export default function App() {
     if (isAmlakOrSub) {
       newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
     }
-    
-    if (product.hasAiAppGeneration) {
-      newAdminOrder.aiAppLicense = generateAiAppLicense(newAdminOrder, adminUser);
+
+    if (product.isAiAppProduct || hasAiAppInItems(newAdminOrder.items)) {
+      const generatedAppLic = generateAppLicense(newAdminOrder, adminUser);
+      newAdminOrder.appLicense = generatedAppLic;
+      registerAppLicenseOnServer(generatedAppLic).catch(() => {});
+      setAiAppLicenseModalLicense(generatedAppLic);
     }
 
     setOrders((prev) => [newAdminOrder, ...prev]);
@@ -983,9 +996,12 @@ export default function App() {
     if (hasAmlakInItems(safeItems)) {
       newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
     }
-    
-    if (hasAiAppGenerationInItems(safeItems)) {
-      newAdminOrder.aiAppLicense = generateAiAppLicense(newAdminOrder, adminUser);
+
+    if (hasAiAppInItems(safeItems)) {
+      const generatedAppLic = generateAppLicense(newAdminOrder, adminUser);
+      newAdminOrder.appLicense = generatedAppLic;
+      registerAppLicenseOnServer(generatedAppLic).catch(() => {});
+      setAiAppLicenseModalLicense(generatedAppLic);
     }
 
     setOrders((prev) => [newAdminOrder, ...prev]);
@@ -1672,30 +1688,30 @@ export default function App() {
               </div>
             )}
 
-            {/* کارت اختصاصی اطلاعات لایسنس اپلیکیشن هوش مصنوعی */}
-            {completedOrderReceipt.order.aiAppLicense && (
-              <div className="bg-gradient-to-br from-blue-500/15 to-indigo-600/10 border border-blue-500/40 rounded-2xl p-4 text-right space-y-3 shadow-lg text-xs mt-3">
-                <div className="flex items-center justify-between pb-2 border-b border-blue-500/30">
+            {/* کارت اختصاصی اطلاعات لایسنس و ورود به اپلیکیشن ویندوز / اندروید ساخته شده با هوش مصنوعی */}
+            {completedOrderReceipt.order.appLicense && (
+              <div className="bg-gradient-to-br from-indigo-950/40 via-[#180e38] to-purple-950/50 border border-amber-400/60 rounded-2xl p-4 text-right space-y-3 shadow-lg text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-purple-800/60">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">🤖</span>
-                    <span className="font-black text-blue-400">حساب کاربری اپلیکیشن هوش مصنوعی اختصاصی:</span>
+                    <span className="text-lg">⚡</span>
+                    <span className="font-black text-amber-300">حساب کاربری ورود به نرم‌افزار / اپلیکیشن:</span>
                   </div>
-                  <span className="bg-blue-500/20 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                    اشتراک {completedOrderReceipt.order.aiAppLicense.days} روزه فعال
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                    اشتراک {completedOrderReceipt.order.appLicense.days} روزه فعال
                   </span>
                 </div>
 
                 <div className="space-y-2 font-mono">
                   <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
-                    <span className="text-slate-400 font-sans text-[11px]">نام کاربری ورود:</span>
+                    <span className="text-slate-400 font-sans text-[11px]">نام کاربری ورود (Username):</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-white font-bold text-xs">{completedOrderReceipt.order.aiAppLicense.username}</span>
+                      <span className="text-amber-300 font-bold text-xs">{completedOrderReceipt.order.appLicense.username}</span>
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(completedOrderReceipt.order.aiAppLicense!.username);
-                          showToast('نام کاربری کپی شد.');
+                          navigator.clipboard.writeText(completedOrderReceipt.order.appLicense!.username);
+                          showToast('نام کاربری ورود کپی شد.');
                         }}
-                        className="text-[10px] text-blue-400 hover:text-blue-300 cursor-pointer font-sans bg-blue-500/20 px-1.5 py-0.5 rounded"
+                        className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans bg-amber-500/20 px-1.5 py-0.5 rounded"
                       >
                         کپی
                       </button>
@@ -1703,15 +1719,15 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
-                    <span className="text-slate-400 font-sans text-[11px]">رمز عبور اختصاصی:</span>
+                    <span className="text-slate-400 font-sans text-[11px]">رمز عبور ورود (Password):</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-blue-300 font-bold text-xs tracking-wider">{completedOrderReceipt.order.aiAppLicense.password}</span>
+                      <span className="text-emerald-300 font-bold text-xs tracking-wider">{completedOrderReceipt.order.appLicense.password}</span>
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(completedOrderReceipt.order.aiAppLicense!.password);
-                          showToast('رمز عبور کپی شد.');
+                          navigator.clipboard.writeText(completedOrderReceipt.order.appLicense!.password);
+                          showToast('رمز عبور ورود کپی شد.');
                         }}
-                        className="text-[10px] text-blue-400 hover:text-blue-300 cursor-pointer font-sans bg-blue-500/20 px-1.5 py-0.5 rounded"
+                        className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans bg-amber-500/20 px-1.5 py-0.5 rounded"
                       >
                         کپی
                       </button>
@@ -1719,9 +1735,18 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center gap-2 w-full py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 font-medium text-[11px] shadow-inner text-center px-2">
-                  <span>لطفاً اپلیکیشن مربوطه را دانلود و نصب کنید و سپس از این نام کاربری و رمز عبور برای ورود استفاده کنید. وقتی اشتراک منقضی شود به صورت خودکار خارج می‌شوید و نیاز به تمدید دارید.</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (completedOrderReceipt.order.appLicense) {
+                      setAiAppLicenseModalLicense(completedOrderReceipt.order.appLicense);
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>مشاهده جزئیات کامل لایسنس و راهنمای ورود به اپ</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
 
@@ -1848,6 +1873,14 @@ export default function App() {
           }}
         />
       )}
+
+      {/* AI App Subscription License Modal (Windows / Android) */}
+      <AppLicenseModal
+        isOpen={Boolean(aiAppLicenseModalLicense)}
+        license={aiAppLicenseModalLicense}
+        onClose={() => setAiAppLicenseModalLicense(null)}
+        onViewOrders={() => setUserOrdersModalOpen(true)}
+      />
 
       </Suspense>
     </div>

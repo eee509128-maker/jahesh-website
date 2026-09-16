@@ -21,11 +21,6 @@ export function hasAmlakInItems(items: CartItem[]): boolean {
   return items.some(isAmlakProduct);
 }
 
-export function hasAiAppGenerationInItems(items: CartItem[]): boolean {
-  if (!Array.isArray(items)) return false;
-  return items.some((item) => Boolean(item?.product?.hasAiAppGeneration));
-}
-
 /**
  * Deterministic hash function ensuring password never changes randomly
  */
@@ -171,57 +166,6 @@ export function saveAmlakLicenseLocally(license: AmlakSubscriptionLicense): void
   } catch (err) {
     console.warn('Error saving amlak license locally:', err);
   }
-}
-
-export function generateAiAppLicense(
-  order: Partial<Order>,
-  user?: User | null
-): AmlakSubscriptionLicense {
-  let exactUsername = '';
-  if (user?.username && user.username.trim().length > 0) {
-    exactUsername = user.username.trim();
-  } else if (order.customerPhone && order.customerPhone.trim().length > 0) {
-    exactUsername = order.customerPhone.trim();
-  } else if (user?.phone && user.phone.trim().length > 0) {
-    exactUsername = user.phone.trim();
-  } else if (order.trackingCode) {
-    exactUsername = order.trackingCode.trim();
-  } else if (order.id) {
-    exactUsername = order.id.trim();
-  } else {
-    exactUsername = 'ai_app_user';
-  }
-
-  if (order.aiAppLicense && order.aiAppLicense.password && order.aiAppLicense.username) {
-    return order.aiAppLicense;
-  }
-
-  const generatedPassword = generateDeterministicAmlakPassword(exactUsername + '_ai');
-  const licenseKey = generateDeterministicLicenseKey(exactUsername + '_ai');
-
-  const aiAppItem = (order.items || []).find((i) => i.product?.hasAiAppGeneration);
-  const days = aiAppItem?.subscriptionDays || 30;
-
-  const now = new Date();
-  const expireDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-
-  const license: AmlakSubscriptionLicense = {
-    username: exactUsername,
-    password: generatedPassword,
-    licenseKey,
-    buyerName: order.customerName || user?.fullName || exactUsername,
-    phone: order.customerPhone || user?.phone || '',
-    days,
-    startDate: now.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }),
-    expiresAt: expireDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }),
-    status: 'active',
-  };
-
-  // We reuse the same saving logic
-  saveAmlakLicenseLocally(license);
-  syncAmlakLicenseWithServer(license).catch(() => {});
-
-  return license;
 }
 
 export function getLocalAmlakLicenses(): AmlakSubscriptionLicense[] {
