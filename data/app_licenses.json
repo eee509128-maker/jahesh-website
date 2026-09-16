@@ -1,5 +1,20 @@
 [
   {
+    "id": "lic_auto_1789596863311_num2",
+    "username": "zahra",
+    "password": "JK-5813Z6A6",
+    "licenseKey": "JA-APP-2026-WEIGAV",
+    "productId": "pkg-amlak-jahesh",
+    "productTitle": "نرم‌افزار جامع مدیریت املاک جهش",
+    "appName": "سامانه مدیریت املاک جهش",
+    "buyerName": "zahra",
+    "phone": "",
+    "days": 30,
+    "startDate": "2026-09-16T22:14:23.311Z",
+    "expiresAt": "2026-10-16T22:14:23.311Z",
+    "status": "active"
+  },
+  {
     "id": "lic-admin-master",
     "username": "jahesh",
     "password": "jahesh1395",
