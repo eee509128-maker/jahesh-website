@@ -1605,6 +1605,34 @@ app.post(['/api/app-auth/register-license', '/jaheshkala/api/app-auth/register-l
 app.get(['/api/app-auth', '/api/app-auth/licenses', '/jaheshkala/api/app-auth', '/jaheshkala/api/app-auth/licenses'], (_req, res) => {
   try {
     const licenses = readLicensesFromDisk();
+    
+    // Also load amlak licenses to ensure complete coverage in lists and counts
+    try {
+      const amlakLicensesFile = path.join(__dirname, 'data', 'amlak_licenses.json');
+      if (fs.existsSync(amlakLicensesFile)) {
+        const amlakRaw = fs.readFileSync(amlakLicensesFile, 'utf8');
+        const amlakLicenses = JSON.parse(amlakRaw || '[]');
+        if (Array.isArray(amlakLicenses)) {
+          amlakLicenses.forEach((amlakLic) => {
+            const formatted = {
+              ...amlakLic,
+              productId: amlakLic.productId || 'pkg-amlak-jahesh',
+              productTitle: amlakLic.productTitle || 'نرم‌افزار جامع مدیریت املاک جهش',
+              appName: amlakLic.appName || 'سامانه مدیریت املاک جهش',
+            };
+            const exists = licenses.some(
+              (l) => l.id === formatted.id || (l.username && formatted.username && l.username.trim().toLowerCase() === formatted.username.trim().toLowerCase() && l.productId === formatted.productId)
+            );
+            if (!exists) {
+              licenses.push(formatted);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('GET /api/app-auth could not load amlak_licenses:', e);
+    }
+
     const now = new Date();
     const enriched = licenses.map((lic) => {
       let startDate = lic.startDate ? new Date(lic.startDate) : now;
@@ -1837,7 +1865,8 @@ app.post('/api/zibal-verify', async (req, res) => {
             paymentGateway: 'زیبال (Zibal - پرداخت موفق شاپرک)',
           };
           writeOrdersToDisk(currentOrders);
-          console.log(`[Zibal Verify] Updated order ${currentOrders[oIdx].id} on disk to confirmed!`);
+          syncOrderLicenseToDisk(currentOrders[oIdx]);
+          console.log(`[Zibal Verify] Updated order ${currentOrders[oIdx].id} on disk and synced license!`);
         }
       } catch (diskErr) {
         console.warn('[Zibal Verify] Could not auto-update order on disk:', diskErr);
