@@ -19,8 +19,20 @@
       "destination": "/assets/47887509.txt"
     },
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
+      "source": "/api/products/save",
+      "destination": "/api/products-save"
+    },
+    {
+      "source": "/api/products",
+      "destination": "/api/products"
+    },
+    {
+      "source": "/api/app-license/:path*",
+      "destination": "/api/app-license"
+    },
+    {
+      "source": "/images/:path*",
+      "destination": "/jaheshkala/images/:path*"
     },
     {
       "source": "/jaheshkala/images/:path*",
@@ -39,7 +51,7 @@
       "destination": "/jaheshkala/index.html"
     },
     {
-      "source": "/jaheshkala/((?!.*\\.[\\w]+$).*)",
+      "source": "/jaheshkala/:match*",
       "destination": "/jaheshkala/index.html"
     }
   ]

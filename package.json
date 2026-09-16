@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npm run build && node server.js",
+    "dev": "node server.js",
     "build": "cd jaheshkala-app && npm install && npx vite build",
     "lint": "node --check server.js",
     "start": "node server.js"
