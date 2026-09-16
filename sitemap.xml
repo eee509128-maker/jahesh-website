@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- 1. جهش آی تی (صفحه اصلی و خدمات فناوری اطلاعات) -->
+  <url>
+    <loc>https://jaheshit.ir/</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- 2. فروشگاه آنلاین جهش کالا -->
+  <url>
+    <loc>https://jaheshit.ir/jaheshkala/</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <!-- 3. انجمن علمی جهش (تاسیس ۱۳۹۵) -->
+  <url>
+    <loc>https://jaheshit.ir/drbarh-anjmn/</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- 4. مستندات هوش مصنوعی (GEO / LLMs context) -->
+  <url>
+    <loc>https://jaheshit.ir/llms.txt</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+  <url>
+    <loc>https://jaheshit.ir/llms-full.txt</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <!-- سایر بخش‌ها -->
+  <url>
+    <loc>https://jaheshit.ir/abzar-jahesh/</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://jaheshit.ir/akhbar/</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://jaheshit.ir/hwsh-msnway/</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://jaheshit.ir/download-app/</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+  </url>
+</urlset>
