@@ -9,7 +9,7 @@ import {
   Coins, Dumbbell, Truck, BookOpen, Layers
 } from 'lucide-react';
 import { User as UserType } from '../types';
-import { registerUserInDb, findUserInDb, checkUsernameAvailability, checkPhoneAvailability } from '../lib/dbService';
+import { registerUserInDb, findUserInDb } from '../lib/dbService';
 import { AntiBotGuard } from '../security/antiBot';
 import { IRANIAN_GUILDS, GuildItem } from '../data/guildsData';
 
@@ -103,6 +103,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setUsernameStatus('checking');
     const timer = setTimeout(async () => {
       try {
+        const { checkUsernameAvailability } = await import('../lib/dbService');
         const res = await checkUsernameAvailability(clean);
         if (!res.available) {
           setUsernameStatus('taken');
@@ -247,6 +248,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
 
         // Check if username or phone already exists in system across all devices
+        const { checkUsernameAvailability, checkPhoneAvailability } = await import('../lib/dbService');
+        
         const usernameCheck = await checkUsernameAvailability(cleanUsername);
         if (!usernameCheck.available) {
           setErrorMsg('نام کاربری توسط فرد دیگری استفاده شده');

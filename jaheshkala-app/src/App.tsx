@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, AlertTriangle
+  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
@@ -27,10 +27,6 @@ import {
   parseOrderTimestamp,
   safeSetLocalStorage,
   subscribeToProductsRealtime,
-  fetchAllUsersFromDb,
-  updateUserInDb,
-  deleteUserFromDb,
-  registerUserInDb,
 } from './lib/dbService';
 import {
   verifyZibalPayment,
@@ -38,14 +34,10 @@ import {
   clearPendingOrder,
   ZIBAL_DEFAULT_MERCHANT,
 } from './lib/zibalService';
-import {
-  hasAmlakInItems,
-  generateAmlakLicense,
-  hasAiAppGenerationInItems,
-  generateAiAppLicense,
-  hasAppConnectionInItems,
-  generateAppSubscriptionCredential,
-} from './lib/amlakLicenseService';
+import { hasAmlakInItems, generateAmlakLicense } from './lib/amlakLicenseService';
+import { hasAiAppInItems, generateAppLicense, registerAppLicenseOnServer, checkLicenseStatus } from './lib/appLicenseService';
+import { AppSubscriptionLicense } from './types';
+import { AppLicenseModal } from './components/AppLicenseModal';
 import { isProductMatchingCategoryOrGuild, isProductMatchingSearchQuery } from './lib/guildMatcher';
 import confetti from 'canvas-confetti';
 
@@ -110,79 +102,6 @@ export function sanitizeProductsList(list: any[]): Product[] {
   if (!Array.isArray(list)) return INITIAL_PRODUCTS;
   const cleaned = list.map(sanitizeProduct).filter((p): p is Product => p !== null);
   return cleaned.length > 0 ? cleaned : INITIAL_PRODUCTS;
-}
-
-interface AdminErrorBoundaryProps {
-  children: React.ReactNode;
-  onClose: () => void;
-}
-
-interface AdminErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-}
-
-class AdminErrorBoundary extends React.Component<AdminErrorBoundaryProps, AdminErrorBoundaryState> {
-  constructor(props: AdminErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error): AdminErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('CRITICAL: AdminPanel caught error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="bg-[#120a2b] border border-rose-500/50 rounded-2xl p-6 max-w-md w-full text-center space-y-4 shadow-2xl text-slate-200">
-            <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-white">خطا در پردازش پنل مدیریت</h3>
-            <p className="text-xs text-slate-300">
-              یک خطای غیرمنتظره در پردازش اطلاعات رخ داد:
-            </p>
-            <div className="p-3 bg-rose-950/40 rounded-xl border border-rose-900/50 text-[11px] text-rose-300 font-mono text-left overflow-auto max-h-24">
-              {this.state.error?.message || 'Unknown Error'}
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-              <button
-                onClick={() => this.setState({ hasError: false, error: null })}
-                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all cursor-pointer"
-              >
-                تلاش مجدد
-              </button>
-              <button
-                onClick={() => {
-                  try {
-                    localStorage.removeItem('jahesh_orders');
-                    localStorage.removeItem('jahesh_products');
-                  } catch {}
-                  window.location.reload();
-                }}
-                className="px-4 py-2 rounded-xl bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700/50 text-xs font-bold transition-all cursor-pointer"
-              >
-                پاکسازی کش موقت
-              </button>
-              <button
-                onClick={this.props.onClose}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
-              >
-                بستن
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 export default function App() {
@@ -306,6 +225,7 @@ export default function App() {
   const [footerInfoModalOpen, setFooterInfoModalOpen] = useState(false);
   const [amlakModalOpen, setAmlakModalOpen] = useState(false);
   const [guildsModalOpen, setGuildsModalOpen] = useState(false);
+  const [aiAppLicenseModalLicense, setAiAppLicenseModalLicense] = useState<AppSubscriptionLicense | null>(null);
   const [activeFooterTopic, setActiveFooterTopic] = useState('terms');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -479,13 +399,12 @@ export default function App() {
         if (hasAmlakInItems(fallbackItems) && !finalOrder.amlakLicense) {
           finalOrder.amlakLicense = pendingOrder?.amlakLicense || generateAmlakLicense(finalOrder, activeUser);
         }
-        
-        if (hasAiAppGenerationInItems(fallbackItems) && !finalOrder.aiAppLicense) {
-          finalOrder.aiAppLicense = pendingOrder?.aiAppLicense || generateAiAppLicense(finalOrder, activeUser);
-        }
 
-        if (hasAppConnectionInItems(fallbackItems) && !finalOrder.appCredentials) {
-          finalOrder.appCredentials = pendingOrder?.appCredentials || generateAppSubscriptionCredential(finalOrder, activeUser);
+        if (hasAiAppInItems(fallbackItems) && !finalOrder.appLicense) {
+          const generatedAppLic = pendingOrder?.appLicense || generateAppLicense(finalOrder, activeUser);
+          finalOrder.appLicense = generatedAppLic;
+          registerAppLicenseOnServer(generatedAppLic).catch(() => {});
+          setAiAppLicenseModalLicense(generatedAppLic);
         }
 
         // 1. Save to DB (Supabase cloud), server disk and local storage
@@ -583,19 +502,22 @@ export default function App() {
         }
         
         // Load users list once
-        const allUsers = await fetchAllUsersFromDb();
-        if (isMounted && allUsers) {
-          setUsersList(allUsers);
+        const { fetchAllUsersFromDb } = await import('./lib/dbService');
+        if (fetchAllUsersFromDb) {
+          const allUsers = await fetchAllUsersFromDb();
+          if (isMounted && allUsers) {
+            setUsersList(allUsers);
 
-          // Auto synchronize current logged in user's role from cloud
-          const rawStored = localStorage.getItem('jahesh_current_user');
-          const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
-          if (activeUser) {
-            const cloudUser = allUsers.find((u) => areSameUser(u, activeUser));
-            if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
-              const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
-              setCurrentUser(updated);
-              safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
+            // Auto synchronize current logged in user's role from cloud
+            const rawStored = localStorage.getItem('jahesh_current_user');
+            const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
+            if (activeUser) {
+              const cloudUser = allUsers.find((u) => areSameUser(u, activeUser));
+              if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
+                const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
+                setCurrentUser(updated);
+                safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
+              }
             }
           }
         }
@@ -721,7 +643,7 @@ export default function App() {
       return;
     }
 
-    const isAmlakOrSub = Boolean(product.isSubscription || product.hasAppConnection || product.hasAiAppGeneration || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
+    const isAmlakOrSub = Boolean(product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
 
     if (isAmlakOrSub && !subscriptionDays && !selectedPlan) {
       setDetailModalProduct(null);
@@ -827,7 +749,7 @@ export default function App() {
       return;
     }
 
-    const isAmlakOrSub = Boolean(product.isSubscription || product.hasAppConnection || product.hasAiAppGeneration || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
+    const isAmlakOrSub = Boolean(product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
 
     if (isAmlakOrSub && !subscriptionDays && !selectedPlan) {
       setDetailModalProduct(null);
@@ -936,11 +858,11 @@ export default function App() {
     if (hasAmlakInItems(newOrder.items) && !newOrder.amlakLicense) {
       newOrder.amlakLicense = generateAmlakLicense(newOrder, currentUser);
     }
-    if (hasAiAppGenerationInItems(newOrder.items) && !newOrder.aiAppLicense) {
-      newOrder.aiAppLicense = generateAiAppLicense(newOrder, currentUser);
-    }
-    if (hasAppConnectionInItems(newOrder.items) && !newOrder.appCredentials) {
-      newOrder.appCredentials = generateAppSubscriptionCredential(newOrder, currentUser);
+    if (hasAiAppInItems(newOrder.items) && !newOrder.appLicense) {
+      const generatedAppLic = generateAppLicense(newOrder, currentUser);
+      newOrder.appLicense = generatedAppLic;
+      registerAppLicenseOnServer(generatedAppLic).catch(() => {});
+      setAiAppLicenseModalLicense(generatedAppLic);
     }
     setOrders((prev) => [newOrder, ...prev]);
     setCartItems([]);
@@ -966,7 +888,7 @@ export default function App() {
     };
 
     const orderId = 'JAHESH-ADM-' + Math.floor(10000 + Math.random() * 90000).toString();
-    const isAmlakOrSub = Boolean(product.isSubscription || product.hasAppConnection || product.hasAiAppGeneration || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
+    const isAmlakOrSub = Boolean(product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
     
     const newAdminOrder: Order = {
       id: orderId,
@@ -1005,13 +927,12 @@ export default function App() {
     if (isAmlakOrSub) {
       newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
     }
-    
-    if (product.hasAiAppGeneration) {
-      newAdminOrder.aiAppLicense = generateAiAppLicense(newAdminOrder, adminUser);
-    }
 
-    if (product.hasAppConnection || product.hasAiAppGeneration) {
-      newAdminOrder.appCredentials = generateAppSubscriptionCredential(newAdminOrder, adminUser);
+    if (product.isAiAppProduct || hasAiAppInItems(newAdminOrder.items)) {
+      const generatedAppLic = generateAppLicense(newAdminOrder, adminUser);
+      newAdminOrder.appLicense = generatedAppLic;
+      registerAppLicenseOnServer(generatedAppLic).catch(() => {});
+      setAiAppLicenseModalLicense(generatedAppLic);
     }
 
     setOrders((prev) => [newAdminOrder, ...prev]);
@@ -1074,9 +995,12 @@ export default function App() {
     if (hasAmlakInItems(safeItems)) {
       newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
     }
-    
-    if (hasAiAppGenerationInItems(safeItems)) {
-      newAdminOrder.aiAppLicense = generateAiAppLicense(newAdminOrder, adminUser);
+
+    if (hasAiAppInItems(safeItems)) {
+      const generatedAppLic = generateAppLicense(newAdminOrder, adminUser);
+      newAdminOrder.appLicense = generatedAppLic;
+      registerAppLicenseOnServer(generatedAppLic).catch(() => {});
+      setAiAppLicenseModalLicense(generatedAppLic);
     }
 
     setOrders((prev) => [newAdminOrder, ...prev]);
@@ -1209,6 +1133,7 @@ export default function App() {
   // User Management Actions
   const handleDeleteUser = async (userId: string) => {
     setUsersList((prev) => prev.filter((u) => u.id !== userId));
+    const { deleteUserFromDb } = await import('./lib/dbService');
     await deleteUserFromDb(userId);
     showToast('کاربر با موفقیت حذف شد.');
   };
@@ -1236,6 +1161,7 @@ export default function App() {
     }
 
     // 3. Persist across multi-layered storage (Local, Server, Supabase)
+    const { updateUserInDb, fetchAllUsersFromDb } = await import('./lib/dbService');
     await updateUserInDb(updatedUser);
 
     // 4. Refetch all users to make sure state is 100% in sync without reverting the role
@@ -1257,6 +1183,7 @@ export default function App() {
 
   const handleAddNewUser = async (newUser: User, initialPass: string = '123456') => {
     setUsersList((prev) => [newUser, ...prev]);
+    const { registerUserInDb } = await import('./lib/dbService');
     await registerUserInDb(newUser, initialPass);
     showToast(`کاربر جدید (${newUser.fullName}) با موفقیت ایجاد شد.`);
   };
@@ -1379,6 +1306,8 @@ export default function App() {
 
   return (
     <div className={`min-h-screen flex flex-col font-['Vazirmatn',sans-serif] transition-colors duration-200 ${theme === 'light' ? 'theme-light bg-[#fbf9ff] text-slate-800' : 'theme-dark bg-[#0b0819] text-slate-100'}`}>
+      <Suspense fallback={null}>
+      
       {/* Toast popup */}
       {toastMessage && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-purple-700 to-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-2xl shadow-xl border border-purple-400/40 flex items-center gap-2 animate-in fade-in">
@@ -1400,7 +1329,13 @@ export default function App() {
           if (!currentUser) setAuthModalOpen(true);
           else setUserOrdersModalOpen(true);
         }}
-        onOpenAdmin={() => setAdminModalOpen(true)}
+        onOpenAdmin={() => {
+          if (currentUser?.role === 'admin') {
+            setAdminModalOpen(true);
+          } else {
+            setAuthModalOpen(true);
+          }
+        }}
         onOpenProfile={() => setUserProfileModalOpen(true)}
         onLogout={handleLogout}
         onScrollToIncredible={scrollToIncredible}
@@ -1588,7 +1523,7 @@ export default function App() {
       </main>
 
       {/* 7. DIGIKALA FLOATING HEADSET SUPPORT CHAT (Icon on bottom-left) */}
-      <LiveChatWidget currentUser={currentUser} />
+      <Suspense fallback={null}><LiveChatWidget currentUser={currentUser} /></Suspense>
 
       {/* 8. DIGIKALA FOOTER */}
       <DigikalaFooter
@@ -1616,7 +1551,7 @@ export default function App() {
       />
 
       {/* Digikala Cart Modal */}
-      <CartModal
+      <Suspense fallback={null}><CartModal
         isOpen={cartModalOpen}
         onClose={() => setCartModalOpen(false)}
         cartItems={resolvedCartItems}
@@ -1638,7 +1573,7 @@ export default function App() {
           setPaymentModalOpen(true);
         }}
         coupons={coupons}
-      />
+      /></Suspense>
 
       {/* Terms Modal (Rules protecting Team Jahesh) */}
       <TermsModal
@@ -1758,108 +1693,67 @@ export default function App() {
               </div>
             )}
 
-            {/* کارت اختصاصی اطلاعات لایسنس و دسترسی اپلیکیشن ویندوز و اندروید */}
-            {(completedOrderReceipt.order.appCredentials || completedOrderReceipt.order.aiAppLicense) && (() => {
-              const cred = completedOrderReceipt.order.appCredentials || {
-                appId: 'jahesh-app',
-                appName: 'اپلیکیشن اختصاصی جهش‌کالا',
-                username: completedOrderReceipt.order.aiAppLicense!.username,
-                password: completedOrderReceipt.order.aiAppLicense!.password,
-                days: completedOrderReceipt.order.aiAppLicense!.days,
-                startDate: new Date().toISOString(),
-                expiresAt: new Date(Date.now() + (completedOrderReceipt.order.aiAppLicense!.days || 30) * 24 * 60 * 60 * 1000).toISOString(),
-                windowsDownloadUrl: undefined,
-                androidDownloadUrl: undefined,
-                status: 'active' as const,
-              };
+            {/* کارت اختصاصی اطلاعات لایسنس و ورود به اپلیکیشن ویندوز / اندروید ساخته شده با هوش مصنوعی */}
+            {completedOrderReceipt.order.appLicense && (
+              <div className="bg-gradient-to-br from-indigo-950/40 via-[#180e38] to-purple-950/50 border border-amber-400/60 rounded-2xl p-4 text-right space-y-3 shadow-lg text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-purple-800/60">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⚡</span>
+                    <span className="font-black text-amber-300">حساب کاربری ورود به نرم‌افزار / اپلیکیشن:</span>
+                  </div>
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                    اشتراک {completedOrderReceipt.order.appLicense.days} روزه فعال
+                  </span>
+                </div>
 
-              return (
-                <div className="bg-gradient-to-br from-cyan-950/70 via-[#0a122c] to-blue-950/70 border-2 border-cyan-400/60 rounded-2xl p-4 text-right space-y-3 shadow-xl text-xs mt-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-cyan-500/30">
+                <div className="space-y-2 font-mono">
+                  <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                    <span className="text-slate-400 font-sans text-[11px]">نام کاربری ورود (Username):</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">📱</span>
-                      <div>
-                        <span className="font-black text-cyan-300 block text-xs sm:text-sm">
-                          اطلاعات ورود به {cred.appName}:
-                        </span>
-                        <span className="text-[10px] text-slate-300">
-                          شناسه اپلیکیشن: <strong className="font-mono text-cyan-200">{cred.appId}</strong>
-                        </span>
-                      </div>
-                    </div>
-                    <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2.5 py-0.5 rounded-full text-[10px] font-bold">
-                      اشتراک {cred.days} روزه فعال
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 font-mono">
-                    <div className="flex items-center justify-between bg-black/50 px-3 py-2 rounded-xl border border-cyan-500/20">
-                      <span className="text-slate-400 font-sans text-[11px]">نام کاربری ورود به اپ:</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-white font-bold text-xs">{cred.username}</span>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(cred.username);
-                            showToast('نام کاربری اپلیکیشن کپی شد.');
-                          }}
-                          className="text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer font-sans bg-cyan-500/20 px-2 py-0.5 rounded"
-                        >
-                          کپی
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between bg-black/50 px-3 py-2 rounded-xl border border-cyan-500/20">
-                      <span className="text-slate-400 font-sans text-[11px]">رمز عبور اختصاصی:</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-cyan-300 font-bold text-xs tracking-wider">{cred.password}</span>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(cred.password);
-                            showToast('رمز عبور اپلیکیشن کپی شد.');
-                          }}
-                          className="text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer font-sans bg-cyan-500/20 px-2 py-0.5 rounded"
-                        >
-                          کپی
-                        </button>
-                      </div>
+                      <span className="text-amber-300 font-bold text-xs">{completedOrderReceipt.order.appLicense.username}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(completedOrderReceipt.order.appLicense!.username);
+                          showToast('نام کاربری ورود کپی شد.');
+                        }}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans bg-amber-500/20 px-1.5 py-0.5 rounded"
+                      >
+                        کپی
+                      </button>
                     </div>
                   </div>
 
-                  {/* لینک‌های دانلود نسخه ویندوز و اندروید */}
-                  {(cred.windowsDownloadUrl || cred.androidDownloadUrl) && (
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      {cred.windowsDownloadUrl && (
-                        <a
-                          href={cred.windowsDownloadUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 min-w-[130px] px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md no-underline transition-all"
-                        >
-                          <span>دانلود نسخه ویندوز</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                      {cred.androidDownloadUrl && (
-                        <a
-                          href={cred.androidDownloadUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 min-w-[130px] px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md no-underline transition-all"
-                        >
-                          <span>دانلود نسخه اندروید</span>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      )}
+                  <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                    <span className="text-slate-400 font-sans text-[11px]">رمز عبور ورود (Password):</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-300 font-bold text-xs tracking-wider">{completedOrderReceipt.order.appLicense.password}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(completedOrderReceipt.order.appLicense!.password);
+                          showToast('رمز عبور ورود کپی شد.');
+                        }}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans bg-amber-500/20 px-1.5 py-0.5 rounded"
+                      >
+                        کپی
+                      </button>
                     </div>
-                  )}
-
-                  <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-200 font-medium text-[11px] leading-relaxed text-center">
-                    با وارد کردن نام کاربری و رمز عبور فوق در اپلیکیشن ویندوز یا موبایل، اشتراک شما به صورت خودکار شناسایی و فعال می‌گردد. پس از پایان اعتبار ({cred.days} روزه)، جهت تمدید اشتراک می‌توانید مجدداً از سایت جهش‌کالا اقدام فرمایید.
                   </div>
                 </div>
-              );
-            })()}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (completedOrderReceipt.order.appLicense) {
+                      setAiAppLicenseModalLicense(completedOrderReceipt.order.appLicense);
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>مشاهده جزئیات کامل لایسنس و راهنمای ورود به اپ</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             <div className="flex gap-2.5 pt-2">
               <button
@@ -1891,36 +1785,34 @@ export default function App() {
 
       {/* Admin Panel (Orders, New Product Form, Zibal Settings, Coupons, Users, Banners) */}
       {adminModalOpen && (
-        <AdminErrorBoundary onClose={() => setAdminModalOpen(false)}>
-          <AdminPanel
-            isOpen={adminModalOpen}
-            onClose={() => setAdminModalOpen(false)}
-            currentUser={currentUser}
-            onAdminInstantPurchase={handleAdminInstantPurchase}
-            onOpenAmlakApp={() => setAmlakModalOpen(true)}
-            orders={orders}
-            onUpdateOrderStatus={handleUpdateOrderStatus}
-            onDeleteOrder={handleDeleteOrder}
-            onClearAllOrders={handleClearAllOrders}
-            products={products}
-            onAddNewProduct={handleAddNewProduct}
-            onUpdateProduct={handleUpdateProduct}
-            onDeleteProduct={handleDeleteProduct}
-            zibalMerchant={zibalMerchant}
-            onUpdateZibalMerchant={handleUpdateZibalMerchant}
-            coupons={coupons}
-            onAddNewCoupon={handleAddNewCoupon}
-            onDeleteCoupon={handleDeleteCoupon}
-            onToggleCoupon={handleToggleCoupon}
-            usersList={usersList}
-            onDeleteUser={handleDeleteUser}
-            onUpdateUser={handleUpdateUser}
-            onAddNewUser={handleAddNewUser}
-            banners={banners}
-            onSaveBanner={handleSaveBanner}
-            onDeleteBanner={handleDeleteBanner}
-          />
-        </AdminErrorBoundary>
+        <AdminPanel
+          isOpen={adminModalOpen}
+          onClose={() => setAdminModalOpen(false)}
+          currentUser={currentUser}
+          onAdminInstantPurchase={handleAdminInstantPurchase}
+          onOpenAmlakApp={() => setAmlakModalOpen(true)}
+          orders={orders}
+          onUpdateOrderStatus={handleUpdateOrderStatus}
+          onDeleteOrder={handleDeleteOrder}
+          onClearAllOrders={handleClearAllOrders}
+          products={products}
+          onAddNewProduct={handleAddNewProduct}
+          onUpdateProduct={handleUpdateProduct}
+          onDeleteProduct={handleDeleteProduct}
+          zibalMerchant={zibalMerchant}
+          onUpdateZibalMerchant={handleUpdateZibalMerchant}
+          coupons={coupons}
+          onAddNewCoupon={handleAddNewCoupon}
+          onDeleteCoupon={handleDeleteCoupon}
+          onToggleCoupon={handleToggleCoupon}
+          usersList={usersList}
+          onDeleteUser={handleDeleteUser}
+          onUpdateUser={handleUpdateUser}
+          onAddNewUser={handleAddNewUser}
+          banners={banners}
+          onSaveBanner={handleSaveBanner}
+          onDeleteBanner={handleDeleteBanner}
+        />
       )}
 
       {/* User Orders Modal */}
@@ -1988,6 +1880,16 @@ export default function App() {
           }}
         />
       )}
+
+      {/* AI App Subscription License Modal (Windows / Android) */}
+      <AppLicenseModal
+        isOpen={Boolean(aiAppLicenseModalLicense)}
+        license={aiAppLicenseModalLicense}
+        onClose={() => setAiAppLicenseModalLicense(null)}
+        onViewOrders={() => setUserOrdersModalOpen(true)}
+      />
+
+      </Suspense>
     </div>
   );
 }

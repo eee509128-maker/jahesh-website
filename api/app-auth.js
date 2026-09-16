@@ -1,20 +1,52 @@
 import fs from 'fs';
 import path from 'path';
 
-const ORDERS_FILE = path.join(process.cwd(), 'data', 'orders.json');
-const USERS_FILE = path.join(process.cwd(), 'data', 'users.json');
+const LICENSES_FILE = path.join(process.cwd(), 'data', 'app_licenses.json');
 
-function readOrders() {
-  if (fs.existsSync(ORDERS_FILE)) {
+function hashString(str) {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) + hash + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
+function generateDeterministicAppPassword(seed) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const cleanSeed = (seed || 'jahesh').toLowerCase().trim();
+  const num = hashString(cleanSeed + '_jahesh_app_secret_salt_2026');
+  const digits = 1000 + (num % 9000);
+  let letters = '';
+  let temp = Math.floor(num / 17);
+  for (let i = 0; i < 4; i++) {
+    letters += chars[temp % chars.length];
+    temp = Math.floor(temp / chars.length) + (i * 5) + 2;
+  }
+  return `JK-${digits}${letters}`;
+}
+
+function readLicenses() {
+  if (fs.existsSync(LICENSES_FILE)) {
     try {
-      const raw = fs.readFileSync(ORDERS_FILE, 'utf8');
+      const raw = fs.readFileSync(LICENSES_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     } catch (e) {
-      console.warn('Orders read warning:', e);
+      console.warn('Licenses read error:', e);
     }
   }
   return [];
+}
+
+function writeLicenses(licenses) {
+  try {
+    const dir = path.dirname(LICENSES_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(LICENSES_FILE, JSON.stringify(licenses, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('Licenses write error:', e);
+  }
 }
 
 export default async function handler(req, res) {
@@ -24,145 +56,123 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (req.method === 'GET') {
-    return res.status(200).json({
-      status: 'online',
-      service: 'JaheshKala App Subscription & Auth API',
-      version: '2.0.0',
-      description: 'API جهت احراز هویت و بررسی اعتبار لایسنس کاربران اپلیکیشن‌های ویندوز و اندروید',
-      endpoint: 'POST /api/app-auth',
-      samplePayload: {
-        username: 'user_phone_or_code',
-        password: 'user_password',
-        appId: 'pkg-identifier'
-      }
-    });
-  }
+  const url = req.url || '';
+  const isRegister = url.includes('/register-license');
+  const isVerify = url.includes('/verify');
 
   if (req.method === 'POST') {
-    try {
-      const { username, password, appId } = req.body || {};
+    const body = req.body || {};
 
-      if (!username || !password) {
-        return res.status(400).json({
-          success: false,
-          status: 'missing_fields',
-          message: 'لطفاً نام کاربری و کلمه عبور را وارد نمایید.'
-        });
+    if (isRegister) {
+      if (!body.id || !body.username) {
+        return res.status(400).json({ success: false, error: 'Invalid license payload' });
       }
-
-      const cleanUsername = String(username).trim();
-      const cleanPassword = String(password).trim();
-      const cleanAppId = appId ? String(appId).trim() : '';
-
-      // 1. Check local orders
-      const orders = readOrders();
-      let matchedCred = null;
-      let matchedOrder = null;
-
-      for (const ord of orders) {
-        // Check order.appCredentials
-        if (ord.appCredentials) {
-          const cred = ord.appCredentials;
-          const uMatch = String(cred.username).trim().toLowerCase() === cleanUsername.toLowerCase() ||
-                         (ord.customerPhone && ord.customerPhone.trim() === cleanUsername);
-          const pMatch = String(cred.password).trim() === cleanPassword;
-          const appMatch = !cleanAppId || !cred.appId || cred.appId === cleanAppId;
-
-          if (uMatch && pMatch && appMatch) {
-            matchedCred = cred;
-            matchedOrder = ord;
-            break;
-          }
-        }
-
-        // Also check amlakLicense / aiAppLicense for backward compatibility
-        const lic = ord.amlakLicense || ord.aiAppLicense;
-        if (lic) {
-          const uMatch = String(lic.username).trim().toLowerCase() === cleanUsername.toLowerCase() ||
-                         (ord.customerPhone && ord.customerPhone.trim() === cleanUsername);
-          const pMatch = String(lic.password).trim() === cleanPassword;
-          if (uMatch && pMatch) {
-            matchedCred = {
-              appId: cleanAppId || 'jahesh-app',
-              appName: 'اپلیکیشن جهش کالا',
-              username: lic.username,
-              password: lic.password,
-              days: lic.days || 30,
-              startDate: lic.startDate,
-              expiresAt: lic.expiresAt,
-              status: lic.status || 'active'
-            };
-            matchedOrder = ord;
-            break;
-          }
-        }
+      const list = readLicenses();
+      const idx = list.findIndex((l) => l.id === body.id || (l.username === body.username && l.productId === body.productId));
+      let updated;
+      if (idx >= 0) {
+        updated = [...list];
+        updated[idx] = { ...list[idx], ...body };
+      } else {
+        updated = [body, ...list];
       }
+      writeLicenses(updated);
+      return res.status(200).json({ success: true, count: updated.length, license: body });
+    }
 
-      // 2. If not found in local orders, check master users or fallback master accounts
-      if (!matchedCred && cleanUsername === 'admin' && cleanPassword === 'admin') {
-        matchedCred = {
-          appId: cleanAppId || 'jahesh-app',
-          appName: 'نسخه مدیریت سیستم',
-          username: 'admin',
-          days: 3650,
-          startDate: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 3650 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'active'
-        };
-      }
+    // Authenticate or Verify
+    const { username, password, productId, token } = body;
+    const cleanUser = String(username || '').trim();
+    const cleanPass = String(password || '').trim();
+    const cleanProd = String(productId || '').trim();
 
-      if (!matchedCred) {
-        return res.status(401).json({
-          success: false,
-          status: 'invalid_credentials',
-          message: 'نام کاربری یا کلمه عبور وارد شده معتبر نمی‌باشد.'
-        });
-      }
+    const list = readLicenses();
 
-      // Check subscription validity
-      const nowTime = Date.now();
-      const expiresTime = matchedCred.expiresAt ? new Date(matchedCred.expiresAt).getTime() : 0;
-      const isExpired = expiresTime > 0 && expiresTime < nowTime;
-      const daysRemaining = Math.max(0, Math.ceil((expiresTime - nowTime) / (1000 * 60 * 60 * 24)));
+    // 1. Check for exact match on THIS productId
+    const found = list.find((lic) => {
+      const uMatch = lic.username && (lic.username === cleanUser || lic.phone === cleanUser);
+      const pMatch = !cleanProd || lic.productId === cleanProd;
+      const passMatch = !cleanPass || lic.password === cleanPass || lic.licenseKey === cleanPass;
+      const tokenMatch = Boolean(token && (lic.id === token || lic.licenseKey === token));
+      return (uMatch || tokenMatch) && (passMatch || tokenMatch) && pMatch;
+    });
+
+    if (found) {
+      const now = new Date();
+      const expiry = new Date(found.expiresAt || now.toISOString());
+      const diffMs = expiry.getTime() - now.getTime();
+      const isExpired = diffMs <= 0;
+      const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
       if (isExpired) {
-        return res.status(403).json({
+        return res.status(200).json({
           success: false,
-          status: 'subscription_expired',
-          message: 'اشتراک زمانی شما به پایان رسیده است. جهت فعال‌سازی مجدد و تمدید دسترسی، به سایت جهش‌کالا مراجعه فرمایید.',
-          expiresAt: matchedCred.expiresAt,
+          authenticated: true,
+          expired: true,
+          status: 'expired',
           daysRemaining: 0,
-          renewUrl: 'https://jaheshit.ir/jaheshkala/'
+          expiresAt: found.expiresAt,
+          productId: found.productId,
+          productTitle: found.productTitle || found.appName,
+          message: 'مدت زمان اشتراک شما به پایان رسیده است. جهت تمدید اشتراک به سایت جهش‌کالا مراجعه فرمایید.',
+          renewUrl: 'https://jaheshit.ir/jaheshkala',
         });
       }
 
       return res.status(200).json({
         success: true,
+        authenticated: true,
+        expired: false,
         status: 'active',
-        message: 'ورود با موفقیت انجام شد و اشتراک فعال است.',
-        subscription: {
-          isActive: true,
-          daysRemaining,
-          expiresAt: matchedCred.expiresAt,
-          startDate: matchedCred.startDate,
-          appName: matchedCred.appName || 'اپلیکیشن جهش کالا',
-          appId: matchedCred.appId || cleanAppId
-        },
+        token: found.licenseKey || found.id,
+        licenseKey: found.licenseKey,
+        daysRemaining,
+        startDate: found.startDate,
+        expiresAt: found.expiresAt,
+        productId: found.productId,
+        productTitle: found.productTitle || found.appName,
         user: {
-          username: matchedCred.username,
-          name: matchedOrder ? matchedOrder.customerName : 'کاربر جهش کالا',
-          phone: matchedOrder ? matchedOrder.customerPhone : ''
-        }
-      });
-    } catch (err) {
-      console.error('App auth exception:', err);
-      return res.status(500).json({
-        success: false,
-        error: 'خطای سرور در بررسی اعتبار اشتراک',
-        details: err.message
+          username: found.username,
+          fullName: found.buyerName,
+          phone: found.phone,
+        },
+        message: `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${daysRemaining} روز اعتبار فعال است.`,
       });
     }
+
+    // 2. Strict Product Isolation Check: Check if user exists for a DIFFERENT product
+    if (cleanProd) {
+      const crossProductMatch = list.find((lic) => {
+        const uMatch = lic.username && (lic.username === cleanUser || lic.phone === cleanUser);
+        const passMatch = !cleanPass || lic.password === cleanPass || lic.licenseKey === cleanPass;
+        return uMatch && passMatch && lic.productId !== cleanProd;
+      });
+
+      if (crossProductMatch) {
+        return res.status(401).json({
+          success: false,
+          authenticated: false,
+          expired: false,
+          productMismatch: true,
+          targetProductId: cleanProd,
+          ownedProductId: crossProductMatch.productId,
+          message: `این نام کاربری و رمز عبور برای «${crossProductMatch.productTitle || crossProductMatch.appName || 'محصول دیگری'}» خریداری شده است و اجازه ورود به این برنامه را ندارد.`,
+        });
+      }
+    }
+
+    // 3. Fallback: Invalid Credentials
+    return res.status(401).json({
+      success: false,
+      authenticated: false,
+      expired: false,
+      message: 'نام کاربری یا رمز عبور اشتباه است.',
+    });
+  }
+
+  if (req.method === 'GET') {
+    const list = readLicenses();
+    return res.status(200).json({ success: true, count: list.length, licenses: list });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });

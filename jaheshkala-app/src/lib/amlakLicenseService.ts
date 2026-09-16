@@ -21,22 +21,6 @@ export function hasAmlakInItems(items: CartItem[]): boolean {
   return items.some(isAmlakProduct);
 }
 
-export function hasAiAppGenerationInItems(items: CartItem[]): boolean {
-  if (!Array.isArray(items)) return false;
-  return items.some((item) => Boolean(item?.product?.hasAiAppGeneration || item?.product?.hasAppConnection));
-}
-
-export function hasAppConnectionInItems(items: CartItem[]): boolean {
-  if (!Array.isArray(items)) return false;
-  return items.some((item) => Boolean(item?.product?.hasAppConnection || item?.product?.hasAiAppGeneration));
-}
-
-export function getAppProductFromItems(items: CartItem[]) {
-  if (!Array.isArray(items)) return null;
-  const found = items.find((item) => Boolean(item?.product?.hasAppConnection || item?.product?.hasAiAppGeneration));
-  return found?.product || null;
-}
-
 /**
  * Deterministic hash function ensuring password never changes randomly
  */
@@ -184,57 +168,6 @@ export function saveAmlakLicenseLocally(license: AmlakSubscriptionLicense): void
   }
 }
 
-export function generateAiAppLicense(
-  order: Partial<Order>,
-  user?: User | null
-): AmlakSubscriptionLicense {
-  let exactUsername = '';
-  if (user?.username && user.username.trim().length > 0) {
-    exactUsername = user.username.trim();
-  } else if (order.customerPhone && order.customerPhone.trim().length > 0) {
-    exactUsername = order.customerPhone.trim();
-  } else if (user?.phone && user.phone.trim().length > 0) {
-    exactUsername = user.phone.trim();
-  } else if (order.trackingCode) {
-    exactUsername = order.trackingCode.trim();
-  } else if (order.id) {
-    exactUsername = order.id.trim();
-  } else {
-    exactUsername = 'ai_app_user';
-  }
-
-  if (order.aiAppLicense && order.aiAppLicense.password && order.aiAppLicense.username) {
-    return order.aiAppLicense;
-  }
-
-  const generatedPassword = generateDeterministicAmlakPassword(exactUsername + '_ai');
-  const licenseKey = generateDeterministicLicenseKey(exactUsername + '_ai');
-
-  const aiAppItem = (order.items || []).find((i) => i.product?.hasAiAppGeneration);
-  const days = aiAppItem?.subscriptionDays || 30;
-
-  const now = new Date();
-  const expireDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-
-  const license: AmlakSubscriptionLicense = {
-    username: exactUsername,
-    password: generatedPassword,
-    licenseKey,
-    buyerName: order.customerName || user?.fullName || exactUsername,
-    phone: order.customerPhone || user?.phone || '',
-    days,
-    startDate: now.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }),
-    expiresAt: expireDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }),
-    status: 'active',
-  };
-
-  // We reuse the same saving logic
-  saveAmlakLicenseLocally(license);
-  syncAmlakLicenseWithServer(license).catch(() => {});
-
-  return license;
-}
-
 export function getLocalAmlakLicenses(): AmlakSubscriptionLicense[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -258,75 +191,4 @@ export async function syncAmlakLicenseWithServer(
   } catch (err) {
     console.warn('Failed to sync license with server:', err);
   }
-}
-
-/**
- * Generates an AppSubscriptionCredential for products connected to Windows / Android apps
- */
-export function generateAppSubscriptionCredential(
-  order: Partial<Order>,
-  user?: User | null
-): import('../types').AppSubscriptionCredential {
-  let exactUsername = '';
-  if (user?.username && user.username.trim().length > 0) {
-    exactUsername = user.username.trim();
-  } else if (order.customerPhone && order.customerPhone.trim().length > 0) {
-    exactUsername = order.customerPhone.trim();
-  } else if (user?.phone && user.phone.trim().length > 0) {
-    exactUsername = user.phone.trim();
-  } else if (order.trackingCode) {
-    exactUsername = order.trackingCode.trim();
-  } else if (order.id) {
-    exactUsername = order.id.trim();
-  } else {
-    exactUsername = 'jahesh_user';
-  }
-
-  // If already generated on order, return it
-  if (order.appCredentials && order.appCredentials.username && order.appCredentials.password) {
-    return order.appCredentials;
-  }
-
-  const items = order.items || [];
-  const matchedItem = items.find((i) => Boolean(i.product?.hasAppConnection || i.product?.hasAiAppGeneration || i.product?.isSubscription));
-  const product = matchedItem?.product;
-
-  const appId = product?.appIdentifier || product?.id || 'jahesh-app';
-  const appName = product?.title || 'اپلیکیشن ویندوز و اندروید جهش کالا';
-  const days = matchedItem?.subscriptionDays || 30;
-
-  const generatedPassword = generateDeterministicAmlakPassword(exactUsername + '_' + appId);
-
-  const now = new Date();
-  const expireDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-
-  const cred: import('../types').AppSubscriptionCredential = {
-    appId,
-    appName,
-    username: exactUsername,
-    password: generatedPassword,
-    days,
-    startDate: now.toISOString(),
-    expiresAt: expireDate.toISOString(),
-    windowsDownloadUrl: product?.windowsDownloadUrl || undefined,
-    androidDownloadUrl: product?.androidDownloadUrl || undefined,
-    status: 'active',
-  };
-
-  // Also sync with server licenses table
-  const legacyLicense: AmlakSubscriptionLicense = {
-    username: exactUsername,
-    password: generatedPassword,
-    licenseKey: `JA-APP-${appId.toUpperCase().slice(-5)}-${exactUsername.slice(-4).toUpperCase()}`,
-    buyerName: order.customerName || user?.fullName || exactUsername,
-    phone: order.customerPhone || user?.phone || '',
-    days,
-    startDate: now.toLocaleDateString('fa-IR'),
-    expiresAt: expireDate.toLocaleDateString('fa-IR'),
-    status: 'active',
-  };
-  saveAmlakLicenseLocally(legacyLicense);
-  syncAmlakLicenseWithServer(legacyLicense).catch(() => {});
-
-  return cred;
 }

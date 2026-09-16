@@ -11,21 +11,22 @@ import {
   Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool } from '../types';
-import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, fetchAllUsersFromDb } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { renderFormattedBannerTitle } from '../lib/bannerUtils';
 import { JAHESH_OFFICIAL_25_GUILDS } from '../data/guildProducts';
+import { buildAiAppPrompt } from '../lib/appLicenseService';
 
 interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  orders?: Order[];
+  orders: Order[];
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus) => void;
   onDeleteOrder?: (orderId: string) => void;
   onClearAllOrders?: () => void;
-  products?: Product[];
+  products: Product[];
   onAddNewProduct: (newProduct: Product) => void;
   onUpdateProduct?: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
@@ -267,22 +268,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // محصول انتخاب شده برای اتصال به بنر
   const selectedProductForBanner = useMemo(() => {
     if (bannerActionType !== 'product' || !bannerActionTarget) return null;
-    return (Array.isArray(products) ? products.filter(Boolean) : []).find((p) => p && p.id === bannerActionTarget);
+    return products.find((p) => p.id === bannerActionTarget);
   }, [products, bannerActionType, bannerActionTarget]);
 
   // لیست کالاهای منطبق با جستجو در ویرایش بنر
   const matchingProductsForBanner = useMemo(() => {
     if (bannerActionType !== 'product') return [];
-    const safeList = Array.isArray(products) ? products.filter((p): p is Product => Boolean(p && typeof p === 'object')) : [];
     const q = bannerProductSearch.trim().toLowerCase();
     if (!q) {
-      return safeList.slice(0, 10);
+      return products.slice(0, 10);
     }
-    return safeList.filter((p) =>
-      (p?.title && p.title.toLowerCase().includes(q)) ||
-      (p?.brand && p.brand.toLowerCase().includes(q)) ||
-      (p?.category && p.category.toLowerCase().includes(q)) ||
-      (p?.id && p.id.toLowerCase().includes(q))
+    return products.filter((p) =>
+      (p.title && p.title.toLowerCase().includes(q)) ||
+      (p.brand && p.brand.toLowerCase().includes(q)) ||
+      (p.category && p.category.toLowerCase().includes(q)) ||
+      (p.id && p.id.toLowerCase().includes(q))
     ).slice(0, 25);
   }, [products, bannerActionType, bannerProductSearch]);
   const [bannerPreviewDevice, setBannerPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
@@ -338,6 +338,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleRefreshUsersList = async () => {
     setIsRefreshingUsers(true);
     try {
+      const { fetchAllUsersFromDb } = await import('../lib/dbService');
       const fresh = await fetchAllUsersFromDb();
       if (fresh && Array.isArray(fresh)) {
         if (typeof window !== 'undefined') {
@@ -779,78 +780,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isFreeShipping, setIsFreeShipping] = useState(true);
   const [isInStock, setIsInStock] = useState(true);
 
-  // Original Product Reference for Safe Editing (prevents accidental image/field loss)
-  const [originalEditingProduct, setOriginalEditingProduct] = useState<Product | null>(null);
-
   // Subscription Settings Flag & Daily Price
   const [isSubscription, setIsSubscription] = useState(false);
   const [pricePerDayInput, setPricePerDayInput] = useState('250000');
-
-  // App Connection (Windows/Android) & AI Prompt Generator
-  const [hasAppConnection, setHasAppConnection] = useState(false);
-  const [appIdentifier, setAppIdentifier] = useState('');
-  const [windowsDownloadUrl, setWindowsDownloadUrl] = useState('');
-  const [androidDownloadUrl, setAndroidDownloadUrl] = useState('');
-  const [aiAppPrompt, setAiAppPrompt] = useState('');
-  const [hasAiAppGeneration, setHasAiAppGeneration] = useState(false); // backward compatibility
-  const [promptCopiedNotice, setPromptCopiedNotice] = useState(false);
-
-  const generateCleanAiPrompt = (title: string, appId: string) => {
-    const cleanId = (appId || title.toLowerCase().replace(/[^a-z0-9]/g, '-')).slice(0, 30);
-    return `# مشخصات اتصال، لاگین و اعتبارسنجی اشتراک اپلیکیشن (Windows / Android)
-
-نام سامانه / محصول: ${title || 'محصول جهش کالا'}
-شناسه اپلیکیشن (App ID): ${cleanId || 'jahesh-app'}
-دامنه اصلی سرور: https://jaheshit.ir
-
-## ۱. اندپوینت احراز هویت و بررسی اشتراک کاربران:
-URL: POST https://jaheshit.ir/api/app-auth
-Headers: Content-Type: application/json
-
-## ۲. ساختار درخواست ارسالی از اپلیکیشن (Request Payload):
-{
-  "username": "نام کاربری یا شماره موبایل خریدار",
-  "password": "رمز عبور اختصاصی تولیدشده پس از خرید",
-  "appId": "${cleanId || 'jahesh-app'}"
-}
-
-## ۳. پاسخ سرور در صورت موفقیت و اشتراک فعال (HTTP 200):
-{
-  "success": true,
-  "status": "active",
-  "subscription": {
-    "isActive": true,
-    "daysRemaining": 30,
-    "expiresAt": "2026-10-16T12:00:00.000Z"
-  },
-  "user": {
-    "username": "...",
-    "name": "نام کاربر",
-    "phone": "شماره تماس"
-  }
-}
-
-## ۴. پاسخ سرور در صورت انقضای اشتراک (HTTP 403):
-{
-  "success": false,
-  "status": "subscription_expired",
-  "message": "اشتراک شما به پایان رسیده است. جهت تمدید به سایت جهش‌کالا مراجعه فرمایید.",
-  "daysRemaining": 0,
-  "renewUrl": "https://jaheshit.ir/jaheshkala/"
-}
-
-## ۵. دستورالعمل پیاده‌سازی در اپلیکیشن:
-- یک فرم ورود شامل نام کاربری و رمز عبور طراحی کنید.
-- اطلاعات را به اندپوینت فوق POST کنید.
-- در صورت دریافت status == "active"، وضعیت کاربر را ذخیره کرده و وارد محیط اصلی اپلیکیشن شوید.
-- در هر بار باز شدن اپلیکیشن یا به صورت روزانه، اعتبار اشتراک را از همین اندپوینت بررسی کنید؛ در صورت status == "subscription_expired"، دسترسی کاربر را بلافاصله مسدود کرده و پیام تمدید اشتراک در جهش‌کالا را نمایش دهید.`;
-  };
 
   // Custom Multi-Tier Subscription / Pricing Plans
   const [hasCustomPlans, setHasCustomPlans] = useState(false);
   const [customPlansTitle, setCustomPlansTitle] = useState('پکیج‌های تبلیغات هوشمند');
   const [customPlansSubtitle, setCustomPlansSubtitle] = useState('انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
   const [customPlans, setCustomPlans] = useState<SubscriptionPlan[]>([]);
+
+  // AI Application & Prompt Engine State (Windows Desktop & Android Mobile App generation)
+  const [isAiAppProduct, setIsAiAppProduct] = useState(false);
+  const [aiAppName, setAiAppName] = useState('');
+  const [aiAppPlatform, setAiAppPlatform] = useState<'windows' | 'android' | 'cross-platform' | 'all'>('all');
+  const [aiAppDefaultDays, setAiAppDefaultDays] = useState(7);
+  const [aiAppCustomPromptNote, setAiAppCustomPromptNote] = useState('');
+  const [copiedPromptFeedback, setCopiedPromptFeedback] = useState<string | null>(null);
+  const [testAuthUsername, setTestAuthUsername] = useState('jahesh');
+  const [testAuthPassword, setTestAuthPassword] = useState('jahesh1395');
+  const [testAuthResult, setTestAuthResult] = useState<any | null>(null);
+  const [isTestingAuth, setIsTestingAuth] = useState(false);
+
+  const handleTestAppAuth = async () => {
+    setIsTestingAuth(true);
+    setTestAuthResult(null);
+    try {
+      const res = await fetch('/api/app-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: testAuthUsername.trim(),
+          password: testAuthPassword.trim(),
+          productId: editingProductId || 'test-app',
+        }),
+      });
+      const data = await res.json();
+      setTestAuthResult(data);
+    } catch (err: any) {
+      setTestAuthResult({ success: false, error: err.message || 'خطا در برقراری ارتباط با سرور' });
+    } finally {
+      setIsTestingAuth(false);
+    }
+  };
 
   const handleLoadDefaultPlansPreset = () => {
     setCustomPlans([
@@ -1093,9 +1065,7 @@ Headers: Content-Type: application/json
       'زیبایی و سلامت',
       'کتاب و فرهنگ',
       'خدمات و نرم‌افزار',
-      ...(Array.isArray(products)
-        ? products.filter(Boolean).map((p) => p?.category).filter((c): c is string => Boolean(c))
-        : []),
+      ...products.map((p) => p.category).filter(Boolean),
     ])
   );
 
@@ -1106,7 +1076,6 @@ Headers: Content-Type: application/json
 
   const handleStartNew = () => {
     setEditingProductId(null);
-    setOriginalEditingProduct(null);
     setNewTitle('');
     setNewBrand('');
     setIsCustomCategory(false);
@@ -1132,16 +1101,17 @@ Headers: Content-Type: application/json
     setIsInStock(true);
     setIsSubscription(false);
     setPricePerDayInput('250000');
-    setHasAppConnection(false);
-    setAppIdentifier('');
-    setWindowsDownloadUrl('');
-    setAndroidDownloadUrl('');
-    setAiAppPrompt('');
-    setHasAiAppGeneration(false);
     setHasCustomPlans(false);
     setCustomPlansTitle('پکیج‌های تبلیغات هوشمند');
     setCustomPlansSubtitle('انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
     setCustomPlans([]);
+    setIsAiAppProduct(false);
+    setAiAppName('');
+    setAiAppPlatform('all');
+    setAiAppDefaultDays(7);
+    setAiAppCustomPromptNote('');
+    setCopiedPromptFeedback(null);
+    setTestAuthResult(null);
     setSelectedGuildMode('25guilds');
     setSelectedOfficialGuild(JAHESH_OFFICIAL_25_GUILDS[0] || 'طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات');
     setCustomGuildInput('');
@@ -1154,7 +1124,6 @@ Headers: Content-Type: application/json
 
   const handleStartEdit = (prod: Product) => {
     setEditingProductId(prod.id);
-    setOriginalEditingProduct(prod);
     setNewTitle(prod.title);
     setNewBrand(prod.brand || '');
     
@@ -1191,22 +1160,20 @@ Headers: Content-Type: application/json
     setIsInStock(true);
     setIsSubscription(Boolean(prod.isSubscription || prod.id === 'pkg-amlak-jahesh'));
     setPricePerDayInput(prod.pricePerDay ? prod.pricePerDay.toString() : '250000');
-    
-    // App Connection & AI Prompt settings
-    const hasApp = Boolean(prod.hasAppConnection || prod.hasAiAppGeneration);
-    setHasAppConnection(hasApp);
-    setHasAiAppGeneration(hasApp);
-    const appId = prod.appIdentifier || prod.id;
-    setAppIdentifier(appId);
-    setWindowsDownloadUrl(prod.windowsDownloadUrl || '');
-    setAndroidDownloadUrl(prod.androidDownloadUrl || '');
-    setAiAppPrompt(prod.aiAppPrompt || generateCleanAiPrompt(prod.title, appId));
-
     setHasCustomPlans(Boolean(prod.hasCustomPlans));
     setCustomPlansTitle(prod.customPlansTitle || 'پکیج‌های تبلیغات هوشمند');
     setCustomPlansSubtitle(prod.customPlansSubtitle || 'انتخاب کنید و کمپین خود را به سطح بالاتری ببرید');
     setCustomPlans(prod.subscriptionPlans && prod.subscriptionPlans.length > 0 ? prod.subscriptionPlans : []);
     
+    // AI App & Prompt Engine fields
+    setIsAiAppProduct(Boolean(prod.isAiAppProduct || prod.isSubscription || prod.id === 'pkg-amlak-jahesh'));
+    setAiAppName(prod.aiAppName || prod.title || '');
+    setAiAppPlatform(prod.aiAppPlatform || 'all');
+    setAiAppDefaultDays(prod.aiAppDefaultDays || (prod.isSubscription ? 30 : 7));
+    setAiAppCustomPromptNote(prod.aiAppCustomPromptNote || '');
+    setCopiedPromptFeedback(null);
+    setTestAuthResult(null);
+
     // Guild & Innovation Settings
     const currentGuild = prod.guild || (prod as any).targetGuild || '';
     if (!currentGuild) {
@@ -1290,14 +1257,8 @@ Headers: Content-Type: application/json
     const prodCouponCode = newProductCouponCode.trim().toUpperCase() || undefined;
     const prodCouponPercent = newProductCouponPercent ? Math.min(100, Math.max(1, parseInt(newProductCouponPercent.replace(/[^0-9]/g, ''), 10) || 10)) : undefined;
 
-    // Image resolution: if user didn't enter a new image, keep the original product image
-    let finalImage = newImage.trim();
-    if (!finalImage && originalEditingProduct?.image) {
-      finalImage = originalEditingProduct.image;
-    }
-    if (!finalImage) {
-      finalImage = getFallbackProductImage(newTitle.trim(), finalCategory);
-    }
+    const existingProduct = editingProductId ? products.find((p) => p.id === editingProductId) : undefined;
+    const finalImage = newImage.trim() || (existingProduct ? existingProduct.image : '') || getFallbackProductImage(newTitle.trim(), finalCategory);
 
     let finalGuild: string | undefined = undefined;
     if (selectedGuildMode === '25guilds') {
@@ -1306,13 +1267,8 @@ Headers: Content-Type: application/json
       finalGuild = customGuildInput.trim() || undefined;
     }
 
-    const cleanAppId = (appIdentifier.trim() || editingProductId || ('app-' + Date.now())).slice(0, 40);
-    const finalAiPrompt = hasAppConnection
-      ? (aiAppPrompt.trim() || generateCleanAiPrompt(newTitle.trim(), cleanAppId))
-      : undefined;
-
     const productData: Product = {
-      ...(originalEditingProduct && editingProductId ? originalEditingProduct : {}),
+      ...(existingProduct || {}),
       id: editingProductId || ('prod-' + Date.now()),
       title: newTitle.trim(),
       category: finalCategory,
@@ -1329,14 +1285,14 @@ Headers: Content-Type: application/json
       badge: newBadge.trim() || (discount && discount > 0 ? `${discount}% تخفیف` : undefined),
       isPopular: Boolean(isPopular),
       isGolden: Boolean(newTitle.includes('طلایی') || finalCategory.includes('طراحی سایت')),
-      rating: originalEditingProduct?.rating || 5.0,
-      reviewsCount: originalEditingProduct?.reviewsCount || (Math.floor(Math.random() * 20) + 5),
+      rating: 5.0,
+      reviewsCount: Math.floor(Math.random() * 20) + 5,
       deliveryDays: newDeliveryDays.trim() || 'ارسال ۱ تا ۳ روز کاری',
       shortDescription: newShortDesc.trim() || newTitle.trim(),
       fullDescription: newFullDesc.trim() || newShortDesc.trim() || newTitle.trim(),
       features: newFeatures.split('\n').map((s) => s.trim()).filter(Boolean),
       image: finalImage,
-      gallery: newGallery.length > 0 ? newGallery : (originalEditingProduct?.gallery || []),
+      gallery: newGallery,
       isIncredible: Boolean(isIncredible),
       incredibleTimerDuration: isIncredible ? (incredibleTimerDuration || 'permanent') : undefined,
       incredibleExpiresAt: isIncredible
@@ -1344,14 +1300,8 @@ Headers: Content-Type: application/json
             ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
             : (incredibleExpiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()))
         : undefined,
-      isSubscription: Boolean(isSubscription || hasAppConnection),
-      pricePerDay: (isSubscription || hasAppConnection) ? (parseInt(pricePerDayInput.replace(/[^0-9]/g, ''), 10) || 250000) : undefined,
-      hasAppConnection: Boolean(hasAppConnection),
-      hasAiAppGeneration: Boolean(hasAppConnection), // backward compatibility
-      appIdentifier: hasAppConnection ? cleanAppId : undefined,
-      windowsDownloadUrl: hasAppConnection ? (windowsDownloadUrl.trim() || undefined) : undefined,
-      androidDownloadUrl: hasAppConnection ? (androidDownloadUrl.trim() || undefined) : undefined,
-      aiAppPrompt: finalAiPrompt,
+      isSubscription: Boolean(isSubscription),
+      pricePerDay: isSubscription ? (parseInt(pricePerDayInput.replace(/[^0-9]/g, ''), 10) || 250000) : undefined,
       hasCustomPlans: Boolean(hasCustomPlans),
       customPlansTitle: hasCustomPlans ? (customPlansTitle.trim() || 'پکیج‌های تبلیغات هوشمند') : undefined,
       customPlansSubtitle: hasCustomPlans ? (customPlansSubtitle.trim() || 'انتخاب کنید و کمپین خود را به سطح بالاتری ببرید') : undefined,
@@ -1363,16 +1313,19 @@ Headers: Content-Type: application/json
               : [],
           }))
         : undefined,
+      isAiAppProduct: Boolean(isAiAppProduct),
+      aiAppName: isAiAppProduct ? (aiAppName.trim() || newTitle.trim()) : undefined,
+      aiAppPlatform: isAiAppProduct ? aiAppPlatform : undefined,
+      aiAppDefaultDays: isAiAppProduct ? Math.max(1, aiAppDefaultDays || 7) : undefined,
+      aiAppCustomPromptNote: isAiAppProduct ? aiAppCustomPromptNote.trim() : undefined,
       updatedAt: new Date().toISOString(),
     };
 
     if (editingProductId && onUpdateProduct) {
       onUpdateProduct(productData);
-      saveProductToDb(productData).catch((e) => console.warn('Direct saveProductToDb notice:', e));
       setFormSuccess('تغییرات محصول با موفقیت در دیتابیس ذخیره شد!');
     } else {
       onAddNewProduct(productData);
-      saveProductToDb(productData).catch((e) => console.warn('Direct saveProductToDb notice:', e));
       setFormSuccess(`محصول «${productData.title}» با قیمت ${formatPrice(priceNum)} در دیتابیس ثبت و منتشر شد!`);
     }
     
@@ -1407,6 +1360,8 @@ Headers: Content-Type: application/json
       setCouponSuccessMsg('');
     }, 3000);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
@@ -1708,8 +1663,7 @@ Headers: Content-Type: application/json
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-purple-900/30 text-slate-200">
-                      {(Array.isArray(orders) ? [...orders] : [])
-                        .filter(Boolean)
+                      {[...orders]
                         .sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a))
                         .map((order) => (
                         <tr key={order.id} className="hover:bg-purple-950/40 transition-colors">
@@ -1734,15 +1688,15 @@ Headers: Content-Type: application/json
                           </td>
                           <td className="p-3.5">
                             <div className="max-w-[280px] font-medium text-xs space-y-1">
-                              {(Array.isArray(order.items) ? order.items : []).map((i, idx) => (
+                              {(order.items || []).map((i, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-white font-bold">{i?.product?.title || (i as any)?.title || 'محصول'}</span>
-                                  {i?.selectedPlan && (
+                                  <span className="text-white font-bold">{i.product.title}</span>
+                                  {i.selectedPlan && (
                                     <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40 shadow-xs">
                                       تعرفه: {i.selectedPlan.name}
                                     </span>
                                   )}
-                                  <span className="text-[10px] text-slate-400">({i?.quantity || 1} عدد)</span>
+                                  <span className="text-[10px] text-slate-400">({i.quantity} عدد)</span>
                                 </div>
                               ))}
                             </div>
@@ -1832,19 +1786,16 @@ Headers: Content-Type: application/json
                   )
                 );
 
-                const safeProds = Array.isArray(products) ? products.filter((p): p is Product => Boolean(p && typeof p === 'object')) : [];
-
                 const uniqueCategories = Array.from(
                   new Set(
-                    safeProds
+                    products
                       .map((p) => p.category?.trim())
-                      .filter((c): c is string => Boolean(c))
+                      .filter((c) => Boolean(c))
                   )
                 );
 
-                const processedProducts = safeProds
+                const processedProducts = products
                   .filter((prod) => {
-                    if (!prod) return false;
                     // Search query
                     if (prodSearchQuery.trim()) {
                       const q = prodSearchQuery.trim().toLowerCase();
@@ -1881,9 +1832,9 @@ Headers: Content-Type: application/json
                     return true;
                   })
                   .sort((a, b) => {
-                    if (prodSortBy === 'price_desc') return (b.price || 0) - (a.price || 0);
-                    if (prodSortBy === 'price_asc') return (a.price || 0) - (b.price || 0);
-                    if (prodSortBy === 'title') return (a.title || '').localeCompare(b.title || '', 'fa');
+                    if (prodSortBy === 'price_desc') return b.price - a.price;
+                    if (prodSortBy === 'price_asc') return a.price - b.price;
+                    if (prodSortBy === 'title') return a.title.localeCompare(b.title, 'fa');
                     return (b.updatedAt || '').localeCompare(a.updatedAt || '');
                   });
 
@@ -2025,7 +1976,7 @@ Headers: Content-Type: application/json
                           >
                             <option value="all">🏢 فیلتر صنف شغلی (همه ۲۵ صنف)</option>
                             {uniqueGuilds.map((g) => {
-                              const count = (Array.isArray(products) ? products : []).filter(p => p && (((p as any).guild || (p as any).targetGuild || '') === g)).length;
+                              const count = products.filter(p => ((p as any).guild || (p as any).targetGuild || '') === g).length;
                               return (
                                 <option key={g} value={g}>
                                   {g} ({count} محصول)
@@ -2044,7 +1995,7 @@ Headers: Content-Type: application/json
                           >
                             <option value="all">🏷️ دسته‌بندی موضوعی (همه)</option>
                             {uniqueCategories.map((c) => {
-                              const count = (Array.isArray(products) ? products : []).filter(p => p && p.category === c).length;
+                              const count = products.filter(p => p.category === c).length;
                               return (
                                 <option key={c} value={c}>
                                   {c} ({count} کالا)
@@ -3003,8 +2954,8 @@ Headers: Content-Type: application/json
                   </label>
                 </div>
 
-                {/* 6.0 Subscription Configuration (Configurable duration selector for SaaS/Software products) */}
-                <div className="p-4 bg-gradient-to-r from-purple-950/70 via-indigo-950/70 to-purple-950/70 border border-amber-400/60 rounded-2xl space-y-3 shadow-xl">
+                {/* 6.0 Subscription Configuration (Configurable duration selector for SaaS/Software products + AI App Prompt & Auth) */}
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-950/70 via-indigo-950/70 to-purple-950/70 border border-amber-400/60 rounded-2xl space-y-4 shadow-xl">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -3028,11 +2979,11 @@ Headers: Content-Type: application/json
                   </p>
 
                   {isSubscription && (
-                    <div className="p-3 bg-black/60 border border-amber-400/50 rounded-xl space-y-2 animate-in fade-in">
+                    <div className="p-3.5 bg-black/60 border border-amber-400/50 rounded-xl space-y-2 animate-in fade-in">
                       <label className="text-xs font-bold text-amber-200 block">
                         قیمت پایه هر روز اشتراک (تومان):
                       </label>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-3">
                         <input
                           type="number"
                           placeholder="250000"
@@ -3049,141 +3000,250 @@ Headers: Content-Type: application/json
                       </div>
                     </div>
                   )}
-                </div>
 
-                {/* 6.1 App Connection & AI Prompt Generator (Windows & Android) */}
-                <div className="p-4 bg-gradient-to-r from-blue-950/80 via-indigo-950/80 to-slate-950/90 border-2 border-cyan-400/70 rounded-2xl space-y-3.5 shadow-2xl">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cyan-500/30 pb-2.5">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={hasAppConnection}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setHasAppConnection(checked);
-                          setHasAiAppGeneration(checked);
-                          if (checked && !isSubscription) {
-                            setIsSubscription(true);
-                          }
-                          if (checked && !aiAppPrompt) {
-                            setAiAppPrompt(generateCleanAiPrompt(newTitle.trim(), appIdentifier.trim()));
-                          }
-                        }}
-                        className="w-5 h-5 rounded border-cyan-400 text-cyan-500 focus:ring-0 cursor-pointer"
-                      />
-                      <div>
-                        <span className="text-xs sm:text-sm font-black text-cyan-300 flex items-center gap-1.5">
-                          <Sparkles className="w-4 h-4 text-cyan-400" />
-                          اتصال به اپلیکیشن ویندوز و موبایل اندروید + پرامپت هوش مصنوعی (API اتصال)
-                        </span>
-                        <p className="text-[11px] text-slate-300 font-normal mt-0.5">
-                          تولید خودکار نام کاربری و پسورد اختصاصی اپلیکیشن برای خریدار بر اساس مدت اشتراک روزانه
-                        </p>
-                      </div>
-                    </label>
-                    <span className="text-[10px] bg-cyan-500 text-slate-950 font-black px-3 py-1 rounded-full shrink-0 shadow-md">
-                      ویندوز / اندروید
-                    </span>
-                  </div>
-
-                  <p className="text-[11px] text-slate-200 leading-relaxed">
-                    با فعال‌سازی این بخش، هنگام خرید این محصول توسط مشتری، سامانه یک نام‌کاربری و رمز عبور اختصاصی تولید کرده و روزهای اشتراک را ثبت می‌کند. در صفحه تشکر پس از خرید و پنل کاربر مشخصات ورود و لینک دانلود به مشتری نمایش داده می‌شود. پرامپت زیر نیز اختصاصی برای ساخت اپلیکیشن با هوش مصنوعی (Google AI Studio / Antigravity) تهیه شده و فقط حاوی اطلاعات اتصال به سایت و API لاگین و اعتبارسنجی اشتراک است.
-                  </p>
-
-                  {hasAppConnection && (
-                    <div className="space-y-3 pt-2 animate-in fade-in">
-                      {/* App Configurations */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                          <label className="text-xs font-bold text-cyan-200 block mb-1">
-                            شناسه اپلیکیشن (App ID):
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="مثال: pkg-agro یا jahesh-app"
-                            value={appIdentifier}
-                            onChange={(e) => setAppIdentifier(e.target.value)}
-                            className="w-full bg-[#0a1128] border border-cyan-400/60 rounded-xl px-3 py-2 text-xs text-cyan-200 font-mono focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                            dir="ltr"
-                          />
+                  {/* Integrated AI App Prompt & Auth Module inside Subscription Section */}
+                  <div className={`p-4 rounded-xl border transition-all ${
+                    isAiAppProduct
+                      ? 'bg-gradient-to-br from-[#1c0f38] via-[#150a2e] to-[#0d0520] border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.15)] ring-1 ring-amber-400/40'
+                      : 'bg-[#120a26]/80 border-purple-800/60 hover:border-purple-600/70'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-800/60 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
+                          isAiAppProduct
+                            ? 'bg-amber-400/20 border-amber-400/60 text-amber-300'
+                            : 'bg-purple-900/40 border-purple-700/50 text-purple-300'
+                        }`}>
+                          <Sparkles className="w-4 h-4 animate-pulse" />
                         </div>
-
                         <div>
-                          <label className="text-xs font-bold text-slate-200 block mb-1">
-                            لینک دانلود نسخه ویندوز (.exe):
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="https://.../app-windows.exe"
-                            value={windowsDownloadUrl}
-                            onChange={(e) => setWindowsDownloadUrl(e.target.value)}
-                            className="w-full bg-[#0a1128] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                            dir="ltr"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-bold text-slate-200 block mb-1">
-                            لینک دانلود نسخه اندروید (.apk):
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="https://.../app-android.apk"
-                            value={androidDownloadUrl}
-                            onChange={(e) => setAndroidDownloadUrl(e.target.value)}
-                            className="w-full bg-[#0a1128] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                            dir="ltr"
-                          />
-                        </div>
-                      </div>
-
-                      {/* AI Prompt Box */}
-                      <div className="p-3.5 bg-black/80 border border-cyan-400/50 rounded-xl space-y-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-                            پرامپت هوش مصنوعی جهت ساخت اپ با API سایت (گوگل استودیو / آنتی‌گرویتی):
-                          </label>
                           <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const generated = generateCleanAiPrompt(newTitle.trim(), appIdentifier.trim());
-                                setAiAppPrompt(generated);
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 transition-colors"
-                            >
-                              بازنشانی پرامپت استاندارد
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const textToCopy = aiAppPrompt || generateCleanAiPrompt(newTitle.trim(), appIdentifier.trim());
-                                navigator.clipboard.writeText(textToCopy);
-                                setPromptCopiedNotice(true);
-                                setTimeout(() => setPromptCopiedNotice(false), 2500);
-                              }}
-                              className="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-[11px] font-black text-slate-950 transition-colors flex items-center gap-1 shadow"
-                            >
-                              {promptCopiedNotice ? 'کپی شد! ✓' : 'کپی پرامپت هوش مصنوعی'}
-                            </button>
+                            <h4 className="text-xs sm:text-sm font-black text-white">
+                              اتصال به اپلیکیشن ویندوز و اندروید + مولد پرامپت هوش مصنوعی (AI App Prompt & Auth)
+                            </h4>
+                            <span className="text-[9px] bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black px-2 py-0.5 rounded-full shadow-sm">
+                              ویژه توسعه اپ با AI
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 mt-0.5">
+                            تولید پرامپت آماده برای Google Antigravity، Google AI Studio و ChatGPT با API متصل به جهش‌کالا و سیستم اشتراک چند روزه
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Toggle Switch */}
+                      <label className="flex items-center gap-2 text-xs font-black text-amber-300 cursor-pointer self-end sm:self-auto bg-purple-950/70 px-3 py-1.5 rounded-xl border border-purple-700/60 hover:border-amber-400 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isAiAppProduct}
+                          onChange={(e) => setIsAiAppProduct(e.target.checked)}
+                          className="w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-0 cursor-pointer"
+                        />
+                        <span>فعال‌سازی اپلیکیشن و صدور لایسنس اشتراک</span>
+                      </label>
+                    </div>
+
+                    {isAiAppProduct && (
+                      <div className="mt-4 space-y-4 animate-in fade-in">
+                        {/* Dynamic Duration Info Banner */}
+                        <div className="p-3 bg-amber-500/10 border border-amber-400/40 rounded-xl flex items-start gap-2.5 text-xs text-amber-200">
+                          <Sparkles className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+                          <div className="leading-relaxed">
+                            <span className="font-black text-amber-300">مدت زمان اشتراک کاملاً پویا بر اساس انتخاب خریدار: </span>
+                            نیازی به تعریف ثابت مدت لایسنس نیست. مشتری در هنگام خرید این محصول از سایت جهش‌کالا، مدت دلخواه خود را (۱ روز، ۷ روز، ۱ ماه، ۳ ماه، ۶ ماه، ۱ سال یا روزهای دلخواه) انتخاب نموده و سیستم به طور خودکار نام کاربری و رمز عبور اختصاصی را با همان مدت منحصراً برای همین محصول (<span className="text-white font-mono font-bold">{editingProductId || 'این کالا'}</span>) صادر می‌نماید.
                           </div>
                         </div>
 
-                        <textarea
-                          placeholder="پرامپت آماده اتصال به API سایت..."
-                          value={aiAppPrompt}
-                          onChange={(e) => setAiAppPrompt(e.target.value)}
-                          rows={8}
-                          className="w-full bg-[#060b18] border border-cyan-500/40 rounded-lg p-3 text-xs text-cyan-100 font-mono focus:outline-none focus:ring-2 focus:ring-cyan-400 leading-relaxed"
-                          dir="ltr"
-                        />
-                        <p className="text-[10px] text-slate-400">
-                          این متن را مستقیماً به هوش مصنوعی (Google AI Studio یا هر هوش مصنوعی دیگر) بدهید تا اپلیکیشن ویندوز یا موبایل شما را با صفحه لاگین متصل به سرور جهش‌کالا و اعتبارسنجی روزهای اشتراک پیاده‌سازی کند.
-                        </p>
+                        {/* Configuration Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                              نام اپلیکیشن در پرامپت هوش مصنوعی:
+                            </label>
+                            <input
+                              type="text"
+                              value={aiAppName}
+                              onChange={(e) => setAiAppName(e.target.value)}
+                              placeholder={newTitle.trim() || 'مثلاً: سامانه مدیریت املاک جهش'}
+                              className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400 font-bold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                              پلتفرم هدف برای تولید کد توسط AI:
+                            </label>
+                            <select
+                              value={aiAppPlatform}
+                              onChange={(e) => setAiAppPlatform(e.target.value as any)}
+                              className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+                            >
+                              <option value="all">🌐 همه‌کاره (ویندوز Desktop + موبایل اندروید)</option>
+                              <option value="windows">💻 فقط ویندوز دسکتاپ (WPF / C# / Electron)</option>
+                              <option value="android">📱 فقط اندروید موبایل (Kotlin / Java / Flutter)</option>
+                              <option value="cross-platform">⚡ کراس‌پلتفرم (Flutter / React Native / Tauri)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Custom Prompt Notes */}
+                        <div>
+                          <label className="text-[11px] font-bold text-amber-200 block mb-1">
+                            ویژگی‌ها، فیلترها و الزامات اختصاصی برنامه برای اضافه شدن در پرامپت (اختیاری):
+                          </label>
+                          <input
+                            type="text"
+                            value={aiAppCustomPromptNote}
+                            onChange={(e) => setAiAppCustomPromptNote(e.target.value)}
+                            placeholder="مثلاً: دارای بخش فیلتر پیشرفته بر اساس قیمت و منطقه، نمودار سود ماهانه، ثبت قراردادها و بکاپ‌گیری محلی"
+                            className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          />
+                        </div>
+
+                        {/* The Magic AI Prompt Box */}
+                        <div className="rounded-2xl bg-[#0e071e] border border-amber-400/60 p-4 space-y-3 shadow-inner">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-800/60 pb-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-amber-400 font-black text-xs sm:text-sm flex items-center gap-1.5">
+                                <Code2 className="w-4 h-4" />
+                                متن آماده پرامپت هوش مصنوعی (Master AI Prompt):
+                              </span>
+                              <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+                                اتصال API + امنیت انحصاری محصول
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const promptText = buildAiAppPrompt(
+                                  {
+                                    id: editingProductId || 'pkg-software',
+                                    title: newTitle.trim() || 'نرم‌افزار جهش',
+                                    aiAppName: aiAppName.trim() || newTitle.trim(),
+                                    isSubscription: true,
+                                  },
+                                  aiAppPlatform,
+                                  aiAppCustomPromptNote.trim()
+                                );
+                                navigator.clipboard.writeText(promptText);
+                                setCopiedPromptFeedback('پرامپت با موفقیت کپی شد! اکنون می‌توانید آن را در Google Antigravity، Google AI Studio یا ChatGPT پیست کنید.');
+                                setTimeout(() => setCopiedPromptFeedback(null), 5000);
+                              }}
+                              className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition-all shadow-md cursor-pointer shrink-0"
+                            >
+                              <Copy className="w-4 h-4" />
+                              <span>کپی پرامپت اتصال هوش مصنوعی (یک کلیک)</span>
+                            </button>
+                          </div>
+
+                          {copiedPromptFeedback && (
+                            <div className="bg-emerald-950/70 border border-emerald-500/60 text-emerald-200 text-xs px-3 py-2 rounded-xl flex items-center gap-2 animate-in fade-in">
+                              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span>{copiedPromptFeedback}</span>
+                            </div>
+                          )}
+
+                          {/* Prompt Preview Code Block */}
+                          <div className="relative">
+                            <textarea
+                              readOnly
+                              rows={8}
+                              value={buildAiAppPrompt(
+                                {
+                                  id: editingProductId || 'pkg-software',
+                                  title: newTitle.trim() || 'نرم‌افزار جهش',
+                                  aiAppName: aiAppName.trim() || newTitle.trim(),
+                                  isSubscription: true,
+                                },
+                                aiAppPlatform,
+                                aiAppCustomPromptNote.trim()
+                              )}
+                              className="w-full bg-[#080411] border border-purple-900/80 rounded-xl p-3 text-[11px] text-purple-200 font-mono leading-relaxed focus:outline-none resize-none cursor-text select-all"
+                            />
+                          </div>
+
+                          {/* AI Instructions Guide */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] text-slate-300 pt-1">
+                            <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/40 space-y-1">
+                              <span className="font-bold text-amber-300 block">🤖 ساخت اپلیکیشن با Google Antigravity یا ChatGPT:</span>
+                              <p className="text-slate-300 text-[11px] leading-relaxed">
+                                کافیست دکمه کپی بالا را بزنید و در <strong>Google Antigravity</strong> یا <strong>Google AI Studio</strong> پیست کنید. هوش مصنوعی بدون نیاز به تعریف روزهای ثابت، اتصال خودکار به API و لاگین جهش‌کالا را پیاده‌سازی می‌کند.
+                              </p>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/40 space-y-1">
+                              <span className="font-bold text-emerald-300 block">🛡️ انحصار محصول و مدت اشتراک پویا:</span>
+                              <p className="text-slate-300 text-[11px] leading-relaxed">
+                                هر کاربر فقط با نام کاربری و رمز همان محصول خریداری‌شده می‌تواند لاگین کند و به محصولات دیگر دسترسی نخواهد داشت. مدت روزهای فعال نیز بر اساس انتخاب مشتری در زمان خرید محاسبه و مدیریت می‌شود.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Live API Auth Tester inside Admin Panel */}
+                        <div className="p-3.5 rounded-2xl bg-[#140a28] border border-purple-800/60 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                              <Server className="w-3.5 h-3.5 text-amber-400" />
+                              تست زنده API احراز هویت لایسنس (<span className="text-amber-300 font-mono">/api/app-auth</span>):
+                            </span>
+                            <span className="text-[10px] text-slate-400">تست مستقیم روی سرور جهش</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              value={testAuthUsername}
+                              onChange={(e) => setTestAuthUsername(e.target.value)}
+                              placeholder="نام کاربری (مثلاً 0915...)"
+                              className="bg-[#0e071c] border border-purple-700/60 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                            />
+                            <input
+                              type="text"
+                              value={testAuthPassword}
+                              onChange={(e) => setTestAuthPassword(e.target.value)}
+                              placeholder="رمز عبور"
+                              className="bg-[#0e071c] border border-purple-700/60 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleTestAppAuth}
+                              disabled={isTestingAuth}
+                              className="bg-purple-800 hover:bg-purple-700 text-white font-bold rounded-xl px-3 py-1.5 text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              {isTestingAuth ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Key className="w-3.5 h-3.5 text-amber-300" />
+                              )}
+                              <span>تست زنده ورود API</span>
+                            </button>
+                          </div>
+
+                          {testAuthResult && (
+                            <div className={`p-2.5 rounded-xl border text-xs font-mono transition-all ${
+                              testAuthResult.success
+                                ? 'bg-emerald-950/50 border-emerald-500/60 text-emerald-200'
+                                : 'bg-rose-950/50 border-rose-500/60 text-rose-200'
+                            }`}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold">
+                                  {testAuthResult.success ? '✅ ورود موفقیت‌آمیز (اشتراک معتبر)' : '❌ ورود ناموفق یا اشتراک منقضی'}
+                                </span>
+                                {testAuthResult.daysRemaining !== undefined && (
+                                  <span className="text-amber-300 font-bold">
+                                    {testAuthResult.daysRemaining} روز باقیمانده
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] opacity-90">{testAuthResult.message}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 {/* 6.05 Custom Multi-Tier Subscription & Pricing Plans Builder (پکیج‌ها و تعرفه‌های اشتراک سفارشی) */}
@@ -3737,7 +3797,7 @@ Headers: Content-Type: application/json
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {(Array.isArray(coupons) ? coupons : []).filter(Boolean).map((cp) => (
+                  {coupons.map((cp) => (
                     <div
                       key={cp.id}
                       className="p-4 rounded-2xl bg-[#140c2e] border border-purple-900/60 flex items-center justify-between hover:border-purple-700 transition-all"
@@ -4833,7 +4893,7 @@ Headers: Content-Type: application/json
                 </div>
 
                 <div className="space-y-3">
-                  {(Array.isArray(bannersList) ? bannersList : []).filter(Boolean).map((banner, index) => (
+                  {bannersList.map((banner, index) => (
                     <div
                       key={banner.id}
                       className={`p-3.5 rounded-2xl bg-[#140c2e] border transition-all flex flex-col sm:flex-row items-center justify-between gap-4 ${
@@ -5195,7 +5255,7 @@ on public.users for delete using (true);`;
               {/* User List Table */}
               {(() => {
                 const filteredUsers = sortUsersNewestFirst(
-                  (Array.isArray(usersList) ? usersList : []).filter(Boolean).filter((u) => {
+                  usersList.filter((u) => {
                     const matchesSearch =
                       !userSearchTerm.trim() ||
                       u.fullName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
@@ -6423,7 +6483,7 @@ on public.users for delete using (true);`;
                 <div className="pt-2">
                   <strong className="block mb-2 text-white text-xs">اقلام خریداری‌شده:</strong>
                   <div className="space-y-2">
-                    {selectedOrder.items.map((item, idx) => {
+                    {(selectedOrder.items || []).map((item, idx) => {
                       const cleanItemTitle = item.product?.title?.trim().toLowerCase();
                       const live = products?.find(
                         (p) =>
