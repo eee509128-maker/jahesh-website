@@ -1361,6 +1361,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }, 3000);
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
       <div className="relative w-full max-w-6xl bg-[#0f0924] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden h-[90vh] max-h-[90vh] flex flex-col">

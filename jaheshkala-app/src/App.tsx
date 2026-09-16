@@ -1779,34 +1779,38 @@ export default function App() {
       />
 
       {/* Admin Panel (Orders, New Product Form, Zibal Settings, Coupons, Users, Banners) */}
-      <Suspense fallback={<div className="p-8 text-center text-white">در حال بارگذاری پنل مدیریت...</div>}><AdminPanel
-        isOpen={adminModalOpen}
-        onClose={() => setAdminModalOpen(false)}
-        currentUser={currentUser}
-        onAdminInstantPurchase={handleAdminInstantPurchase}
-        onOpenAmlakApp={() => setAmlakModalOpen(true)}
-        orders={orders}
-        onUpdateOrderStatus={handleUpdateOrderStatus}
-        onDeleteOrder={handleDeleteOrder}
-        onClearAllOrders={handleClearAllOrders}
-        products={products}
-        onAddNewProduct={handleAddNewProduct}
-        onUpdateProduct={handleUpdateProduct}
-        onDeleteProduct={handleDeleteProduct}
-        zibalMerchant={zibalMerchant}
-        onUpdateZibalMerchant={handleUpdateZibalMerchant}
-        coupons={coupons}
-        onAddNewCoupon={handleAddNewCoupon}
-        onDeleteCoupon={handleDeleteCoupon}
-        onToggleCoupon={handleToggleCoupon}
-        usersList={usersList}
-        onDeleteUser={handleDeleteUser}
-        onUpdateUser={handleUpdateUser}
-        onAddNewUser={handleAddNewUser}
-        banners={banners}
-        onSaveBanner={handleSaveBanner}
-        onDeleteBanner={handleDeleteBanner}
-      /></Suspense>
+      {adminModalOpen && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 text-white font-bold text-sm">در حال بارگذاری پنل مدیریت...</div>}>
+          <AdminPanel
+            isOpen={adminModalOpen}
+            onClose={() => setAdminModalOpen(false)}
+            currentUser={currentUser}
+            onAdminInstantPurchase={handleAdminInstantPurchase}
+            onOpenAmlakApp={() => setAmlakModalOpen(true)}
+            orders={orders}
+            onUpdateOrderStatus={handleUpdateOrderStatus}
+            onDeleteOrder={handleDeleteOrder}
+            onClearAllOrders={handleClearAllOrders}
+            products={products}
+            onAddNewProduct={handleAddNewProduct}
+            onUpdateProduct={handleUpdateProduct}
+            onDeleteProduct={handleDeleteProduct}
+            zibalMerchant={zibalMerchant}
+            onUpdateZibalMerchant={handleUpdateZibalMerchant}
+            coupons={coupons}
+            onAddNewCoupon={handleAddNewCoupon}
+            onDeleteCoupon={handleDeleteCoupon}
+            onToggleCoupon={handleToggleCoupon}
+            usersList={usersList}
+            onDeleteUser={handleDeleteUser}
+            onUpdateUser={handleUpdateUser}
+            onAddNewUser={handleAddNewUser}
+            banners={banners}
+            onSaveBanner={handleSaveBanner}
+            onDeleteBanner={handleDeleteBanner}
+          />
+        </Suspense>
+      )}
 
       {/* User Orders Modal */}
       {/* User Profile Modal */}
