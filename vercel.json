@@ -19,34 +19,6 @@
       "destination": "/assets/47887509.txt"
     },
     {
-      "source": "/api/products/save",
-      "destination": "/api/products-save"
-    },
-    {
-      "source": "/api/products",
-      "destination": "/api/products"
-    },
-    {
-      "source": "/api/app-license/:path*",
-      "destination": "/api/app-license"
-    },
-    {
-      "source": "/images/:path*",
-      "destination": "/jaheshkala/images/:path*"
-    },
-    {
-      "source": "/jaheshkala/images/:path*",
-      "destination": "/jaheshkala/images/:path*"
-    },
-    {
-      "source": "/jaheshkala/assets/:path*",
-      "destination": "/jaheshkala/assets/:path*"
-    },
-    {
-      "source": "/jaheshkala/uploads/:path*",
-      "destination": "/jaheshkala/uploads/:path*"
-    },
-    {
       "source": "/jaheshkala",
       "destination": "/jaheshkala/index.html"
     },
