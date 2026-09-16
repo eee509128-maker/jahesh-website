@@ -1,6 +1,0 @@
-{
-  "name": "فروشگاه آنلاین جهش‌کالا",
-  "description": "فروشگاه اینترنتی جامع انواع کالای دیجیتال، گوشی موبایل، لپ‌تاپ، هدفون و ساعت هوشمند و پکیج‌های اختصاصی جهش",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
