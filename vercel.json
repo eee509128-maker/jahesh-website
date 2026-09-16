@@ -1,0 +1,46 @@
+{
+  "outputDirectory": ".",
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/frwshgah",
+      "destination": "/jaheshkala",
+      "permanent": true
+    },
+    {
+      "source": "/frwshgah/:match*",
+      "destination": "/jaheshkala",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/47887509.txt",
+      "destination": "/assets/47887509.txt"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/jaheshkala/images/:path*",
+      "destination": "/jaheshkala/images/:path*"
+    },
+    {
+      "source": "/jaheshkala/assets/:path*",
+      "destination": "/jaheshkala/assets/:path*"
+    },
+    {
+      "source": "/jaheshkala/uploads/:path*",
+      "destination": "/jaheshkala/uploads/:path*"
+    },
+    {
+      "source": "/jaheshkala",
+      "destination": "/jaheshkala/index.html"
+    },
+    {
+      "source": "/jaheshkala/((?!.*\\.[\\w]+$).*)",
+      "destination": "/jaheshkala/index.html"
+    }
+  ]
+}
