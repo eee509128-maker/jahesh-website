@@ -1,0 +1,16 @@
+{
+  "name": "jahesh-website",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build && node server.js",
+    "build": "cd jaheshkala-app && npm install && npx vite build",
+    "lint": "node --check server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "react-easy-crop": "^6.2.3"
+  }
+}
