@@ -207,11 +207,14 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
           {/* User Auth / Profile */}
           {currentUser ? (
             <div className="flex items-center gap-1 sm:gap-2">
-              {currentUser.role === 'admin' || currentUser.role === 'operator' ? (
+              {String(currentUser.role || '').toLowerCase().trim() === 'admin' || String(currentUser.role || '').toLowerCase().trim() === 'operator' ? (
                 <button
                   id="digikala-admin-btn"
-                  onClick={onOpenAdmin}
-                  className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-700 dark:text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-colors shadow-sm"
+                  onClick={() => {
+                    console.log('[Header] Admin button clicked');
+                    onOpenAdmin();
+                  }}
+                  className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-700 dark:text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-colors shadow-sm cursor-pointer"
                 >
                   <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                   <span className="hidden xs:inline">پنل مدیریت</span>

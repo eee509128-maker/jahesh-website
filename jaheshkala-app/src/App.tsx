@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight
+  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, AlertTriangle
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
@@ -27,6 +27,10 @@ import {
   parseOrderTimestamp,
   safeSetLocalStorage,
   subscribeToProductsRealtime,
+  fetchAllUsersFromDb,
+  updateUserInDb,
+  deleteUserFromDb,
+  registerUserInDb,
 } from './lib/dbService';
 import {
   verifyZibalPayment,
@@ -106,6 +110,79 @@ export function sanitizeProductsList(list: any[]): Product[] {
   if (!Array.isArray(list)) return INITIAL_PRODUCTS;
   const cleaned = list.map(sanitizeProduct).filter((p): p is Product => p !== null);
   return cleaned.length > 0 ? cleaned : INITIAL_PRODUCTS;
+}
+
+interface AdminErrorBoundaryProps {
+  children: React.ReactNode;
+  onClose: () => void;
+}
+
+interface AdminErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class AdminErrorBoundary extends React.Component<AdminErrorBoundaryProps, AdminErrorBoundaryState> {
+  constructor(props: AdminErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): AdminErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('CRITICAL: AdminPanel caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-[#120a2b] border border-rose-500/50 rounded-2xl p-6 max-w-md w-full text-center space-y-4 shadow-2xl text-slate-200">
+            <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-white">خطا در پردازش پنل مدیریت</h3>
+            <p className="text-xs text-slate-300">
+              یک خطای غیرمنتظره در پردازش اطلاعات رخ داد:
+            </p>
+            <div className="p-3 bg-rose-950/40 rounded-xl border border-rose-900/50 text-[11px] text-rose-300 font-mono text-left overflow-auto max-h-24">
+              {this.state.error?.message || 'Unknown Error'}
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+              <button
+                onClick={() => this.setState({ hasError: false, error: null })}
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all cursor-pointer"
+              >
+                تلاش مجدد
+              </button>
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('jahesh_orders');
+                    localStorage.removeItem('jahesh_products');
+                  } catch {}
+                  window.location.reload();
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700/50 text-xs font-bold transition-all cursor-pointer"
+              >
+                پاکسازی کش موقت
+              </button>
+              <button
+                onClick={this.props.onClose}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
+              >
+                بستن
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function App() {
@@ -506,22 +583,19 @@ export default function App() {
         }
         
         // Load users list once
-        const { fetchAllUsersFromDb } = await import('./lib/dbService');
-        if (fetchAllUsersFromDb) {
-          const allUsers = await fetchAllUsersFromDb();
-          if (isMounted && allUsers) {
-            setUsersList(allUsers);
+        const allUsers = await fetchAllUsersFromDb();
+        if (isMounted && allUsers) {
+          setUsersList(allUsers);
 
-            // Auto synchronize current logged in user's role from cloud
-            const rawStored = localStorage.getItem('jahesh_current_user');
-            const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
-            if (activeUser) {
-              const cloudUser = allUsers.find((u) => areSameUser(u, activeUser));
-              if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
-                const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
-                setCurrentUser(updated);
-                safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
-              }
+          // Auto synchronize current logged in user's role from cloud
+          const rawStored = localStorage.getItem('jahesh_current_user');
+          const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
+          if (activeUser) {
+            const cloudUser = allUsers.find((u) => areSameUser(u, activeUser));
+            if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
+              const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
+              setCurrentUser(updated);
+              safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
             }
           }
         }
@@ -1135,7 +1209,6 @@ export default function App() {
   // User Management Actions
   const handleDeleteUser = async (userId: string) => {
     setUsersList((prev) => prev.filter((u) => u.id !== userId));
-    const { deleteUserFromDb } = await import('./lib/dbService');
     await deleteUserFromDb(userId);
     showToast('کاربر با موفقیت حذف شد.');
   };
@@ -1163,7 +1236,6 @@ export default function App() {
     }
 
     // 3. Persist across multi-layered storage (Local, Server, Supabase)
-    const { updateUserInDb, fetchAllUsersFromDb } = await import('./lib/dbService');
     await updateUserInDb(updatedUser);
 
     // 4. Refetch all users to make sure state is 100% in sync without reverting the role
@@ -1185,7 +1257,6 @@ export default function App() {
 
   const handleAddNewUser = async (newUser: User, initialPass: string = '123456') => {
     setUsersList((prev) => [newUser, ...prev]);
-    const { registerUserInDb } = await import('./lib/dbService');
     await registerUserInDb(newUser, initialPass);
     showToast(`کاربر جدید (${newUser.fullName}) با موفقیت ایجاد شد.`);
   };
@@ -1820,34 +1891,36 @@ export default function App() {
 
       {/* Admin Panel (Orders, New Product Form, Zibal Settings, Coupons, Users, Banners) */}
       {adminModalOpen && (
-        <AdminPanel
-          isOpen={adminModalOpen}
-          onClose={() => setAdminModalOpen(false)}
-          currentUser={currentUser}
-          onAdminInstantPurchase={handleAdminInstantPurchase}
-          onOpenAmlakApp={() => setAmlakModalOpen(true)}
-          orders={orders}
-          onUpdateOrderStatus={handleUpdateOrderStatus}
-          onDeleteOrder={handleDeleteOrder}
-          onClearAllOrders={handleClearAllOrders}
-          products={products}
-          onAddNewProduct={handleAddNewProduct}
-          onUpdateProduct={handleUpdateProduct}
-          onDeleteProduct={handleDeleteProduct}
-          zibalMerchant={zibalMerchant}
-          onUpdateZibalMerchant={handleUpdateZibalMerchant}
-          coupons={coupons}
-          onAddNewCoupon={handleAddNewCoupon}
-          onDeleteCoupon={handleDeleteCoupon}
-          onToggleCoupon={handleToggleCoupon}
-          usersList={usersList}
-          onDeleteUser={handleDeleteUser}
-          onUpdateUser={handleUpdateUser}
-          onAddNewUser={handleAddNewUser}
-          banners={banners}
-          onSaveBanner={handleSaveBanner}
-          onDeleteBanner={handleDeleteBanner}
-        />
+        <AdminErrorBoundary onClose={() => setAdminModalOpen(false)}>
+          <AdminPanel
+            isOpen={adminModalOpen}
+            onClose={() => setAdminModalOpen(false)}
+            currentUser={currentUser}
+            onAdminInstantPurchase={handleAdminInstantPurchase}
+            onOpenAmlakApp={() => setAmlakModalOpen(true)}
+            orders={orders}
+            onUpdateOrderStatus={handleUpdateOrderStatus}
+            onDeleteOrder={handleDeleteOrder}
+            onClearAllOrders={handleClearAllOrders}
+            products={products}
+            onAddNewProduct={handleAddNewProduct}
+            onUpdateProduct={handleUpdateProduct}
+            onDeleteProduct={handleDeleteProduct}
+            zibalMerchant={zibalMerchant}
+            onUpdateZibalMerchant={handleUpdateZibalMerchant}
+            coupons={coupons}
+            onAddNewCoupon={handleAddNewCoupon}
+            onDeleteCoupon={handleDeleteCoupon}
+            onToggleCoupon={handleToggleCoupon}
+            usersList={usersList}
+            onDeleteUser={handleDeleteUser}
+            onUpdateUser={handleUpdateUser}
+            onAddNewUser={handleAddNewUser}
+            banners={banners}
+            onSaveBanner={handleSaveBanner}
+            onDeleteBanner={handleDeleteBanner}
+          />
+        </AdminErrorBoundary>
       )}
 
       {/* User Orders Modal */}

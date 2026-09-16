@@ -11,7 +11,7 @@ import {
   Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool } from '../types';
-import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, fetchAllUsersFromDb } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
@@ -21,11 +21,11 @@ import { JAHESH_OFFICIAL_25_GUILDS } from '../data/guildProducts';
 interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  orders: Order[];
+  orders?: Order[];
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus) => void;
   onDeleteOrder?: (orderId: string) => void;
   onClearAllOrders?: () => void;
-  products: Product[];
+  products?: Product[];
   onAddNewProduct: (newProduct: Product) => void;
   onUpdateProduct?: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
@@ -50,11 +50,11 @@ interface AdminPanelProps {
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   isOpen,
   onClose,
-  orders,
+  orders = [],
   onUpdateOrderStatus,
   onDeleteOrder,
   onClearAllOrders,
-  products,
+  products = [],
   onAddNewProduct,
   onUpdateProduct,
   onDeleteProduct,
@@ -68,7 +68,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteUser,
   onUpdateUser,
   onAddNewUser,
-  banners: initialBannersProp,
+  banners: initialBannersProp = [],
   onSaveBanner,
   onDeleteBanner,
   currentUser,
@@ -267,21 +267,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // محصول انتخاب شده برای اتصال به بنر
   const selectedProductForBanner = useMemo(() => {
     if (bannerActionType !== 'product' || !bannerActionTarget) return null;
-    return products.find((p) => p.id === bannerActionTarget);
+    return (Array.isArray(products) ? products.filter(Boolean) : []).find((p) => p && p.id === bannerActionTarget);
   }, [products, bannerActionType, bannerActionTarget]);
 
   // لیست کالاهای منطبق با جستجو در ویرایش بنر
   const matchingProductsForBanner = useMemo(() => {
     if (bannerActionType !== 'product') return [];
+    const safeList = Array.isArray(products) ? products.filter((p): p is Product => Boolean(p && typeof p === 'object')) : [];
     const q = bannerProductSearch.trim().toLowerCase();
     if (!q) {
-      return products.slice(0, 10);
+      return safeList.slice(0, 10);
     }
-    return products.filter((p) =>
-      (p.title && p.title.toLowerCase().includes(q)) ||
-      (p.brand && p.brand.toLowerCase().includes(q)) ||
-      (p.category && p.category.toLowerCase().includes(q)) ||
-      (p.id && p.id.toLowerCase().includes(q))
+    return safeList.filter((p) =>
+      (p?.title && p.title.toLowerCase().includes(q)) ||
+      (p?.brand && p.brand.toLowerCase().includes(q)) ||
+      (p?.category && p.category.toLowerCase().includes(q)) ||
+      (p?.id && p.id.toLowerCase().includes(q))
     ).slice(0, 25);
   }, [products, bannerActionType, bannerProductSearch]);
   const [bannerPreviewDevice, setBannerPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
@@ -337,7 +338,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleRefreshUsersList = async () => {
     setIsRefreshingUsers(true);
     try {
-      const { fetchAllUsersFromDb } = await import('../lib/dbService');
       const fresh = await fetchAllUsersFromDb();
       if (fresh && Array.isArray(fresh)) {
         if (typeof window !== 'undefined') {
@@ -1093,7 +1093,9 @@ Headers: Content-Type: application/json
       'زیبایی و سلامت',
       'کتاب و فرهنگ',
       'خدمات و نرم‌افزار',
-      ...products.map((p) => p.category).filter(Boolean),
+      ...(Array.isArray(products)
+        ? products.filter(Boolean).map((p) => p?.category).filter((c): c is string => Boolean(c))
+        : []),
     ])
   );
 
@@ -1407,7 +1409,7 @@ Headers: Content-Type: application/json
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
       <div className="relative w-full max-w-6xl bg-[#0f0924] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden h-[90vh] max-h-[90vh] flex flex-col">
         
         {/* Top Header */}
@@ -1706,7 +1708,8 @@ Headers: Content-Type: application/json
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-purple-900/30 text-slate-200">
-                      {[...orders]
+                      {(Array.isArray(orders) ? [...orders] : [])
+                        .filter(Boolean)
                         .sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a))
                         .map((order) => (
                         <tr key={order.id} className="hover:bg-purple-950/40 transition-colors">
@@ -1731,15 +1734,15 @@ Headers: Content-Type: application/json
                           </td>
                           <td className="p-3.5">
                             <div className="max-w-[280px] font-medium text-xs space-y-1">
-                              {order.items.map((i, idx) => (
+                              {(Array.isArray(order.items) ? order.items : []).map((i, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-white font-bold">{i.product.title}</span>
-                                  {i.selectedPlan && (
+                                  <span className="text-white font-bold">{i?.product?.title || (i as any)?.title || 'محصول'}</span>
+                                  {i?.selectedPlan && (
                                     <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40 shadow-xs">
                                       تعرفه: {i.selectedPlan.name}
                                     </span>
                                   )}
-                                  <span className="text-[10px] text-slate-400">({i.quantity} عدد)</span>
+                                  <span className="text-[10px] text-slate-400">({i?.quantity || 1} عدد)</span>
                                 </div>
                               ))}
                             </div>
@@ -1829,16 +1832,19 @@ Headers: Content-Type: application/json
                   )
                 );
 
+                const safeProds = Array.isArray(products) ? products.filter((p): p is Product => Boolean(p && typeof p === 'object')) : [];
+
                 const uniqueCategories = Array.from(
                   new Set(
-                    products
+                    safeProds
                       .map((p) => p.category?.trim())
-                      .filter((c) => Boolean(c))
+                      .filter((c): c is string => Boolean(c))
                   )
                 );
 
-                const processedProducts = products
+                const processedProducts = safeProds
                   .filter((prod) => {
+                    if (!prod) return false;
                     // Search query
                     if (prodSearchQuery.trim()) {
                       const q = prodSearchQuery.trim().toLowerCase();
@@ -1875,9 +1881,9 @@ Headers: Content-Type: application/json
                     return true;
                   })
                   .sort((a, b) => {
-                    if (prodSortBy === 'price_desc') return b.price - a.price;
-                    if (prodSortBy === 'price_asc') return a.price - b.price;
-                    if (prodSortBy === 'title') return a.title.localeCompare(b.title, 'fa');
+                    if (prodSortBy === 'price_desc') return (b.price || 0) - (a.price || 0);
+                    if (prodSortBy === 'price_asc') return (a.price || 0) - (b.price || 0);
+                    if (prodSortBy === 'title') return (a.title || '').localeCompare(b.title || '', 'fa');
                     return (b.updatedAt || '').localeCompare(a.updatedAt || '');
                   });
 
@@ -2019,7 +2025,7 @@ Headers: Content-Type: application/json
                           >
                             <option value="all">🏢 فیلتر صنف شغلی (همه ۲۵ صنف)</option>
                             {uniqueGuilds.map((g) => {
-                              const count = products.filter(p => ((p as any).guild || (p as any).targetGuild || '') === g).length;
+                              const count = (Array.isArray(products) ? products : []).filter(p => p && (((p as any).guild || (p as any).targetGuild || '') === g)).length;
                               return (
                                 <option key={g} value={g}>
                                   {g} ({count} محصول)
@@ -2038,7 +2044,7 @@ Headers: Content-Type: application/json
                           >
                             <option value="all">🏷️ دسته‌بندی موضوعی (همه)</option>
                             {uniqueCategories.map((c) => {
-                              const count = products.filter(p => p.category === c).length;
+                              const count = (Array.isArray(products) ? products : []).filter(p => p && p.category === c).length;
                               return (
                                 <option key={c} value={c}>
                                   {c} ({count} کالا)
@@ -3731,7 +3737,7 @@ Headers: Content-Type: application/json
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {coupons.map((cp) => (
+                  {(Array.isArray(coupons) ? coupons : []).filter(Boolean).map((cp) => (
                     <div
                       key={cp.id}
                       className="p-4 rounded-2xl bg-[#140c2e] border border-purple-900/60 flex items-center justify-between hover:border-purple-700 transition-all"
@@ -4827,7 +4833,7 @@ Headers: Content-Type: application/json
                 </div>
 
                 <div className="space-y-3">
-                  {bannersList.map((banner, index) => (
+                  {(Array.isArray(bannersList) ? bannersList : []).filter(Boolean).map((banner, index) => (
                     <div
                       key={banner.id}
                       className={`p-3.5 rounded-2xl bg-[#140c2e] border transition-all flex flex-col sm:flex-row items-center justify-between gap-4 ${
@@ -5189,7 +5195,7 @@ on public.users for delete using (true);`;
               {/* User List Table */}
               {(() => {
                 const filteredUsers = sortUsersNewestFirst(
-                  usersList.filter((u) => {
+                  (Array.isArray(usersList) ? usersList : []).filter(Boolean).filter((u) => {
                     const matchesSearch =
                       !userSearchTerm.trim() ||
                       u.fullName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
