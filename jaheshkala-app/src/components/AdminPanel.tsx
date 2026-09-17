@@ -1544,7 +1544,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </span>
             </button>
 
-            {(currentUser?.role === 'admin' || currentUser?.role === 'operator') && (
+            {currentUser?.role === 'admin' && (
               <button
                 onClick={() => setActiveTab('integrations')}
                 className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
@@ -1801,7 +1801,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               >
                                 جزئیات
                               </button>
-                              {onDeleteOrder && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && (
+                              {onDeleteOrder && currentUser?.role === 'admin' && (
                                 <button
                                   onClick={() => onDeleteOrder(order.id)}
                                   className="p-1 rounded-lg hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors"
@@ -2171,15 +2171,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <Sliders className="w-4 h-4" />
                                   </button>
 
-                                  <button
-                                    onClick={() => handleStartEdit(prod)}
-                                    className="p-1.5 text-slate-400 hover:text-amber-400 transition-colors rounded-lg hover:bg-purple-900/40"
-                                    title="ویرایش کامل مشخصات این کالا"
-                                  >
-                                    <Edit3 className="w-4 h-4" />
-                                  </button>
+                                  {currentUser?.role === 'admin' && (
+                                    <button
+                                      onClick={() => handleStartEdit(prod)}
+                                      className="p-1.5 text-slate-400 hover:text-amber-400 transition-colors rounded-lg hover:bg-purple-900/40"
+                                      title="ویرایش کامل مشخصات این کالا"
+                                    >
+                                      <Edit3 className="w-4 h-4" />
+                                    </button>
+                                  )}
 
-                                  {currentUser?.role === 'admin' || currentUser?.role === 'operator' ? (
+                                  {currentUser?.role === 'admin' ? (
                                     <button
                                       onClick={() => onDeleteProduct(prod.id)}
                                       className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-purple-900/40"
@@ -3890,7 +3892,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             )}
                           </button>
                         )}
-                        {onDeleteCoupon && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && (
+                        {onDeleteCoupon && currentUser?.role === 'admin' && (
                           <button
                             onClick={() => onDeleteCoupon(cp.id)}
                             title="حذف کد تخفیف"
@@ -5389,7 +5391,7 @@ on public.users for delete using (true);`;
                                <td className="p-3.5 text-center whitespace-nowrap">
                                 <select
                                   value={user.role || 'user'}
-                                  disabled={isMaster}
+                                  disabled={isMaster || currentUser?.role === 'operator'}
                                   onChange={(e) => {
                                     const nextRole = e.target.value as 'admin' | 'operator' | 'user';
                                     const updated = { ...user, role: nextRole };
@@ -5403,7 +5405,7 @@ on public.users for delete using (true);`;
                                       : user.role === 'operator'
                                       ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50 hover:border-cyan-400'
                                       : 'bg-slate-900/90 text-slate-300 border-slate-700/50 hover:border-slate-500'
-                                  } ${isMaster ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                  } ${isMaster || currentUser?.role === 'operator' ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 >
                                   <option value="user" className="bg-[#130b2e] text-slate-200">👤 کاربر عادی</option>
                                   <option value="operator" className="bg-[#130b2e] text-cyan-300">🛡️ ادمین محدود (اپراتور)</option>
@@ -5427,6 +5429,10 @@ on public.users for delete using (true);`;
                                   {/* Toggle Role Button */}
                                   <button
                                     onClick={() => {
+                                      if (currentUser?.role === 'operator') {
+                                        alert('تغییر سطح دسترسی کاربران نیازمند دسترسی مدیر ارشد است.');
+                                        return;
+                                      }
                                       if (isMaster) {
                                         alert('نقش مدیر اصلی سایت قابل تغییر نیست.');
                                         return;
@@ -5438,13 +5444,19 @@ on public.users for delete using (true);`;
                                       const roleTitle = nextRole === 'admin' ? 'مدیر ارشد' : nextRole === 'operator' ? 'ادمین محدود (اپراتور)' : 'کاربر عادی';
                                       setUserActionMessage(`نقش کاربر ${user.fullName} به «${roleTitle}» تغییر یافت.`);
                                     }}
-                                    disabled={false}
+                                    disabled={currentUser?.role === 'operator'}
                                     title={
-                                      `تغییر نقش (فعلی: ${
+                                      currentUser?.role === 'operator'
+                                        ? 'تغییر نقش نیازمند دسترسی مدیر ارشد است'
+                                        : `تغییر نقش (فعلی: ${
                                             user.role === 'admin' ? 'مدیر ارشد' : user.role === 'operator' ? 'ادمین محدود' : 'کاربر عادی'
                                           })`
                                     }
-                                    className="p-1.5 rounded-lg border transition-colors bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-700/40"
+                                    className={`p-1.5 rounded-lg border transition-colors ${
+                                      currentUser?.role === 'operator'
+                                        ? 'opacity-30 cursor-not-allowed bg-slate-900 border-slate-800 text-slate-600'
+                                        : 'bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-700/40'
+                                    }`}
                                   >
                                     <Shield className="w-3.5 h-3.5" />
                                   </button>
@@ -5452,6 +5464,10 @@ on public.users for delete using (true);`;
                                   {/* Delete Button */}
                                   <button
                                     onClick={() => {
+                                      if (currentUser?.role === 'operator') {
+                                        alert('حذف حساب کاربری نیازمند دسترسی مدیر ارشد است.');
+                                        return;
+                                      }
                                       if (isMaster) {
                                         alert('حساب کاربری مدیر اصلی سایت قابل حذف نیست.');
                                         return;

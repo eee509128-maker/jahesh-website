@@ -60,7 +60,7 @@ export const CartModal: React.FC<CartModalProps> = ({
     ? cartItems.filter((item) => item && item.product && typeof item.product === 'object' && item.product.id)
     : [];
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'operator';
 
   const rawTotalAmount = safeCartItems.reduce((sum, item) => {
     const unitPrice = item.selectedPlan?.price !== undefined

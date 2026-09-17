@@ -78,7 +78,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
     return sum + unitPrice * (Number(item.quantity) || 1);
   }, 0);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'operator';
   const discountAmount = isAdmin
     ? rawTotalAmount
     : appliedCoupon
@@ -104,7 +104,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
     }
 
     // Admin direct free checkout without going to Zibal/Shaparak
-    if (currentUser.role === 'admin') {
+    if (currentUser.role === 'admin' || currentUser.role === 'operator') {
       setIsProcessing(true);
       setErrorMessage('');
 

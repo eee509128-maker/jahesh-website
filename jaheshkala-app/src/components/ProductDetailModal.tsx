@@ -242,7 +242,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               )}
 
               {/* Direct Launch Button for Amlak / Online SaaS - STRICTLY FOR ADMIN ONLY */}
-              {isAmlakOrSub && onOpenAmlakApp && currentUser?.role === 'admin' && (
+              {isAmlakOrSub && onOpenAmlakApp && (currentUser?.role === 'admin' || currentUser?.role === 'operator') && (
                 <div className="bg-gradient-to-br from-[#1b103c] to-[#12082b] border border-amber-500/35 rounded-2xl p-4 space-y-3 shadow-xl relative overflow-hidden">
                   {/* Subtle top indicator bar */}
                   <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-amber-400 via-emerald-400 to-amber-500" />

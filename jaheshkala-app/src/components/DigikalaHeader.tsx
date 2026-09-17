@@ -205,7 +205,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           
           {/* Admin Management Panel Button (Only visible for authorized admin users) */}
-          {currentUser?.role === 'admin' && (
+          {(currentUser?.role === 'admin' || currentUser?.role === 'operator') && (
             <button
               id="digikala-admin-btn"
               onClick={onOpenAdmin}
