@@ -1665,24 +1665,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <tbody className="divide-y divide-purple-900/30 text-slate-200">
                       {[...orders]
                         .sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a))
-                        .map((order) => (
-                        <tr key={order.id} className="hover:bg-purple-950/40 transition-colors">
-                          <td className="p-3.5 font-mono font-bold text-purple-300">
-                            {order.id}
-                            <div className="text-[10px] text-slate-400 font-normal">{order.date}</div>
-                            {(order.trackingCode || order.paymentRefId || order.zibalTrackId) && (
-                              <div className="text-[10px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
-                                <span className="text-slate-400 font-sans">پیگیری:</span>
-                                <span>{order.trackingCode || order.paymentRefId || order.zibalTrackId}</span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-3.5">
-                            <span className="font-bold text-white">{order.customerName}</span>
-                            {order.customerEmail && (
-                              <div className="text-[10px] text-slate-400">{order.customerEmail}</div>
-                            )}
-                          </td>
+                        .map((order) => {
+                          const cleanPhone = (order.customerPhone || '').replace(/[^0-9]/g, '');
+                          const matchedUser = (usersList || []).find((u) => {
+                            if (order.userId && (u.id === order.userId || u.username === order.userId)) return true;
+                            if (cleanPhone && u.phone && u.phone !== 'ثبت نشده') {
+                              const uPhone = u.phone.replace(/[^0-9]/g, '');
+                              if (uPhone && (uPhone === cleanPhone || uPhone.endsWith(cleanPhone) || cleanPhone.endsWith(uPhone))) return true;
+                            }
+                            if (order.customerEmail && u.email && u.email.toLowerCase() === order.customerEmail.toLowerCase()) return true;
+                            return false;
+                          });
+
+                          const isGeneric = !order.customerName ||
+                            order.customerName === 'خریدار جهش‌کالا' ||
+                            order.customerName === 'خریدار جهش کالا' ||
+                            order.customerName === 'خریدار درگاه شاپرک زیبال';
+
+                          let displayName = order.customerName;
+                          let displayUsername = '';
+
+                          if (matchedUser) {
+                            displayName = matchedUser.fullName || matchedUser.username;
+                            displayUsername = matchedUser.username;
+                          } else if (isGeneric) {
+                            if (order.customerPhone) {
+                              displayName = `کاربر (${order.customerPhone})`;
+                            } else {
+                              displayName = 'کاربر جهش‌کالا';
+                            }
+                          }
+
+                          return (
+                            <tr key={order.id} className="hover:bg-purple-950/40 transition-colors">
+                              <td className="p-3.5 font-mono font-bold text-purple-300">
+                                {order.id}
+                                <div className="text-[10px] text-slate-400 font-normal">{order.date}</div>
+                                {(order.trackingCode || order.paymentRefId || order.zibalTrackId) && (
+                                  <div className="text-[10px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
+                                    <span className="text-slate-400 font-sans">پیگیری:</span>
+                                    <span>{order.trackingCode || order.paymentRefId || order.zibalTrackId}</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3.5">
+                                <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
+                                  <span>{displayName}</span>
+                                  {displayUsername && displayUsername !== displayName && (
+                                    <span className="text-[10px] font-normal text-purple-300 font-mono bg-purple-950/70 px-1.5 py-0.5 rounded border border-purple-700/50">
+                                      @{displayUsername}
+                                    </span>
+                                  )}
+                                </div>
+                                {order.customerEmail && (
+                                  <div className="text-[10px] text-slate-400">{order.customerEmail}</div>
+                                )}
+                              </td>
                           <td className="p-3.5 font-mono text-emerald-400">
                             {order.customerPhone}
                           </td>
@@ -1761,7 +1799,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      );
+                    })}
                     </tbody>
                   </table>
                 </div>
@@ -6415,7 +6454,41 @@ on public.users for delete using (true);`;
               </div>
 
               <div className="space-y-2 text-xs text-slate-300">
-                <p><strong>نام مشتری:</strong> {selectedOrder.customerName}</p>
+                {(() => {
+                  const cleanPhone = (selectedOrder.customerPhone || '').replace(/[^0-9]/g, '');
+                  const matchedUser = (usersList || []).find((u) => {
+                    if (selectedOrder.userId && (u.id === selectedOrder.userId || u.username === selectedOrder.userId)) return true;
+                    if (cleanPhone && u.phone && u.phone !== 'ثبت نشده') {
+                      const uPhone = u.phone.replace(/[^0-9]/g, '');
+                      if (uPhone && (uPhone === cleanPhone || uPhone.endsWith(cleanPhone) || cleanPhone.endsWith(uPhone))) return true;
+                    }
+                    if (selectedOrder.customerEmail && u.email && u.email.toLowerCase() === selectedOrder.customerEmail.toLowerCase()) return true;
+                    return false;
+                  });
+                  const isGeneric = !selectedOrder.customerName ||
+                    selectedOrder.customerName === 'خریدار جهش‌کالا' ||
+                    selectedOrder.customerName === 'خریدار جهش کالا' ||
+                    selectedOrder.customerName === 'خریدار درگاه شاپرک زیبال';
+                  let nameToShow = selectedOrder.customerName;
+                  let userTag = '';
+                  if (matchedUser) {
+                    nameToShow = matchedUser.fullName || matchedUser.username;
+                    userTag = matchedUser.username;
+                  } else if (isGeneric) {
+                    nameToShow = selectedOrder.customerPhone ? `کاربر (${selectedOrder.customerPhone})` : 'کاربر جهش‌کالا';
+                  }
+                  return (
+                    <p>
+                      <strong>نام و اکانت مشتری:</strong>{' '}
+                      <span className="font-bold text-white">{nameToShow}</span>
+                      {userTag && userTag !== nameToShow && (
+                        <span className="mr-2 text-[10px] text-purple-300 font-mono bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800">
+                          @{userTag}
+                        </span>
+                      )}
+                    </p>
+                  );
+                })()}
                 <p><strong>شماره تماس:</strong> {selectedOrder.customerPhone}</p>
                 {selectedOrder.customerEmail && (
                   <p><strong>ایمیل:</strong> {selectedOrder.customerEmail}</p>

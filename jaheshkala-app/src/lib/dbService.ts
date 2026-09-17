@@ -1,6 +1,9 @@
 import { supabase } from './supabase';
+import { db } from './firebase';
+import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
 import { Product, Order, User, Coupon, BannerSlide, DashboardTool } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
+import { RESTORED_ZIBAL_ORDERS } from '../data/restoredOrders';
 import { areSameUser, normalizePhone, normalizeUsername, mergeUserRecords } from './userUtils';
 
 
@@ -730,17 +733,40 @@ export const getLocalOrdersStore = (): Order[] => {
     const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Ensure restored Zibal orders are merged if not present
+        const map = new Map<string, Order>();
+        RESTORED_ZIBAL_ORDERS.forEach((o) => map.set(o.id || o.trackingCode || '', o));
+        parsed.forEach((o) => {
+          if (o && (o.id || o.trackingCode)) {
+            map.set(o.id || o.trackingCode || '', { ...map.get(o.id || o.trackingCode || ''), ...o });
+          }
+        });
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
+        return merged;
+      }
     }
     const legacyRaw = localStorage.getItem('jahesh_orders');
     if (legacyRaw) {
       const parsedLegacy = JSON.parse(legacyRaw);
-      if (Array.isArray(parsedLegacy)) return parsedLegacy;
+      if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+        const map = new Map<string, Order>();
+        RESTORED_ZIBAL_ORDERS.forEach((o) => map.set(o.id || o.trackingCode || '', o));
+        parsedLegacy.forEach((o) => {
+          if (o && (o.id || o.trackingCode)) {
+            map.set(o.id || o.trackingCode || '', { ...map.get(o.id || o.trackingCode || ''), ...o });
+          }
+        });
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
+        return merged;
+      }
     }
   } catch (e) {
     console.warn('Error reading local orders store:', e);
   }
-  return [];
+  return [...RESTORED_ZIBAL_ORDERS];
 };
 
 export const saveLocalOrdersStore = (orders: Order[]) => {
@@ -882,6 +908,20 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
     console.warn('Supabase fetch orders table notice:', err);
   }
 
+  // 4. Layer 4: Fetch from Google Firebase Firestore Cloud Database
+  const firestoreOrders: Order[] = [];
+  try {
+    const snap = await getDocs(collection(db, 'orders'));
+    snap.forEach((d) => {
+      const o = d.data() as Order;
+      if (o && (o.id || o.trackingCode)) {
+        firestoreOrders.push(o);
+      }
+    });
+  } catch (err) {
+    console.warn('Firebase Firestore fetch orders notice:', err);
+  }
+
   // Merge all sources into a single deduplicated list
   const allOrdersMap = new Map<string, Order>();
   const addOrderToMap = (o: Order) => {
@@ -906,6 +946,8 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
     }
   };
 
+  RESTORED_ZIBAL_ORDERS.forEach(addOrderToMap);
+  firestoreOrders.forEach(addOrderToMap);
   tableOrders.forEach(addOrderToMap);
   chatConfigOrders.forEach(addOrderToMap);
   serverDiskOrders.forEach(addOrderToMap);
@@ -1023,6 +1065,20 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
     console.warn('Save order to orders table notice:', err);
   }
 
+  // 5. Enterprise Cloud: Persist order to Google Firebase Firestore (High-scale, 100% Free, Global Google Cloud)
+  try {
+    const cleanOrderData: Record<string, any> = { ...order };
+    Object.keys(cleanOrderData).forEach((k) => {
+      if (cleanOrderData[k] === undefined) {
+        cleanOrderData[k] = '';
+      }
+    });
+    await setDoc(doc(db, 'orders', String(order.id)), cleanOrderData, { merge: true });
+    console.log('Order persisted to Google Firebase Firestore successfully:', order.id);
+  } catch (fbErr) {
+    console.warn('Firebase Firestore save order notice:', fbErr);
+  }
+
   return true;
 };
 
@@ -1036,6 +1092,13 @@ export const updateOrderStatusInDb = async (orderId: string, status: string): Pr
       window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updated }));
     }
   } catch (e) {}
+
+  // Update in Firebase Firestore
+  try {
+    await setDoc(doc(db, 'orders', String(orderId)), { status }, { merge: true });
+  } catch (err) {
+    console.warn('Firestore update order status notice:', err);
+  }
 
   try {
     await fetch('/api/orders/update-status', {
@@ -2003,7 +2066,8 @@ export const findUserByEmailInDb = async (email: string): Promise<User | null> =
 // ==========================================
 
 export const uploadProductImage = async (image: string, filename?: string): Promise<string | null> => {
-  if (!image || !image.startsWith('data:')) return image || null;
+  if (!image) return null;
+  if (!image.startsWith('data:')) return image;
   try {
     const res = await fetch('/api/upload-product-image', {
       method: 'POST',
@@ -2019,10 +2083,12 @@ export const uploadProductImage = async (image: string, filename?: string): Prom
   } catch (err) {
     console.warn('Upload product image to server failed:', err);
   }
-  return null;
+  return image;
 };
 
 export const uploadBannerImage = async (image: string, filename?: string): Promise<string | null> => {
+  if (!image) return null;
+  if (!image.startsWith('data:')) return image;
   try {
     const res = await fetch('/api/upload-banner', {
       method: 'POST',
@@ -2038,7 +2104,7 @@ export const uploadBannerImage = async (image: string, filename?: string): Promi
   } catch (err) {
     console.warn('Upload banner image to server failed:', err);
   }
-  return null;
+  return image;
 };
 
 export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {

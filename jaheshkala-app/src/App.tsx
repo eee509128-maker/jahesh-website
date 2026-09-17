@@ -6,6 +6,7 @@ import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, Subsc
 import { supabase } from './lib/supabase';
 import { areSameUser } from './lib/userUtils';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from './data/initialData';
+import { RESTORED_ZIBAL_ORDERS } from './data/restoredOrders';
 import {
   fetchProductsFromDb,
   saveProductToDb,
@@ -39,6 +40,7 @@ import { hasAiAppInItems, generateAppLicense, registerAppLicenseOnServer, checkL
 import { AppSubscriptionLicense } from './types';
 import { AppLicenseModal } from './components/AppLicenseModal';
 import { isProductMatchingCategoryOrGuild, isProductMatchingSearchQuery } from './lib/guildMatcher';
+import { testConnection } from './lib/firebase';
 import confetti from 'canvas-confetti';
 
 // Digikala-styled Components
@@ -138,9 +140,24 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
       const saved = localStorage.getItem('jahesh_orders');
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const map = new Map<string, Order>();
+          RESTORED_ZIBAL_ORDERS.forEach((o) => map.set(o.id || o.trackingCode || '', o));
+          parsed.forEach((o) => {
+            if (o && (o.id || o.trackingCode)) {
+              map.set(o.id || o.trackingCode || '', { ...map.get(o.id || o.trackingCode || ''), ...o });
+            }
+          });
+          const merged = Array.from(map.values());
+          merged.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
+          return merged;
+        }
+      }
+      return RESTORED_ZIBAL_ORDERS;
     } catch {
-      return [];
+      return RESTORED_ZIBAL_ORDERS;
     }
   });
 
@@ -266,6 +283,7 @@ export default function App() {
 
   // Ensure secret coupon jahesh1395 is active and present
   useEffect(() => {
+    testConnection();
     setCoupons((prev) => {
       if (prev.some((c) => c.code.toLowerCase() === 'jahesh1395')) return prev;
       const secretCoupon: Coupon = {

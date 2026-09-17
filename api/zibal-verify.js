@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 function getZibalUrl(endpointPath) {
   const proxyUrl = process.env.ZIBAL_PROXY_URL && process.env.ZIBAL_PROXY_URL.trim();
   const cleanEndpoint = endpointPath.startsWith('/') ? endpointPath : `/${endpointPath}`;
@@ -60,6 +63,63 @@ export default async function handler(req, res) {
     // result 100: Successfully verified
     // result 201: Previously verified
     if (data.result === 100 || data.result === 201) {
+      try {
+        const ordersFile = path.join(process.cwd(), 'data', 'orders.json');
+        let currentOrders = [];
+        if (fs.existsSync(ordersFile)) {
+          try {
+            const raw = fs.readFileSync(ordersFile, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) currentOrders = parsed;
+          } catch {}
+        }
+        const refStr = data.refNumber ? String(data.refNumber) : String(trackId);
+        const orderIdStr = data.orderId || `JAHESH-${trackId}`;
+        const existingIdx = currentOrders.findIndex(
+          (o) => o.id === orderIdStr || o.trackingCode === String(trackId) || o.paymentRefId === refStr
+        );
+        const verifiedOrder = {
+          id: orderIdStr,
+          trackingCode: String(trackId),
+          paymentRefId: refStr,
+          zibalTrackId: String(trackId),
+          zibalRefNumber: refStr,
+          cardNumber: data.cardNumber || '',
+          totalAmount: data.amount ? Math.round(data.amount / 10) : 0,
+          customerName: req.body?.customerName || 'خریدار درگاه شاپرک زیبال',
+          customerPhone: req.body?.customerPhone || '',
+          status: 'تایید شده / در حال آماده‌سازی',
+          paymentGateway: 'زیبال (Zibal - شاپرک رسمی)',
+          paidAt: data.paidAt || new Date().toISOString(),
+          createdAt: data.paidAt || new Date().toISOString(),
+          date: new Date().toLocaleDateString('fa-IR'),
+          acceptedTerms: true,
+          items: req.body?.items || [
+            {
+              product: {
+                id: 'pkg-zibal-verified',
+                title: 'سفارش پرداخت‌شده از درگاه پرداخت زیبال جهش‌کالا',
+                price: data.amount ? Math.round(data.amount / 10) : 0,
+                category: 'خدمات وب و نرم‌افزار',
+                image: '/uploads/banners/official_banner-2.jpg',
+                inStock: true,
+              },
+              quantity: 1,
+            },
+          ],
+        };
+        if (existingIdx >= 0) {
+          currentOrders[existingIdx] = { ...currentOrders[existingIdx], ...verifiedOrder };
+        } else {
+          currentOrders = [verifiedOrder, ...currentOrders];
+        }
+        const dir = path.dirname(ordersFile);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(ordersFile, JSON.stringify(currentOrders, null, 2), 'utf8');
+      } catch (saveErr) {
+        console.warn('Auto-save order from zibal verify notice:', saveErr);
+      }
+
       return res.status(200).json({
         success: true,
         result: data.result,
