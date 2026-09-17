@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { db } from './firebase';
-import { doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { doc, setDoc, getDocs, getDoc, collection, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Product, Order, User, Coupon, BannerSlide, DashboardTool } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { RESTORED_ZIBAL_ORDERS } from '../data/restoredOrders';
@@ -269,6 +269,24 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   } catch {}
 
+  // 0. Layer 0: Google Firebase Firestore (Realtime Cloud Database)
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'products'));
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data && Array.isArray(data.products) && data.products.length > 0) {
+        const cleaned = data.products
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+        if (cleaned.length > 0) {
+          authoritativeList = cleaned;
+        }
+      }
+    }
+  } catch (fbErr) {
+    console.warn('Firestore fetch products notice:', fbErr);
+  }
+
   // 1. Layer 1: Primary Cloud Check - Supabase SYSTEM_CONFIG_PRODUCTS (shared across all devices & Vercel)
   try {
     const { data: configData, error: configError } = await supabase
@@ -459,6 +477,20 @@ export const saveAllProductsToDb = async (products: Product[]): Promise<boolean>
     );
   } catch (err) {
     console.warn('Save products to SYSTEM_CONFIG_PRODUCTS notice:', err);
+  }
+
+  // 4. Primary Cloud Database 2: Google Firebase Firestore
+  try {
+    await setDoc(
+      doc(db, 'settings', 'products'),
+      {
+        products: stampedProducts,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (fbErr) {
+    console.warn('Save products to Firestore notice:', fbErr);
   }
 
   return true;
@@ -1925,7 +1957,7 @@ export const mergeChatMessages = (localMsgs: any[], dbMsgs: any[]): any[] => {
 };
 
 export const fetchChatsFromDb = async (): Promise<any[]> => {
-  // Try local storage cache first for instant response
+  // 1. Try local storage cache first for instant initial render
   let cachedChats: any[] = [];
   try {
     const saved = localStorage.getItem('jahesh_all_chats');
@@ -1937,99 +1969,231 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
     }
   } catch {}
 
+  const mergedMap = new Map<string, any>();
+  for (const c of cachedChats) {
+    if (c && c.userId) {
+      mergedMap.set(String(c.userId), c);
+    }
+  }
+
+  // 2. Primary Database: Google Firebase Firestore (Realtime Cloud Collection)
+  try {
+    const snap = await getDocs(collection(db, 'chats'));
+    if (!snap.empty) {
+      snap.forEach((docSnap) => {
+        const item = docSnap.data();
+        if (item && item.userId && !String(item.userId).startsWith('SYSTEM_')) {
+          const parsedMsgs = Array.isArray(item.messages)
+            ? item.messages
+            : typeof item.messages === 'string'
+            ? JSON.parse(item.messages)
+            : [];
+          const uid = String(item.userId);
+          const existing = mergedMap.get(uid);
+          const mergedMsgs = existing ? mergeChatMessages(existing.messages, parsedMsgs) : parsedMsgs;
+          mergedMap.set(uid, {
+            userId: uid,
+            userName: item.userName || existing?.userName || 'کاربر جهش‌کالا',
+            messages: mergedMsgs,
+            lastUpdated: item.lastUpdated || existing?.lastUpdated || new Date().toISOString(),
+            isReadByAdmin: item.isReadByAdmin !== undefined ? Boolean(item.isReadByAdmin) : false,
+            needsHumanSupport:
+              item.needsHumanSupport !== undefined
+                ? Boolean(item.needsHumanSupport)
+                : mergedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس') || m.text?.includes('کارشناس')),
+          });
+        }
+      });
+    }
+  } catch (fbErr) {
+    console.warn('Firestore fetch chats notice:', fbErr);
+  }
+
+  // 3. Secondary Backup: Supabase chats table
   try {
     const { data, error } = await supabase.from('chats').select('*').order('last_updated', { ascending: false });
     if (!error && data && Array.isArray(data)) {
-      const dbChats = data
-        .filter(item => !String(item.user_id || '').startsWith('SYSTEM_'))
-        .map(item => {
-          const parsedMsgs = typeof item.messages === 'string' ? JSON.parse(item.messages) : (item.messages || []);
-          return {
-            userId: item.user_id,
-            userName: item.user_name || 'کاربر ناشناس',
-            messages: parsedMsgs,
-            lastUpdated: item.last_updated || '',
-            isReadByAdmin: !!item.is_read_by_admin,
-            needsHumanSupport: item.needs_human_support !== undefined 
-              ? !!item.needs_human_support 
-              : parsedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس')),
-          };
-        });
-
-      // Merge local cached chats with DB chats to prevent deleting un-synced user messages
-      const mergedMap = new Map<string, any>();
-      for (const c of cachedChats) {
-        if (c && c.userId) {
-          mergedMap.set(c.userId, c);
-        }
-      }
-
-      for (const dbChat of dbChats) {
-        const existingLocal = mergedMap.get(dbChat.userId);
-        if (existingLocal) {
-          const mergedMsgs = mergeChatMessages(existingLocal.messages, dbChat.messages);
-          mergedMap.set(dbChat.userId, {
-            ...existingLocal,
-            ...dbChat,
+      for (const item of data) {
+        if (!String(item.user_id || '').startsWith('SYSTEM_')) {
+          const parsedMsgs = typeof item.messages === 'string' ? JSON.parse(item.messages) : item.messages || [];
+          const uid = String(item.user_id);
+          const existing = mergedMap.get(uid);
+          const mergedMsgs = existing ? mergeChatMessages(existing.messages, parsedMsgs) : parsedMsgs;
+          mergedMap.set(uid, {
+            userId: uid,
+            userName: item.user_name || existing?.userName || 'کاربر ناشناس',
             messages: mergedMsgs,
-            needsHumanSupport: dbChat.needsHumanSupport || existingLocal.needsHumanSupport,
-            lastUpdated: dbChat.lastUpdated > existingLocal.lastUpdated ? dbChat.lastUpdated : existingLocal.lastUpdated,
+            lastUpdated: item.last_updated || existing?.lastUpdated || '',
+            isReadByAdmin: item.is_read_by_admin !== undefined ? Boolean(item.is_read_by_admin) : (existing?.isReadByAdmin ?? false),
+            needsHumanSupport:
+              item.needs_human_support !== undefined
+                ? Boolean(item.needs_human_support)
+                : mergedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس')),
           });
-        } else {
-          mergedMap.set(dbChat.userId, dbChat);
         }
       }
-
-      const mergedList = Array.from(mergedMap.values());
-
-      // Cache merged result locally
-      try {
-        safeSetLocalStorage('jahesh_all_chats', JSON.stringify(mergedList));
-      } catch {}
-
-      return mergedList;
     }
   } catch (err) {
-    console.warn('Fetch chats exception:', err);
+    console.warn('Supabase fetch chats exception:', err);
   }
 
-  return cachedChats;
+  const mergedList = Array.from(mergedMap.values()).sort(
+    (a, b) => new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime()
+  );
+
+  // Cache merged result locally
+  try {
+    safeSetLocalStorage('jahesh_all_chats', JSON.stringify(mergedList));
+  } catch {}
+
+  return mergedList;
 };
 
 export const saveChatToDb = async (chat: any): Promise<boolean> => {
-  // Update local cache immediately
+  if (!chat || !chat.userId) return false;
+  const uid = String(chat.userId);
+
+  // 1. Update local cache immediately for snappy UI
   try {
     const saved = localStorage.getItem('jahesh_all_chats');
     let chatsList: any[] = saved ? JSON.parse(saved) : [];
-    const idx = chatsList.findIndex(c => c.userId === chat.userId);
+    const idx = chatsList.findIndex(c => String(c.userId) === uid);
     if (idx >= 0) {
-      chatsList[idx] = chat;
+      chatsList[idx] = { ...chatsList[idx], ...chat };
     } else {
       chatsList.unshift(chat);
     }
     safeSetLocalStorage('jahesh_all_chats', JSON.stringify(chatsList));
-    safeSetLocalStorage(`jahesh_chat_${chat.userId}`, JSON.stringify(chat.messages));
-    window.dispatchEvent(new CustomEvent('jahesh-chats-updated', { detail: chat }));
+    safeSetLocalStorage(`jahesh_chat_${uid}`, JSON.stringify(chat.messages || []));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-chats-updated', { detail: chat }));
+    }
   } catch {}
 
+  // 2. Save directly to Google Firebase Firestore (Realtime Cloud Database)
+  let firestoreSuccess = false;
+  try {
+    const chatDocRef = doc(db, 'chats', uid);
+    const firestorePayload = {
+      userId: uid,
+      userName: chat.userName || 'کاربر جهش‌کالا',
+      messages: Array.isArray(chat.messages) ? chat.messages : [],
+      lastUpdated: chat.lastUpdated || new Date().toISOString(),
+      isReadByAdmin: Boolean(chat.isReadByAdmin),
+      needsHumanSupport: Boolean(chat.needsHumanSupport),
+    };
+    await setDoc(chatDocRef, firestorePayload, { merge: true });
+    firestoreSuccess = true;
+    console.log(`Chat ${uid} saved to Google Firebase Firestore successfully`);
+  } catch (fbErr) {
+    console.warn('Firestore save chat notice:', fbErr);
+  }
+
+  // 3. Save backup to Supabase
   try {
     const payload = {
-      user_id: chat.userId,
+      user_id: uid,
       user_name: chat.userName,
       messages: chat.messages,
-      last_updated: chat.lastUpdated,
-      is_read_by_admin: chat.isReadByAdmin,
-      needs_human_support: !!chat.needsHumanSupport,
+      last_updated: chat.lastUpdated || new Date().toISOString(),
+      is_read_by_admin: Boolean(chat.isReadByAdmin),
+      needs_human_support: Boolean(chat.needsHumanSupport),
     };
-    const { error } = await supabase.from('chats').upsert(payload, { onConflict: 'user_id' });
-    if (error) {
-       console.warn('Save chat error:', error.message);
-       return false;
-    }
-    return true;
+    await supabase.from('chats').upsert(payload, { onConflict: 'user_id' });
   } catch (err) {
-    console.warn('Save chat exception:', err);
-    return false;
+    console.warn('Supabase save chat exception:', err);
+  }
+
+  return firestoreSuccess || true;
+};
+
+/**
+ * Real-time subscription to all customer chats via Google Firebase Firestore.
+ * Updates the Admin Panel instantly when any customer sends a message or requests a human specialist.
+ */
+export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() => void) => {
+  try {
+    return onSnapshot(
+      collection(db, 'chats'),
+      (snap) => {
+        const list: any[] = [];
+        snap.forEach((docSnap) => {
+          const item = docSnap.data();
+          if (item && item.userId && !String(item.userId).startsWith('SYSTEM_')) {
+            const parsedMsgs = Array.isArray(item.messages)
+              ? item.messages
+              : typeof item.messages === 'string'
+              ? JSON.parse(item.messages)
+              : [];
+            list.push({
+              userId: String(item.userId),
+              userName: item.userName || 'کاربر جهش‌کالا',
+              messages: parsedMsgs,
+              lastUpdated: item.lastUpdated || '',
+              isReadByAdmin: Boolean(item.isReadByAdmin),
+              needsHumanSupport:
+                item.needsHumanSupport !== undefined
+                  ? Boolean(item.needsHumanSupport)
+                  : parsedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس')),
+            });
+          }
+        });
+        list.sort((a, b) => new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime());
+        if (list.length > 0) {
+          safeSetLocalStorage('jahesh_all_chats', JSON.stringify(list));
+        }
+        callback(list);
+      },
+      (err) => {
+        console.warn('Firestore onSnapshot chats error:', err);
+      }
+    );
+  } catch (e) {
+    console.warn('subscribeToChatsFromDb exception:', e);
+    return () => {};
+  }
+};
+
+/**
+ * Real-time subscription to a single user's chat session via Google Firebase Firestore.
+ * Updates the LiveChatWidget instantly when admin replies.
+ */
+export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any) => void): (() => void) => {
+  if (!userId) return () => {};
+  const uid = String(userId);
+  try {
+    return onSnapshot(
+      doc(db, 'chats', uid),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const item = docSnap.data();
+          const parsedMsgs = Array.isArray(item.messages)
+            ? item.messages
+            : typeof item.messages === 'string'
+            ? JSON.parse(item.messages)
+            : [];
+          const chatObj = {
+            userId: uid,
+            userName: item.userName || 'کاربر جهش‌کالا',
+            messages: parsedMsgs,
+            lastUpdated: item.lastUpdated || '',
+            isReadByAdmin: Boolean(item.isReadByAdmin),
+            needsHumanSupport:
+              item.needsHumanSupport !== undefined
+                ? Boolean(item.needsHumanSupport)
+                : parsedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس')),
+          };
+          safeSetLocalStorage(`jahesh_chat_${uid}`, JSON.stringify(parsedMsgs));
+          callback(chatObj);
+        }
+      },
+      (err) => {
+        console.warn('Firestore onSnapshot single chat error:', err);
+      }
+    );
+  } catch (e) {
+    console.warn('subscribeToSingleChatFromDb exception:', e);
+    return () => {};
   }
 };
 

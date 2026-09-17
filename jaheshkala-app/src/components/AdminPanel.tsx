@@ -11,7 +11,7 @@ import {
   Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool } from '../types';
-import { fetchChatsFromDb, saveChatToDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
@@ -435,6 +435,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       loadBanners();
       loadTools();
 
+      // Real-time Firestore Chat Sync: instantly receives messages & human escalation
+      const unsubscribeChats = subscribeToChatsFromDb((liveChats) => {
+        setChats(liveChats);
+        setSelectedChat((currentSelected) => {
+          if (!currentSelected) return currentSelected;
+          const fresh = liveChats.find((c) => c.userId === currentSelected.userId);
+          return fresh || currentSelected;
+        });
+      });
+
       const handleChatsUpdated = () => {
         loadChats();
       };
@@ -459,6 +469,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       window.addEventListener('jahesh-banners-updated', handleBannersUpdated as EventListener);
 
       return () => {
+        if (unsubscribeChats) {
+          unsubscribeChats();
+        }
         window.removeEventListener('jahesh-chats-updated', handleChatsUpdated);
         window.removeEventListener('jahesh-tools-updated', handleToolsUpdated as EventListener);
         window.removeEventListener('jahesh-banners-updated', handleBannersUpdated as EventListener);
@@ -1667,33 +1680,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         .sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a))
                         .map((order) => {
                           const cleanPhone = (order.customerPhone || '').replace(/[^0-9]/g, '');
+                          const namePhoneMatch = (order.customerName || '').match(/09[0-9]{9}/);
+                          const extractedPhone = namePhoneMatch ? namePhoneMatch[0] : '';
+                          const effectivePhone = cleanPhone || extractedPhone;
+
                           const matchedUser = (usersList || []).find((u) => {
                             if (order.userId && (u.id === order.userId || u.username === order.userId)) return true;
-                            if (cleanPhone && u.phone && u.phone !== 'ثبت نشده') {
+                            if (effectivePhone && u.phone && u.phone !== 'ثبت نشده') {
                               const uPhone = u.phone.replace(/[^0-9]/g, '');
-                              if (uPhone && (uPhone === cleanPhone || uPhone.endsWith(cleanPhone) || cleanPhone.endsWith(uPhone))) return true;
+                              if (uPhone && (uPhone === effectivePhone || uPhone.endsWith(effectivePhone) || effectivePhone.endsWith(uPhone))) return true;
                             }
                             if (order.customerEmail && u.email && u.email.toLowerCase() === order.customerEmail.toLowerCase()) return true;
+                            if (order.customerName && (u.username === order.customerName || u.fullName === order.customerName)) return true;
                             return false;
                           });
 
-                          const isGeneric = !order.customerName ||
-                            order.customerName === 'خریدار جهش‌کالا' ||
-                            order.customerName === 'خریدار جهش کالا' ||
-                            order.customerName === 'خریدار درگاه شاپرک زیبال';
-
-                          let displayName = order.customerName;
-                          let displayUsername = '';
+                          let displayName = '';
+                          let displaySubName = '';
 
                           if (matchedUser) {
-                            displayName = matchedUser.fullName || matchedUser.username;
-                            displayUsername = matchedUser.username;
-                          } else if (isGeneric) {
-                            if (order.customerPhone) {
-                              displayName = `کاربر (${order.customerPhone})`;
-                            } else {
-                              displayName = 'کاربر جهش‌کالا';
-                            }
+                            displayName = matchedUser.username;
+                            displaySubName = matchedUser.fullName && matchedUser.fullName !== matchedUser.username ? matchedUser.fullName : '';
+                          } else if (order.userId && order.userId !== 'guest' && !order.userId.startsWith('cust-09') && !order.userId.startsWith('09')) {
+                            displayName = order.userId;
+                            displaySubName = order.customerName && !order.customerName.includes('09') ? order.customerName : '';
+                          } else if (order.customerName && !order.customerName.includes('09') && order.customerName !== 'خریدار جهش‌کالا' && order.customerName !== 'خریدار جهش کالا' && order.customerName !== 'خریدار درگاه شاپرک زیبال') {
+                            displayName = order.customerName;
+                          } else {
+                            displayName = effectivePhone ? `کاربر (${effectivePhone})` : 'کاربر جهش‌کالا';
                           }
 
                           return (
@@ -1710,10 +1724,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </td>
                               <td className="p-3.5">
                                 <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
-                                  <span>{displayName}</span>
-                                  {displayUsername && displayUsername !== displayName && (
-                                    <span className="text-[10px] font-normal text-purple-300 font-mono bg-purple-950/70 px-1.5 py-0.5 rounded border border-purple-700/50">
-                                      @{displayUsername}
+                                  <span className="font-mono text-amber-300 font-bold">{displayName}</span>
+                                  {displaySubName && (
+                                    <span className="text-[11px] font-normal text-slate-300">
+                                      ({displaySubName})
                                     </span>
                                   )}
                                 </div>
@@ -6456,35 +6470,34 @@ on public.users for delete using (true);`;
               <div className="space-y-2 text-xs text-slate-300">
                 {(() => {
                   const cleanPhone = (selectedOrder.customerPhone || '').replace(/[^0-9]/g, '');
+                  const namePhoneMatch = (selectedOrder.customerName || '').match(/09[0-9]{9}/);
+                  const extractedPhone = namePhoneMatch ? namePhoneMatch[0] : '';
+                  const effectivePhone = cleanPhone || extractedPhone;
+
                   const matchedUser = (usersList || []).find((u) => {
                     if (selectedOrder.userId && (u.id === selectedOrder.userId || u.username === selectedOrder.userId)) return true;
-                    if (cleanPhone && u.phone && u.phone !== 'ثبت نشده') {
+                    if (effectivePhone && u.phone && u.phone !== 'ثبت نشده') {
                       const uPhone = u.phone.replace(/[^0-9]/g, '');
-                      if (uPhone && (uPhone === cleanPhone || uPhone.endsWith(cleanPhone) || cleanPhone.endsWith(uPhone))) return true;
+                      if (uPhone && (uPhone === effectivePhone || uPhone.endsWith(effectivePhone) || effectivePhone.endsWith(uPhone))) return true;
                     }
                     if (selectedOrder.customerEmail && u.email && u.email.toLowerCase() === selectedOrder.customerEmail.toLowerCase()) return true;
+                    if (selectedOrder.customerName && (u.username === selectedOrder.customerName || u.fullName === selectedOrder.customerName)) return true;
                     return false;
                   });
-                  const isGeneric = !selectedOrder.customerName ||
-                    selectedOrder.customerName === 'خریدار جهش‌کالا' ||
-                    selectedOrder.customerName === 'خریدار جهش کالا' ||
-                    selectedOrder.customerName === 'خریدار درگاه شاپرک زیبال';
-                  let nameToShow = selectedOrder.customerName;
-                  let userTag = '';
-                  if (matchedUser) {
-                    nameToShow = matchedUser.fullName || matchedUser.username;
-                    userTag = matchedUser.username;
-                  } else if (isGeneric) {
-                    nameToShow = selectedOrder.customerPhone ? `کاربر (${selectedOrder.customerPhone})` : 'کاربر جهش‌کالا';
+
+                  let usernameToShow = matchedUser?.username || (selectedOrder.userId && !selectedOrder.userId.startsWith('cust-09') && selectedOrder.userId !== 'guest' ? selectedOrder.userId : '');
+                  let fullNameToShow = matchedUser?.fullName || (selectedOrder.customerName && !selectedOrder.customerName.includes('09') && selectedOrder.customerName !== 'خریدار جهش‌کالا' ? selectedOrder.customerName : '');
+
+                  if (!usernameToShow && !fullNameToShow) {
+                    usernameToShow = effectivePhone ? `کاربر (${effectivePhone})` : 'کاربر جهش‌کالا';
                   }
+
                   return (
                     <p>
-                      <strong>نام و اکانت مشتری:</strong>{' '}
-                      <span className="font-bold text-white">{nameToShow}</span>
-                      {userTag && userTag !== nameToShow && (
-                        <span className="mr-2 text-[10px] text-purple-300 font-mono bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800">
-                          @{userTag}
-                        </span>
+                      <strong>نام کاربری خریدار:</strong>{' '}
+                      <span className="font-bold font-mono text-amber-300 text-base">{usernameToShow || fullNameToShow}</span>
+                      {fullNameToShow && fullNameToShow !== usernameToShow && (
+                        <span className="mr-2 text-xs text-slate-300 font-sans">({fullNameToShow})</span>
                       )}
                     </p>
                   );

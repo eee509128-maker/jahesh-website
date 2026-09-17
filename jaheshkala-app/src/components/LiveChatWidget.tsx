@@ -7,7 +7,7 @@ import {
   AlertCircle, UserCheck, RefreshCw
 } from 'lucide-react';
 import { ChatMessage, User as UserType, UserChat } from '../types';
-import { fetchChatsFromDb, saveChatToDb, mergeChatMessages } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, mergeChatMessages, subscribeToSingleChatFromDb } from '../lib/dbService';
 import { askCloudflareAI } from '../lib/cloudflareAI';
 
 export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ currentUser }) => {
@@ -26,6 +26,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
 
   // Persistent User/Guest Identity
   const getUserId = () => {
+    if (currentUser?.username) return currentUser.username.toLowerCase();
     if (currentUser?.id) return currentUser.id;
     let guestId = localStorage.getItem('jahesh_guest_id');
     if (!guestId) {
@@ -36,8 +37,10 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
   };
 
   const getUserName = () => {
+    if (currentUser?.username) {
+      return currentUser.fullName ? `${currentUser.username} (${currentUser.fullName})` : currentUser.username;
+    }
     if (currentUser?.fullName) return currentUser.fullName;
-    if (currentUser?.username) return currentUser.username;
     let guestName = localStorage.getItem('jahesh_guest_name');
     if (!guestName) {
       guestName = 'کاربر مهمان #' + Math.floor(1000 + Math.random() * 9000);
@@ -106,7 +109,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
 
   // Sync with DB and listen for Admin replies
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let unsubscribeChat: (() => void) | null = null;
 
     const syncChat = async () => {
       try {
@@ -123,9 +126,16 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
       }
     };
 
-    if (isOpen) {
+    if (isOpen && currentUserId) {
       syncChat();
-      interval = setInterval(syncChat, 12000);
+      unsubscribeChat = subscribeToSingleChatFromDb(currentUserId, (updatedChat) => {
+        if (updatedChat && updatedChat.messages) {
+          setMessages((prevMsgs) => mergeChatMessages(prevMsgs, updatedChat.messages));
+          setNeedsHumanSupport(!!updatedChat.needsHumanSupport);
+          const hasHuman = updatedChat.messages.some((m: ChatMessage) => m.sender === 'support' && m.isHumanAdmin);
+          setHasHumanReplied(hasHuman);
+        }
+      });
     }
 
     const handleCustomEvent = (e: any) => {
@@ -142,7 +152,9 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
     window.addEventListener('jahesh-chats-updated', handleCustomEvent);
 
     return () => {
-      clearInterval(interval);
+      if (unsubscribeChat) {
+        unsubscribeChat();
+      }
       window.removeEventListener('jahesh-chats-updated', handleCustomEvent);
     };
   }, [currentUserId, isOpen]);

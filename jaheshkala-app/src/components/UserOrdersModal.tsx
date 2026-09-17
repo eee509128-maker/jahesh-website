@@ -784,8 +784,10 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                 <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">{invoiceOrder.trackingCode}</span>
               </div>
               <div className="flex justify-between border-b border-slate-200 dark:border-purple-950 pb-1.5">
-                <span className="text-slate-500 dark:text-slate-400">نام خریدار:</span>
-                <span className="font-bold text-slate-900 dark:text-white">{invoiceOrder.customerName}</span>
+                <span className="text-slate-500 dark:text-slate-400">نام کاربری خریدار:</span>
+                <span className="font-bold font-mono text-purple-900 dark:text-amber-300">
+                  {currentUser?.username || (!invoiceOrder.customerName?.includes('09') && invoiceOrder.customerName !== 'خریدار جهش‌کالا' ? invoiceOrder.customerName : (invoiceOrder.userId && !invoiceOrder.userId.startsWith('09') && !invoiceOrder.userId.startsWith('cust-09') ? invoiceOrder.userId : (currentUser?.fullName || invoiceOrder.customerName)))}
+                </span>
               </div>
               <div className="flex justify-between border-b border-slate-200 dark:border-purple-950 pb-1.5">
                 <span className="text-slate-500 dark:text-slate-400">شماره تماس:</span>

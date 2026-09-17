@@ -165,8 +165,8 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
       id: orderId,
       trackingCode: '', // will be filled from bank trackId
       paymentRefId: '', // will be filled from bank refNumber
-      userId: currentUser.id,
-      customerName: currentUser.fullName,
+      userId: currentUser.username || currentUser.id,
+      customerName: currentUser.username || currentUser.fullName || 'مشتری گرامی',
       customerPhone: currentUser.phone,
       customerEmail: currentUser.email,
       requestedDomain,
@@ -199,7 +199,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
     const res = await requestZibalPayment({
       amountInTomans: payableTotal,
       orderId,
-      customerName: currentUser.fullName,
+      customerName: currentUser.username || currentUser.fullName || 'مشتری گرامی',
       customerPhone: currentUser.phone,
       customerEmail: currentUser.email,
       description: `خرید از فروشگاه جهش کالا - فاکتور ${orderId}`,
