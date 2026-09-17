@@ -589,8 +589,14 @@ function getDefaultProducts() {
 
 const DEFAULT_SERVER_PRODUCTS = getDefaultProducts();
 
-// Endpoint to upload product image file directly to server (returns a permanent, lightweight URL)
-app.post('/api/upload-product-image', (req, res) => {
+// Endpoint to upload image file directly to server (returns a permanent, lightweight URL)
+app.post(['/api/upload-product-image', '/api/upload'], (req, res) => {
+  const type = req.query?.type || req.body?.type;
+  const isBanner = type === 'banners' || (req.url && req.url.includes('banner'));
+  const isTool = type === 'tools' || (req.url && req.url.includes('tool'));
+  const targetDir = isBanner ? BANNERS_UPLOADS_DIR : (isTool ? path.join(__dirname, 'uploads', 'tools') : PRODUCTS_UPLOADS_DIR);
+  const targetFolder = isBanner ? 'banners' : (isTool ? 'tools' : 'products');
+  const filePrefix = isBanner ? 'banner' : (isTool ? 'tool' : 'prod');
   try {
     const { image, filename } = req.body || {};
     if (!image || typeof image !== 'string') {
@@ -618,12 +624,15 @@ app.post('/api/upload-product-image', (req, res) => {
       return res.status(400).json({ error: 'فرمت تصویر نامعتبر است.' });
     }
 
-    const safeName = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
-    const filePath = path.join(PRODUCTS_UPLOADS_DIR, safeName);
+    const safeName = `${filePrefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    const filePath = path.join(targetDir, safeName);
     fs.writeFileSync(filePath, buffer);
 
     // Also mirror to jaheshkala static directory if exists
-    const distUploads = path.join(__dirname, 'jaheshkala', 'uploads', 'products');
+    const distUploads = path.join(__dirname, 'jaheshkala', 'uploads', targetFolder);
     try {
       if (!fs.existsSync(distUploads)) {
         fs.mkdirSync(distUploads, { recursive: true });
@@ -631,8 +640,8 @@ app.post('/api/upload-product-image', (req, res) => {
       fs.writeFileSync(path.join(distUploads, safeName), buffer);
     } catch {}
 
-    const publicUrl = `/uploads/products/${safeName}`;
-    console.log(`[Upload] Product image saved to ${publicUrl}`);
+    const publicUrl = `/uploads/${targetFolder}/${safeName}`;
+    console.log(`[Upload] Image saved to ${publicUrl}`);
     return res.json({ success: true, url: publicUrl });
   } catch (err) {
     console.error('Error in /api/upload-product-image:', err);

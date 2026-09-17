@@ -20,15 +20,31 @@
     },
     {
       "source": "/api/products/save",
-      "destination": "/api/products-save"
-    },
-    {
-      "source": "/api/products",
       "destination": "/api/products"
     },
     {
-      "source": "/api/app-license/:path*",
-      "destination": "/api/app-license"
+      "source": "/api/products-save",
+      "destination": "/api/products"
+    },
+    {
+      "source": "/api/orders/save",
+      "destination": "/api/orders"
+    },
+    {
+      "source": "/api/orders-save",
+      "destination": "/api/orders"
+    },
+    {
+      "source": "/api/upload-banner",
+      "destination": "/api/upload?type=banners"
+    },
+    {
+      "source": "/api/upload-product-image",
+      "destination": "/api/upload?type=products"
+    },
+    {
+      "source": "/api/upload-tool-image",
+      "destination": "/api/upload?type=tools"
     },
     {
       "source": "/images/:path*",
@@ -45,6 +61,10 @@
     {
       "source": "/jaheshkala/uploads/:path*",
       "destination": "/jaheshkala/uploads/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "/uploads/:path*"
     },
     {
       "source": "/jaheshkala",
