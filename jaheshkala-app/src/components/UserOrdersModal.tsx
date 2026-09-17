@@ -84,11 +84,26 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
     return () => window.removeEventListener('jahesh-orders-updated', handleOrdersUpdated);
   }, []);
 
-  // Fetch freshest data whenever modal opens
+  // Fetch freshest data whenever modal opens and set up polling
   useEffect(() => {
+    let intervalId: any;
     if (isOpen) {
       handleRefreshOrders();
+      // Auto-poll to instantly reflect admin changes
+      intervalId = setInterval(() => {
+        fetchOrdersFromDb().then((fresh) => {
+          if (fresh && Array.isArray(fresh)) {
+            setCurrentOrders(fresh);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: fresh }));
+            }
+          }
+        }).catch(() => {});
+      }, 2500);
     }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [isOpen]);
 
   const handleRefreshOrders = async () => {

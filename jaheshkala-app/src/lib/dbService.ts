@@ -854,7 +854,7 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
 
   // 1. Layer 1: Fetch from server disk /api/orders (Universal Vercel + PHP)
   try {
-    const res = await fetchUniversalApi('orders');
+    const res = await fetchUniversalApi('orders', { cache: 'no-store' });
     if (res && res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.orders)) {
