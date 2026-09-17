@@ -85,6 +85,9 @@ export const askCloudflareAI = async (
   chatHistory: { role: 'user' | 'assistant'; content: string }[] = []
 ): Promise<AIAnswerResult> => {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
     const res = await fetch('/api/cloudflare-ai', {
       method: 'POST',
       headers: {
@@ -93,8 +96,10 @@ export const askCloudflareAI = async (
       body: JSON.stringify({
         userQuestion,
         chatHistory: chatHistory.slice(-4)
-      })
+      }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();
@@ -106,7 +111,7 @@ export const askCloudflareAI = async (
       }
     }
   } catch (error) {
-    console.warn('Backend Cloudflare AI call failed, switching to local knowledge engine:', error);
+    console.warn('Backend Cloudflare AI call timed out or failed, using local knowledge engine:', error);
   }
 
   // Fallback to local knowledge matching

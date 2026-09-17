@@ -1956,7 +1956,15 @@ export const mergeChatMessages = (localMsgs: any[], dbMsgs: any[]): any[] => {
   return Array.from(msgMap.values());
 };
 
-export const fetchChatsFromDb = async (): Promise<any[]> => {
+// Helper to prevent blocked cloud networks (Firestore/Supabase in Iran) from hanging client requests
+const withTimeout = <T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+};
+
+export const fetchChatsFromDb = async (): Promise<UserChat[]> => {
   // 1. Try local storage cache first for instant initial render
   let cachedChats: any[] = [];
   try {
@@ -1978,7 +1986,10 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
 
   // 2. Direct Server API (/api/chats) - 100% Works in Iran with ZERO VPN & Unlimited Quota
   try {
-    const res = await fetch('/api/chats', { cache: 'no-store' });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch('/api/chats', { cache: 'no-store', signal: controller.signal });
+    clearTimeout(timeoutId);
     if (res.ok) {
       const serverData = await res.json();
       if (serverData && Array.isArray(serverData.chats)) {
@@ -2007,11 +2018,11 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
     console.warn('Server /api/chats fetch notice:', apiErr);
   }
 
-  // 3. Primary Database: Google Firebase Firestore (Realtime Cloud Collection)
+  // 3. Primary Database: Google Firebase Firestore (With 1.5s timeout so it never hangs in Iran)
   try {
-    const snap = await getDocs(collection(db, 'chats'));
-    if (!snap.empty) {
-      snap.forEach((docSnap) => {
+    const snap = await withTimeout(getDocs(collection(db, 'chats')), 1500, null as any);
+    if (snap && !snap.empty) {
+      snap.forEach((docSnap: any) => {
         const item = docSnap.data();
         if (item && item.userId && !String(item.userId).startsWith('SYSTEM_')) {
           const parsedMsgs = Array.isArray(item.messages)
@@ -2040,9 +2051,11 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
     console.warn('Firestore fetch chats notice:', fbErr);
   }
 
-  // 4. Secondary Backup: Supabase chats table
+  // 4. Secondary Backup: Supabase chats table (With 1.5s timeout)
   try {
-    const { data, error } = await supabase.from('chats').select('*').order('last_updated', { ascending: false });
+    const supaQuery = supabase.from('chats').select('*').order('last_updated', { ascending: false });
+    const supaResult: any = await withTimeout(supaQuery, 1500, { data: null, error: null });
+    const { data, error } = supaResult;
     if (!error && data && Array.isArray(data)) {
       for (const item of data) {
         if (!String(item.user_id || '').startsWith('SYSTEM_')) {
@@ -2103,7 +2116,7 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
 
   // 2. Save directly to Server API (/api/chats) - Instant Zero-VPN delivery
   try {
-    await fetch('/api/chats', {
+    fetch('/api/chats', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2114,13 +2127,12 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
         isReadByAdmin: Boolean(chat.isReadByAdmin),
         needsHumanSupport: Boolean(chat.needsHumanSupport),
       }),
-    });
+    }).catch((e) => console.warn('Server /api/chats async save notice:', e));
   } catch (apiErr) {
     console.warn('Server /api/chats save notice:', apiErr);
   }
 
-  // 3. Save directly to Google Firebase Firestore (Realtime Cloud Database)
-  let firestoreSuccess = false;
+  // 3. Save directly to Google Firebase Firestore (Background Async)
   try {
     const chatDocRef = doc(db, 'chats', uid);
     const firestorePayload = {
@@ -2131,13 +2143,14 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
       isReadByAdmin: Boolean(chat.isReadByAdmin),
       needsHumanSupport: Boolean(chat.needsHumanSupport),
     };
-    await setDoc(chatDocRef, firestorePayload, { merge: true });
-    firestoreSuccess = true;
+    setDoc(chatDocRef, firestorePayload, { merge: true }).catch((err) =>
+      console.warn('Firestore async save notice:', err)
+    );
   } catch (fbErr) {
     console.warn('Firestore save chat notice:', fbErr);
   }
 
-  // 4. Save backup to Supabase
+  // 4. Save backup to Supabase (Background Async)
   try {
     const payload = {
       user_id: uid,
@@ -2147,12 +2160,16 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
       is_read_by_admin: Boolean(chat.isReadByAdmin),
       needs_human_support: Boolean(chat.needsHumanSupport),
     };
-    await supabase.from('chats').upsert(payload, { onConflict: 'user_id' });
+    supabase
+      .from('chats')
+      .upsert(payload, { onConflict: 'user_id' })
+      .then(() => {})
+      .catch((err) => console.warn('Supabase async save notice:', err));
   } catch (err) {
     console.warn('Supabase save chat exception:', err);
   }
 
-  return firestoreSuccess || true;
+  return true;
 };
 
 /**
@@ -2222,7 +2239,7 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
   };
 
   pollServer();
-  intervalId = setInterval(pollServer, 2500);
+  intervalId = setInterval(pollServer, 1500);
 
   return () => {
     isUnsubscribed = true;
@@ -2296,7 +2313,7 @@ export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any
   };
 
   pollSingle();
-  intervalId = setInterval(pollSingle, 2500);
+  intervalId = setInterval(pollSingle, 1500);
 
   return () => {
     isUnsubscribed = true;
