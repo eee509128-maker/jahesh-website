@@ -242,13 +242,13 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
     return 1; // در حال بررسی
   };
 
-  const getResolvedProduct = (itemProduct: Product) => {
-    if (!itemProduct) return itemProduct;
-    const cleanItemTitle = itemProduct.title?.trim().toLowerCase();
+  const getResolvedProduct = (itemProduct?: Product) => {
+    if (!itemProduct) return undefined;
+    const cleanItemTitle = itemProduct.title ? String(itemProduct.title).trim().toLowerCase() : '';
     const live = (products || []).find(
       (p) =>
-        (p.id && itemProduct.id && p.id === itemProduct.id) ||
-        (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
+        (p?.id && itemProduct?.id && p.id === itemProduct.id) ||
+        (cleanItemTitle && p?.title && p.title.trim().toLowerCase() === cleanItemTitle)
     );
     return live ? { ...itemProduct, ...live } : itemProduct;
   };
@@ -472,8 +472,14 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                   {/* Items in order */}
                   <div className="space-y-2">
                     {(order.items || []).map((item, idx) => {
-                      const prod = getResolvedProduct(item.product);
-                      const prodImg = prod?.image || item.product?.image;
+                      const prod = getResolvedProduct(item?.product);
+                      const prodTitle = prod?.title || item?.product?.title || (item as any)?.title || 'محصول جهش‌کالا';
+                      const prodImg = prod?.image || item?.product?.image;
+                      const planName = item?.selectedPlan?.name || item?.selectedPlan?.title;
+                      const itemQuantity = Number(item?.quantity) || 1;
+                      const unitPrice = item?.selectedPlan?.price !== undefined
+                        ? Number(item.selectedPlan.price)
+                        : (Number(prod?.price || item?.product?.price) || 0);
 
                       return (
                         <div
@@ -485,7 +491,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                               {prodImg ? (
                                 <img
                                   src={prodImg}
-                                  alt={prod.title}
+                                  alt={prodTitle}
                                   className="w-full h-full object-contain"
                                 />
                               ) : (
@@ -494,17 +500,17 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                             </div>
                             <div className="space-y-0.5">
                               <span className="text-slate-900 dark:text-white font-bold text-xs sm:text-sm block line-clamp-1">
-                                {prod.title}
-                                {item.selectedPlan ? ` (${item.selectedPlan.name})` : ''}
+                                {prodTitle}
+                                {planName ? ` (${planName})` : ''}
                               </span>
                               <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
-                                <span>تعداد: <strong className="text-purple-700 dark:text-purple-300 font-bold">{item.quantity}</strong> عدد</span>
-                                {item.selectedPlan ? (
+                                <span>تعداد: <strong className="text-purple-700 dark:text-purple-300 font-bold">{itemQuantity}</strong> عدد</span>
+                                {planName ? (
                                   <>
                                     <span>•</span>
-                                    <span className="text-amber-700 dark:text-amber-300 font-bold">تعرفه {item.selectedPlan.name}</span>
+                                    <span className="text-amber-700 dark:text-amber-300 font-bold">تعرفه {planName}</span>
                                   </>
-                                ) : prod.category ? (
+                                ) : prod?.category ? (
                                   <>
                                     <span>•</span>
                                     <span className="text-purple-700 dark:text-purple-400 font-bold">{prod.category}</span>
@@ -514,11 +520,18 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                             </div>
                           </div>
                           <span className="text-purple-900 dark:text-amber-300 font-black text-xs sm:text-sm shrink-0">
-                            {formatPrice((item.selectedPlan?.price !== undefined ? item.selectedPlan.price : prod.price) * item.quantity)}
+                            {formatPrice(unitPrice * itemQuantity)}
                           </span>
                         </div>
                       );
                     })}
+                    {(!order.items || order.items.length === 0) && (
+                      <div className="text-xs text-slate-400 bg-slate-50 dark:bg-purple-950/30 p-2.5 rounded-xl border border-slate-200 dark:border-purple-900/30">
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {order.appLicense?.productTitle || order.appLicense?.appName || 'سفارش ثبت‌شده جهش‌کالا'}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Details Footer */}
@@ -723,7 +736,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                       * جهت هماهنگی و ارسال سریع، پشتیبانی جهش همواره پاسخگوی شماست.
                     </span>
                     <div className="flex items-center gap-2">
-                      {(order.items || []).some(it => it.product?.id === 'pkg-amlak-jahesh' || it.product?.title?.includes('املاک')) && onOpenAmlakApp && currentUser?.role === 'admin' && (
+                      {(order.items || []).some(it => it?.product?.id === 'pkg-amlak-jahesh' || (it?.product?.title && it.product.title.includes('املاک')) || order.appLicense?.productId === 'pkg-amlak-jahesh') && onOpenAmlakApp && currentUser?.role === 'admin' && (
                         <button
                           onClick={() => {
                             onClose();
@@ -820,8 +833,11 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
               <span className="text-xs font-bold text-purple-800 dark:text-purple-300 block">اقلام فاکتور:</span>
               <div className="max-h-48 overflow-y-auto space-y-1.5 text-xs">
                 {(invoiceOrder.items || []).map((item, idx) => {
-                  const prod = getResolvedProduct(item.product);
-                  const prodImg = prod?.image || item.product?.image;
+                  const prod = getResolvedProduct(item?.product);
+                  const prodTitle = prod?.title || item?.product?.title || (item as any)?.title || 'محصول جهش‌کالا';
+                  const prodImg = prod?.image || item?.product?.image;
+                  const itemPrice = Number(item?.selectedPlan?.price !== undefined ? item.selectedPlan.price : (prod?.price || item?.product?.price || (item as any)?.price || 0));
+                  const itemQty = Number(item?.quantity) || 1;
 
                   return (
                     <div
@@ -831,26 +847,33 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-lg bg-white dark:bg-black/60 border border-slate-200 dark:border-purple-800/50 overflow-hidden flex items-center justify-center shrink-0 p-0.5">
                           {prodImg ? (
-                            <img src={prodImg} alt={prod.title} className="w-full h-full object-contain" />
+                            <img src={prodImg} alt={prodTitle} className="w-full h-full object-contain" />
                           ) : (
                             <Package className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                           )}
                         </div>
                         <div className="text-right">
                           <span className="font-bold text-slate-900 dark:text-white block text-xs">
-                            {prod.title}
+                            {prodTitle}
                           </span>
                           <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                            تعداد: {item.quantity} عدد
+                            تعداد: {itemQty} عدد
                           </span>
                         </div>
                       </div>
                       <span className="font-bold text-purple-900 dark:text-amber-300 text-xs">
-                        {formatPrice(prod.price * item.quantity)}
+                        {formatPrice(itemPrice * itemQty)}
                       </span>
                     </div>
                   );
                 })}
+                {(!invoiceOrder.items || invoiceOrder.items.length === 0) && (
+                  <div className="text-xs text-slate-400 bg-slate-50 dark:bg-purple-950/30 p-2.5 rounded-xl border border-slate-200 dark:border-purple-900/30">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {invoiceOrder.appLicense?.productTitle || invoiceOrder.appLicense?.appName || 'سفارش خدمات جهش‌کالا'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

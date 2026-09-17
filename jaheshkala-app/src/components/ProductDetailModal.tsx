@@ -65,6 +65,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!product) return null;
 
+  const prodTitle = product.title || 'محصول جهش‌کالا';
   const allImages = [product.image, ...(product.gallery || [])].filter((url, idx, arr) => url && arr.indexOf(url) === idx);
 
   // Dynamic calculated price for display
@@ -144,9 +145,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div className="relative rounded-2xl overflow-hidden border border-purple-800/50 h-64 sm:h-72 bg-purple-950/40 group">
                 <img
                   src={activeImage || product.image}
-                  alt={product.title}
+                  alt={prodTitle}
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = getFallbackProductImage(product.title, product.category);
+                    (e.target as HTMLImageElement).src = getFallbackProductImage(prodTitle, product.category);
                   }}
                   className="w-full h-full object-contain p-2 bg-black/40 transition-transform duration-300 group-hover:scale-105"
                 />
@@ -181,9 +182,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       >
                         <img
                           src={imgUrl}
-                          alt={`${product.title} - عکس ${idx + 1}`}
+                          alt={`${prodTitle} - عکس ${idx + 1}`}
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = getFallbackProductImage(product.title, product.category);
+                            (e.target as HTMLImageElement).src = getFallbackProductImage(prodTitle, product.category);
                           }}
                           className="w-full h-full object-cover rounded-lg"
                         />
@@ -341,7 +342,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
 
                 <h2 className="text-xl sm:text-2xl font-black text-white leading-snug mb-3">
-                  {product.title}
+                  {prodTitle}
                 </h2>
 
                 {/* Innovative Guild Solution & Pain Point Card - Beautifully Crafted & Legible */}

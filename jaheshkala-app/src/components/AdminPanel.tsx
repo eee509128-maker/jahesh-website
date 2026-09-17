@@ -288,6 +288,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bannerPreviewDevice, setBannerPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [isRefreshingOrders, setIsRefreshingOrders] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
+  const [orderSearchTerm, setOrderSearchTerm] = useState('');
+
+  const filteredOrders = useMemo(() => {
+    const q = orderSearchTerm.trim().toLowerCase();
+    const sorted = [...orders].sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
+    if (!q) return sorted;
+    return sorted.filter((o) => {
+      const orderId = String(o.id || '').toLowerCase();
+      const name = String(o.customerName || '').toLowerCase();
+      const phone = String(o.customerPhone || '').toLowerCase();
+      const email = String(o.customerEmail || '').toLowerCase();
+      const track = String(o.trackingCode || o.zibalTrackId || o.paymentRefId || '').toLowerCase();
+      const items = (o.items || []).map((i) => i?.product?.title || '').join(' ').toLowerCase();
+      return (
+        orderId.includes(q) ||
+        name.includes(q) ||
+        phone.includes(q) ||
+        email.includes(q) ||
+        track.includes(q) ||
+        items.includes(q)
+      );
+    });
+  }, [orders, orderSearchTerm]);
 
   const handleRefreshOrders = async () => {
     setIsRefreshingOrders(true);
@@ -1640,6 +1663,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
+              {/* Quick Search & Filter Bar */}
+              {orders.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-purple-950/30 p-3 rounded-xl border border-purple-900/40">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-purple-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={orderSearchTerm}
+                      onChange={(e) => setOrderSearchTerm(e.target.value)}
+                      placeholder="جستجوی سریع سفارش (نام مشتری، نام کاربری مثل cscdas، شماره تماس، کد پیگیری)..."
+                      className="w-full pr-9 pl-4 py-2 bg-[#0d0722] border border-purple-800/50 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 transition-colors"
+                    />
+                    {orderSearchTerm && (
+                      <button
+                        onClick={() => setOrderSearchTerm('')}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-300 whitespace-nowrap flex items-center gap-2">
+                    <span className="font-bold text-amber-300">{filteredOrders.length.toLocaleString('fa-IR')}</span>
+                    <span>سفارش یافت شد (از کل {orders.length.toLocaleString('fa-IR')})</span>
+                  </div>
+                </div>
+              )}
+
               {orders.length === 0 ? (
                 <div className="p-12 text-center rounded-2xl bg-purple-950/20 border border-purple-900/30">
                   <ShoppingCart className="w-12 h-12 text-purple-500/40 mx-auto mb-3" />
@@ -1647,6 +1698,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <p className="text-xs text-slate-400 mt-1">
                     به‌محض اینکه کاربری خریدی را انجام دهد، اطلاعات سفارش فوراً در این جدول ظاهر می‌گردد.
                   </p>
+                </div>
+              ) : filteredOrders.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl bg-purple-950/20 border border-purple-900/30">
+                  <p className="text-sm font-bold text-white">هیچ سفارشی با عبارت «{orderSearchTerm}» یافت نشد.</p>
+                  <button
+                    onClick={() => setOrderSearchTerm('')}
+                    className="mt-3 px-3 py-1 bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-xs rounded-lg font-bold"
+                  >
+                    نمایش تمام سفارشات
+                  </button>
                 </div>
               ) : (
                 <div className="overflow-x-auto rounded-2xl border border-purple-900/40 bg-[#130b2e]">
@@ -1663,9 +1724,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-purple-900/30 text-slate-200">
-                      {[...orders]
-                        .sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a))
-                        .map((order) => (
+                      {filteredOrders.map((order) => (
                         <tr key={order.id} className="hover:bg-purple-950/40 transition-colors">
                           <td className="p-3.5 font-mono font-bold text-purple-300">
                             {order.id}
@@ -1688,17 +1747,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </td>
                           <td className="p-3.5">
                             <div className="max-w-[280px] font-medium text-xs space-y-1">
-                              {(order.items || []).map((i, idx) => (
-                                <div key={idx} className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-white font-bold">{i.product.title}</span>
-                                  {i.selectedPlan && (
-                                    <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40 shadow-xs">
-                                      تعرفه: {i.selectedPlan.name}
-                                    </span>
-                                  )}
-                                  <span className="text-[10px] text-slate-400">({i.quantity} عدد)</span>
+                              {(order.items || []).map((i, idx) => {
+                                const prodTitle = i?.product?.title || (i as any)?.title || (i?.product as any)?.name || order.appLicense?.productTitle || 'محصول جهش‌کالا';
+                                const planTitle = i?.selectedPlan?.name || i?.selectedPlan?.title;
+                                const qty = i?.quantity || 1;
+                                return (
+                                  <div key={idx} className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-white font-bold">{prodTitle}</span>
+                                    {planTitle && (
+                                      <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40 shadow-xs">
+                                        تعرفه: {planTitle}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400">({qty} عدد)</span>
+                                  </div>
+                                );
+                              })}
+                              {(!order.items || order.items.length === 0) && (
+                                <div className="text-slate-300 text-xs font-semibold">
+                                  {order.appLicense?.productTitle || order.appLicense?.appName || 'سفارش ثبت‌شده جهش‌کالا'}
                                 </div>
-                              ))}
+                              )}
                             </div>
                           </td>
                           <td className="p-3.5 font-bold text-amber-300 whitespace-nowrap">
@@ -1834,7 +1903,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   .sort((a, b) => {
                     if (prodSortBy === 'price_desc') return b.price - a.price;
                     if (prodSortBy === 'price_asc') return a.price - b.price;
-                    if (prodSortBy === 'title') return a.title.localeCompare(b.title, 'fa');
+                    if (prodSortBy === 'title') return (a.title || '').localeCompare(b.title || '', 'fa');
                     return (b.updatedAt || '').localeCompare(a.updatedAt || '');
                   });
 
@@ -2075,11 +2144,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               <div className="flex gap-3 mb-2.5">
                                 <img
                                   src={prod.image}
-                                  alt={prod.title}
+                                  alt={prod?.title || 'محصول'}
                                   className="w-14 h-14 rounded-xl object-cover border border-purple-900/60 shrink-0 shadow-md"
                                 />
                                 <div className="min-w-0 flex-1">
-                                  <h4 className="text-xs font-bold text-white line-clamp-2" title={prod.title}>{prod.title}</h4>
+                                  <h4 className="text-xs font-bold text-white line-clamp-2" title={prod?.title || ''}>{prod?.title || 'محصول'}</h4>
                                   <p className="text-xs text-amber-300 font-black mt-1">{formatPrice(prod.price)}</p>
 
                                   {prod.couponCode && (
@@ -2178,13 +2247,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                     <div className="p-3 bg-[#180e38] rounded-2xl border border-purple-900/60 flex items-center gap-3">
                       <img
-                        src={quickViewEditModal.product.image}
-                        alt={quickViewEditModal.product.title}
+                        src={quickViewEditModal.product?.image}
+                        alt={quickViewEditModal.product?.title || 'محصول'}
                         className="w-12 h-12 rounded-xl object-cover border border-purple-800 shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-xs font-bold text-white truncate">{quickViewEditModal.product.title}</h4>
-                        <p className="text-[11px] text-amber-300 mt-0.5">{formatPrice(quickViewEditModal.product.price)}</p>
+                        <h4 className="text-xs font-bold text-white truncate">{quickViewEditModal.product?.title || 'محصول'}</h4>
+                        <p className="text-[11px] text-amber-300 mt-0.5">{formatPrice(quickViewEditModal.product?.price || 0)}</p>
                       </div>
                     </div>
 
@@ -3991,16 +4060,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div className="flex items-center gap-2.5 min-w-0">
                               <img
                                 src={selectedProductForBanner.image}
-                                alt={selectedProductForBanner.title}
+                                alt={selectedProductForBanner?.title || 'محصول'}
                                 className="w-12 h-12 rounded-lg object-cover bg-black/50 border border-purple-500/50 shrink-0"
                               />
                               <div className="min-w-0 text-right">
                                 <h4 className="text-xs font-bold text-white truncate">
-                                  {selectedProductForBanner.title}
+                                  {selectedProductForBanner?.title || 'محصول'}
                                 </h4>
                                 <div className="flex items-center gap-2 text-[10px] text-slate-300 mt-1">
                                   <span className="text-amber-300 font-bold font-mono">
-                                    {selectedProductForBanner.price.toLocaleString('fa-IR')} تومان
+                                    {(selectedProductForBanner.price || 0).toLocaleString('fa-IR')} تومان
                                   </span>
                                   {selectedProductForBanner.category && (
                                     <span className="text-purple-300">({selectedProductForBanner.category})</span>
@@ -4076,13 +4145,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   <div className="flex items-center gap-2 min-w-0">
                                     <img
                                       src={p.image}
-                                      alt={p.title}
+                                      alt={p?.title || 'محصول'}
                                       className="w-8 h-8 rounded-md object-cover bg-black/40 shrink-0"
                                     />
                                     <div className="min-w-0 text-right">
-                                      <p className="text-xs font-bold truncate">{p.title}</p>
+                                      <p className="text-xs font-bold truncate">{p?.title || 'محصول'}</p>
                                       <p className="text-[10px] text-slate-400 font-mono">
-                                        {p.price.toLocaleString('fa-IR')} تومان {p.category ? `• ${p.category}` : ''}
+                                        {(p.price || 0).toLocaleString('fa-IR')} تومان {p.category ? `• ${p.category}` : ''}
                                       </p>
                                     </div>
                                   </div>
@@ -4907,7 +4976,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <div className="relative w-24 h-16 rounded-xl overflow-hidden shrink-0 border border-purple-700/60">
                           <img
                             src={banner.image}
-                            alt={banner.title}
+                            alt={banner?.title || 'بنر'}
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&q=80';
@@ -4921,7 +4990,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                         <div className="text-right flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-black text-white text-xs truncate">{banner.title}</span>
+                            <span className="font-black text-white text-xs truncate">{banner?.title || 'بنر تبلیغاتی'}</span>
                             {banner.badge && (
                               <span className="text-[9px] bg-purple-900/80 text-purple-200 px-2 py-0.5 rounded-full border border-purple-700/40">
                                 {banner.badge}
@@ -5294,7 +5363,12 @@ on public.users for delete using (true);`;
                       </thead>
                       <tbody className="divide-y divide-purple-900/30">
                         {filteredUsers.map((user, idx) => {
-                          const isMaster = user.username === 'jahesh_admin' || user.phone === '09152331974';
+                          const isZahra = user.username?.toLowerCase() === 'zahra' || user.phone === '09152331974';
+                          const isMaster = !isZahra && (
+                            user.email?.toLowerCase() === 'jahesh1395@gmail.com' ||
+                            user.email?.toLowerCase() === 'erfanmoghaddammotagi@gmail.com' ||
+                            (user.username?.toLowerCase() === 'jahesh_admin' && user.phone !== '09152331974')
+                          );
                           const fullGuildText = `${user.guild || (isMaster ? 'فناوری و مدیریت جهش' : 'ثبت نشده')}${user.customGuild ? ` (${user.customGuild})` : ''}`;
                           return (
                             <tr key={user.id} className="hover:bg-purple-900/15 transition-colors whitespace-nowrap">
@@ -6233,7 +6307,7 @@ on public.users for delete using (true);`;
                             {tool.image ? (
                               <img
                                 src={tool.image}
-                                alt={tool.title}
+                                alt={tool?.title || 'طرح'}
                                 className="w-full h-full object-contain"
                               />
                             ) : (
@@ -6244,7 +6318,7 @@ on public.users for delete using (true);`;
                           {/* Info */}
                           <div className="space-y-1 min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="text-sm font-black text-white truncate">{tool.title}</h4>
+                              <h4 className="text-sm font-black text-white truncate">{tool?.title || 'طرح و ابزار'}</h4>
                               {tool.tag && (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700/50">
                                   {tool.tag}
@@ -6630,7 +6704,7 @@ on public.users for delete using (true);`;
                   </div>
                   <div>
                     <h3 className="text-sm sm:text-base font-black text-white">
-                      {editingTool ? `ویرایش طرح: ${editingTool.title}` : 'افزودن طرح و ابزار جدید به داشبورد تکنولوژی'}
+                      {editingTool ? `ویرایش طرح: ${editingTool.title || 'طرح'}` : 'افزودن طرح و ابزار جدید به داشبورد تکنولوژی'}
                     </h3>
                     <p className="text-[11px] text-slate-400 mt-0.5">
                       تنظیم مستقیم لینک هدایت هنگام کلیک، تصویر، تگ، متن دکمه و وضعیت نمایش

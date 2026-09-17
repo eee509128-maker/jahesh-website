@@ -16,13 +16,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onInstantBuy,
   onViewDetails,
 }) => {
+  if (!product) return null;
+
+  const prodTitle = product.title || 'محصول جهش‌کالا';
   const galleryCount = (product.gallery?.length || 0) + 1;
   const safePrice = typeof product.price === 'number' && !isNaN(product.price) ? product.price : 0;
   const safeOriginalPrice = typeof product.originalPrice === 'number' && !isNaN(product.originalPrice) ? product.originalPrice : undefined;
 
   return (
     <div
-      id={`product-card-${product.id}`}
+      id={`product-card-${product.id || 'item'}`}
       className="group rounded-2xl overflow-hidden bg-white dark:bg-[#130d2a] border border-purple-200 dark:border-purple-900/40 hover:border-purple-400 dark:hover:border-purple-600/70 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col justify-between p-2.5 sm:p-3.5 h-full w-full select-none"
     >
       {/* Top Image area with badges */}
@@ -31,10 +34,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         className="relative h-36 sm:h-48 rounded-xl overflow-hidden bg-purple-50 dark:bg-[#181138] mb-2 sm:mb-2.5 cursor-pointer border border-purple-100 dark:border-purple-900/20 shrink-0"
       >
         <img
-          src={product.image || getFallbackProductImage(product.title, product.category)}
-          alt={product.title}
+          src={product.image || getFallbackProductImage(prodTitle, product.category)}
+          alt={prodTitle}
           onError={(e) => {
-            (e.target as HTMLImageElement).src = getFallbackProductImage(product.title, product.category);
+            (e.target as HTMLImageElement).src = getFallbackProductImage(prodTitle, product.category);
           }}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
@@ -78,7 +81,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Rating and Category / Brand (HIDDEN ON MOBILE for clean, uncluttered Digikala view) */}
         <div className="hidden sm:flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 gap-1 h-5 min-h-[1.25rem]">
           <div className="flex items-center gap-1 truncate min-w-0 flex-1">
-            <span className="text-purple-700 dark:text-purple-300 font-bold truncate text-[11px]">{product.category}</span>
+            <span className="text-purple-700 dark:text-purple-300 font-bold truncate text-[11px]">{product.category || 'کالای دیجیتال'}</span>
             {product.brand && (
               <>
                 <span className="shrink-0">•</span>
@@ -97,9 +100,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <h4
             onClick={() => onViewDetails(product)}
             className="text-xs sm:text-sm font-bold sm:font-black text-slate-900 dark:text-white hover:text-purple-700 dark:hover:text-amber-300 transition-colors cursor-pointer line-clamp-2 leading-snug w-full"
-            title={product.title}
+            title={prodTitle}
           >
-            {product.title}
+            {prodTitle}
           </h4>
         </div>
 

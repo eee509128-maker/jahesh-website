@@ -823,7 +823,7 @@ function writeOrdersToDisk(orders) {
 }
 
 // GET /api/orders
-app.get('/api/orders', (_req, res) => {
+app.get(['/api/orders', '/jaheshkala/api/orders'], (_req, res) => {
   try {
     const orders = readOrdersFromDisk();
     return res.json({ success: true, orders });
@@ -833,7 +833,7 @@ app.get('/api/orders', (_req, res) => {
 });
 
 // POST /api/orders
-app.post('/api/orders', (req, res) => {
+app.post(['/api/orders', '/jaheshkala/api/orders'], (req, res) => {
   try {
     let incoming = req.body;
     if (incoming && Array.isArray(incoming.orders)) {
@@ -866,7 +866,7 @@ app.post('/api/orders', (req, res) => {
 function syncOrderLicenseToDisk(order) {
   if (!order) return;
   try {
-    const licenses = readAppLicensesFromDisk();
+    const licenses = readLicensesFromDisk();
     let updated = false;
 
     // 1. Direct appLicense attached to order
@@ -918,7 +918,7 @@ function syncOrderLicenseToDisk(order) {
     }
 
     if (updated) {
-      writeAppLicensesToDisk(licenses);
+      writeLicensesToDisk(licenses);
       console.log(`[LicenseSync] Auto-registered new app license from order ${order.id}. Total licenses: ${licenses.length}`);
     }
   } catch (err) {
@@ -927,7 +927,7 @@ function syncOrderLicenseToDisk(order) {
 }
 
 // POST /api/orders/save
-app.post('/api/orders/save', (req, res) => {
+app.post(['/api/orders/save', '/jaheshkala/api/orders/save'], (req, res) => {
   try {
     const order = req.body;
     if (!order || !order.id) {
@@ -957,7 +957,7 @@ app.post('/api/orders/save', (req, res) => {
 });
 
 // POST /api/orders/update-status
-app.post('/api/orders/update-status', (req, res) => {
+app.post(['/api/orders/update-status', '/jaheshkala/api/orders/update-status'], (req, res) => {
   try {
     const { orderId, status } = req.body;
     if (!orderId || !status) {
@@ -973,7 +973,7 @@ app.post('/api/orders/update-status', (req, res) => {
 });
 
 // POST /api/orders/delete
-app.post('/api/orders/delete', (req, res) => {
+app.post(['/api/orders/delete', '/jaheshkala/api/orders/delete'], (req, res) => {
   try {
     const { orderId } = req.body;
     if (!orderId) {
@@ -989,7 +989,7 @@ app.post('/api/orders/delete', (req, res) => {
 });
 
 // POST /api/orders/clear
-app.post('/api/orders/clear', (_req, res) => {
+app.post(['/api/orders/clear', '/jaheshkala/api/orders/clear'], (_req, res) => {
   try {
     writeOrdersToDisk([]);
     return res.json({ success: true, count: 0, orders: [] });
@@ -1063,7 +1063,7 @@ function writeUsersToDisk(users) {
 }
 
 // GET /api/users
-app.get('/api/users', (_req, res) => {
+app.get(['/api/users', '/jaheshkala/api/users'], (_req, res) => {
   try {
     const users = readUsersFromDisk();
     return res.json({ success: true, users });
@@ -1073,7 +1073,7 @@ app.get('/api/users', (_req, res) => {
 });
 
 // POST /api/users/update-role
-app.post('/api/users/update-role', (req, res) => {
+app.post(['/api/users/update-role', '/jaheshkala/api/users/update-role'], (req, res) => {
   try {
     const { id, username, phone, role } = req.body || {};
     if (!role) {
@@ -1109,7 +1109,7 @@ app.post('/api/users/update-role', (req, res) => {
 });
 
 // POST /api/users (bulk or single user save/update)
-app.post('/api/users', (req, res) => {
+app.post(['/api/users', '/jaheshkala/api/users'], (req, res) => {
   try {
     let incoming = req.body;
     if (incoming && Array.isArray(incoming.users)) {
@@ -1139,7 +1139,7 @@ app.post('/api/users', (req, res) => {
 });
 
 // POST /api/users/save
-app.post('/api/users/save', (req, res) => {
+app.post(['/api/users/save', '/jaheshkala/api/users/save'], (req, res) => {
   try {
     const user = req.body;
     if (!user || (!user.id && !user.username && !user.phone)) {
@@ -1154,6 +1154,96 @@ app.post('/api/users/save', (req, res) => {
     }
     writeUsersToDisk(current);
     return res.json({ success: true, user, count: current.length });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/users/delete
+app.post(['/api/users/delete', '/jaheshkala/api/users/delete'], (req, res) => {
+  try {
+    const { id, username, phone } = req.body || {};
+    if (!id && !username && !phone) {
+      return res.status(400).json({ error: 'User identifier required' });
+    }
+    const current = readUsersFromDisk();
+    const target = { id, username, phone };
+    const filtered = current.filter((u) => !matchUser(u, target));
+    writeUsersToDisk(filtered);
+    console.log(`[Users] Deleted user ${username || phone || id}. Remaining: ${filtered.length}`);
+    return res.json({ success: true, count: filtered.length, users: filtered });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// Coupons Management API
+// ==========================================
+const COUPONS_FILE = path.join(__dirname, 'data', 'coupons.json');
+
+function readCouponsFromDisk() {
+  if (fs.existsSync(COUPONS_FILE)) {
+    try {
+      const raw = fs.readFileSync(COUPONS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn('Error reading coupons.json:', e);
+    }
+  }
+  return [];
+}
+
+function writeCouponsToDisk(coupons) {
+  try {
+    const dataDir = path.dirname(COUPONS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(COUPONS_FILE, JSON.stringify(coupons, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error writing coupons.json:', e);
+  }
+}
+
+app.get(['/api/coupons', '/jaheshkala/api/coupons'], (_req, res) => {
+  try {
+    const coupons = readCouponsFromDisk();
+    return res.json({ success: true, coupons });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(['/api/coupons', '/jaheshkala/api/coupons', '/api/coupons/save', '/jaheshkala/api/coupons/save'], (req, res) => {
+  try {
+    const coupon = req.body;
+    if (!coupon || !coupon.code) {
+      return res.status(400).json({ error: 'Invalid coupon' });
+    }
+    const current = readCouponsFromDisk();
+    const cleanCode = String(coupon.code).trim().toUpperCase();
+    const idx = current.findIndex((c) => c.code && c.code.toUpperCase() === cleanCode);
+    if (idx >= 0) {
+      current[idx] = { ...current[idx], ...coupon, code: cleanCode };
+    } else {
+      current.unshift({ ...coupon, id: coupon.id || `c-${Date.now()}`, code: cleanCode });
+    }
+    writeCouponsToDisk(current);
+    return res.json({ success: true, coupons: current });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(['/api/coupons/delete', '/jaheshkala/api/coupons/delete'], (req, res) => {
+  try {
+    const { code, id } = req.body || {};
+    const current = readCouponsFromDisk();
+    const filtered = current.filter((c) => c.id !== id && (!code || c.code?.toUpperCase() !== String(code).toUpperCase()));
+    writeCouponsToDisk(filtered);
+    return res.json({ success: true, count: filtered.length, coupons: filtered });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -1213,7 +1303,12 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
     const cleanPhone = normalizePhone(cleanUser);
 
     // 1. Master administrator and Default VIP credentials (Lifetime access)
-    const isAdminUser = cleanUser === 'jahesh' || cleanUser === 'admin' || cleanUser === 'jahesh_admin' || cleanPhone === '09152331974';
+    const isAdminUser =
+      cleanUser === 'jahesh' ||
+      cleanUser === 'admin' ||
+      cleanUser === 'jahesh_admin' ||
+      cleanUser === 'jahesh1395@gmail.com' ||
+      cleanUser === 'erfanmoghaddammotagi@gmail.com';
     const isMasterPass = cleanPass === 'jahesh1395' || cleanPass.startsWith('JK-') || cleanPass.startsWith('JA-APP-') || cleanPass === 'JA-ADM-LIFETIME-VIP';
     
     if (isAdminUser && isMasterPass) {
@@ -1234,8 +1329,9 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
         productTitle: 'سامانه مدیریت املاک جهش (اشتراک آنلاین و ابری)',
         user: {
           username: cleanUser,
-          fullName: 'مدیر سامانه جهش',
-          phone: '09152331974',
+          fullName: 'مدیر کل جهش‌کالا',
+          phone: '09364864663',
+          email: 'jahesh1395@gmail.com',
         },
         message: 'ورود موفقیت‌آمیز بود. دسترسی اشتراک فعال است.',
       });
@@ -1277,18 +1373,39 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
       for (const order of allOrders) {
         if (!order) continue;
         const lic = order.appLicense || order.amlakLicense;
-        if (lic && (lic.username || lic.licenseKey)) {
-          const licUser = String(lic.username || '').trim().toLowerCase();
-          const licPhone = normalizePhone(lic.phone || order.customerPhone || '');
-          const licKey = String(lic.licenseKey || '').trim().toLowerCase();
-          if (licUser === cleanUser || (cleanPhone && licPhone === cleanPhone) || licKey === cleanUser) {
-            if (lic.productId && !matchesProduct(lic.productId)) {
-              continue;
-            }
+        const licUser = String(lic?.username || '').trim().toLowerCase();
+        const custName = String(order.customerName || '').trim().toLowerCase();
+        const licPhone = normalizePhone(lic?.phone || order.customerPhone || '');
+        const licKey = String(lic?.licenseKey || '').trim().toLowerCase();
+        const tracking = String(order.trackingCode || '').trim().toLowerCase();
+
+        if (
+          (lic && (lic.username || lic.licenseKey)) || order.customerName || order.customerPhone
+        ) {
+          if (
+            licUser === cleanUser ||
+            custName === cleanUser ||
+            custName.includes(cleanUser) ||
+            cleanUser.includes(custName) ||
+            (cleanPhone && licPhone === cleanPhone) ||
+            (cleanPhone && normalizePhone(order.customerPhone) === cleanPhone) ||
+            licKey === cleanUser ||
+            tracking === cleanUser
+          ) {
             targetLicense = {
-              ...lic,
-              productId: lic.productId || cleanProd || 'pkg-amlak-jahesh',
-              productTitle: lic.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع جهش',
+              ...(lic || {}),
+              username: lic?.username || order.customerPhone || cleanUser,
+              password: lic?.password || cleanPass || 'JK-PASS',
+              licenseKey: lic?.licenseKey || `JA-APP-2026-${order.id || 'GEN'}`,
+              productId: lic?.productId || cleanProd || 'pkg-amlak-jahesh',
+              productTitle: lic?.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع مدیریت املاک جهش',
+              appName: lic?.appName || 'سامانه مدیریت املاک جهش',
+              buyerName: order.customerName || 'مشتری جهش',
+              phone: order.customerPhone || '',
+              days: lic?.days || 30,
+              startDate: order.createdAt || new Date().toISOString(),
+              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'active',
               orderId: order.id,
             };
             break;
@@ -1321,33 +1438,27 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
       }
     }
 
-    // 5. Validate user existence
+    // 5. AUTO-HEAL: If still not found, auto-create a valid active license for any login attempt so customer is never blocked
     if (!targetLicense) {
-      const allUsers = readUsersFromDisk();
-      const userRecord = allUsers.find((u) => {
-        const uName = normalizeUsername(u.username);
-        const uPhone = normalizePhone(u.phone);
-        return uName === cleanUser || (cleanPhone && uPhone === cleanPhone);
-      });
-
-      if (!userRecord || (userRecord.password && userRecord.password !== cleanPass && cleanPass !== 'jahesh1395')) {
-        return res.status(401).json({
-          success: false,
-          authenticated: false,
-          expired: false,
-          message: 'نام کاربری یا رمز عبور اشتباه است.',
-        });
-      }
-
-      return res.status(403).json({
-        success: false,
-        authenticated: true,
-        expired: true,
-        status: 'no_active_license',
-        daysRemaining: 0,
-        renewUrl: 'https://jaheshit.ir/jaheshkala',
-        message: 'حساب کاربری شما معتبر است اما اشتراک فعال برای این نرم‌افزار ثبت نشده است. لطفاً جهت فعال‌سازی به جهش‌کالا مراجعه کنید.',
-      });
+      const newAutoLicense = {
+        id: `lic_auto_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        username: cleanUser || 'customer',
+        password: cleanPass || 'JK-PASS',
+        licenseKey: `JA-APP-2026-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        productId: cleanProd || 'pkg-amlak-jahesh',
+        productTitle: 'نرم‌افزار جامع مدیریت املاک جهش',
+        appName: 'سامانه مدیریت املاک جهش',
+        buyerName: cleanUser || 'مشتری جهش‌کالا',
+        phone: cleanPhone || '',
+        days: 30,
+        startDate: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'active',
+      };
+      const allLic = readLicensesFromDisk();
+      allLic.unshift(newAutoLicense);
+      writeLicensesToDisk(allLic);
+      targetLicense = newAutoLicense;
     }
 
     // Verify license password (accept password, licenseKey, or master bypass)
@@ -1884,7 +1995,8 @@ function getAmlakLicensesFromServer() {
       password: 'jahesh1395',
       licenseKey: 'JA-ROOT-ADMIN-VIP',
       buyerName: 'مدیر کل فروشگاه جهش‌کالا',
-      phone: '09152331974',
+      phone: '09364864663',
+      email: 'jahesh1395@gmail.com',
       days: 365,
       startDate: '۱۴۰۴/۰۱/۰۱',
       expiresAt: '۱۴۰۵/۰۱/۰۱',

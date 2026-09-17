@@ -529,6 +529,13 @@ export default function App() {
 
     loadCloudData();
 
+    // Auto-refresh orders and cloud data every 15 seconds to ensure newly placed orders appear instantly
+    const cloudInterval = setInterval(() => {
+      if (isMounted) {
+        loadCloudData();
+      }
+    }, 15000);
+
     // Subscribe to Supabase real-time cloud changes for instant multi-user synchronization
     const unsubscribeRealtimeProducts = subscribeToProductsRealtime((updatedList) => {
       if (isMounted && Array.isArray(updatedList) && updatedList.length > 0) {
@@ -586,6 +593,7 @@ export default function App() {
 
     return () => {
       isMounted = false;
+      clearInterval(cloudInterval);
       if (typeof unsubscribeRealtimeProducts === 'function') {
         unsubscribeRealtimeProducts();
       }
@@ -882,7 +890,7 @@ export default function App() {
       id: 'admin-jahesh',
       username: 'jahesh',
       fullName: 'مدیر فروشگاه جهش‌کالا',
-      phone: '09152331974',
+      phone: '09364864663',
       email: 'jahesh1395@gmail.com',
       role: 'admin' as const,
     };
@@ -896,7 +904,7 @@ export default function App() {
       paymentRefId: 'FREE-ADM-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
       userId: adminUser.id,
       customerName: adminUser.fullName || 'مدیر فروشگاه جهش‌کالا',
-      customerPhone: adminUser.phone || '09152331974',
+      customerPhone: adminUser.phone || '09364864663',
       customerEmail: adminUser.email || 'jahesh1395@gmail.com',
       requestedDomain: product.domainIncluded ? 'دامنه اختصاصی مدیریت' : undefined,
       clientNotes: `ثبت سفارش رایگان از پنل مدیریت توسط ${adminUser.fullName}`,
@@ -946,7 +954,7 @@ export default function App() {
       id: 'admin-jahesh',
       username: 'jahesh',
       fullName: 'مدیر فروشگاه جهش‌کالا',
-      phone: '09152331974',
+      phone: '09364864663',
       email: 'jahesh1395@gmail.com',
       role: 'admin' as const,
     };
@@ -972,7 +980,7 @@ export default function App() {
       paymentRefId: 'FREE-ADM-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
       userId: adminUser.id,
       customerName: adminUser.fullName || 'مدیر فروشگاه جهش‌کالا',
-      customerPhone: adminUser.phone || '09152331974',
+      customerPhone: adminUser.phone || '09364864663',
       customerEmail: adminUser.email || 'jahesh1395@gmail.com',
       requestedDomain,
       clientNotes,
@@ -1055,9 +1063,12 @@ export default function App() {
   const handleClearAllOrders = async () => {
     if (confirm('آیا از پاکسازی تمام سفارشات اطمینان دارید؟')) {
       setOrders([]);
-      localStorage.removeItem('jahesh_orders');
+      try {
+        localStorage.removeItem('jahesh_orders');
+        localStorage.removeItem('jahesh_orders_store');
+      } catch {}
       await clearAllOrdersFromDb();
-      showToast('کلیه سفارشات با موفقیت از دیتابیس پاکسازی شدند.');
+      showToast('کلیه سفارشات تستی با موفقیت از سیستم و دیتابیس پاکسازی شدند.');
     }
   };
 

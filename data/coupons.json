@@ -1,0 +1,30 @@
+[
+  {
+    "id": "c-jahesh1395",
+    "code": "jahesh1395",
+    "discountPercent": 68,
+    "description": "کد تخفیف سرّی مدیریت: اعمال قیمت ویژه ۲,۵۰۰,۰۰۰ تومان روی پکیج طراحی سایت",
+    "isActive": true
+  },
+  {
+    "id": "c-welcome20",
+    "code": "WELCOME20",
+    "discountPercent": 20,
+    "description": "تخفیف ۲۰ درصدی خرید اول از جهش‌کالا",
+    "isActive": true
+  },
+  {
+    "id": "c-golden10",
+    "code": "GOLDEN10",
+    "discountPercent": 10,
+    "description": "تخفیف ۱۰ درصدی پکیج‌های طلایی",
+    "isActive": true
+  },
+  {
+    "id": "c-vip30",
+    "code": "VIP30",
+    "discountPercent": 30,
+    "description": "تخفیف ویژه مشتریان VIP جهش‌کالا",
+    "isActive": true
+  }
+]

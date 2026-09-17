@@ -27,6 +27,42 @@
       "destination": "/api/products"
     },
     {
+      "source": "/api/orders/save",
+      "destination": "/api/orders"
+    },
+    {
+      "source": "/api/orders",
+      "destination": "/api/orders"
+    },
+    {
+      "source": "/api/users/save",
+      "destination": "/api/users"
+    },
+    {
+      "source": "/api/users",
+      "destination": "/api/users"
+    },
+    {
+      "source": "/jaheshkala/api/orders/save",
+      "destination": "/api/orders"
+    },
+    {
+      "source": "/jaheshkala/api/orders",
+      "destination": "/api/orders"
+    },
+    {
+      "source": "/jaheshkala/api/users/save",
+      "destination": "/api/users"
+    },
+    {
+      "source": "/jaheshkala/api/users",
+      "destination": "/api/users"
+    },
+    {
+      "source": "/jaheshkala/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
       "source": "/api/app-license/:path*",
       "destination": "/api/app-license"
     },

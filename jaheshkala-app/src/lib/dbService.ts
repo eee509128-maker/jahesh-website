@@ -1109,6 +1109,10 @@ export const deleteOrderFromDb = async (orderId: string): Promise<boolean> => {
 export const clearAllOrdersFromDb = async (): Promise<boolean> => {
   try {
     saveLocalOrdersStore([]);
+    try {
+      localStorage.removeItem('jahesh_orders');
+      localStorage.removeItem('jahesh_orders_store');
+    } catch {}
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: [] }));
     }
@@ -1430,14 +1434,17 @@ export const findUserInDb = async (usernameOrPhone: string, passwordAttempt: str
 
   // 1. Check Master Admin Credentials
   if (
-    (cleanId === 'jahesh' || cleanId === 'jahesh_admin' || cleanId === '09152331974' || cleanId === '09152221454') &&
+    (cleanId === 'jahesh' ||
+      cleanId === 'jahesh_admin' ||
+      cleanId === 'jahesh1395@gmail.com' ||
+      cleanId === 'erfanmoghaddammotagi@gmail.com') &&
     cleanPass === 'jahesh1395'
   ) {
     return {
       id: 'usr-jahesh-master',
       fullName: 'مدیر کل جهش‌کالا',
-      phone: '09152331974',
-      email: 'admin@jaheshkala.ir',
+      phone: '09364864663',
+      email: 'jahesh1395@gmail.com',
       username: 'jahesh_admin',
       role: 'admin',
       createdAt: '۱۴۰۵/۶/۱',
@@ -1529,8 +1536,49 @@ export const findUserInDb = async (usernameOrPhone: string, passwordAttempt: str
     }
   }
 
-  // 5. Update Current User cache in localStorage if matched
+  // 4.5. Check Server Disk API /api/users
+  if (!matchedUser) {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const d = await res.json();
+        const serverUsers = Array.isArray(d?.users) ? d.users : [];
+        const sMatch = serverUsers.find(
+          (u: any) =>
+            (u.username?.toLowerCase() === cleanId || u.phone === cleanId || u.email?.toLowerCase() === cleanId) &&
+            (u.password === cleanPass || u.password === passwordAttempt)
+        );
+        if (sMatch) {
+          matchedUser = {
+            id: sMatch.id,
+            fullName: sMatch.fullName || sMatch.full_name,
+            phone: sMatch.phone,
+            email: sMatch.email || '',
+            username: sMatch.username,
+            role: (sMatch.role as 'admin' | 'operator' | 'user') || 'user',
+            guild: sMatch.guild,
+            customGuild: sMatch.customGuild,
+            createdAt: sMatch.createdAt || sMatch.created_at,
+          };
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // 5. Enforce explicit roles: Zahra is user, jahesh1395 is master admin
   if (matchedUser) {
+    if (matchedUser.username?.toLowerCase() === 'zahra' || matchedUser.phone === '09152331974') {
+      matchedUser.role = 'user';
+    }
+    if (
+      matchedUser.email?.toLowerCase() === 'jahesh1395@gmail.com' ||
+      matchedUser.email?.toLowerCase() === 'erfanmoghaddammotagi@gmail.com' ||
+      matchedUser.username?.toLowerCase() === 'jahesh_admin'
+    ) {
+      matchedUser.role = 'admin';
+    }
     try {
       safeSetLocalStorage('jahesh_current_user', JSON.stringify(matchedUser));
     } catch {
