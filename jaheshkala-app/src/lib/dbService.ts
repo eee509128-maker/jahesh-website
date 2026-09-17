@@ -1976,7 +1976,38 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
     }
   }
 
-  // 2. Primary Database: Google Firebase Firestore (Realtime Cloud Collection)
+  // 2. Direct Server API (/api/chats) - 100% Works in Iran with ZERO VPN & Unlimited Quota
+  try {
+    const res = await fetch('/api/chats', { cache: 'no-store' });
+    if (res.ok) {
+      const serverData = await res.json();
+      if (serverData && Array.isArray(serverData.chats)) {
+        for (const item of serverData.chats) {
+          if (item && item.userId && !String(item.userId).startsWith('SYSTEM_')) {
+            const uid = String(item.userId);
+            const existing = mergedMap.get(uid);
+            const parsedMsgs = Array.isArray(item.messages) ? item.messages : [];
+            const mergedMsgs = existing ? mergeChatMessages(existing.messages, parsedMsgs) : parsedMsgs;
+            mergedMap.set(uid, {
+              userId: uid,
+              userName: item.userName || existing?.userName || 'کاربر جهش‌کالا',
+              messages: mergedMsgs,
+              lastUpdated: item.lastUpdated || existing?.lastUpdated || new Date().toISOString(),
+              isReadByAdmin: item.isReadByAdmin !== undefined ? Boolean(item.isReadByAdmin) : false,
+              needsHumanSupport:
+                item.needsHumanSupport !== undefined
+                  ? Boolean(item.needsHumanSupport)
+                  : mergedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس') || m.text?.includes('کارشناس')),
+            });
+          }
+        }
+      }
+    }
+  } catch (apiErr) {
+    console.warn('Server /api/chats fetch notice:', apiErr);
+  }
+
+  // 3. Primary Database: Google Firebase Firestore (Realtime Cloud Collection)
   try {
     const snap = await getDocs(collection(db, 'chats'));
     if (!snap.empty) {
@@ -2009,7 +2040,7 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
     console.warn('Firestore fetch chats notice:', fbErr);
   }
 
-  // 3. Secondary Backup: Supabase chats table
+  // 4. Secondary Backup: Supabase chats table
   try {
     const { data, error } = await supabase.from('chats').select('*').order('last_updated', { ascending: false });
     if (!error && data && Array.isArray(data)) {
@@ -2070,7 +2101,25 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
     }
   } catch {}
 
-  // 2. Save directly to Google Firebase Firestore (Realtime Cloud Database)
+  // 2. Save directly to Server API (/api/chats) - Instant Zero-VPN delivery
+  try {
+    await fetch('/api/chats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: uid,
+        userName: chat.userName || 'کاربر جهش‌کالا',
+        messages: Array.isArray(chat.messages) ? chat.messages : [],
+        lastUpdated: chat.lastUpdated || new Date().toISOString(),
+        isReadByAdmin: Boolean(chat.isReadByAdmin),
+        needsHumanSupport: Boolean(chat.needsHumanSupport),
+      }),
+    });
+  } catch (apiErr) {
+    console.warn('Server /api/chats save notice:', apiErr);
+  }
+
+  // 3. Save directly to Google Firebase Firestore (Realtime Cloud Database)
   let firestoreSuccess = false;
   try {
     const chatDocRef = doc(db, 'chats', uid);
@@ -2084,12 +2133,11 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
     };
     await setDoc(chatDocRef, firestorePayload, { merge: true });
     firestoreSuccess = true;
-    console.log(`Chat ${uid} saved to Google Firebase Firestore successfully`);
   } catch (fbErr) {
     console.warn('Firestore save chat notice:', fbErr);
   }
 
-  // 3. Save backup to Supabase
+  // 4. Save backup to Supabase
   try {
     const payload = {
       user_id: uid,
@@ -2108,14 +2156,20 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
 };
 
 /**
- * Real-time subscription to all customer chats via Google Firebase Firestore.
+ * Real-time subscription to all customer chats via Google Firebase Firestore + Server API Fallback.
  * Updates the Admin Panel instantly when any customer sends a message or requests a human specialist.
  */
 export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() => void) => {
+  let isUnsubscribed = false;
+  let firestoreUnsub: (() => void) | null = null;
+  let intervalId: any = null;
+
+  // 1. Google Firebase Firestore Live Listener (works with VPN or unblocked networks)
   try {
-    return onSnapshot(
+    firestoreUnsub = onSnapshot(
       collection(db, 'chats'),
       (snap) => {
+        if (isUnsubscribed) return;
         const list: any[] = [];
         snap.forEach((docSnap) => {
           const item = docSnap.data();
@@ -2150,21 +2204,53 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
     );
   } catch (e) {
     console.warn('subscribeToChatsFromDb exception:', e);
-    return () => {};
   }
+
+  // 2. High-speed Iran Domestic Poll (Server API /api/chats - every 2.5 seconds)
+  const pollServer = async () => {
+    if (isUnsubscribed) return;
+    try {
+      const res = await fetch('/api/chats', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.chats) && data.chats.length > 0) {
+          data.chats.sort((a: any, b: any) => new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime());
+          callback(data.chats);
+        }
+      }
+    } catch {}
+  };
+
+  pollServer();
+  intervalId = setInterval(pollServer, 2500);
+
+  return () => {
+    isUnsubscribed = true;
+    if (firestoreUnsub) {
+      firestoreUnsub();
+    }
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
+  };
 };
 
 /**
- * Real-time subscription to a single user's chat session via Google Firebase Firestore.
+ * Real-time subscription to a single user's chat session via Google Firebase Firestore + Server API Fallback.
  * Updates the LiveChatWidget instantly when admin replies.
  */
 export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any) => void): (() => void) => {
   if (!userId) return () => {};
   const uid = String(userId);
+  let isUnsubscribed = false;
+  let firestoreUnsub: (() => void) | null = null;
+  let intervalId: any = null;
+
   try {
-    return onSnapshot(
+    firestoreUnsub = onSnapshot(
       doc(db, 'chats', uid),
       (docSnap) => {
+        if (isUnsubscribed) return;
         if (docSnap.exists()) {
           const item = docSnap.data();
           const parsedMsgs = Array.isArray(item.messages)
@@ -2193,8 +2279,34 @@ export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any
     );
   } catch (e) {
     console.warn('subscribeToSingleChatFromDb exception:', e);
-    return () => {};
   }
+
+  // High-speed Iran Domestic Poll for single chat session
+  const pollSingle = async () => {
+    if (isUnsubscribed) return;
+    try {
+      const res = await fetch(`/api/chats?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.chat) {
+          callback(data.chat);
+        }
+      }
+    } catch {}
+  };
+
+  pollSingle();
+  intervalId = setInterval(pollSingle, 2500);
+
+  return () => {
+    isUnsubscribed = true;
+    if (firestoreUnsub) {
+      firestoreUnsub();
+    }
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
+  };
 };
 
 export const findUserByEmailInDb = async (email: string): Promise<User | null> => {

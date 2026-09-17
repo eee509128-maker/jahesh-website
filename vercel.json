@@ -43,6 +43,10 @@
       "destination": "/api/orders"
     },
     {
+      "source": "/api/chats/save",
+      "destination": "/api/chats"
+    },
+    {
       "source": "/api/upload-banner",
       "destination": "/api/upload?type=banners"
     },

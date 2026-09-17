@@ -981,6 +981,78 @@ app.post('/api/orders/update-status', (req, res) => {
   }
 });
 
+// ==========================================
+// Real-time Chats Persistence API (Zero-VPN Domestic & Global)
+// ==========================================
+const CHATS_FILE = path.join(__dirname, 'data', 'chats.json');
+
+function readChatsFromDisk() {
+  if (fs.existsSync(CHATS_FILE)) {
+    try {
+      const raw = fs.readFileSync(CHATS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn('Error reading chats.json:', e);
+    }
+  }
+  return [];
+}
+
+function writeChatsToDisk(chats) {
+  try {
+    const dataDir = path.dirname(CHATS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(CHATS_FILE, JSON.stringify(chats, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error writing chats.json:', e);
+  }
+}
+
+app.get('/api/chats', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  const { userId } = req.query;
+  const chats = readChatsFromDisk();
+  if (userId) {
+    const single = chats.find((c) => String(c.userId) === String(userId));
+    return res.json({ success: true, chat: single || null });
+  }
+  return res.json({ success: true, chats });
+});
+
+app.post('/api/chats', (req, res) => {
+  try {
+    const incoming = req.body;
+    if (!incoming || !incoming.userId) {
+      return res.status(400).json({ error: 'Invalid chat. userId is required.' });
+    }
+    const chats = readChatsFromDisk();
+    const idx = chats.findIndex((c) => String(c.userId) === String(incoming.userId));
+
+    const updatedItem = {
+      userId: String(incoming.userId),
+      userName: incoming.userName || 'کاربر جهش‌کالا',
+      messages: Array.isArray(incoming.messages) ? incoming.messages : [],
+      lastUpdated: incoming.lastUpdated || new Date().toISOString(),
+      isReadByAdmin: incoming.isReadByAdmin !== undefined ? Boolean(incoming.isReadByAdmin) : false,
+      needsHumanSupport: Boolean(incoming.needsHumanSupport),
+    };
+
+    if (idx >= 0) {
+      chats[idx] = updatedItem;
+    } else {
+      chats.unshift(updatedItem);
+    }
+
+    writeChatsToDisk(chats);
+    return res.json({ success: true, chat: updatedItem, count: chats.length });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/orders/delete
 app.post('/api/orders/delete', (req, res) => {
   try {
