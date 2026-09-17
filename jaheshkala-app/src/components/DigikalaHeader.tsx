@@ -201,32 +201,34 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
 
         </div>
 
-        {/* Left side: Login/User Profile, Admin, Cart */}
+        {/* Left side: Management Panel, Login/User Profile, Cart */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           
+          {/* Admin Management Panel Button (Only visible for authorized admin users) */}
+          {currentUser?.role === 'admin' && (
+            <button
+              id="digikala-admin-btn"
+              onClick={onOpenAdmin}
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-700 dark:text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-colors shadow-sm shrink-0"
+              title="پنل مدیریت فروشگاه و محصولات"
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="hidden xs:inline">پنل مدیریت</span>
+              <span className="xs:hidden">مدیریت</span>
+            </button>
+          )}
+
           {/* User Auth / Profile */}
           {currentUser ? (
             <div className="flex items-center gap-1 sm:gap-2">
-              {currentUser.role === 'admin' || currentUser.role === 'operator' ? (
-                <button
-                  id="digikala-admin-btn"
-                  onClick={onOpenAdmin}
-                  className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-700 dark:text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-colors shadow-sm"
-                >
-                  <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <span className="hidden xs:inline">پنل مدیریت</span>
-                  <span className="xs:hidden">مدیریت</span>
-                </button>
-              ) : (
-                <button
-                  onClick={onOpenOrders}
-                  className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-purple-100 dark:bg-purple-950/80 border border-purple-200 dark:border-purple-800/40 text-purple-900 dark:text-purple-200 text-xs font-bold hover:bg-purple-200 dark:hover:bg-purple-900 transition-colors"
-                >
-                  <Package className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                  <span className="hidden xs:inline">سفارشات من</span>
-                  <span className="xs:hidden">سفارشات</span>
-                </button>
-              )}
+              <button
+                onClick={onOpenOrders}
+                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-purple-100 dark:bg-purple-950/80 border border-purple-200 dark:border-purple-800/40 text-purple-900 dark:text-purple-200 text-xs font-bold hover:bg-purple-200 dark:hover:bg-purple-900 transition-colors shrink-0"
+              >
+                <Package className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span className="hidden xs:inline">سفارشات من</span>
+                <span className="xs:hidden">سفارشات</span>
+              </button>
 
               <button
                 onClick={onOpenProfile}

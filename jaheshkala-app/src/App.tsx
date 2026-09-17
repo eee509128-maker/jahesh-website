@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight
+  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, ExternalLink
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
@@ -51,19 +51,18 @@ import { DigikalaFooter } from './components/DigikalaFooter';
 import { ProductCard } from './components/ProductCard';
 
 // Modals
-const CartModal = lazy(() => import('./components/CartModal').then(module => ({ default: module.CartModal })));
+import { CartModal } from './components/CartModal';
 import { TermsModal } from './components/TermsModal';
-const PaymentGatewayModal = lazy(() => import('./components/PaymentGatewayModal').then(module => ({ default: module.PaymentGatewayModal })));
-const AuthModal = lazy(() => import('./components/AuthModal').then(module => ({ default: module.AuthModal })));
-import { Suspense, lazy } from 'react';
-const AdminPanel = lazy(() => import('./components/AdminPanel').then(module => ({ default: module.AdminPanel })));
-const UserOrdersModal = lazy(() => import('./components/UserOrdersModal').then(module => ({ default: module.UserOrdersModal })));
-const UserProfileModal = lazy(() => import('./components/UserProfileModal').then(module => ({ default: module.UserProfileModal })));
-const ProductDetailModal = lazy(() => import('./components/ProductDetailModal').then(module => ({ default: module.ProductDetailModal })));
-const LiveChatWidget = lazy(() => import('./components/LiveChatWidget').then(module => ({ default: module.LiveChatWidget })));
-const FooterInfoModal = lazy(() => import('./components/FooterInfoModal').then(module => ({ default: module.FooterInfoModal })));
-const AmlakAppModal = lazy(() => import('./components/AmlakAppModal').then(module => ({ default: module.AmlakAppModal })));
-const SubscriptionDurationModal = lazy(() => import('./components/SubscriptionDurationModal').then(module => ({ default: module.SubscriptionDurationModal })));
+import { PaymentGatewayModal } from './components/PaymentGatewayModal';
+import { AuthModal } from './components/AuthModal';
+import { AdminPanel } from './components/AdminPanel';
+import { UserOrdersModal } from './components/UserOrdersModal';
+import { UserProfileModal } from './components/UserProfileModal';
+import { ProductDetailModal } from './components/ProductDetailModal';
+import { LiveChatWidget } from './components/LiveChatWidget';
+import { FooterInfoModal } from './components/FooterInfoModal';
+import { AmlakAppModal } from './components/AmlakAppModal';
+import { SubscriptionDurationModal } from './components/SubscriptionDurationModal';
 import { ProductPlansModal } from './components/ProductPlansModal';
 
 export function sanitizeProduct(p: any): Product | null {
@@ -1330,7 +1329,13 @@ export default function App() {
           if (!currentUser) setAuthModalOpen(true);
           else setUserOrdersModalOpen(true);
         }}
-        onOpenAdmin={() => setAdminModalOpen(true)}
+        onOpenAdmin={() => {
+          if (currentUser?.role === 'admin') {
+            setAdminModalOpen(true);
+          } else {
+            setAuthModalOpen(true);
+          }
+        }}
         onOpenProfile={() => setUserProfileModalOpen(true)}
         onLogout={handleLogout}
         onScrollToIncredible={scrollToIncredible}
@@ -1779,34 +1784,36 @@ export default function App() {
       />
 
       {/* Admin Panel (Orders, New Product Form, Zibal Settings, Coupons, Users, Banners) */}
-      <Suspense fallback={<div className="p-8 text-center text-white">در حال بارگذاری پنل مدیریت...</div>}><AdminPanel
-        isOpen={adminModalOpen}
-        onClose={() => setAdminModalOpen(false)}
-        currentUser={currentUser}
-        onAdminInstantPurchase={handleAdminInstantPurchase}
-        onOpenAmlakApp={() => setAmlakModalOpen(true)}
-        orders={orders}
-        onUpdateOrderStatus={handleUpdateOrderStatus}
-        onDeleteOrder={handleDeleteOrder}
-        onClearAllOrders={handleClearAllOrders}
-        products={products}
-        onAddNewProduct={handleAddNewProduct}
-        onUpdateProduct={handleUpdateProduct}
-        onDeleteProduct={handleDeleteProduct}
-        zibalMerchant={zibalMerchant}
-        onUpdateZibalMerchant={handleUpdateZibalMerchant}
-        coupons={coupons}
-        onAddNewCoupon={handleAddNewCoupon}
-        onDeleteCoupon={handleDeleteCoupon}
-        onToggleCoupon={handleToggleCoupon}
-        usersList={usersList}
-        onDeleteUser={handleDeleteUser}
-        onUpdateUser={handleUpdateUser}
-        onAddNewUser={handleAddNewUser}
-        banners={banners}
-        onSaveBanner={handleSaveBanner}
-        onDeleteBanner={handleDeleteBanner}
-      /></Suspense>
+      {adminModalOpen && (
+        <AdminPanel
+          isOpen={adminModalOpen}
+          onClose={() => setAdminModalOpen(false)}
+          currentUser={currentUser}
+          onAdminInstantPurchase={handleAdminInstantPurchase}
+          onOpenAmlakApp={() => setAmlakModalOpen(true)}
+          orders={orders}
+          onUpdateOrderStatus={handleUpdateOrderStatus}
+          onDeleteOrder={handleDeleteOrder}
+          onClearAllOrders={handleClearAllOrders}
+          products={products}
+          onAddNewProduct={handleAddNewProduct}
+          onUpdateProduct={handleUpdateProduct}
+          onDeleteProduct={handleDeleteProduct}
+          zibalMerchant={zibalMerchant}
+          onUpdateZibalMerchant={handleUpdateZibalMerchant}
+          coupons={coupons}
+          onAddNewCoupon={handleAddNewCoupon}
+          onDeleteCoupon={handleDeleteCoupon}
+          onToggleCoupon={handleToggleCoupon}
+          usersList={usersList}
+          onDeleteUser={handleDeleteUser}
+          onUpdateUser={handleUpdateUser}
+          onAddNewUser={handleAddNewUser}
+          banners={banners}
+          onSaveBanner={handleSaveBanner}
+          onDeleteBanner={handleDeleteBanner}
+        />
+      )}
 
       {/* User Orders Modal */}
       {/* User Profile Modal */}

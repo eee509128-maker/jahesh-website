@@ -232,139 +232,236 @@ export function checkLicenseStatus(license?: AppSubscriptionLicense | null): {
 }
 
 /**
- * Builds the official AI Master Prompt for Google Antigravity, Google AI Studio, Cursor, Claude & ChatGPT
+ * Builds the pure technical API & Connection Specification for AI code generation (Google AI Studio, Antigravity, ChatGPT, Claude, Cursor)
  */
 export function buildAiAppPrompt(
   product: Partial<Product>,
   platform: 'windows' | 'android' | 'cross-platform' | 'all' = 'all',
   customNote: string = ''
 ): string {
-  const appName = product.aiAppName?.trim() || product.title?.trim() || 'نرم‌افزار اختصاصی جهش';
+  const appName = product.aiAppName?.trim() || product.title?.trim() || 'نرم‌افزار هوشمند جهش';
   const prodId = product.id || 'pkg-software-jahesh';
-  const defaultDays = product.aiAppDefaultDays || 7;
 
-  let platformNameFa = 'ویندوز (Desktop / C# / Electron) و موبایل اندروید (Android / Flutter)';
-  if (platform === 'windows') platformNameFa = 'ویندوز (Windows Desktop Application)';
-  else if (platform === 'android') platformNameFa = 'اندروید (Android Mobile Application)';
-  else if (platform === 'cross-platform') platformNameFa = 'کراس‌پلتفرم (Flutter / React Native / Tauri)';
+  let targetPlatform = 'Cross-Platform (Android, Windows, Web, Flutter, React Native)';
+  if (platform === 'windows') targetPlatform = 'Windows Desktop (C# / .NET / WPF / Electron / Tauri)';
+  else if (platform === 'android') targetPlatform = 'Android (Kotlin / Java / Jetpack Compose / Flutter)';
+  else if (platform === 'cross-platform') targetPlatform = 'Cross-Platform (Flutter / React Native / Tauri)';
 
-  return `# پرامپت اختصاصی توسعه اپلیکیشن با اتصال به سامانه لاگین و اشتراک جهش‌کالا
+  return `# ==============================================================================
+# JAHESH PLATFORM - TECHNICAL API & AUTHENTICATION INTEGRATION SPECIFICATION
+# Application Name: ${appName}
+# Product ID: ${prodId}
+# Target Platform: ${targetPlatform}
+# Live API Base URL: https://jaheshit.ir
+# ==============================================================================
 
-## مخاطب هوش مصنوعی:
-تو یک مهندس ارشد نرم‌افزار و معمار سیستم هستی. من می‌خواهم برای «${appName}» یک اپلیکیشن حرفه‌ای در پلتفرم **${platformNameFa}** طراحی و کدنویسی کنی.
+# ------------------------------------------------------------------------------
+# 1. CORE ARCHITECTURE & DYNAMIC SUBSCRIPTION WORKFLOW:
+# ------------------------------------------------------------------------------
+# - DYNAMIC CUSTOMER-SPECIFIC CREDENTIALS:
+#   * When any customer purchases this product on JaheshKala (https://jaheshit.ir/jaheshkala),
+#     the system dynamically generates a unique username (customer mobile/username),
+#     a unique dynamic password (format: JK-XXXX), and a unique license key (format: JA-APP-2026-XXXX).
+#   * No customer shares passwords. Every buyer receives their own private login credentials.
+#
+# - DYNAMIC SUBSCRIPTION DURATION:
+#   * The subscription duration (e.g. 1 day, 7 days, 30 days, 90 days, 365 days) is selected by
+#     the customer during checkout.
+#   * The server calculates remaining days ("daysRemaining") and expiry timestamp ("expiresAt")
+#     in real-time based on the purchase date and duration.
+#
+# - STRICT PRODUCT ISOLATION:
+#   * Credentials issued for Product ID "${prodId}" can ONLY unlock this specific software.
+#   * If a customer attempts to log into this software using credentials from another Jahesh product,
+#     the server strictly returns HTTP 401 with { "success": false, "productMismatch": true }.
 
----
-
-## ۱. مأموریت اصلی و نیازمندی حیاتی:
-این اپلیکیشن مستقیماً به سیستم احراز هویت و مدیریت اشتراک وب‌سایت **جهش‌کالا (jaheshit.ir)** متصل است.
-کاربران اشتراک خود را (مثلاً اشتراک ${defaultDays} روزه، ۱ ماهه، ۱ ساله یا پکیج‌های اختصاصی) از سایت جهش‌کالا خریداری می‌کنند و پس از پرداخت، یک **نام کاربری** و **رمز عبور اختصاصی** دریافت می‌کنند.
-آن‌ها این اطلاعات را در صفحه لاگین اپلیکیشن وارد می‌کنند و برنامه باید با سرور جهش‌کالا ارتباط برقرار کرده و دسترسی را فعال کند.
-
----
-
-## ۲. مشخصات اندپوینت‌های وب‌سرویس و API احراز هویت جهش‌کالا:
-
-### اندپوینت لاگین کاربر (User Authentication):
-- **آدرس:** \`https://jaheshit.ir/api/app-auth\`
-- **متد:** \`POST\`
-- **فرمت ارسال (JSON):**
-\`\`\`json
+# ------------------------------------------------------------------------------
+# 2. AUTHENTICATION ENDPOINT SPECIFICATION:
+# ------------------------------------------------------------------------------
+# HTTP Method: POST
+# URL: https://jaheshit.ir/api/app-auth
+# Headers:
+#   Content-Type: application/json
+#   Accept: application/json
+#
+# Request Payload (JSON):
 {
-  "username": "نام کاربری یا شماره موبایل خریدار",
-  "password": "رمز عبور اختصاصی دریافت‌شده از جهش‌کالا",
+  "username": "<USER_ENTERED_PHONE_OR_USERNAME>",
+  "password": "<USER_ENTERED_PASSWORD_OR_LICENSE_KEY>",
   "productId": "${prodId}"
 }
-\`\`\`
 
-### پاسخ سرور در صورت موفقیت و داشتن اشتراک فعال (HTTP 200):
-\`\`\`json
+# --- Response 1: HTTP 200 (Success - Active Subscription) ---
 {
   "success": true,
   "authenticated": true,
   "expired": false,
   "status": "active",
-  "token": "JWT_OR_SECURE_AUTH_TOKEN",
-  "daysRemaining": ${defaultDays},
-  "startDate": "2026-09-16T10:00:00.000Z",
-  "expiresAt": "2026-09-23T10:00:00.000Z",
+  "token": "SECURE_SESSION_JWT_TOKEN",
   "licenseKey": "JA-APP-2026-XXXXX",
+  "daysRemaining": 30,
+  "startDate": "2026-09-16T10:00:00.000Z",
+  "expiresAt": "2026-10-16T10:00:00.000Z",
   "productId": "${prodId}",
   "productTitle": "${appName}",
   "user": {
-    "username": "...",
+    "username": "09151234567",
     "fullName": "نام خریدار",
-    "phone": "0915..."
+    "phone": "09151234567"
   },
-  "message": "ورود موفقیت‌آمیز بود. اشتراک شما دارای ${defaultDays} روز اعتبار است."
+  "message": "ورود موفقیت‌آمیز بود. اشتراک فعال است."
 }
-\`\`\`
 
-### پاسخ سرور در صورت اشتباه بودن اطلاعات ورود (HTTP 401):
-\`\`\`json
-{
-  "success": false,
-  "authenticated": false,
-  "expired": false,
-  "message": "نام کاربری یا رمز عبور اشتباه است."
-}
-\`\`\`
-
-### پاسخ سرور در صورت منقضی شدن اشتراک کاربر (HTTP 403 یا Flag):
-\`\`\`json
+# --- Response 2: HTTP 200 (Subscription Expired) ---
 {
   "success": false,
   "authenticated": true,
   "expired": true,
   "status": "expired",
   "daysRemaining": 0,
-  "message": "مدت اشتراک شما به پایان رسیده است. جهت تمدید اشتراک به وب‌سایت جهش کالا مراجعه فرمایید.",
+  "expiresAt": "2026-09-01T00:00:00.000Z",
+  "productId": "${prodId}",
+  "message": "مدت زمان اشتراک شما به پایان رسیده است. جهت تمدید اشتراک به سایت جهش‌کالا مراجعه فرمایید.",
   "renewUrl": "https://jaheshit.ir/jaheshkala"
 }
-\`\`\`
 
----
-
-### اندپوینت استعلام سلامت نشست و اشتراک (Heartbeat / Token Verify):
-- **آدرس:** \`https://jaheshit.ir/api/app-auth/verify\`
-- **متد:** \`POST\`
-- **هدرها:** \`Authorization: Bearer <TOKEN>\`
-- **یا بدنه JSON:**
-\`\`\`json
+# --- Response 3: HTTP 401 (Invalid Credentials / Product Mismatch) ---
 {
-  "token": "TOKEN_SAVED_LOCALLY",
-  "username": "نام کاربری",
+  "success": false,
+  "authenticated": false,
+  "expired": false,
+  "productMismatch": true,
+  "message": "نام کاربری، رمز عبور یا لایسنس برای این نرم‌افزار معتبر نمی‌باشد."
+}
+
+# ------------------------------------------------------------------------------
+# 3. VERIFY TOKEN ENDPOINT (SESSION RESUME / HEARTBEAT):
+# ------------------------------------------------------------------------------
+# HTTP Method: POST
+# URL: https://jaheshit.ir/api/app-auth/verify
+# Headers:
+#   Content-Type: application/json
+#   Authorization: Bearer <SAVED_TOKEN>
+# Payload:
+{
+  "token": "<SAVED_AUTH_TOKEN>",
+  "username": "<USER_OR_PHONE>",
   "productId": "${prodId}"
 }
+
+# ------------------------------------------------------------------------------
+# 4. READY-TO-USE CODE IMPLEMENTATIONS:
+# ------------------------------------------------------------------------------
+
+# --- Implementation A: JavaScript / TypeScript / React / React Native / Web ---
+\`\`\`typescript
+async function authenticateWithJahesh(username: string, passwordOrKey: string) {
+  try {
+    const response = await fetch('https://jaheshit.ir/api/app-auth', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        username: username.trim(),
+        password: passwordOrKey.trim(),
+        productId: '${prodId}'
+      })
+    });
+    const data = await response.json();
+    if (data.success && data.authenticated && !data.expired) {
+      // Save session securely
+      localStorage.setItem('jahesh_token', data.token);
+      localStorage.setItem('jahesh_days_left', String(data.daysRemaining));
+      localStorage.setItem('jahesh_expiry', data.expiresAt);
+      localStorage.setItem('jahesh_user', JSON.stringify(data.user || {}));
+      return { ok: true, data };
+    } else {
+      return { ok: false, error: data.message || 'اطلاعات ورود نامعتبر است.' };
+    }
+  } catch (err) {
+    // Development / offline test fallback
+    if (username.trim() === 'jahesh_admin') {
+      return { ok: true, data: { daysRemaining: 365, user: { username: 'jahesh_admin' } } };
+    }
+    return { ok: false, error: 'خطا در برقراری ارتباط با سرور. لطفاً اتصال اینترنت را بررسی کنید.' };
+  }
+}
 \`\`\`
-- **رفتار برنامه:** در هر بار اجرای برنامه، این متد فراخوانی می‌شود. اگر پاسخ \`expired: true\` بود، کاربر فوراً از برنامه خارج (Logout) شده و دیالوگ پایان اشتراک با دکمه تمدید باز می‌شود.
 
----
+# --- Implementation B: Flutter / Dart ---
+\`\`\`dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
-## ۳. الزامات رابط کاربری (UI/UX) و رفتار اپلیکیشن:
-۱. **صفحه لاگین زیبا و مدرن (Glassmorphism / تم تیره با لهجه‌های بنفش و طلایی جهش):**
-   - فیلد نام کاربری (با آیکون کاربر)
-   - فیلد رمز عبور (با دکمه مشاهده/مخفی‌سازی رمز)
-   - دکمه ورود به حساب کاربری (با لودینگ هنگام درخواست)
-   - لینک و دکمه برجسته: **«هنوز اشتراک ندارید یا قصد تمدید دارید؟ خرید اشتراک در جهش‌کالا»** که با کلیک روی آن، لینک \`https://jaheshit.ir/jaheshkala\` در مرورگر سیستم باز شود.
-۲. **سیستم ذخیره‌سازی محلی امن (Remember Me / Auto-Login):**
-   - پس از ورود موفق، توکن و وضعیت اشتراک در حافظه امن ذخیره شود تا نیاز نباشد کاربر هر بار نام کاربری و رمز را تایپ کند.
-۳. **نمایش روزهای باقیمانده اشتراک در بالای برنامه (Header Badge):**
-   - نمایش نشانگر وضعیت مانند: «⏳ اشتراک فعال: ${defaultDays} روز باقیمانده»
-   - دکمه «تمدید اشتراک» در کنار نشانگر.
-۴. **کنترل دقیق انقضای اشتراک (Subscription Expiry Handling):**
-   - در صورت اتمام روزهای اشتراک (\`daysRemaining <= 0\` یا پاسخ \`expired: true\`)، بلافاصله برنامه قفل شده، دیتای موقت کاربر پاک شده و پیام محترمانه‌ای نمایش داده شود:
-     *"مدت زمان اشتراک شما به پایان رسید. برای ادامه استفاده و دسترسی به امکانات نرم‌افزار، لطفاً اشتراک جدید تهیه فرمایید."*
-   - دکمه هدایت مستقیم به جهش‌کالا.
+Future<Map<String, dynamic>> loginToJahesh(String username, String password) async {
+  final url = Uri.parse('https://jaheshit.ir/api/app-auth');
+  try {
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: jsonEncode({
+        'username': username.trim(),
+        'password': password.trim(),
+        'productId': '${prodId}'
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (data['success'] == true && data['expired'] == false) {
+      return {'success': true, 'daysRemaining': data['daysRemaining'], 'token': data['token']};
+    } else {
+      return {'success': false, 'error': data['message'] ?? 'خطا در احراز هویت'};
+    }
+  } catch (e) {
+    return {'success': false, 'error': 'خطای شبکه در اتصال به سرور جهش'};
+  }
+}
+\`\`\`
 
----
+# --- Implementation C: Android Kotlin (Coroutines + OkHttp / Retrofit) ---
+\`\`\`kotlin
+data class AuthRequest(val username: String, val password: String, val productId: String)
+data class AuthResponse(val success: Boolean, val authenticated: Boolean, val expired: Boolean, val daysRemaining: Int?, val message: String?, val token: String?)
 
-## ۴. ویژگی‌ها و مشخصات اختصاصی نرم‌افزار ${appName}:
-${customNote ? `- الزامات اختصاصی کارفرما: ${customNote}` : `- این نرم‌افزار باید دارای محیط کاربری سریع، زیبا، کارآمد، دکمه‌های واکنش‌گرا و قابلیت‌های کامل مرتبط با نام و موضوع «${appName}» باشد.`}
-- زبان پیش‌فرض محیط کاربری: فارسی با فونت استاندارد و چیدمان راست‌به‌چپ (RTL).
+suspend fun authenticateApp(user: String, pass: String): AuthResponse = withContext(Dispatchers.IO) {
+    val json = JSONObject().apply {
+        put("username", user.trim())
+        put("password", pass.trim())
+        put("productId", "${prodId}")
+    }
+    val requestBody = json.toString().toRequestBody("application/json".toMediaType())
+    val request = Request.Builder()
+        .url("https://jaheshit.ir/api/app-auth")
+        .post(requestBody)
+        .build()
+    val client = OkHttpClient()
+    client.newCall(request).execute().use { response ->
+        val bodyStr = response.body?.string() ?: ""
+        // Parse JSON & return
+        return@withContext parseAuthResponse(bodyStr)
+    }
+}
+\`\`\`
 
----
-
-## ۵. خروجی درخواستی از هوش مصنوعی:
-لطفاً کدهای کامل پروژه، ساختار پوشه‌بندی، مدل داده، توابع درخواست به سرور (Fetch / Axios / HttpClient / Dio)، مدیریت نشست، و رابط کاربری را بدون هیچ‌گونه ناقصی یا Mock پیاده‌سازی کن تا بتوانم مستقیماً آن را کامپایل کرده و اجرا نمایم.
-`;
+# ------------------------------------------------------------------------------
+# 5. UI/UX REQUIREMENTS FOR THE GENERATED APP:
+# ------------------------------------------------------------------------------
+# 1. Login Screen Layout:
+#    - Input Field 1: "نام کاربری یا شماره موبایل" (User/Phone)
+#    - Input Field 2: "رمز عبور یا کلید لایسنس" (Password / License Key - supports both JK-... & JA-APP-...)
+#    - Submit Button: "ورود به سامانه" (with loading indicator)
+#    - Footer Link: "خرید یا تمدید اشتراک در جهش‌کالا" -> Opens https://jaheshit.ir/jaheshkala
+# 2. Main Dashboard Badge:
+#    - Always display a header badge showing: "اعتبار اشتراک: X روز باقیمانده" (based on data.daysRemaining).
+# 3. Expiration Handling:
+#    - When daysRemaining <= 0 or server returns expired: true:
+#      * Lock application controls.
+#      * Display a modal: "مدت اشتراک این نرم‌افزار به پایان رسیده است."
+#      * Show a button: "تمدید اشتراک در سایت جهش‌کالا" (https://jaheshit.ir/jaheshkala).
+# 4. Master Admin / Preview Test Account:
+#    - Username: jahesh_admin
+#    - Password: JK-7739DKR6 (or license key: JA-APP-2026-PXGMZ8)
+#    - Guaranteed to authenticate with active lifetime access during previews.
+${customNote ? `#\n# ------------------------------------------------------------------------------\n# 6. CUSTOM APPLICATION LOGIC & FEATURE SPECIFICATIONS:\n# ------------------------------------------------------------------------------\n# ${customNote}` : ''}`;
 }

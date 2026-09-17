@@ -39,7 +39,7 @@ interface UserOrdersModalProps {
 export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   isOpen,
   onClose,
-  orders: initialOrders,
+  orders: initialOrders = [],
   currentUser,
   onOpenShop,
   products = [],
@@ -114,7 +114,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   const cleanUserId = currentUser?.id?.trim();
   const searchPhone = normalizeDigits(manualPhoneSearch);
 
-  const userOrders = currentOrders
+  const userOrders = (currentOrders || [])
     .filter((o) => {
       if (currentUser?.role === 'admin') return true;
 
@@ -238,7 +238,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   const getResolvedProduct = (itemProduct: Product) => {
     if (!itemProduct) return itemProduct;
     const cleanItemTitle = itemProduct.title?.trim().toLowerCase();
-    const live = products.find(
+    const live = (products || []).find(
       (p) =>
         (p.id && itemProduct.id && p.id === itemProduct.id) ||
         (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
@@ -313,7 +313,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
         {/* Orders List Content */}
         <div className="p-6 overflow-y-auto flex-1 space-y-4 text-right">
-          {userOrders.length === 0 ? (
+          {(userOrders || []).length === 0 ? (
             <div className="text-center py-12 space-y-3">
               <div className="w-14 h-14 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-400 flex items-center justify-center mx-auto border border-purple-200 dark:border-purple-800/40 shadow-sm">
                 <ShoppingBag className="w-6 h-6" />
@@ -335,7 +335,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
               </button>
             </div>
           ) : (
-            userOrders.map((order) => {
+            (userOrders || []).map((order) => {
               const stepIdx = getStepIndex(order.status);
               const isCanceled = order.status === 'لغو شده';
               const isPhysicalDelivery =
@@ -464,7 +464,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
                   {/* Items in order */}
                   <div className="space-y-2">
-                    {order.items.map((item, idx) => {
+                    {(order.items || []).map((item, idx) => {
                       const prod = getResolvedProduct(item.product);
                       const prodImg = prod?.image || item.product?.image;
 
@@ -716,7 +716,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                       * جهت هماهنگی و ارسال سریع، پشتیبانی جهش همواره پاسخگوی شماست.
                     </span>
                     <div className="flex items-center gap-2">
-                      {order.items.some(it => it.product?.id === 'pkg-amlak-jahesh' || it.product?.title?.includes('املاک')) && onOpenAmlakApp && currentUser?.role === 'admin' && (
+                      {(order.items || []).some(it => it.product?.id === 'pkg-amlak-jahesh' || it.product?.title?.includes('املاک')) && onOpenAmlakApp && currentUser?.role === 'admin' && (
                         <button
                           onClick={() => {
                             onClose();
@@ -812,7 +812,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
             <div className="space-y-1.5">
               <span className="text-xs font-bold text-purple-800 dark:text-purple-300 block">اقلام فاکتور:</span>
               <div className="max-h-48 overflow-y-auto space-y-1.5 text-xs">
-                {invoiceOrder.items.map((item, idx) => {
+                {(invoiceOrder.items || []).map((item, idx) => {
                   const prod = getResolvedProduct(item.product);
                   const prodImg = prod?.image || item.product?.image;
 

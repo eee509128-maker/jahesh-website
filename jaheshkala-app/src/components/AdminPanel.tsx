@@ -51,11 +51,11 @@ interface AdminPanelProps {
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   isOpen,
   onClose,
-  orders,
+  orders = [],
   onUpdateOrderStatus,
   onDeleteOrder,
   onClearAllOrders,
-  products,
+  products = [],
   onAddNewProduct,
   onUpdateProduct,
   onDeleteProduct,
@@ -69,7 +69,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteUser,
   onUpdateUser,
   onAddNewUser,
-  banners: initialBannersProp,
+  banners: initialBannersProp = [],
   onSaveBanner,
   onDeleteBanner,
   currentUser,
@@ -1257,7 +1257,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const prodCouponCode = newProductCouponCode.trim().toUpperCase() || undefined;
     const prodCouponPercent = newProductCouponPercent ? Math.min(100, Math.max(1, parseInt(newProductCouponPercent.replace(/[^0-9]/g, ''), 10) || 10)) : undefined;
 
-    const finalImage = newImage.trim() || getFallbackProductImage(newTitle.trim(), finalCategory);
+    const existingProduct = editingProductId ? products.find((p) => p.id === editingProductId) : undefined;
+    const finalImage = newImage.trim() || (existingProduct ? existingProduct.image : '') || getFallbackProductImage(newTitle.trim(), finalCategory);
 
     let finalGuild: string | undefined = undefined;
     if (selectedGuildMode === '25guilds') {
@@ -1267,6 +1268,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
 
     const productData: Product = {
+      ...(existingProduct || {}),
       id: editingProductId || ('prod-' + Date.now()),
       title: newTitle.trim(),
       category: finalCategory,
@@ -1359,8 +1361,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }, 3000);
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
       <div className="relative w-full max-w-6xl bg-[#0f0924] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden h-[90vh] max-h-[90vh] flex flex-col">
         
         {/* Top Header */}
@@ -1684,7 +1688,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </td>
                           <td className="p-3.5">
                             <div className="max-w-[280px] font-medium text-xs space-y-1">
-                              {order.items.map((i, idx) => (
+                              {(order.items || []).map((i, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5 flex-wrap">
                                   <span className="text-white font-bold">{i.product.title}</span>
                                   {i.selectedPlan && (
@@ -2950,8 +2954,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </label>
                 </div>
 
-                {/* 6.0 Subscription Configuration (Configurable duration selector for SaaS/Software products) */}
-                <div className="p-4 bg-gradient-to-r from-purple-950/70 via-indigo-950/70 to-purple-950/70 border border-amber-400/60 rounded-2xl space-y-3 shadow-xl">
+                {/* 6.0 Subscription Configuration (Configurable duration selector for SaaS/Software products + AI App Prompt & Auth) */}
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-950/70 via-indigo-950/70 to-purple-950/70 border border-amber-400/60 rounded-2xl space-y-4 shadow-xl">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -2975,11 +2979,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </p>
 
                   {isSubscription && (
-                    <div className="p-3 bg-black/60 border border-amber-400/50 rounded-xl space-y-2 animate-in fade-in">
+                    <div className="p-3.5 bg-black/60 border border-amber-400/50 rounded-xl space-y-2 animate-in fade-in">
                       <label className="text-xs font-bold text-amber-200 block">
                         قیمت پایه هر روز اشتراک (تومان):
                       </label>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-3">
                         <input
                           type="number"
                           placeholder="250000"
@@ -2996,6 +3000,250 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Integrated AI App Prompt & Auth Module inside Subscription Section */}
+                  <div className={`p-4 rounded-xl border transition-all ${
+                    isAiAppProduct
+                      ? 'bg-gradient-to-br from-[#1c0f38] via-[#150a2e] to-[#0d0520] border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.15)] ring-1 ring-amber-400/40'
+                      : 'bg-[#120a26]/80 border-purple-800/60 hover:border-purple-600/70'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-800/60 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
+                          isAiAppProduct
+                            ? 'bg-amber-400/20 border-amber-400/60 text-amber-300'
+                            : 'bg-purple-900/40 border-purple-700/50 text-purple-300'
+                        }`}>
+                          <Sparkles className="w-4 h-4 animate-pulse" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs sm:text-sm font-black text-white">
+                              اتصال به اپلیکیشن ویندوز و اندروید + مولد پرامپت هوش مصنوعی (AI App Prompt & Auth)
+                            </h4>
+                            <span className="text-[9px] bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black px-2 py-0.5 rounded-full shadow-sm">
+                              ویژه توسعه اپ با AI
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 mt-0.5">
+                            تولید پرامپت آماده برای Google Antigravity، Google AI Studio و ChatGPT با API متصل به جهش‌کالا و سیستم اشتراک چند روزه
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Toggle Switch */}
+                      <label className="flex items-center gap-2 text-xs font-black text-amber-300 cursor-pointer self-end sm:self-auto bg-purple-950/70 px-3 py-1.5 rounded-xl border border-purple-700/60 hover:border-amber-400 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isAiAppProduct}
+                          onChange={(e) => setIsAiAppProduct(e.target.checked)}
+                          className="w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-0 cursor-pointer"
+                        />
+                        <span>فعال‌سازی اپلیکیشن و صدور لایسنس اشتراک</span>
+                      </label>
+                    </div>
+
+                    {isAiAppProduct && (
+                      <div className="mt-4 space-y-4 animate-in fade-in">
+                        {/* Dynamic Duration Info Banner */}
+                        <div className="p-3 bg-amber-500/10 border border-amber-400/40 rounded-xl flex items-start gap-2.5 text-xs text-amber-200">
+                          <Sparkles className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+                          <div className="leading-relaxed">
+                            <span className="font-black text-amber-300">مدت زمان اشتراک کاملاً پویا بر اساس انتخاب خریدار: </span>
+                            نیازی به تعریف ثابت مدت لایسنس نیست. مشتری در هنگام خرید این محصول از سایت جهش‌کالا، مدت دلخواه خود را (۱ روز، ۷ روز، ۱ ماه، ۳ ماه، ۶ ماه، ۱ سال یا روزهای دلخواه) انتخاب نموده و سیستم به طور خودکار نام کاربری و رمز عبور اختصاصی را با همان مدت منحصراً برای همین محصول (<span className="text-white font-mono font-bold">{editingProductId || 'این کالا'}</span>) صادر می‌نماید.
+                          </div>
+                        </div>
+
+                        {/* Configuration Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                              نام اپلیکیشن در پرامپت هوش مصنوعی:
+                            </label>
+                            <input
+                              type="text"
+                              value={aiAppName}
+                              onChange={(e) => setAiAppName(e.target.value)}
+                              placeholder={newTitle.trim() || 'مثلاً: سامانه مدیریت املاک جهش'}
+                              className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400 font-bold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                              پلتفرم هدف برای تولید کد توسط AI:
+                            </label>
+                            <select
+                              value={aiAppPlatform}
+                              onChange={(e) => setAiAppPlatform(e.target.value as any)}
+                              className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+                            >
+                              <option value="all">🌐 همه‌کاره (ویندوز Desktop + موبایل اندروید)</option>
+                              <option value="windows">💻 فقط ویندوز دسکتاپ (WPF / C# / Electron)</option>
+                              <option value="android">📱 فقط اندروید موبایل (Kotlin / Java / Flutter)</option>
+                              <option value="cross-platform">⚡ کراس‌پلتفرم (Flutter / React Native / Tauri)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Custom Prompt Notes */}
+                        <div>
+                          <label className="text-[11px] font-bold text-amber-200 block mb-1">
+                            ویژگی‌ها، فیلترها و الزامات اختصاصی برنامه برای اضافه شدن در پرامپت (اختیاری):
+                          </label>
+                          <input
+                            type="text"
+                            value={aiAppCustomPromptNote}
+                            onChange={(e) => setAiAppCustomPromptNote(e.target.value)}
+                            placeholder="مثلاً: دارای بخش فیلتر پیشرفته بر اساس قیمت و منطقه، نمودار سود ماهانه، ثبت قراردادها و بکاپ‌گیری محلی"
+                            className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          />
+                        </div>
+
+                        {/* The Magic AI Prompt Box */}
+                        <div className="rounded-2xl bg-[#0e071e] border border-amber-400/60 p-4 space-y-3 shadow-inner">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-800/60 pb-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-amber-400 font-black text-xs sm:text-sm flex items-center gap-1.5">
+                                <Code2 className="w-4 h-4" />
+                                متن آماده پرامپت هوش مصنوعی (Master AI Prompt):
+                              </span>
+                              <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+                                اتصال API + امنیت انحصاری محصول
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const promptText = buildAiAppPrompt(
+                                  {
+                                    id: editingProductId || 'pkg-software',
+                                    title: newTitle.trim() || 'نرم‌افزار جهش',
+                                    aiAppName: aiAppName.trim() || newTitle.trim(),
+                                    isSubscription: true,
+                                  },
+                                  aiAppPlatform,
+                                  aiAppCustomPromptNote.trim()
+                                );
+                                navigator.clipboard.writeText(promptText);
+                                setCopiedPromptFeedback('پرامپت با موفقیت کپی شد! اکنون می‌توانید آن را در Google Antigravity، Google AI Studio یا ChatGPT پیست کنید.');
+                                setTimeout(() => setCopiedPromptFeedback(null), 5000);
+                              }}
+                              className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition-all shadow-md cursor-pointer shrink-0"
+                            >
+                              <Copy className="w-4 h-4" />
+                              <span>کپی پرامپت اتصال هوش مصنوعی (یک کلیک)</span>
+                            </button>
+                          </div>
+
+                          {copiedPromptFeedback && (
+                            <div className="bg-emerald-950/70 border border-emerald-500/60 text-emerald-200 text-xs px-3 py-2 rounded-xl flex items-center gap-2 animate-in fade-in">
+                              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span>{copiedPromptFeedback}</span>
+                            </div>
+                          )}
+
+                          {/* Prompt Preview Code Block */}
+                          <div className="relative">
+                            <textarea
+                              readOnly
+                              rows={8}
+                              value={buildAiAppPrompt(
+                                {
+                                  id: editingProductId || 'pkg-software',
+                                  title: newTitle.trim() || 'نرم‌افزار جهش',
+                                  aiAppName: aiAppName.trim() || newTitle.trim(),
+                                  isSubscription: true,
+                                },
+                                aiAppPlatform,
+                                aiAppCustomPromptNote.trim()
+                              )}
+                              className="w-full bg-[#080411] border border-purple-900/80 rounded-xl p-3 text-[11px] text-purple-200 font-mono leading-relaxed focus:outline-none resize-none cursor-text select-all"
+                            />
+                          </div>
+
+                          {/* AI Instructions Guide */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] text-slate-300 pt-1">
+                            <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/40 space-y-1">
+                              <span className="font-bold text-amber-300 block">🤖 ساخت اپلیکیشن با Google Antigravity یا ChatGPT:</span>
+                              <p className="text-slate-300 text-[11px] leading-relaxed">
+                                کافیست دکمه کپی بالا را بزنید و در <strong>Google Antigravity</strong> یا <strong>Google AI Studio</strong> پیست کنید. هوش مصنوعی بدون نیاز به تعریف روزهای ثابت، اتصال خودکار به API و لاگین جهش‌کالا را پیاده‌سازی می‌کند.
+                              </p>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/40 space-y-1">
+                              <span className="font-bold text-emerald-300 block">🛡️ انحصار محصول و مدت اشتراک پویا:</span>
+                              <p className="text-slate-300 text-[11px] leading-relaxed">
+                                هر کاربر فقط با نام کاربری و رمز همان محصول خریداری‌شده می‌تواند لاگین کند و به محصولات دیگر دسترسی نخواهد داشت. مدت روزهای فعال نیز بر اساس انتخاب مشتری در زمان خرید محاسبه و مدیریت می‌شود.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Live API Auth Tester inside Admin Panel */}
+                        <div className="p-3.5 rounded-2xl bg-[#140a28] border border-purple-800/60 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                              <Server className="w-3.5 h-3.5 text-amber-400" />
+                              تست زنده API احراز هویت لایسنس (<span className="text-amber-300 font-mono">/api/app-auth</span>):
+                            </span>
+                            <span className="text-[10px] text-slate-400">تست مستقیم روی سرور جهش</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <input
+                              type="text"
+                              value={testAuthUsername}
+                              onChange={(e) => setTestAuthUsername(e.target.value)}
+                              placeholder="نام کاربری (مثلاً 0915...)"
+                              className="bg-[#0e071c] border border-purple-700/60 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                            />
+                            <input
+                              type="text"
+                              value={testAuthPassword}
+                              onChange={(e) => setTestAuthPassword(e.target.value)}
+                              placeholder="رمز عبور"
+                              className="bg-[#0e071c] border border-purple-700/60 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleTestAppAuth}
+                              disabled={isTestingAuth}
+                              className="bg-purple-800 hover:bg-purple-700 text-white font-bold rounded-xl px-3 py-1.5 text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              {isTestingAuth ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Key className="w-3.5 h-3.5 text-amber-300" />
+                              )}
+                              <span>تست زنده ورود API</span>
+                            </button>
+                          </div>
+
+                          {testAuthResult && (
+                            <div className={`p-2.5 rounded-xl border text-xs font-mono transition-all ${
+                              testAuthResult.success
+                                ? 'bg-emerald-950/50 border-emerald-500/60 text-emerald-200'
+                                : 'bg-rose-950/50 border-rose-500/60 text-rose-200'
+                            }`}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold">
+                                  {testAuthResult.success ? '✅ ورود موفقیت‌آمیز (اشتراک معتبر)' : '❌ ورود ناموفق یا اشتراک منقضی'}
+                                </span>
+                                {testAuthResult.daysRemaining !== undefined && (
+                                  <span className="text-amber-300 font-bold">
+                                    {testAuthResult.daysRemaining} روز باقیمانده
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] opacity-90">{testAuthResult.message}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* 6.05 Custom Multi-Tier Subscription & Pricing Plans Builder (پکیج‌ها و تعرفه‌های اشتراک سفارشی) */}
@@ -3248,283 +3496,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                           </div>
                         ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 6.06 AI App Prompt Generator & License Authentication Engine */}
-                <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
-                  isAiAppProduct
-                    ? 'bg-gradient-to-br from-[#1c0f38] via-[#150a2e] to-[#0d0520] border-amber-400/80 shadow-[0_0_25px_rgba(251,191,36,0.15)] ring-1 ring-amber-400/40'
-                    : 'bg-[#120a26] border-purple-800/60 hover:border-purple-600/70'
-                }`}>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-800/60 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
-                        isAiAppProduct
-                          ? 'bg-amber-400/20 border-amber-400/60 text-amber-300'
-                          : 'bg-purple-900/40 border-purple-700/50 text-purple-300'
-                      }`}>
-                        <Sparkles className="w-5 h-5 animate-pulse" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs sm:text-sm font-black text-white">
-                            اتصال به اپلیکیشن ویندوز و اندروید + مولد پرامپت هوش مصنوعی (AI App Prompt & Auth)
-                          </h4>
-                          <span className="text-[10px] bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black px-2 py-0.5 rounded-full shadow-sm">
-                            ویژه توسعه اپ با AI
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-300 mt-0.5">
-                          تولید پرامپت آماده برای Google Antigravity، Google AI Studio و ChatGPT با API متصل به جهش‌کالا و سیستم اشتراک چند روزه
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Toggle Switch */}
-                    <label className="flex items-center gap-2 text-xs font-black text-amber-300 cursor-pointer self-end sm:self-auto bg-purple-950/70 px-3 py-1.5 rounded-xl border border-purple-700/60 hover:border-amber-400 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={isAiAppProduct}
-                        onChange={(e) => setIsAiAppProduct(e.target.checked)}
-                        className="w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-0 cursor-pointer"
-                      />
-                      <span>فعال‌سازی اپلیکیشن و صدور لایسنس اشتراک</span>
-                    </label>
-                  </div>
-
-                  {isAiAppProduct && (
-                    <div className="mt-4 space-y-4 animate-in fade-in">
-                      {/* Configuration Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-right">
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                            نام اپلیکیشن در پرامپت هوش مصنوعی:
-                          </label>
-                          <input
-                            type="text"
-                            value={aiAppName}
-                            onChange={(e) => setAiAppName(e.target.value)}
-                            placeholder={newTitle.trim() || 'مثلاً: سامانه مدیریت املاک جهش'}
-                            className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400 font-bold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                            پلتفرم هدف برای تولید کد توسط AI:
-                          </label>
-                          <select
-                            value={aiAppPlatform}
-                            onChange={(e) => setAiAppPlatform(e.target.value as any)}
-                            className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
-                          >
-                            <option value="all">🌐 همه‌کاره (ویندوز Desktop + موبایل اندروید)</option>
-                            <option value="windows">💻 فقط ویندوز دسکتاپ (WPF / C# / Electron)</option>
-                            <option value="android">📱 فقط اندروید موبایل (Kotlin / Java / Flutter)</option>
-                            <option value="cross-platform">⚡ کراس‌پلتفرم (Flutter / React Native / Tauri)</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                            مدت پیش‌فرض لایسنس اشتراک (روز):
-                          </label>
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              min={1}
-                              max={3650}
-                              value={aiAppDefaultDays}
-                              onChange={(e) => setAiAppDefaultDays(Math.max(1, parseInt(e.target.value, 10) || 7))}
-                              className="w-full bg-[#180f33] border border-amber-400/80 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono font-black focus:outline-none focus:ring-2 focus:ring-amber-400"
-                            />
-                            <span className="text-xs text-slate-300 shrink-0 font-bold">روز</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Quick Duration Preset Pills */}
-                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                        <span className="text-[11px] font-bold text-slate-400 ml-1">انتخاب سریع مدت:</span>
-                        {[
-                          { days: 7, label: '⚡ ۷ روزه (یک هفته‌ای)' },
-                          { days: 14, label: '۱۴ روزه' },
-                          { days: 30, label: '۳۰ روزه (۱ ماهه)' },
-                          { days: 90, label: '۹۰ روزه (۳ ماهه)' },
-                          { days: 365, label: '👑 ۳۶۵ روزه (یک ساله)' },
-                        ].map((p) => (
-                          <button
-                            key={p.days}
-                            type="button"
-                            onClick={() => setAiAppDefaultDays(p.days)}
-                            className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                              aiAppDefaultDays === p.days
-                                ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-sm'
-                                : 'bg-purple-900/40 text-slate-300 border-purple-700/50 hover:bg-purple-800/60'
-                            }`}
-                          >
-                            {p.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Custom Prompt Notes */}
-                      <div>
-                        <label className="text-[11px] font-bold text-amber-200 block mb-1">
-                          ویژگی‌ها، فیلترها و الزامات اختصاصی برنامه برای اضافه شدن در پرامپت:
-                        </label>
-                        <input
-                          type="text"
-                          value={aiAppCustomPromptNote}
-                          onChange={(e) => setAiAppCustomPromptNote(e.target.value)}
-                          placeholder="مثلاً: دارای بخش فیلتر پیشرفته بر اساس قیمت و منطقه، نمودار سود ماهانه، ثبت قراردادها و بکاپ‌گیری محلی"
-                          className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                        />
-                      </div>
-
-                      {/* The Magic AI Prompt Box */}
-                      <div className="rounded-2xl bg-[#0e071e] border border-amber-400/60 p-4 space-y-3 shadow-inner">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-800/60 pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-amber-400 font-black text-xs sm:text-sm flex items-center gap-1.5">
-                              <Code2 className="w-4 h-4" />
-                              متن آماده پرامپت هوش مصنوعی (Master AI Prompt):
-                            </span>
-                            <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full">
-                              آماده اتصال به API
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const promptText = buildAiAppPrompt(
-                                {
-                                  id: editingProductId || 'pkg-software',
-                                  title: newTitle.trim() || 'نرم‌افزار جهش',
-                                  aiAppName: aiAppName.trim() || newTitle.trim(),
-                                  aiAppDefaultDays,
-                                },
-                                aiAppPlatform,
-                                aiAppCustomPromptNote.trim()
-                              );
-                              navigator.clipboard.writeText(promptText);
-                              setCopiedPromptFeedback('پرامپت با موفقیت کپی شد! اکنون می‌توانید آن را در Google Antigravity، Google AI Studio یا ChatGPT پیست کنید.');
-                              setTimeout(() => setCopiedPromptFeedback(null), 5000);
-                            }}
-                            className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black px-4 py-2 rounded-xl text-xs transition-all shadow-md cursor-pointer shrink-0"
-                          >
-                            <Copy className="w-4 h-4" />
-                            <span>کپی پرامپت مخصوص هوش مصنوعی (یک کلیک)</span>
-                          </button>
-                        </div>
-
-                        {copiedPromptFeedback && (
-                          <div className="bg-emerald-950/70 border border-emerald-500/60 text-emerald-200 text-xs px-3 py-2 rounded-xl flex items-center gap-2 animate-in fade-in">
-                            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                            <span>{copiedPromptFeedback}</span>
-                          </div>
-                        )}
-
-                        {/* Prompt Preview Code Block */}
-                        <div className="relative">
-                          <textarea
-                            readOnly
-                            rows={8}
-                            value={buildAiAppPrompt(
-                              {
-                                id: editingProductId || 'pkg-software',
-                                title: newTitle.trim() || 'نرم‌افزار جهش',
-                                aiAppName: aiAppName.trim() || newTitle.trim(),
-                                aiAppDefaultDays,
-                              },
-                              aiAppPlatform,
-                              aiAppCustomPromptNote.trim()
-                            )}
-                            className="w-full bg-[#080411] border border-purple-900/80 rounded-xl p-3 text-[11px] text-purple-200 font-mono leading-relaxed focus:outline-none resize-none cursor-text select-all"
-                          />
-                        </div>
-
-                        {/* AI Instructions Guide */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] text-slate-300 pt-1">
-                          <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/40 space-y-1">
-                            <span className="font-bold text-amber-300 block">🤖 چگونه با این پرامپت اپلیکیشن بسازم؟</span>
-                            <p className="text-slate-300 text-[11px] leading-relaxed">
-                              کافیست دکمه کپی بالا را بزنید و مستقیماً در <strong>Google Antigravity</strong> یا <strong>Google AI Studio</strong> پیست کنید. هوش مصنوعی بدون نیاز به تنظیمات اضافی، ساختار نرم‌افزار و فرم لاگین را تولید می‌کند.
-                            </p>
-                          </div>
-
-                          <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/40 space-y-1">
-                            <span className="font-bold text-emerald-300 block">🛡️ رفتار انقضای اشتراک ({aiAppDefaultDays} روزه):</span>
-                            <p className="text-slate-300 text-[11px] leading-relaxed">
-                              پس از خرید کاربر از جهش‌کالا، نام کاربری و رمز دریافت می‌کند. با ورود به اپ، سیستم روزانه انقضا را چک کرده و به محض پایان روزها، کاربر را قفل و به جهش‌کالا هدایت می‌کند.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Live API Auth Tester inside Admin Panel */}
-                      <div className="p-3.5 rounded-2xl bg-[#140a28] border border-purple-800/60 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                            <Server className="w-3.5 h-3.5 text-amber-400" />
-                            تست زنده API احراز هویت لایسنس (<span className="text-amber-300 font-mono">/api/app-auth</span>):
-                          </span>
-                          <span className="text-[10px] text-slate-400">تست مستقیم روی سرور جهش</span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <input
-                            type="text"
-                            value={testAuthUsername}
-                            onChange={(e) => setTestAuthUsername(e.target.value)}
-                            placeholder="نام کاربری (مثلاً jahesh یا 0915...)"
-                            className="bg-[#0e071c] border border-purple-700/60 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none"
-                          />
-                          <input
-                            type="text"
-                            value={testAuthPassword}
-                            onChange={(e) => setTestAuthPassword(e.target.value)}
-                            placeholder="رمز عبور"
-                            className="bg-[#0e071c] border border-purple-700/60 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleTestAppAuth}
-                            disabled={isTestingAuth}
-                            className="bg-purple-800 hover:bg-purple-700 text-white font-bold rounded-xl px-3 py-1.5 text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          >
-                            {isTestingAuth ? (
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Key className="w-3.5 h-3.5 text-amber-300" />
-                            )}
-                            <span>تست زنده ورود API</span>
-                          </button>
-                        </div>
-
-                        {testAuthResult && (
-                          <div className={`p-2.5 rounded-xl border text-xs font-mono transition-all ${
-                            testAuthResult.success
-                              ? 'bg-emerald-950/50 border-emerald-500/60 text-emerald-200'
-                              : 'bg-rose-950/50 border-rose-500/60 text-rose-200'
-                          }`}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="font-bold">
-                                {testAuthResult.success ? '✅ ورود موفقیت‌آمیز (اشتراک معتبر)' : '❌ ورود ناموفق یا اشتراک منقضی'}
-                              </span>
-                              {testAuthResult.daysRemaining !== undefined && (
-                                <span className="text-amber-300 font-bold">
-                                  {testAuthResult.daysRemaining} روز باقیمانده
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] opacity-90">{testAuthResult.message}</p>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
@@ -6512,7 +6483,7 @@ on public.users for delete using (true);`;
                 <div className="pt-2">
                   <strong className="block mb-2 text-white text-xs">اقلام خریداری‌شده:</strong>
                   <div className="space-y-2">
-                    {selectedOrder.items.map((item, idx) => {
+                    {(selectedOrder.items || []).map((item, idx) => {
                       const cleanItemTitle = item.product?.title?.trim().toLowerCase();
                       const live = products?.find(
                         (p) =>
