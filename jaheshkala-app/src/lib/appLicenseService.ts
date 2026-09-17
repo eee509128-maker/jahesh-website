@@ -5,19 +5,12 @@ const STORAGE_KEY = 'jahesh_app_licenses';
 
 /**
  * Checks if a product or cart item has AI App / Software Subscription capability
+ * and MUST have the 'isAiAppProduct' explicitly set to true.
  */
 export function isAiAppProduct(prod?: Product | null): boolean {
   if (!prod) return false;
-  return Boolean(
-    prod.isAiAppProduct ||
-    prod.isSubscription ||
-    prod.id === 'pkg-amlak-jahesh' ||
-    (prod.category && (
-      prod.category.includes('نرم‌افزار') ||
-      prod.category.includes('خدمات و نرم‌افزار') ||
-      prod.category.includes('سامانه')
-    ))
-  );
+  // Ensure we only grant app licenses to products that EXPLICITLY have isAiAppProduct toggled on.
+  return Boolean(prod.isAiAppProduct);
 }
 
 export function isAiAppItem(item?: CartItem | null): boolean {
