@@ -287,32 +287,13 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     console.warn('Firestore fetch products notice:', fbErr);
   }
 
-  // 1. Layer 1: Primary Cloud Check - Supabase SYSTEM_CONFIG_PRODUCTS (shared across all devices & Vercel)
-  try {
-    const { data: configData, error: configError } = await supabase
-      .from('chats')
-      .select('messages, last_updated')
-      .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
-      .maybeSingle();
-
-    if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
-      const cleaned = configData.messages
-        .map(cleanProductItem)
-        .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-      if (cleaned.length > 0) {
-        authoritativeList = cleaned;
-      }
-    }
-  } catch (e) {
-    console.warn('Check SYSTEM_CONFIG_PRODUCTS notice:', e);
-  }
-
-  // 2. Layer 2: Server Disk Storage (/api/products) fallback
+  // 1. Layer 1: Universal Server Cloud API (Vercel Serverless + PHP Proxy)
   if (!authoritativeList || authoritativeList.length === 0) {
     try {
-      const res = await fetch('/api/products');
-      if (res.ok) {
-        const serverProducts = await res.json();
+      const res = await fetchUniversalApi('products', { cache: 'no-store' });
+      if (res && res.ok) {
+        const data = await res.json();
+        const serverProducts = Array.isArray(data) ? data : (data?.products || []);
         if (Array.isArray(serverProducts) && serverProducts.length > 0) {
           const cleaned = serverProducts
             .map(cleanProductItem)
@@ -323,7 +304,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
         }
       }
     } catch (err) {
-      console.warn('Check /api/products notice:', err);
+      console.warn('Fetch Universal API products error:', err);
     }
   }
 
@@ -1401,113 +1382,29 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
       password: passwordHash,
     };
 
-    // 1. Persist to Supabase users table
-    try {
-      const payload = {
-        id: userWithPass.id,
-        full_name: userWithPass.fullName,
-        phone: userWithPass.phone,
-        email: userWithPass.email || '',
-        username: userWithPass.username,
-        password: passwordHash,
-        role: userWithPass.role || 'user',
-        created_at: userWithPass.createdAt,
-      };
-
-      const insertRes = await supabase.from('users').upsert(payload, { onConflict: 'id' });
-      if (insertRes.error) {
-        console.warn('Supabase users table insert notice:', insertRes.error.message);
-      }
-    } catch (e) {
-      console.warn('Supabase users upsert exception:', e);
-    }
-
-    // 2. Fetch latest cloud users from SYSTEM_CONFIG_USERS in chats table
-    let cloudUsers: Array<User & { password?: string }> = [];
-    try {
-      const { data: configData } = await supabase
-        .from('chats')
-        .select('messages')
-        .eq('user_id', 'SYSTEM_CONFIG_USERS')
-        .maybeSingle();
-      if (configData && Array.isArray(configData.messages)) {
-        cloudUsers = configData.messages.filter(Boolean);
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    // 3. Merge and sort newest first
+    // 1. Update local cache immediately
     const localUsers = getLocalUsersStore().filter(Boolean);
-    const mergedMap = new Map<string, User & { password?: string }>();
-
-    const getUKey = (u: any): string => {
-      if (!u) return '';
-      if (u.id) return `id:${u.id}`;
-      if (u.phone && u.phone !== 'ثبت نشده' && u.phone !== 'test') return `phone:${u.phone}`;
-      if (u.username) return `u:${u.username.toLowerCase()}`;
-      return `rand:${Math.random()}`;
-    };
-
-    // Add existing
-    for (const u of localUsers) {
-      const k = getUKey(u);
-      if (k) mergedMap.set(k, u);
-    }
-    for (const u of cloudUsers) {
-      const k = getUKey(u);
-      if (k) mergedMap.set(k, u);
-    }
-
-    // Insert or update the new registering user
-    const currentKey = getUKey(userWithPass);
-    let matchedKey: string | null = null;
-    for (const [k, ex] of mergedMap.entries()) {
-      if (
-        (userWithPass.id && ex.id === userWithPass.id) ||
-        (userWithPass.phone && userWithPass.phone !== 'ثبت نشده' && userWithPass.phone !== 'test' && ex.phone === userWithPass.phone)
-      ) {
-        matchedKey = k;
-        break;
-      }
-    }
-
-    if (matchedKey) {
-      mergedMap.set(matchedKey, { ...mergedMap.get(matchedKey), ...userWithPass });
+    const existingIndex = localUsers.findIndex((u) => areSameUser(u, userWithPass));
+    if (existingIndex >= 0) {
+      localUsers[existingIndex] = { ...localUsers[existingIndex], ...userWithPass };
     } else {
-      mergedMap.set(currentKey, userWithPass);
+      localUsers.unshift(userWithPass);
     }
-
-    // Sort so newly registered users are ALWAYS on top (Row #1)
-    const finalUsersList = sortUsersNewestFirst(Array.from(mergedMap.values()));
+    const finalUsersList = sortUsersNewestFirst(localUsers);
     saveLocalUsersStore(finalUsersList);
 
-    // 4. Save full array to Supabase chats table (SYSTEM_CONFIG_USERS)
+    // 2. Persist to Universal Server API (Vercel Serverless + PHP Backend)
     try {
-      await supabase.from('chats').upsert(
-        {
-          user_id: 'SYSTEM_CONFIG_USERS',
-          user_name: 'لیست کاربران سیستم جهش',
-          messages: finalUsersList,
-          last_updated: new Date().toISOString(),
-          is_read_by_admin: true,
-        },
-        { onConflict: 'user_id' }
-      );
-    } catch (chatErr) {
-      console.warn('SYSTEM_CONFIG_USERS save notice:', chatErr);
-    }
-
-    // 5. Persist to server disk /api/users/save if active
-    try {
-      await fetch('/api/users/save', {
+      fetchUniversalApi('users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: userWithPass }),
-      });
-    } catch {}
+        body: JSON.stringify(userWithPass),
+      }).catch((e) => console.warn('Save user to server notice:', e));
+    } catch (e) {
+      console.warn('Universal API save user error:', e);
+    }
 
-    // 6. Broadcast event locally
+    // 3. Broadcast event locally
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: finalUsersList }));
     }
@@ -1515,7 +1412,7 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
     return true;
   } catch (err) {
     console.warn('Register user exception:', err);
-    return true; // Local cache is saved
+    return true;
   }
 };
 
@@ -1541,96 +1438,68 @@ export const findUserInDb = async (usernameOrPhone: string, passwordAttempt: str
 
   let matchedUser: User | null = null;
 
-  // 2. Check Supabase chats SYSTEM_CONFIG_USERS first (multi-device synchronized cloud store)
-  try {
-    const { data: configData } = await supabase
-      .from('chats')
-      .select('messages')
-      .eq('user_id', 'SYSTEM_CONFIG_USERS')
-      .maybeSingle();
+  // 2. Check Local Store first for instant login
+  const localUsers = getLocalUsersStore();
+  const localMatch = localUsers.find(
+    (u) =>
+      (u.username?.toLowerCase() === cleanId || u.phone === cleanId || u.email?.toLowerCase() === cleanId) &&
+      (u.password === cleanPass || u.password === passwordAttempt)
+  );
 
-    if (configData && Array.isArray(configData.messages)) {
-      const match = configData.messages.find(
-        (u: any) =>
-          (u.username?.toLowerCase() === cleanId || u.phone === cleanId || u.email?.toLowerCase() === cleanId) &&
-          (u.password === cleanPass || u.password === passwordAttempt)
-      );
-      if (match) {
-        matchedUser = {
-          id: match.id,
-          fullName: match.fullName || match.full_name,
-          phone: match.phone,
-          email: match.email || '',
-          username: match.username,
-          role: (match.role as 'admin' | 'operator' | 'user') || 'user',
-          guild: match.guild,
-          customGuild: match.customGuild,
-          createdAt: match.createdAt || match.created_at,
-        };
-      }
-    }
-  } catch (e) {
-    // ignore
+  if (localMatch) {
+    matchedUser = {
+      id: localMatch.id,
+      fullName: localMatch.fullName,
+      phone: localMatch.phone,
+      email: localMatch.email || '',
+      username: localMatch.username,
+      role: localMatch.role || 'user',
+      guild: localMatch.guild,
+      customGuild: localMatch.customGuild,
+      createdAt: localMatch.createdAt,
+    };
   }
 
-  // 3. Try Supabase users table
+  // 3. If not found in local store, fetch latest from Server Cloud API
   if (!matchedUser) {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .or(`username.ilike.${cleanId},phone.eq.${cleanId},email.ilike.${cleanId}`);
-
-      if (!error && data && data.length > 0) {
-        const dbMatch = data.find((u) => u.password === cleanPass || u.password === passwordAttempt);
-        if (dbMatch) {
-          matchedUser = {
-            id: dbMatch.id,
-            fullName: dbMatch.full_name,
-            phone: dbMatch.phone,
-            email: dbMatch.email || '',
-            username: dbMatch.username,
-            role: (dbMatch.role as 'admin' | 'operator' | 'user') || 'user',
-            createdAt: dbMatch.created_at,
-          };
+      const res = await fetchUniversalApi('users', { cache: 'no-store' });
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.users)) {
+          const cloudMatch = data.users.find(
+            (u: any) =>
+              (u.username?.toLowerCase() === cleanId || u.phone === cleanId || u.email?.toLowerCase() === cleanId) &&
+              (u.password === cleanPass || u.password === passwordAttempt)
+          );
+          if (cloudMatch) {
+            matchedUser = {
+              id: cloudMatch.id,
+              fullName: cloudMatch.fullName || cloudMatch.full_name,
+              phone: cloudMatch.phone,
+              email: cloudMatch.email || '',
+              username: cloudMatch.username,
+              role: cloudMatch.role || 'user',
+              guild: cloudMatch.guild,
+              customGuild: cloudMatch.customGuild,
+              createdAt: cloudMatch.createdAt || cloudMatch.created_at,
+            };
+            // Cache locally
+            const updatedLocal = sortUsersNewestFirst([...localUsers, cloudMatch]);
+            saveLocalUsersStore(updatedLocal);
+          }
         }
       }
     } catch (err) {
-      console.warn('Supabase find user warning:', err);
+      console.warn('Server find user error:', err);
     }
   }
 
-  // 4. Check Local Store
-  if (!matchedUser) {
-    const localUsers = getLocalUsersStore();
-    const localMatch = localUsers.find(
-      (u) =>
-        (u.username?.toLowerCase() === cleanId || u.phone === cleanId || u.email?.toLowerCase() === cleanId) &&
-        (u.password === cleanPass || u.password === passwordAttempt)
-    );
-
-    if (localMatch) {
-      matchedUser = {
-        id: localMatch.id,
-        fullName: localMatch.fullName,
-        phone: localMatch.phone,
-        email: localMatch.email || '',
-        username: localMatch.username,
-        role: localMatch.role || 'user',
-        guild: localMatch.guild,
-        customGuild: localMatch.customGuild,
-        createdAt: localMatch.createdAt,
-      };
-    }
-  }
-
-  // 5. Update Current User cache in localStorage if matched
+  // 4. Update Current User cache in localStorage if matched
   if (matchedUser) {
     try {
       safeSetLocalStorage('jahesh_current_user', JSON.stringify(matchedUser));
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   return matchedUser;
@@ -1642,23 +1511,11 @@ export const deleteUserFromDb = async (userId: string): Promise<boolean> => {
     const localUsers = getLocalUsersStore().filter((u) => u.id !== userId);
     saveLocalUsersStore(localUsers);
 
-    // Remove from Supabase
+    // Remove from Server Cloud API
     try {
-      await supabase.from('users').delete().eq('id', userId);
-    } catch {}
-
-    // Update SYSTEM_CONFIG_USERS in chats table
-    try {
-      await supabase.from('chats').upsert(
-        {
-          user_id: 'SYSTEM_CONFIG_USERS',
-          user_name: 'لیست کاربران سیستم جهش',
-          messages: localUsers,
-          last_updated: new Date().toISOString(),
-          is_read_by_admin: true,
-        },
-        { onConflict: 'user_id' }
-      );
+      fetchUniversalApi(`users?id=${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+      }).catch((e) => console.warn('Universal API delete user notice:', e));
     } catch {}
 
     // Broadcast locally
@@ -1718,58 +1575,17 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       console.warn('Error updating current user session:', err);
     }
 
-    // 3. Multi-layer background persistence (Server disk + Supabase) - AWAITED to prevent race condition reversion
-    const cleanUName = normalizeUsername(user.username);
-    const cleanP = normalizePhone(user.phone);
-
-    await Promise.allSettled([
-      // Server disk role endpoint
-      fetch('/api/users/update-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.id,
-          username: cleanUName || user.username,
-          phone: cleanP || user.phone,
-          role: user.role,
-        }),
-      }),
-      // Server disk full user endpoint
-      fetch('/api/users/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(user),
-      }),
-      // Supabase users table upsert
-      supabase.from('users').upsert(
-        {
-          id: user.id || `usr-${Date.now()}`,
-          full_name: user.fullName || 'کاربر جهش',
-          phone: cleanP || user.phone || '',
-          email: user.email || '',
-          username: cleanUName || user.username,
-          role: user.role,
-          created_at: user.createdAt || new Date().toISOString(),
-        },
-        { onConflict: 'id' }
-      ),
-      // Supabase chats table backup (SYSTEM_CONFIG_USERS)
-      supabase.from('chats').upsert(
-        {
-          user_id: 'SYSTEM_CONFIG_USERS',
-          user_name: 'لیست کاربران سیستم جهش',
-          messages: localUsers,
-          last_updated: new Date().toISOString(),
-          is_read_by_admin: true,
-        },
-        { onConflict: 'user_id' }
-      ),
-    ]);
+    // 3. Persist to Server Cloud API
+    fetchUniversalApi('users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user),
+    }).catch((e) => console.warn('Universal API update user notice:', e));
 
     return true;
   } catch (err) {
     console.warn('Update user exception:', err);
-    return true; // Local store was updated
+    return true;
   }
 };
 
@@ -1792,59 +1608,31 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     if (lu) upsertToMergedList(lu);
   }
 
-  // 2. Load from Supabase users table (Authoritative cloud accounts & roles)
+  // 2. Load from Universal Server API (Vercel Serverless + PHP)
   try {
-    const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
-    if (!error && data && Array.isArray(data)) {
-      for (const matched of data) {
-        const uObj: User = {
-          id: matched.id,
-          fullName: matched.full_name || 'کاربر',
-          phone: matched.phone || '',
-          email: matched.email || '',
-          username: matched.username || '',
-          role: (matched.role as 'admin' | 'operator' | 'user') || 'user',
-          guild: matched.guild,
-          customGuild: matched.custom_guild,
-          createdAt: matched.created_at,
-        };
-        upsertToMergedList(uObj);
-      }
-    }
-  } catch (err) {
-    console.warn('Fetch Supabase users table exception:', err);
-  }
-
-  // 3. Load from SYSTEM_CONFIG_USERS in chats table (Multi-device cloud store)
-  try {
-    const { data: configData } = await supabase
-      .from('chats')
-      .select('messages')
-      .eq('user_id', 'SYSTEM_CONFIG_USERS')
-      .maybeSingle();
-
-    if (configData && Array.isArray(configData.messages)) {
-      for (const u of configData.messages) {
-        if (u) upsertToMergedList(u);
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-
-  // 4. Load from server disk /api/users
-  try {
-    const res = await fetch('/api/users');
-    if (res.ok) {
+    const res = await fetchUniversalApi('users', { cache: 'no-store' });
+    if (res && res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.users)) {
-        for (const u of data.users) {
-          if (u) upsertToMergedList(u);
+        for (const matched of data.users) {
+          const uObj: User = {
+            id: matched.id,
+            fullName: matched.fullName || matched.full_name || 'کاربر',
+            phone: matched.phone || '',
+            email: matched.email || '',
+            username: matched.username || '',
+            role: (matched.role as 'admin' | 'operator' | 'user') || 'user',
+            guild: matched.guild,
+            customGuild: matched.customGuild || matched.custom_guild,
+            createdAt: matched.createdAt || matched.created_at,
+            timestamp: matched.timestamp,
+          };
+          upsertToMergedList(uObj);
         }
       }
     }
-  } catch (e) {
-    // ignore
+  } catch (err) {
+    console.warn('Fetch Universal API users exception:', err);
   }
 
   const result = sortUsersNewestFirst(usersList);
@@ -1873,39 +1661,65 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
 
 // 4. COUPONS & DISCOUNT DB SERVICE
 export const fetchCouponsFromDb = async (): Promise<Coupon[]> => {
+  // 1. Try local cache first
   try {
-    const { data, error } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
-    if (error || !data || data.length === 0) {
-      return INITIAL_COUPONS;
+    const saved = localStorage.getItem('jahesh_coupons');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Return cached, then refresh in background
+        fetchUniversalApi('coupons').then(async (res) => {
+          if (res && res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.coupons)) {
+              safeSetLocalStorage('jahesh_coupons', JSON.stringify(data.coupons));
+            }
+          }
+        }).catch(() => {});
+        return parsed;
+      }
     }
-    return data.map((item) => ({
-      id: item.id,
-      code: item.code,
-      discountPercent: Number(item.discount_percent),
-      maxDiscountAmount: item.max_discount_amount ? Number(item.max_discount_amount) : undefined,
-      minOrderAmount: item.min_order_amount ? Number(item.min_order_amount) : undefined,
-      description: item.description || '',
-      isActive: item.is_active !== undefined ? !!item.is_active : true,
-    }));
+  } catch {}
+
+  // 2. Fetch from Universal Server API
+  try {
+    const res = await fetchUniversalApi('coupons', { cache: 'no-store' });
+    if (res && res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.coupons) && data.coupons.length > 0) {
+        safeSetLocalStorage('jahesh_coupons', JSON.stringify(data.coupons));
+        return data.coupons;
+      }
+    }
   } catch (err) {
     console.warn('Fetch coupons exception:', err);
-    return INITIAL_COUPONS;
   }
+
+  return INITIAL_COUPONS;
 };
 
 export const saveCouponToDb = async (coupon: Coupon): Promise<boolean> => {
   try {
-    const payload = {
-      id: coupon.id,
-      code: coupon.code.toUpperCase().trim(),
-      discount_percent: coupon.discountPercent,
-      max_discount_amount: coupon.maxDiscountAmount,
-      min_order_amount: coupon.minOrderAmount,
-      description: coupon.description,
-      is_active: coupon.isActive,
-    };
-    const { error } = await supabase.from('coupons').upsert(payload);
-    return !error;
+    // 1. Local update
+    const current = await fetchCouponsFromDb();
+    const idx = current.findIndex((c) => c.id === coupon.id);
+    let updated: Coupon[] = [];
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = coupon;
+    } else {
+      updated = [coupon, ...current];
+    }
+    safeSetLocalStorage('jahesh_coupons', JSON.stringify(updated));
+
+    // 2. Server Cloud API
+    fetchUniversalApi('coupons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(coupon),
+    }).catch((e) => console.warn('Save coupon notice:', e));
+
+    return true;
   } catch (err) {
     console.warn('Save coupon exception:', err);
     return false;
@@ -1914,8 +1728,17 @@ export const saveCouponToDb = async (coupon: Coupon): Promise<boolean> => {
 
 export const deleteCouponFromDb = async (couponId: string): Promise<boolean> => {
   try {
-    const { error } = await supabase.from('coupons').delete().eq('id', couponId);
-    return !error;
+    // 1. Local update
+    const current = await fetchCouponsFromDb();
+    const updated = current.filter((c) => c.id !== couponId);
+    safeSetLocalStorage('jahesh_coupons', JSON.stringify(updated));
+
+    // 2. Server Cloud API
+    fetchUniversalApi(`coupons?id=${encodeURIComponent(couponId)}`, {
+      method: 'DELETE',
+    }).catch((e) => console.warn('Delete coupon notice:', e));
+
+    return true;
   } catch (err) {
     console.warn('Delete coupon exception:', err);
     return false;
@@ -2350,29 +2173,10 @@ export const uploadBannerImage = async (image: string, filename?: string): Promi
 };
 
 export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
-  // 1. Primary: Fetch from Supabase Cloud Database (works across ALL mobile phones, browsers, and devices globally)
+  // 1. Primary: Try Universal Server API
   try {
-    const { data, error } = await supabase
-      .from('chats')
-      .select('messages')
-      .eq('user_id', 'SYSTEM_CONFIG_BANNERS')
-      .maybeSingle();
-
-    if (!error && data && Array.isArray(data.messages) && data.messages.length > 0) {
-      const banners: BannerSlide[] = data.messages;
-      try {
-        safeSetLocalStorage('jahesh_banners', JSON.stringify(banners));
-      } catch {}
-      return banners;
-    }
-  } catch (err) {
-    console.warn('Supabase fetch banners exception:', err);
-  }
-
-  // 2. Secondary: Try server-side API endpoint if available
-  try {
-    const res = await fetch('/api/banners', { cache: 'no-store' });
-    if (res.ok) {
+    const res = await fetchUniversalApi('banners', { cache: 'no-store' });
+    if (res && res.ok) {
       const serverBanners = await res.json();
       if (Array.isArray(serverBanners) && serverBanners.length > 0) {
         try {
@@ -2381,11 +2185,9 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
         return serverBanners;
       }
     }
-  } catch (e) {
-    // API not available on static hosting (e.g. Vercel)
-  }
+  } catch (e) {}
 
-  // 3. Fallback: Try LocalStorage
+  // 2. Fallback: Try LocalStorage
   try {
     const saved = localStorage.getItem('jahesh_banners');
     if (saved) {
@@ -2394,52 +2196,27 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
     }
   } catch {}
 
-  // 4. Final Fallback: INITIAL_BANNERS
+  // 3. Final Fallback: INITIAL_BANNERS
   return INITIAL_BANNERS;
 };
 
 export const saveAllBannersToDb = async (banners: BannerSlide[]): Promise<boolean> => {
-  let savedToSupabase = false;
-
   // 1. Cache immediately in localStorage and trigger window event
   try {
     safeSetLocalStorage('jahesh_banners', JSON.stringify(banners));
     window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: banners }));
   } catch {}
 
-  // 2. Primary: Save directly to Supabase cloud database
-  // This immediately syncs to every mobile phone, account, and computer worldwide!
+  // 2. Send to Universal Server Cloud API (Vercel Serverless + PHP Backend)
   try {
-    const { error } = await supabase.from('chats').upsert(
-      {
-        user_id: 'SYSTEM_CONFIG_BANNERS',
-        user_name: 'تنظیمات بنرهای اسلایدر سایت',
-        messages: banners,
-        last_updated: new Date().toISOString(),
-        is_read_by_admin: true,
-      },
-      { onConflict: 'user_id' }
-    );
-    if (!error) {
-      savedToSupabase = true;
-      console.log('Banners successfully saved to Supabase for all devices!');
-    } else {
-      console.warn('Supabase save banners error:', error.message);
-    }
-  } catch (err) {
-    console.warn('Supabase save banners exception:', err);
-  }
-
-  // 3. Secondary: Send to server API if available (Node.js dev server or Vercel serverless)
-  try {
-    await fetch('/api/banners', {
+    fetchUniversalApi('banners', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(banners),
-    });
+    }).catch((e) => console.warn('Universal API save banners notice:', e));
   } catch {}
 
-  return savedToSupabase || true;
+  return true;
 };
 
 export const saveBannerToDb = async (banner: BannerSlide, fullList?: BannerSlide[]): Promise<boolean> => {
@@ -2495,13 +2272,10 @@ export const deleteBannerFromDb = async (bannerId: string | number): Promise<boo
 // Jahesh Technology Dashboard Tools dbService
 // ==========================================
 export const fetchToolsFromDb = async (): Promise<DashboardTool[]> => {
-  // 1. First attempt: Server API endpoint /api/tools with cache-busting
+  // 1. First attempt: Universal Server Cloud API
   try {
-    const res = await fetch(`/api/tools?t=${Date.now()}`, {
-      cache: 'no-store',
-      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' }
-    });
-    if (res.ok) {
+    const res = await fetchUniversalApi('tools', { cache: 'no-store' });
+    if (res && res.ok) {
       const serverTools = await res.json();
       if (Array.isArray(serverTools) && serverTools.length > 0) {
         safeSetLocalStorage('jahesh_tools', JSON.stringify(serverTools));
@@ -2509,26 +2283,10 @@ export const fetchToolsFromDb = async (): Promise<DashboardTool[]> => {
       }
     }
   } catch (err) {
-    console.warn('Fetch /api/tools error:', err);
+    console.warn('Fetch Universal API tools error:', err);
   }
 
-  // 2. Second attempt: Supabase SYSTEM_CONFIG_TOOLS
-  try {
-    const { data, error } = await supabase
-      .from('chats')
-      .select('messages')
-      .eq('user_id', 'SYSTEM_CONFIG_TOOLS')
-      .maybeSingle();
-
-    if (!error && data?.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-      safeSetLocalStorage('jahesh_tools', JSON.stringify(data.messages));
-      return data.messages as DashboardTool[];
-    }
-  } catch (err) {
-    console.warn('Supabase fetch tools error:', err);
-  }
-
-  // 3. Third attempt: LocalStorage cache
+  // 2. Second attempt: LocalStorage cache
   try {
     const cached = localStorage.getItem('jahesh_tools');
     if (cached) {
@@ -2539,22 +2297,9 @@ export const fetchToolsFromDb = async (): Promise<DashboardTool[]> => {
     }
   } catch {}
 
-  // 4. Default authoritative fallback: INITIAL_TOOLS (all 44 tools from Jahesh Technology Dashboard)
+  // 3. Default authoritative fallback: INITIAL_TOOLS
   if (Array.isArray(INITIAL_TOOLS) && INITIAL_TOOLS.length > 0) {
     safeSetLocalStorage('jahesh_tools', JSON.stringify(INITIAL_TOOLS));
-    // Background seed to cloud / api
-    try {
-      supabase.from('chats').upsert(
-        {
-          user_id: 'SYSTEM_CONFIG_TOOLS',
-          user_name: 'تنظیمات ابزارهای داشبورد تکنولوژی جهش',
-          messages: INITIAL_TOOLS,
-          last_updated: new Date().toISOString(),
-          is_read_by_admin: true,
-        },
-        { onConflict: 'user_id' }
-      ).then(() => {});
-    } catch {}
     return INITIAL_TOOLS;
   }
 
@@ -2567,34 +2312,16 @@ export const saveAllToolsToDb = async (tools: DashboardTool[]): Promise<boolean>
     safeSetLocalStorage('jahesh_tools', JSON.stringify(tools));
   } catch {}
 
-  // 2. Save directly to server API
+  // 2. Save to Universal Server Cloud API
   try {
-    await fetch('/api/tools', {
+    fetchUniversalApi('tools', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(tools),
-    });
-  } catch (err) {
-    console.warn('Save /api/tools error:', err);
-  }
+    }).catch((e) => console.warn('Save Universal API tools error:', e));
+  } catch (err) {}
 
-  // 3. Save to Supabase cloud database
-  try {
-    await supabase.from('chats').upsert(
-      {
-        user_id: 'SYSTEM_CONFIG_TOOLS',
-        user_name: 'تنظیمات ابزارهای داشبورد تکنولوژی جهش',
-        messages: tools,
-        last_updated: new Date().toISOString(),
-        is_read_by_admin: true,
-      },
-      { onConflict: 'user_id' }
-    );
-  } catch (err) {
-    console.warn('Supabase save tools error:', err);
-  }
-
-  // 4. Trigger window event with full updated tools detail
+  // 3. Trigger window event with full updated tools detail
   try {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-tools-updated', { detail: tools }));

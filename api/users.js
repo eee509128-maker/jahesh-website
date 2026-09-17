@@ -26,9 +26,11 @@ export default async function handler(req, res) {
       const users = [];
       snap.forEach((d) => {
         const item = d.data();
-        if (item && item.id) users.push(item);
+        if (item && (item.id || item.username || item.phone)) {
+          users.push(item);
+        }
       });
-      return res.status(200).json({ success: true, users });
+      return res.status(200).json({ success: true, count: users.length, users });
     } catch (err) {
       console.error('Fetch users error:', err);
       return res.status(500).json({ error: 'Failed to fetch users', details: String(err) });
@@ -37,17 +39,23 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { id, username, phone, email, role, password, fullName } = req.body || {};
-      const userId = id || (phone ? `usr-${phone}` : (username ? `usr-${username}` : `usr-${Date.now()}`));
-      
+      const u = req.body || {};
+      const cleanPhone = (u.phone || '').trim();
+      const cleanUsername = (u.username || '').trim().toLowerCase();
+      const userId = u.id || (cleanPhone ? `usr-${cleanPhone}` : (cleanUsername ? `usr-${cleanUsername}` : `usr-${Date.now()}`));
+
       const userDoc = {
         id: userId,
-        username: username || '',
-        phone: phone || '',
-        email: email || '',
-        role: role || 'user',
-        password: password || '',
-        fullName: fullName || username || '',
+        fullName: u.fullName || u.full_name || cleanUsername || 'کاربر جهش',
+        phone: cleanPhone,
+        email: (u.email || '').trim(),
+        username: cleanUsername,
+        role: u.role || 'user',
+        guild: u.guild || '',
+        customGuild: u.customGuild || u.custom_guild || '',
+        password: u.password || '',
+        createdAt: u.createdAt || u.created_at || new Date().toLocaleDateString('fa-IR'),
+        timestamp: u.timestamp || Date.now(),
         updatedAt: new Date().toISOString(),
       };
 

@@ -1,35 +1,36 @@
-const SUPABASE_URL = 'https://qxoyvlcpkysucmezxwdn.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_DVRGP68TwGwXrZP5OzzuRQ_wLOHOLSB';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
+
+const firebaseConfig = {
+  projectId: "tranquil-keyword-5ggh3",
+  appId: "1:39375983688:web:640573d31d23e5fe43b47d",
+  apiKey: "AIzaSyBoilrOWTMjbpG1IHvKDkRD9Dm20Pl7UW8",
+  authDomain: "tranquil-keyword-5ggh3.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-jaheshwebsite-13126c61-5143-4f84-b87e-dcc220de14bc",
+};
+
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'GET') {
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/chats?user_id=eq.SYSTEM_CONFIG_BANNERS&select=messages`,
-        {
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0].messages)) {
-          return res.status(200).json(data[0].messages);
+      const docSnap = await getDoc(doc(db, 'settings', 'banners'));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && Array.isArray(data.banners)) {
+          return res.status(200).json(data.banners);
         }
       }
     } catch (err) {
-      console.warn('API fetch banners from supabase failed:', err);
+      console.warn('API fetch banners error:', err);
     }
     return res.status(200).json([]);
   }
@@ -37,29 +38,15 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const banners = req.body;
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/chats`, {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates',
-        },
-        body: JSON.stringify({
-          user_id: 'SYSTEM_CONFIG_BANNERS',
-          user_name: 'تنظیمات بنرهای اسلایدر سایت',
-          messages: banners,
-          last_updated: new Date().toISOString(),
-          is_read_by_admin: true,
-        }),
-      });
-      if (response.ok) {
+      if (Array.isArray(banners)) {
+        await setDoc(doc(db, 'settings', 'banners'), { banners, updatedAt: new Date().toISOString() });
         return res.status(200).json({ success: true, count: banners.length });
       }
+      return res.status(400).json({ error: 'Banners must be an array' });
     } catch (err) {
-      console.warn('API save banners to supabase failed:', err);
+      console.error('API save banners error:', err);
+      return res.status(500).json({ error: 'Failed to save banners', details: String(err) });
     }
-    return res.status(500).json({ success: false });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
