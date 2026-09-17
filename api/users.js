@@ -1,67 +1,75 @@
-import fs from 'fs';
-import path from 'path';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
-const USERS_FILE = path.join(process.cwd(), 'data', 'users.json');
+const firebaseConfig = {
+  projectId: "tranquil-keyword-5ggh3",
+  appId: "1:39375983688:web:640573d31d23e5fe43b47d",
+  apiKey: "AIzaSyBoilrOWTMjbpG1IHvKDkRD9Dm20Pl7UW8",
+  authDomain: "tranquil-keyword-5ggh3.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-jaheshwebsite-13126c61-5143-4f84-b87e-dcc220de14bc",
+};
 
-function readUsers() {
-  if (fs.existsSync(USERS_FILE)) {
-    try {
-      const raw = fs.readFileSync(USERS_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (e) {
-      console.warn('Users read warning:', e);
-    }
-  }
-  return [];
-}
-
-function writeUsers(users) {
-  try {
-    const dir = path.dirname(USERS_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
-  } catch (e) {
-    console.error('Users write error:', e);
-  }
-}
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'GET') {
-    const users = readUsers();
-    return res.status(200).json({ success: true, users });
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const users = [];
+      snap.forEach((d) => {
+        const item = d.data();
+        if (item && item.id) users.push(item);
+      });
+      return res.status(200).json({ success: true, users });
+    } catch (err) {
+      console.error('Fetch users error:', err);
+      return res.status(500).json({ error: 'Failed to fetch users', details: String(err) });
+    }
   }
 
   if (req.method === 'POST') {
-    const { id, username, phone, role } = req.body || {};
-    if (!role) {
-      return res.status(400).json({ error: 'Role is required' });
-    }
-    const current = readUsers();
-    const idx = current.findIndex(
-      (u) => (id && u.id === id) || (username && u.username === username) || (phone && u.phone === phone)
-    );
-    if (idx >= 0) {
-      current[idx].role = role;
-    } else if (username || phone || id) {
-      current.push({
-        id: id || `usr-${Date.now()}`,
+    try {
+      const { id, username, phone, email, role, password, fullName } = req.body || {};
+      const userId = id || (phone ? `usr-${phone}` : (username ? `usr-${username}` : `usr-${Date.now()}`));
+      
+      const userDoc = {
+        id: userId,
         username: username || '',
         phone: phone || '',
-        role,
-        createdAt: new Date().toISOString(),
-      });
+        email: email || '',
+        role: role || 'user',
+        password: password || '',
+        fullName: fullName || username || '',
+        updatedAt: new Date().toISOString(),
+      };
+
+      const docRef = doc(db, 'users', userId);
+      await setDoc(docRef, userDoc, { merge: true });
+
+      return res.status(200).json({ success: true, user: userDoc });
+    } catch (err) {
+      console.error('Save user error:', err);
+      return res.status(500).json({ error: 'Failed to save user', details: String(err) });
     }
-    writeUsers(current);
-    return res.status(200).json({ success: true, count: current.length, users: current });
+  }
+
+  if (req.method === 'DELETE') {
+    try {
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ error: 'User id is required' });
+      await deleteDoc(doc(db, 'users', String(id)));
+      return res.status(200).json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to delete user', details: String(err) });
+    }
   }
 
   return res.status(405).json({ error: 'Method not allowed' });

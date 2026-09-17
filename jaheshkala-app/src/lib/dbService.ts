@@ -871,17 +871,17 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
   let chatConfigOrders: Order[] = [];
   let tableOrders: Order[] = [];
 
-  // 1. Layer 1: Fetch from server disk /api/orders
+  // 1. Layer 1: Fetch from server disk /api/orders (Universal Vercel + PHP)
   try {
-    const res = await fetch('/api/orders');
-    if (res.ok) {
+    const res = await fetchUniversalApi('orders');
+    if (res && res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.orders)) {
         serverDiskOrders = data.orders;
       }
     }
   } catch (err) {
-    console.warn('Check /api/orders notice:', err);
+    console.warn('Check Universal API orders notice:', err);
   }
 
   // 2. Layer 2: Fetch from Supabase SYSTEM_CONFIG_ORDERS in chats table
@@ -1967,20 +1967,36 @@ const getChatBroadcastChannel = (): BroadcastChannel | null => {
 };
 
 // Universal API Fetcher supporting cPanel PHP backend, Node.js, Vercel & AI Studio
-export const fetchUniversalApi = async (action: string, options?: RequestInit): Promise<Response | null> => {
-  const isPost = options?.method === 'POST';
+export const fetchUniversalApi = async (pathOrAction: string, options?: RequestInit): Promise<Response | null> => {
+  let endpointPath = pathOrAction;
+  let queryPart = '';
+
+  if (pathOrAction.includes('?')) {
+    const [p, q] = pathOrAction.split('?');
+    endpointPath = p;
+    queryPart = '?' + q;
+  } else if (pathOrAction.includes('&')) {
+    const [p, ...rest] = pathOrAction.split('&');
+    endpointPath = p;
+    queryPart = '?' + rest.join('&');
+  }
+
+  const queryParams = new URLSearchParams(queryPart.replace(/^\?/, ''));
+  queryParams.set('action', endpointPath);
+  const phpQuery = '?' + queryParams.toString();
+
   const endpoints = [
-    `/jaheshkala/api.php?action=${encodeURIComponent(action)}`,
-    `api.php?action=${encodeURIComponent(action)}`,
-    `/api/${action}`,
-    `/jaheshkala/api/${action}`,
-    `/api.php?action=${encodeURIComponent(action)}`,
+    `/api/${endpointPath}${queryPart}`,
+    `/jaheshkala/api/${endpointPath}${queryPart}`,
+    `/jaheshkala/api.php${phpQuery}`,
+    `api.php${phpQuery}`,
+    `/api.php${phpQuery}`,
   ];
 
   for (const url of endpoints) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1800);
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
       const res = await fetch(url, {
         ...options,
         signal: controller.signal,
@@ -1994,7 +2010,7 @@ export const fetchUniversalApi = async (action: string, options?: RequestInit): 
   return null;
 };
 
-// Helper to prevent blocked cloud networks (Firestore/Supabase in Iran) from hanging client requests
+// Helper to prevent any hanging requests
 const withTimeout = <T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
   return Promise.race([
     promise,
@@ -2022,7 +2038,7 @@ export const fetchChatsFromDb = async (): Promise<UserChat[]> => {
     }
   }
 
-  // 2. Direct Server API (Universal PHP + Node.js) - 100% Works in Iran with ZERO VPN & Unlimited Quota
+  // 2. Direct Server API (Universal Vercel API + PHP) - 100% Works in Iran with ZERO VPN & Unlimited Quota
   try {
     const res = await fetchUniversalApi('chats', { cache: 'no-store' });
     if (res && res.ok) {
@@ -2051,39 +2067,6 @@ export const fetchChatsFromDb = async (): Promise<UserChat[]> => {
     }
   } catch (apiErr) {
     console.warn('Universal API fetch chats notice:', apiErr);
-  }
-
-  // 3. Primary Database: Google Firebase Firestore (With 1.5s timeout so it never hangs in Iran)
-  try {
-    const snap = await withTimeout(getDocs(collection(db, 'chats')), 1500, null as any);
-    if (snap && !snap.empty) {
-      snap.forEach((docSnap: any) => {
-        const item = docSnap.data();
-        if (item && item.userId && !String(item.userId).startsWith('SYSTEM_')) {
-          const parsedMsgs = Array.isArray(item.messages)
-            ? item.messages
-            : typeof item.messages === 'string'
-            ? JSON.parse(item.messages)
-            : [];
-          const uid = String(item.userId);
-          const existing = mergedMap.get(uid);
-          const mergedMsgs = existing ? mergeChatMessages(existing.messages, parsedMsgs) : parsedMsgs;
-          mergedMap.set(uid, {
-            userId: uid,
-            userName: item.userName || existing?.userName || 'کاربر جهش‌کالا',
-            messages: mergedMsgs,
-            lastUpdated: item.lastUpdated || existing?.lastUpdated || new Date().toISOString(),
-            isReadByAdmin: item.isReadByAdmin !== undefined ? Boolean(item.isReadByAdmin) : false,
-            needsHumanSupport:
-              item.needsHumanSupport !== undefined
-                ? Boolean(item.needsHumanSupport)
-                : mergedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس') || m.text?.includes('کارشناس')),
-          });
-        }
-      });
-    }
-  } catch (fbErr) {
-    console.warn('Firestore fetch chats notice:', fbErr);
   }
 
   const mergedList = Array.from(mergedMap.values()).sort(
@@ -2141,34 +2124,15 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
     console.warn('Universal Server save notice:', apiErr);
   }
 
-  // 3. Save directly to Google Firebase Firestore (Background Async)
-  try {
-    const chatDocRef = doc(db, 'chats', uid);
-    const firestorePayload = {
-      userId: uid,
-      userName: chat.userName || 'کاربر جهش‌کالا',
-      messages: Array.isArray(chat.messages) ? chat.messages : [],
-      lastUpdated: chat.lastUpdated || new Date().toISOString(),
-      isReadByAdmin: Boolean(chat.isReadByAdmin),
-      needsHumanSupport: Boolean(chat.needsHumanSupport),
-    };
-    setDoc(chatDocRef, firestorePayload, { merge: true }).catch((err) =>
-      console.warn('Firestore async save notice:', err)
-    );
-  } catch (fbErr) {
-    console.warn('Firestore save chat notice:', fbErr);
-  }
-
   return true;
 };
 
 /**
- * Real-time subscription to all customer chats via BroadcastChannel + Google Firebase + Universal Server API.
+ * Real-time subscription to all customer chats via BroadcastChannel + Universal Server API.
  * Updates the Admin Panel instantly (0ms locally, <1.5s across devices) without VPN.
  */
 export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() => void) => {
   let isUnsubscribed = false;
-  let firestoreUnsub: (() => void) | null = null;
   let intervalId: any = null;
 
   // 0. BroadcastChannel & Storage Event for instant zero-latency multi-tab sync
@@ -2202,49 +2166,7 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
     window.addEventListener('storage', handleStorageChange);
   }
 
-  // 1. Google Firebase Firestore Live Listener (works with VPN or unblocked networks)
-  try {
-    firestoreUnsub = onSnapshot(
-      collection(db, 'chats'),
-      (snap) => {
-        if (isUnsubscribed) return;
-        const list: any[] = [];
-        snap.forEach((docSnap) => {
-          const item = docSnap.data();
-          if (item && item.userId && !String(item.userId).startsWith('SYSTEM_')) {
-            const parsedMsgs = Array.isArray(item.messages)
-              ? item.messages
-              : typeof item.messages === 'string'
-              ? JSON.parse(item.messages)
-              : [];
-            list.push({
-              userId: String(item.userId),
-              userName: item.userName || 'کاربر جهش‌کالا',
-              messages: parsedMsgs,
-              lastUpdated: item.lastUpdated || '',
-              isReadByAdmin: Boolean(item.isReadByAdmin),
-              needsHumanSupport:
-                item.needsHumanSupport !== undefined
-                  ? Boolean(item.needsHumanSupport)
-                  : parsedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس')),
-            });
-          }
-        });
-        list.sort((a, b) => new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime());
-        if (list.length > 0) {
-          safeSetLocalStorage('jahesh_all_chats', JSON.stringify(list));
-        }
-        callback(list);
-      },
-      (err) => {
-        console.warn('Firestore onSnapshot chats error:', err);
-      }
-    );
-  } catch (e) {
-    console.warn('subscribeToChatsFromDb exception:', e);
-  }
-
-  // 2. High-speed Domestic Server Poll (Universal PHP + Node.js - every 1.5 seconds)
+  // 1. High-speed Domestic Server Poll (Universal API - every 1.5 seconds)
   const pollServer = async () => {
     if (isUnsubscribed) return;
     try {
@@ -2271,9 +2193,6 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
     if (typeof window !== 'undefined') {
       window.removeEventListener('storage', handleStorageChange);
     }
-    if (firestoreUnsub) {
-      firestoreUnsub();
-    }
     if (intervalId) {
       clearInterval(intervalId);
     }
@@ -2281,14 +2200,13 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
 };
 
 /**
- * Real-time subscription to a single user's chat session via BroadcastChannel + Google Firebase + Universal Server API.
+ * Real-time subscription to a single user's chat session via BroadcastChannel + Universal Server API.
  * Updates the LiveChatWidget instantly when admin replies.
  */
 export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any) => void): (() => void) => {
   if (!userId) return () => {};
   const uid = String(userId);
   let isUnsubscribed = false;
-  let firestoreUnsub: (() => void) | null = null;
   let intervalId: any = null;
 
   // 0. BroadcastChannel & Storage Event for instant single chat sync
@@ -2325,46 +2243,11 @@ export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any
     window.addEventListener('storage', handleStorageChange);
   }
 
-  try {
-    firestoreUnsub = onSnapshot(
-      doc(db, 'chats', uid),
-      (docSnap) => {
-        if (isUnsubscribed) return;
-        if (docSnap.exists()) {
-          const item = docSnap.data();
-          const parsedMsgs = Array.isArray(item.messages)
-            ? item.messages
-            : typeof item.messages === 'string'
-            ? JSON.parse(item.messages)
-            : [];
-          const chatObj = {
-            userId: uid,
-            userName: item.userName || 'کاربر جهش‌کالا',
-            messages: parsedMsgs,
-            lastUpdated: item.lastUpdated || '',
-            isReadByAdmin: Boolean(item.isReadByAdmin),
-            needsHumanSupport:
-              item.needsHumanSupport !== undefined
-                ? Boolean(item.needsHumanSupport)
-                : parsedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس')),
-          };
-          safeSetLocalStorage(`jahesh_chat_${uid}`, JSON.stringify(parsedMsgs));
-          callback(chatObj);
-        }
-      },
-      (err) => {
-        console.warn('Firestore onSnapshot single chat error:', err);
-      }
-    );
-  } catch (e) {
-    console.warn('subscribeToSingleChatFromDb exception:', e);
-  }
-
   // High-speed Domestic Server Poll for single chat session
   const pollSingle = async () => {
     if (isUnsubscribed) return;
     try {
-      const res = await fetchUniversalApi(`chats&userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
+      const res = await fetchUniversalApi(`chats?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
       if (res && res.ok) {
         const data = await res.json();
         if (data && data.chat) {
@@ -2385,9 +2268,6 @@ export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any
     }
     if (typeof window !== 'undefined') {
       window.removeEventListener('storage', handleStorageChange);
-    }
-    if (firestoreUnsub) {
-      firestoreUnsub();
     }
     if (intervalId) {
       clearInterval(intervalId);
