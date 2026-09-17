@@ -1,1 +1,0 @@
-import{r as e,R as f}from"./chunk-_4i898Gl.js";const l=e.forwardRef(({value:t,defaultValue:a,checked:r,defaultChecked:d,...n},u)=>{const{renderer:c}=e.useContext(f),o=c==="canvas"?String(t??a)+String(r??d):void 0;return e.createElement("input",{...n,key:o,defaultValue:t??a,defaultChecked:r??d,ref:u})});l.displayName="Input";export{l as f};
