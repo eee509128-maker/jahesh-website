@@ -710,7 +710,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
                           <span className="text-[11px] text-slate-300">
                             مدت اشتراک: <strong>{license.days} روز</strong> • تاریخ انقضا: <strong className="text-amber-300">{formattedExpiryFa}</strong>
                           </span>
@@ -721,10 +721,10 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                               const creds = `نرم‌افزار: ${license.appName || license.productTitle}\nنام کاربری: ${license.username}\nرمز عبور: ${license.password}\nکلید لایسنس: ${license.licenseKey}\nانقضا: ${formattedExpiryFa}`;
                               handleCopyText(creds, `ai-key-${order.id}`);
                             }}
-                            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg whitespace-nowrap bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-[11px] shadow-sm transition-all shrink-0 cursor-pointer"
                           >
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>{isKeyCopied ? 'همه مشخصات کپی شد!' : 'کپی کامل اطلاعات ورود به نرم‌افزار'}</span>
+                            <Copy className="w-3 h-3" />
+                            <span>{isKeyCopied ? 'کپی شد!' : 'کپی مشخصات ورود'}</span>
                           </button>
                         </div>
                       </div>

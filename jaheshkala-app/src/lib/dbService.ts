@@ -31,6 +31,68 @@ export const safeSetLocalStorage = (key: string, value: string) => {
   }
 };
 
+// ==========================================
+// High-Speed Zero-Quota Realtime Server-Sent Events (SSE) Client Engine
+// ==========================================
+type RealtimeCallback = (data: any) => void;
+const sseListeners = new Map<string, Set<RealtimeCallback>>();
+let sseSource: EventSource | null = null;
+let sseReconnectTimer: any = null;
+
+export function subscribeToServerRealtime(eventType: string, callback: RealtimeCallback): () => void {
+  if (!sseListeners.has(eventType)) {
+    sseListeners.set(eventType, new Set());
+  }
+  sseListeners.get(eventType)!.add(callback);
+
+  if (!sseSource && typeof window !== 'undefined') {
+    initSseConnection();
+  }
+
+  return () => {
+    const set = sseListeners.get(eventType);
+    if (set) {
+      set.delete(callback);
+    }
+  };
+}
+
+function initSseConnection() {
+  if (typeof window === 'undefined') return;
+  try {
+    if (sseSource) {
+      try { sseSource.close(); } catch {}
+    }
+    sseSource = new EventSource('/api/realtime-stream');
+    
+    const events = ['products_updated', 'orders_updated', 'users_updated', 'coupons_updated', 'banners_updated', 'tools_updated', 'chats_updated'];
+    events.forEach(evt => {
+      sseSource?.addEventListener(evt, (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          const listeners = sseListeners.get(evt);
+          if (listeners) {
+            listeners.forEach(cb => {
+              try { cb(data); } catch (err) { console.error('SSE listener callback error:', err); }
+            });
+          }
+        } catch (err) {
+          console.warn('Error parsing SSE event data:', err);
+        }
+      });
+    });
+
+    sseSource.onerror = () => {
+      try { sseSource?.close(); } catch {}
+      sseSource = null;
+      clearTimeout(sseReconnectTimer);
+      sseReconnectTimer = setTimeout(initSseConnection, 4000);
+    };
+  } catch (err) {
+    console.warn('Could not initialize SSE connection:', err);
+  }
+}
+
 export const INITIAL_COUPONS: Coupon[] = [
   {
     id: 'c-jahesh1395',
@@ -266,47 +328,47 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   } catch {}
 
-  // 1. Layer 1: Primary Cloud Check - Supabase SYSTEM_CONFIG_PRODUCTS (shared across all devices & Vercel)
+  // 1. Layer 1: Server Disk Storage (/api/products) - Authoritative High Speed Local API
   try {
-    const { data: configData, error: configError } = await supabase
-      .from('chats')
-      .select('messages, last_updated')
-      .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
-      .maybeSingle();
-
-    if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
-      const cleaned = configData.messages
-        .map(cleanProductItem)
-        .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-      if (cleaned.length > 0) {
-        authoritativeList = cleaned;
-      }
-    }
-  } catch (e) {
-    console.warn('Check SYSTEM_CONFIG_PRODUCTS notice:', e);
-  }
-
-  // 2. Layer 2: Server Disk Storage (/api/products) fallback
-  if (!authoritativeList || authoritativeList.length === 0) {
-    try {
-      const res = await fetch('/api/products');
-      if (res.ok) {
-        const serverProducts = await res.json();
-        if (Array.isArray(serverProducts) && serverProducts.length > 0) {
-          const cleaned = serverProducts
-            .map(cleanProductItem)
-            .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-          if (cleaned.length > 0) {
-            authoritativeList = cleaned;
-          }
+    const res = await fetch('/api/products');
+    if (res.ok) {
+      const serverProducts = await res.json();
+      if (Array.isArray(serverProducts) && serverProducts.length > 0) {
+        const cleaned = serverProducts
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+        if (cleaned.length > 0) {
+          authoritativeList = cleaned;
         }
       }
-    } catch (err) {
-      console.warn('Check /api/products notice:', err);
+    }
+  } catch (err) {
+    console.warn('Check /api/products notice:', err);
+  }
+
+  // 2. Layer 2: Cloud Fallback - Supabase SYSTEM_CONFIG_PRODUCTS (if server was empty)
+  if (!authoritativeList || authoritativeList.length === 0) {
+    try {
+      const { data: configData, error: configError } = await supabase
+        .from('chats')
+        .select('messages, last_updated')
+        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+        .maybeSingle();
+
+      if (!configError && configData && Array.isArray(configData.messages) && configData.messages.length > 0) {
+        const cleaned = configData.messages
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+        if (cleaned.length > 0) {
+          authoritativeList = cleaned;
+        }
+      }
+    } catch (e) {
+      console.warn('Check SYSTEM_CONFIG_PRODUCTS notice:', e);
     }
   }
 
-  // 3. Base Products List: Cloud authoritative list merged intelligently with local edits
+  // 3. Base Products List: Cloud/Server authoritative list merged intelligently with local edits
   if (authoritativeList && authoritativeList.length > 0) {
     const localMap = new Map<string, Product>();
     for (const lp of localProducts) {
@@ -315,7 +377,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
 
     const mergedProductsMap = new Map<string, Product>();
 
-    // Start by merging each cloud product with any local counterpart
+    // Start by merging each authoritative product with any local counterpart
     for (const cp of authoritativeList) {
       if (!cp || !cp.id || deletedIds.has(cp.id)) continue;
       const localItem = localMap.get(cp.id);
@@ -326,7 +388,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
       }
     }
 
-    // Preserve any local products that are not yet in cloud
+    // Preserve any local products that are not yet in server
     for (const lp of localProducts) {
       if (!lp || !lp.id || deletedIds.has(lp.id)) continue;
       if (!mergedProductsMap.has(lp.id)) {
@@ -360,20 +422,66 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
 
 // Real-time subscription to products across all clients and devices
 export const subscribeToProductsRealtime = (callback: (products: Product[]) => void) => {
-  const channel = supabase
-    .channel('jahesh-products-sync')
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'chats',
-        filter: 'user_id=eq.SYSTEM_CONFIG_PRODUCTS',
-      },
-      async (payload: any) => {
-        if (payload?.new && Array.isArray(payload.new.messages)) {
+  // 1. Zero-Quota High Speed Server-Sent Events (SSE) stream
+  const unsubscribeSSE = subscribeToServerRealtime('products_updated', async (fresh: any) => {
+    if (Array.isArray(fresh)) {
+      const deletedIds = new Set(await getDeletedProductIds());
+      const cleaned = fresh
+        .map(cleanProductItem)
+        .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
+      if (cleaned.length > 0) {
+        safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
+        callback(cleaned);
+      }
+    }
+  });
+
+  // 2. Window event listener
+  const onWindowEvent = async (e: any) => {
+    if (e.detail && Array.isArray(e.detail)) {
+      const deletedIds = new Set(await getDeletedProductIds());
+      const cleaned = e.detail
+        .map(cleanProductItem)
+        .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
+      if (cleaned.length > 0) {
+        callback(cleaned);
+      }
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('jahesh-products-updated', onWindowEvent);
+  }
+
+  // 3. Fallback Supabase channel (non-blocking)
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel('jahesh-products-sync')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chats',
+          filter: 'user_id=eq.SYSTEM_CONFIG_PRODUCTS',
+        },
+        async (payload: any) => {
+          if (payload?.new && Array.isArray(payload.new.messages)) {
+            const deletedIds = new Set(await getDeletedProductIds());
+            const cleaned = payload.new.messages
+              .map(cleanProductItem)
+              .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
+            if (cleaned.length > 0) {
+              safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
+              callback(cleaned);
+            }
+          }
+        }
+      )
+      .on('broadcast', { event: 'products_updated' }, async (payload: any) => {
+        if (payload?.payload && Array.isArray(payload.payload)) {
           const deletedIds = new Set(await getDeletedProductIds());
-          const cleaned = payload.new.messages
+          const cleaned = payload.payload
             .map(cleanProductItem)
             .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
           if (cleaned.length > 0) {
@@ -381,24 +489,18 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
             callback(cleaned);
           }
         }
-      }
-    )
-    .on('broadcast', { event: 'products_updated' }, async (payload: any) => {
-      if (payload?.payload && Array.isArray(payload.payload)) {
-        const deletedIds = new Set(await getDeletedProductIds());
-        const cleaned = payload.payload
-          .map(cleanProductItem)
-          .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
-        if (cleaned.length > 0) {
-          safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
-          callback(cleaned);
-        }
-      }
-    })
-    .subscribe();
+      })
+      .subscribe();
+  } catch {}
 
   return () => {
-    supabase.removeChannel(channel);
+    unsubscribeSSE();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('jahesh-products-updated', onWindowEvent);
+    }
+    if (channel) {
+      try { supabase.removeChannel(channel); } catch {}
+    }
   };
 };
 
@@ -1023,7 +1125,101 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
     console.warn('Save order to orders table notice:', err);
   }
 
+  // 5. Broadcast real-time order creation to all connected clients
+  try {
+    broadcastOrdersUpdate(updatedList);
+  } catch {}
+
   return true;
+};
+
+export const broadcastOrdersUpdate = (orders: Order[]) => {
+  try {
+    const channel = supabase.channel('jahesh-orders-sync');
+    channel.send({
+      type: 'broadcast',
+      event: 'orders_updated',
+      payload: orders,
+    });
+  } catch {}
+};
+
+export const subscribeToOrdersRealtime = (callback: (orders: Order[]) => void) => {
+  // 1. Zero-Quota High Speed Server-Sent Events (SSE) stream
+  const unsubscribeSSE = subscribeToServerRealtime('orders_updated', (fresh: any) => {
+    if (Array.isArray(fresh)) {
+      saveLocalOrdersStore(fresh);
+      callback(fresh);
+    }
+  });
+
+  // 2. Window event listener
+  const onWindowEvent = (e: any) => {
+    if (e.detail && Array.isArray(e.detail)) {
+      callback(e.detail);
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('jahesh-orders-updated', onWindowEvent);
+  }
+
+  // 3. Fallback Supabase channel (non-blocking)
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel('jahesh-orders-sync')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chats',
+          filter: 'user_id=eq.SYSTEM_CONFIG_ORDERS',
+        },
+        async (payload: any) => {
+          if (payload?.new && Array.isArray(payload.new.messages)) {
+            const fresh = payload.new.messages;
+            saveLocalOrdersStore(fresh);
+            callback(fresh);
+          } else {
+            const fresh = await fetchOrdersFromDb();
+            callback(fresh);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+        },
+        async () => {
+          const fresh = await fetchOrdersFromDb();
+          callback(fresh);
+        }
+      )
+      .on('broadcast', { event: 'orders_updated' }, async (payload: any) => {
+        if (payload?.payload && Array.isArray(payload.payload)) {
+          saveLocalOrdersStore(payload.payload);
+          callback(payload.payload);
+        } else {
+          const fresh = await fetchOrdersFromDb();
+          callback(fresh);
+        }
+      })
+      .subscribe();
+  } catch {}
+
+  return () => {
+    unsubscribeSSE();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('jahesh-orders-updated', onWindowEvent);
+    }
+    if (channel) {
+      try { supabase.removeChannel(channel); } catch {}
+    }
+  };
 };
 
 export const updateOrderStatusInDb = async (orderId: string, status: string): Promise<boolean> => {
@@ -1035,6 +1231,7 @@ export const updateOrderStatusInDb = async (orderId: string, status: string): Pr
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updated }));
     }
+    broadcastOrdersUpdate(updated);
   } catch (e) {}
 
   try {
@@ -1719,11 +1916,102 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       ),
     ]);
 
+    broadcastUsersUpdate(localUsers);
+
     return true;
   } catch (err) {
     console.warn('Update user exception:', err);
     return true; // Local store was updated
   }
+};
+
+export const broadcastUsersUpdate = (users: User[]) => {
+  try {
+    const channel = supabase.channel('jahesh-users-sync');
+    channel.send({
+      type: 'broadcast',
+      event: 'users_updated',
+      payload: users,
+    });
+  } catch {}
+};
+
+export const subscribeToUsersRealtime = (callback: (users: User[]) => void) => {
+  // 1. Zero-Quota High Speed Server-Sent Events (SSE) stream
+  const unsubscribeSSE = subscribeToServerRealtime('users_updated', (fresh: any) => {
+    if (Array.isArray(fresh)) {
+      saveLocalUsersStore(fresh);
+      callback(fresh);
+    }
+  });
+
+  // 2. Window event listener
+  const onWindowEvent = (e: any) => {
+    if (e.detail && Array.isArray(e.detail)) {
+      callback(e.detail);
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('jahesh-users-updated', onWindowEvent);
+  }
+
+  // 3. Fallback Supabase channel (non-blocking)
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel('jahesh-users-sync')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chats',
+          filter: 'user_id=eq.SYSTEM_CONFIG_USERS',
+        },
+        async (payload: any) => {
+          if (payload?.new && Array.isArray(payload.new.messages)) {
+            const fresh = payload.new.messages;
+            saveLocalUsersStore(fresh);
+            callback(fresh);
+          } else {
+            const fresh = await fetchAllUsersFromDb();
+            callback(fresh);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users',
+        },
+        async () => {
+          const fresh = await fetchAllUsersFromDb();
+          callback(fresh);
+        }
+      )
+      .on('broadcast', { event: 'users_updated' }, async (payload: any) => {
+        if (payload?.payload && Array.isArray(payload.payload)) {
+          saveLocalUsersStore(payload.payload);
+          callback(payload.payload);
+        } else {
+          const fresh = await fetchAllUsersFromDb();
+          callback(fresh);
+        }
+      })
+      .subscribe();
+  } catch {}
+
+  return () => {
+    unsubscribeSSE();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('jahesh-users-updated', onWindowEvent);
+    }
+    if (channel) {
+      try { supabase.removeChannel(channel); } catch {}
+    }
+  };
 };
 
 export const fetchAllUsersFromDb = async (): Promise<User[]> => {
@@ -1826,27 +2114,51 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
 
 // 4. COUPONS & DISCOUNT DB SERVICE
 export const fetchCouponsFromDb = async (): Promise<Coupon[]> => {
+  // 1. Authoritative local server API
+  try {
+    const res = await fetch('/api/coupons');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.coupons) && data.coupons.length > 0) {
+        return data.coupons;
+      }
+    }
+  } catch (e) {
+    console.warn('Fetch server coupons warning:', e);
+  }
+
+  // 2. Supabase / Initial fallback
   try {
     const { data, error } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
-    if (error || !data || data.length === 0) {
-      return INITIAL_COUPONS;
+    if (!error && data && data.length > 0) {
+      return data.map((item) => ({
+        id: item.id,
+        code: item.code,
+        discountPercent: Number(item.discount_percent),
+        maxDiscountAmount: item.max_discount_amount ? Number(item.max_discount_amount) : undefined,
+        minOrderAmount: item.min_order_amount ? Number(item.min_order_amount) : undefined,
+        description: item.description || '',
+        isActive: item.is_active !== undefined ? !!item.is_active : true,
+      }));
     }
-    return data.map((item) => ({
-      id: item.id,
-      code: item.code,
-      discountPercent: Number(item.discount_percent),
-      maxDiscountAmount: item.max_discount_amount ? Number(item.max_discount_amount) : undefined,
-      minOrderAmount: item.min_order_amount ? Number(item.min_order_amount) : undefined,
-      description: item.description || '',
-      isActive: item.is_active !== undefined ? !!item.is_active : true,
-    }));
   } catch (err) {
     console.warn('Fetch coupons exception:', err);
-    return INITIAL_COUPONS;
   }
+
+  return INITIAL_COUPONS;
 };
 
 export const saveCouponToDb = async (coupon: Coupon): Promise<boolean> => {
+  // 1. Save to local server disk
+  try {
+    await fetch('/api/coupons/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(coupon),
+    });
+  } catch (e) {}
+
+  // 2. Mirror to Supabase non-blocking
   try {
     const payload = {
       id: coupon.id,
@@ -1857,22 +2169,28 @@ export const saveCouponToDb = async (coupon: Coupon): Promise<boolean> => {
       description: coupon.description,
       is_active: coupon.isActive,
     };
-    const { error } = await supabase.from('coupons').upsert(payload);
-    return !error;
-  } catch (err) {
-    console.warn('Save coupon exception:', err);
-    return false;
-  }
+    supabase.from('coupons').upsert(payload).then(() => {});
+  } catch {}
+
+  return true;
 };
 
 export const deleteCouponFromDb = async (couponId: string): Promise<boolean> => {
+  // 1. Delete from local server disk
   try {
-    const { error } = await supabase.from('coupons').delete().eq('id', couponId);
-    return !error;
-  } catch (err) {
-    console.warn('Delete coupon exception:', err);
-    return false;
-  }
+    await fetch('/api/coupons/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: couponId }),
+    });
+  } catch (e) {}
+
+  // 2. Mirror to Supabase non-blocking
+  try {
+    supabase.from('coupons').delete().eq('id', couponId).then(() => {});
+  } catch {}
+
+  return true;
 };
 
 // 5. CHATS DB SERVICE
@@ -1910,7 +2228,7 @@ export const mergeChatMessages = (localMsgs: any[], dbMsgs: any[]): any[] => {
 };
 
 export const fetchChatsFromDb = async (): Promise<any[]> => {
-  // Try local storage cache first for instant response
+  // 1. Try local storage cache first for instant response
   let cachedChats: any[] = [];
   try {
     const saved = localStorage.getItem('jahesh_all_chats');
@@ -1922,6 +2240,21 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
     }
   } catch {}
 
+  // 2. Fetch authoritative from Local Server API
+  try {
+    const res = await fetch('/api/chats');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.chats) && data.chats.length > 0) {
+        safeSetLocalStorage('jahesh_all_chats', JSON.stringify(data.chats));
+        return data.chats;
+      }
+    }
+  } catch (e) {
+    console.warn('Fetch /api/chats error:', e);
+  }
+
+  // 3. Fallback to Supabase
   try {
     const { data, error } = await supabase.from('chats').select('*').order('last_updated', { ascending: false });
     if (!error && data && Array.isArray(data)) {
@@ -1941,38 +2274,10 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
           };
         });
 
-      // Merge local cached chats with DB chats to prevent deleting un-synced user messages
-      const mergedMap = new Map<string, any>();
-      for (const c of cachedChats) {
-        if (c && c.userId) {
-          mergedMap.set(c.userId, c);
-        }
+      if (dbChats.length > 0) {
+        safeSetLocalStorage('jahesh_all_chats', JSON.stringify(dbChats));
+        return dbChats;
       }
-
-      for (const dbChat of dbChats) {
-        const existingLocal = mergedMap.get(dbChat.userId);
-        if (existingLocal) {
-          const mergedMsgs = mergeChatMessages(existingLocal.messages, dbChat.messages);
-          mergedMap.set(dbChat.userId, {
-            ...existingLocal,
-            ...dbChat,
-            messages: mergedMsgs,
-            needsHumanSupport: dbChat.needsHumanSupport || existingLocal.needsHumanSupport,
-            lastUpdated: dbChat.lastUpdated > existingLocal.lastUpdated ? dbChat.lastUpdated : existingLocal.lastUpdated,
-          });
-        } else {
-          mergedMap.set(dbChat.userId, dbChat);
-        }
-      }
-
-      const mergedList = Array.from(mergedMap.values());
-
-      // Cache merged result locally
-      try {
-        safeSetLocalStorage('jahesh_all_chats', JSON.stringify(mergedList));
-      } catch {}
-
-      return mergedList;
     }
   } catch (err) {
     console.warn('Fetch chats exception:', err);
@@ -1982,7 +2287,7 @@ export const fetchChatsFromDb = async (): Promise<any[]> => {
 };
 
 export const saveChatToDb = async (chat: any): Promise<boolean> => {
-  // Update local cache immediately
+  // 1. Update local cache immediately
   try {
     const saved = localStorage.getItem('jahesh_all_chats');
     let chatsList: any[] = saved ? JSON.parse(saved) : [];
@@ -1997,6 +2302,16 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
     window.dispatchEvent(new CustomEvent('jahesh-chats-updated', { detail: chat }));
   } catch {}
 
+  // 2. Persist to Local Server API (Zero-Quota)
+  try {
+    await fetch('/api/chats/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(chat),
+    });
+  } catch (e) {}
+
+  // 3. Mirror to Supabase non-blocking
   try {
     const payload = {
       user_id: chat.userId,
@@ -2006,16 +2321,38 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
       is_read_by_admin: chat.isReadByAdmin,
       needs_human_support: !!chat.needsHumanSupport,
     };
-    const { error } = await supabase.from('chats').upsert(payload, { onConflict: 'user_id' });
-    if (error) {
-       console.warn('Save chat error:', error.message);
-       return false;
+    supabase.from('chats').upsert(payload, { onConflict: 'user_id' }).then(() => {});
+  } catch {}
+
+  return true;
+};
+
+export const deleteChatFromDb = async (userId: string): Promise<boolean> => {
+  // 1. Remove from local store
+  try {
+    const saved = localStorage.getItem('jahesh_all_chats');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const filtered = parsed.filter((c: any) => c.userId !== userId);
+      safeSetLocalStorage('jahesh_all_chats', JSON.stringify(filtered));
     }
-    return true;
-  } catch (err) {
-    console.warn('Save chat exception:', err);
-    return false;
-  }
+  } catch {}
+
+  // 2. Delete from Local Server API
+  try {
+    await fetch('/api/chats/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+  } catch (e) {}
+
+  // 3. Mirror to Supabase non-blocking
+  try {
+    supabase.from('chats').delete().eq('user_id', userId).then(() => {});
+  } catch {}
+
+  return true;
 };
 
 export const findUserByEmailInDb = async (email: string): Promise<User | null> => {

@@ -44,6 +44,86 @@ app.use('/jaheshkala/uploads', express.static(UPLOADS_DIR));
 app.use('/jaheshkala/images', express.static(JAHESH_IMAGES_DIR));
 app.use('/images', express.static(JAHESH_IMAGES_DIR));
 
+// ==========================================
+// Atomic JSON Disk Persistence & Backup Engine (Zero-Quota, High-Capacity)
+// ==========================================
+const DATA_DIR = path.join(__dirname, 'data');
+const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+if (!fs.existsSync(BACKUPS_DIR)) {
+  fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+}
+
+function safeWriteJsonAtomic(targetPath, data) {
+  try {
+    const parent = path.dirname(targetPath);
+    if (!fs.existsSync(parent)) {
+      fs.mkdirSync(parent, { recursive: true });
+    }
+    const tempPath = `${targetPath}.${Date.now()}_${Math.random().toString(36).substring(2, 6)}.tmp`;
+    const jsonStr = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    fs.writeFileSync(tempPath, jsonStr, 'utf8');
+    fs.renameSync(tempPath, targetPath);
+    return true;
+  } catch (err) {
+    console.error(`[SafeWriteJson] Failed to write ${targetPath}:`, err);
+    try {
+      const jsonStr = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+      fs.writeFileSync(targetPath, jsonStr, 'utf8');
+      return true;
+    } catch (directErr) {
+      console.error(`[SafeWriteJson] Direct fallback failed for ${targetPath}:`, directErr);
+      return false;
+    }
+  }
+}
+
+// ==========================================
+// High-Speed Zero-Quota Realtime Server-Sent Events (SSE) Engine
+// ==========================================
+const sseClients = new Set();
+
+export function broadcastServerEvent(eventType, payload) {
+  if (!sseClients || sseClients.size === 0) return;
+  const message = `event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(message);
+    } catch (e) {
+      sseClients.delete(client);
+    }
+  }
+}
+
+app.get(['/api/realtime-stream', '/jaheshkala/api/realtime-stream'], (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  // Initial connection handshake
+  res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected', time: new Date().toISOString() })}\n\n`);
+
+  sseClients.add(res);
+
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch {
+      clearInterval(keepAlive);
+      sseClients.delete(res);
+    }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    sseClients.delete(res);
+  });
+});
+
 // Favicon and Web App Manifest routes for Googlebot, Search Engine Crawlers, browsers and mobile
 const faviconFiles = [
   'favicon.ico',
@@ -385,11 +465,8 @@ app.post('/api/banners', (req, res) => {
     if (!Array.isArray(banners)) {
       return res.status(400).json({ error: 'Expected array of banners' });
     }
-    const dataDir = path.dirname(BANNERS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners, null, 2), 'utf8');
+    safeWriteJsonAtomic(BANNERS_FILE, banners);
+    broadcastServerEvent('banners_updated', banners);
     console.log(`[Banners] Successfully persisted ${banners.length} banners across all devices.`);
     return res.json({ success: true, count: banners.length });
   } catch (err) {
@@ -438,11 +515,8 @@ app.post('/api/tools', (req, res) => {
     if (!Array.isArray(tools)) {
       return res.status(400).json({ error: 'Expected array of tools' });
     }
-    const dataDir = path.dirname(TOOLS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
+    safeWriteJsonAtomic(TOOLS_FILE, tools);
+    broadcastServerEvent('tools_updated', tools);
     console.log(`[Tools] Successfully persisted ${tools.length} dashboard tools.`);
     return res.json({ success: true, count: tools.length });
   } catch (err) {
@@ -470,7 +544,8 @@ app.post('/api/tools/save', (req, res) => {
       };
       tools.push(newTool);
     }
-    fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
+    safeWriteJsonAtomic(TOOLS_FILE, tools);
+    broadcastServerEvent('tools_updated', tools);
     return res.json({ success: true, tool });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -483,7 +558,8 @@ app.post('/api/tools/delete', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Tool id is required' });
     let tools = getStoredTools();
     tools = tools.filter(t => t.id !== id);
-    fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
+    safeWriteJsonAtomic(TOOLS_FILE, tools);
+    broadcastServerEvent('tools_updated', tools);
     return res.json({ success: true, remaining: tools.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -698,11 +774,8 @@ app.post('/api/products', (req, res) => {
     }
     const deletedIds = new Set(getDeletedProductIds());
     const filtered = products.filter((p) => p && p.id && !deletedIds.has(p.id));
-    const dataDir = path.dirname(PRODUCTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+    safeWriteJsonAtomic(PRODUCTS_FILE, filtered);
+    broadcastServerEvent('products_updated', filtered);
     console.log(`[Products] Successfully persisted ${filtered.length} products to disk.`);
     return res.json({ success: true, count: filtered.length });
   } catch (err) {
@@ -738,11 +811,8 @@ app.post('/api/products/save', (req, res) => {
     } else {
       list = [product, ...list];
     }
-    const dataDir = path.dirname(PRODUCTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    safeWriteJsonAtomic(PRODUCTS_FILE, list);
+    broadcastServerEvent('products_updated', list);
     console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}`);
     return res.json({ success: true, products: list });
   } catch (err) {
@@ -770,7 +840,8 @@ app.post('/api/products/delete', (req, res) => {
       } catch {}
     }
     list = list.filter((p) => p.id !== productId);
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    safeWriteJsonAtomic(PRODUCTS_FILE, list);
+    broadcastServerEvent('products_updated', list);
     console.log(`[Products] Deleted product ${productId}. Total left: ${list.length}`);
     return res.json({ success: true, products: list });
   } catch (err) {
@@ -811,12 +882,9 @@ function readOrdersFromDisk() {
 
 function writeOrdersToDisk(orders) {
   try {
-    const dataDir = path.dirname(ORDERS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
     const sorted = sortOrdersNewestFirst(orders);
-    fs.writeFileSync(ORDERS_FILE, JSON.stringify(sorted, null, 2), 'utf8');
+    safeWriteJsonAtomic(ORDERS_FILE, sorted);
+    broadcastServerEvent('orders_updated', sorted);
   } catch (e) {
     console.error('Error writing orders.json:', e);
   }
@@ -1052,11 +1120,8 @@ function readUsersFromDisk() {
 
 function writeUsersToDisk(users) {
   try {
-    const dataDir = path.dirname(USERS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
+    safeWriteJsonAtomic(USERS_FILE, users);
+    broadcastServerEvent('users_updated', users);
   } catch (e) {
     console.error('Error writing users.json:', e);
   }
@@ -1197,11 +1262,8 @@ function readCouponsFromDisk() {
 
 function writeCouponsToDisk(coupons) {
   try {
-    const dataDir = path.dirname(COUPONS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(COUPONS_FILE, JSON.stringify(coupons, null, 2), 'utf8');
+    safeWriteJsonAtomic(COUPONS_FILE, coupons);
+    broadcastServerEvent('coupons_updated', coupons);
   } catch (e) {
     console.error('Error writing coupons.json:', e);
   }
@@ -1244,6 +1306,78 @@ app.post(['/api/coupons/delete', '/jaheshkala/api/coupons/delete'], (req, res) =
     const filtered = current.filter((c) => c.id !== id && (!code || c.code?.toUpperCase() !== String(code).toUpperCase()));
     writeCouponsToDisk(filtered);
     return res.json({ success: true, count: filtered.length, coupons: filtered });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// Live Chat & Support Messages API (Zero-Quota Local Disk Persistence)
+// ==========================================
+const CHATS_FILE = path.join(__dirname, 'data', 'chats.json');
+
+function readChatsFromDisk() {
+  if (fs.existsSync(CHATS_FILE)) {
+    try {
+      const raw = fs.readFileSync(CHATS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      console.warn('Error reading chats.json:', e);
+    }
+  }
+  return [];
+}
+
+function writeChatsToDisk(chats) {
+  try {
+    safeWriteJsonAtomic(CHATS_FILE, chats);
+    broadcastServerEvent('chats_updated', chats);
+  } catch (e) {
+    console.error('Error writing chats.json:', e);
+  }
+}
+
+app.get(['/api/chats', '/jaheshkala/api/chats'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  try {
+    const chats = readChatsFromDisk();
+    return res.json({ success: true, chats });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(['/api/chats', '/jaheshkala/api/chats', '/api/chats/save', '/jaheshkala/api/chats/save'], (req, res) => {
+  try {
+    const chat = req.body;
+    if (!chat || !chat.userId) {
+      return res.status(400).json({ error: 'Chat userId is required' });
+    }
+    const current = readChatsFromDisk();
+    const idx = current.findIndex((c) => c.userId === chat.userId);
+    if (idx >= 0) {
+      current[idx] = { ...current[idx], ...chat, lastUpdated: new Date().toISOString() };
+    } else {
+      current.unshift({ ...chat, lastUpdated: new Date().toISOString() });
+    }
+    writeChatsToDisk(current);
+    return res.json({ success: true, chat, count: current.length });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(['/api/chats/delete', '/jaheshkala/api/chats/delete'], (req, res) => {
+  try {
+    const { userId } = req.body || {};
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    const current = readChatsFromDisk();
+    const filtered = current.filter((c) => c.userId !== userId);
+    writeChatsToDisk(filtered);
+    return res.json({ success: true, remaining: filtered.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

@@ -229,26 +229,26 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
           </div>
 
           {/* Bottom Actions */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+          <div className="flex items-center justify-between gap-2.5 pt-2 border-t border-purple-900/40">
             <button
               type="button"
               onClick={handleCopyAll}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs sm:text-sm transition-all shadow-lg cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs transition-all shadow-md active:scale-95 shrink-0 cursor-pointer"
             >
               {copiedField === 'all' ? (
                 <>
-                  <Check className="w-4 h-4 text-slate-950" />
-                  <span>تمام اطلاعات در کلیپ‌بورد کپی شد</span>
+                  <Check className="w-3.5 h-3.5 text-slate-950" />
+                  <span>کپی شد</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4" />
-                  <span>کپی تمام مشخصات ورود (یکجا)</span>
+                  <Copy className="w-3.5 h-3.5 text-slate-950" />
+                  <span>کپی مشخصات ورود</span>
                 </>
               )}
             </button>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2">
               {onViewOrders && (
                 <button
                   type="button"
@@ -256,19 +256,20 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
                     onClose();
                     onViewOrders();
                   }}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-purple-900/60 hover:bg-purple-800 border border-purple-700/60 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 whitespace-nowrap bg-purple-900/60 hover:bg-purple-800 border border-purple-700/60 text-white font-bold px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>مشاهده در سفارش‌های من</span>
+                  <ExternalLink className="w-3 h-3" />
+                  <span className="hidden sm:inline">مشاهده در</span>
+                  <span>سفارش‌ها</span>
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-5 py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+                className="whitespace-nowrap bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-4 py-2 rounded-xl text-xs transition-colors cursor-pointer"
               >
-                متوجه شدم و بستن
+                بستن
               </button>
             </div>
           </div>

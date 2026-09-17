@@ -27,6 +27,8 @@ import {
   parseOrderTimestamp,
   safeSetLocalStorage,
   subscribeToProductsRealtime,
+  subscribeToOrdersRealtime,
+  subscribeToUsersRealtime,
 } from './lib/dbService';
 import {
   verifyZibalPayment,
@@ -514,7 +516,7 @@ export default function App() {
             if (activeUser) {
               const cloudUser = allUsers.find((u) => areSameUser(u, activeUser));
               if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
-                const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
+                const updated = { ...activeUser, role: cloudUser.role };
                 setCurrentUser(updated);
                 safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
               }
@@ -529,18 +531,32 @@ export default function App() {
 
     loadCloudData();
 
-    // Auto-refresh orders and cloud data every 15 seconds to ensure newly placed orders appear instantly
+    // Auto-refresh orders and cloud data every 10 seconds to ensure newly placed orders appear instantly
     const cloudInterval = setInterval(() => {
       if (isMounted) {
         loadCloudData();
       }
-    }, 15000);
+    }, 10000);
 
-    // Subscribe to Supabase real-time cloud changes for instant multi-user synchronization
+    // 1. Subscribe to Supabase real-time cloud changes for instant multi-user products synchronization
     const unsubscribeRealtimeProducts = subscribeToProductsRealtime((updatedList) => {
       if (isMounted && Array.isArray(updatedList) && updatedList.length > 0) {
         const cleaned = sanitizeProductsList(updatedList);
         setProducts(cleaned);
+      }
+    });
+
+    // 2. Subscribe to Supabase real-time cloud changes for orders (Digikala-like instantaneous updates across devices)
+    const unsubscribeRealtimeOrders = subscribeToOrdersRealtime((updatedOrders) => {
+      if (isMounted && Array.isArray(updatedOrders)) {
+        setOrders(updatedOrders);
+      }
+    });
+
+    // 3. Subscribe to Supabase real-time cloud changes for users & roles
+    const unsubscribeRealtimeUsers = subscribeToUsersRealtime((updatedUsers) => {
+      if (isMounted && Array.isArray(updatedUsers)) {
+        setUsersList(updatedUsers);
       }
     });
 
@@ -566,8 +582,18 @@ export default function App() {
 
     // Listen for real-time orders updates via window events
     const handleOrdersUpdatedEvent = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) {
-        setOrders(e.detail);
+      if (e.detail) {
+        if (Array.isArray(e.detail)) {
+          setOrders(e.detail);
+        } else if (typeof e.detail === 'object' && e.detail.id) {
+          setOrders((prev) => {
+            const filtered = prev.filter(
+              (o) => o.id !== e.detail.id && (!e.detail.trackingCode || o.trackingCode !== e.detail.trackingCode)
+            );
+            const combined = [e.detail, ...filtered];
+            return combined.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
+          });
+        }
       }
     };
     window.addEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
@@ -594,9 +620,9 @@ export default function App() {
     return () => {
       isMounted = false;
       clearInterval(cloudInterval);
-      if (typeof unsubscribeRealtimeProducts === 'function') {
-        unsubscribeRealtimeProducts();
-      }
+      if (typeof unsubscribeRealtimeProducts === 'function') unsubscribeRealtimeProducts();
+      if (typeof unsubscribeRealtimeOrders === 'function') unsubscribeRealtimeOrders();
+      if (typeof unsubscribeRealtimeUsers === 'function') unsubscribeRealtimeUsers();
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
       window.removeEventListener('jahesh-users-updated', handleUsersUpdatedEvent);
       window.removeEventListener('jahesh-products-updated', handleProductsUpdatedEvent);
@@ -1037,9 +1063,23 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('jahesh_current_user');
+    try {
+      await supabase.auth.signOut();
+    } catch {}
+    try {
+      localStorage.removeItem('jahesh_current_user');
+      localStorage.removeItem('jahesh_user_session');
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.includes('supabase') || k.startsWith('sb-') || k === 'jahesh_current_user' || k === 'jahesh_user_session')) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch {}
     setCurrentUser(null);
+    setAdminModalOpen(false);
+    setUserProfileModalOpen(false);
+    setUserOrdersModalOpen(false);
     showToast('از حساب کاربری خارج شدید.');
   };
 
