@@ -71,6 +71,19 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
     setCurrentOrders(initialOrders);
   }, [initialOrders]);
 
+  useEffect(() => {
+    const handleOrdersUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<Order[]>;
+      if (customEvent.detail && Array.isArray(customEvent.detail)) {
+        setCurrentOrders(customEvent.detail);
+      } else {
+        handleRefreshOrders();
+      }
+    };
+    window.addEventListener('jahesh-orders-updated', handleOrdersUpdated);
+    return () => window.removeEventListener('jahesh-orders-updated', handleOrdersUpdated);
+  }, []);
+
   // Fetch freshest data whenever modal opens
   useEffect(() => {
     if (isOpen) {

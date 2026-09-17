@@ -980,15 +980,27 @@ app.post('/api/orders/save', (req, res) => {
 });
 
 // POST /api/orders/update-status
-app.post('/api/orders/update-status', (req, res) => {
+app.post(['/api/orders/update-status', '/jaheshkala/api/orders/update-status', '/api/orders/status', '/jaheshkala/api/orders/status'], (req, res) => {
   try {
-    const { orderId, status } = req.body;
-    if (!orderId || !status) {
+    const { orderId, id, status } = req.body || {};
+    const targetId = orderId || id;
+    if (!targetId || !status) {
       return res.status(400).json({ error: 'orderId and status required' });
     }
     const current = readOrdersFromDisk();
-    const updated = current.map((o) => (o.id === orderId ? { ...o, status } : o));
+    let found = false;
+    const updated = current.map((o) => {
+      if (o.id === targetId || o.trackingCode === targetId || o.paymentRefId === targetId || o.zibalTrackId === targetId) {
+        found = true;
+        return { ...o, status, statusUpdatedAt: new Date().toISOString() };
+      }
+      return o;
+    });
+    if (!found) {
+      updated.unshift({ id: targetId, status, statusUpdatedAt: new Date().toISOString(), createdAt: new Date().toISOString() });
+    }
     writeOrdersToDisk(updated);
+    console.log(`[Orders] Updated status of ${targetId} to ${status}`);
     return res.json({ success: true, count: updated.length, orders: updated });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -1190,7 +1202,7 @@ app.get('/api/users', (_req, res) => {
 });
 
 // POST /api/users/update-role
-app.post('/api/users/update-role', (req, res) => {
+app.post(['/api/users/update-role', '/jaheshkala/api/users/update-role', '/api/update-role', '/jaheshkala/api/update-role'], (req, res) => {
   try {
     const { id, username, phone, role } = req.body || {};
     if (!role) {
@@ -1226,7 +1238,7 @@ app.post('/api/users/update-role', (req, res) => {
 });
 
 // POST /api/users (bulk or single user save/update)
-app.post('/api/users', (req, res) => {
+app.post(['/api/users', '/jaheshkala/api/users'], (req, res) => {
   try {
     let incoming = req.body;
     if (incoming && Array.isArray(incoming.users)) {
@@ -1256,7 +1268,7 @@ app.post('/api/users', (req, res) => {
 });
 
 // POST /api/users/save
-app.post('/api/users/save', (req, res) => {
+app.post(['/api/users/save', '/jaheshkala/api/users/save'], (req, res) => {
   try {
     const user = req.body;
     if (!user || (!user.id && !user.username && !user.phone)) {

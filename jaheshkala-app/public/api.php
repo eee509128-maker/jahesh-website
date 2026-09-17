@@ -141,9 +141,75 @@ switch ($action) {
     case 'orders':
     case 'get_orders':
     case 'api/orders':
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    case 'orders/update-status':
+    case 'orders/status':
+    case 'update-status':
+    case 'orders/save':
+    case 'orders/delete':
+    case 'orders/clear':
+        $orders = readJsonFile($ordersFile, []);
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'DELETE') {
             $incoming = $inputData;
-            $orders = readJsonFile($ordersFile, []);
+
+            // Delete single order
+            if ($action === 'orders/delete' || isset($_GET['delete'])) {
+                $delId = isset($_GET['id']) ? (string)$_GET['id'] : (isset($incoming['id']) ? (string)$incoming['id'] : (isset($incoming['orderId']) ? (string)$incoming['orderId'] : ''));
+                if (!empty($delId)) {
+                    $orders = array_values(array_filter($orders, function($o) use ($delId) {
+                        return (isset($o['id']) && (string)$o['id'] === $delId) ||
+                               (isset($o['trackingCode']) && (string)$o['trackingCode'] === $delId) ? false : true;
+                    }));
+                    writeJsonFile($ordersFile, $orders);
+                    echo json_encode(['success' => true, 'count' => count($orders), 'orders' => $orders]);
+                    exit;
+                }
+            }
+
+            // Clear all orders
+            if ($action === 'orders/clear' || isset($_GET['clear'])) {
+                $orders = [];
+                writeJsonFile($ordersFile, $orders);
+                echo json_encode(['success' => true, 'count' => 0, 'orders' => []]);
+                exit;
+            }
+
+            // Update order status specifically
+            if ($action === 'orders/update-status' || $action === 'orders/status' || $action === 'update-status' || isset($incoming['status'])) {
+                $targetId = isset($incoming['orderId']) ? (string)$incoming['orderId'] : (isset($incoming['id']) ? (string)$incoming['id'] : '');
+                $targetStatus = isset($incoming['status']) ? (string)$incoming['status'] : '';
+
+                if (!empty($targetId) && !empty($targetStatus)) {
+                    $found = false;
+                    foreach ($orders as $idx => $o) {
+                        $oId = isset($o['id']) ? (string)$o['id'] : '';
+                        $oTrack = isset($o['trackingCode']) ? (string)$o['trackingCode'] : '';
+                        $oRef = isset($o['paymentRefId']) ? (string)$o['paymentRefId'] : '';
+                        $oZibal = isset($o['zibalTrackId']) ? (string)$o['zibalTrackId'] : '';
+
+                        if ($oId === $targetId || $oTrack === $targetId || $oRef === $targetId || $oZibal === $targetId) {
+                            $orders[$idx]['status'] = $targetStatus;
+                            $orders[$idx]['statusUpdatedAt'] = date('c');
+                            $found = true;
+                        }
+                    }
+
+                    if (!$found) {
+                        // Create placeholder record if missing
+                        $newOrder = [
+                            'id' => $targetId,
+                            'status' => $targetStatus,
+                            'statusUpdatedAt' => date('c'),
+                            'createdAt' => date('c')
+                        ];
+                        array_unshift($orders, $newOrder);
+                    }
+
+                    writeJsonFile($ordersFile, $orders);
+                    echo json_encode(['success' => true, 'orderId' => $targetId, 'status' => $targetStatus, 'count' => count($orders), 'orders' => $orders]);
+                    exit;
+                }
+            }
+
             if (isset($incoming['id'])) {
                 $orderId = (string)$incoming['id'];
                 $foundIndex = -1;

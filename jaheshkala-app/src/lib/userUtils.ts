@@ -95,19 +95,23 @@ export const mergeUserRecords = (current: User, incoming: User): User => {
     user: 1,
   };
 
-  const currentPriority = rolePriority[current.role || 'user'] || 1;
-  const incomingPriority = rolePriority[incoming.role || 'user'] || 1;
+  const incomingTime = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
+  const currentTime = current.updatedAt ? new Date(current.updatedAt).getTime() : 0;
+  const incomingIsNewer = !isNaN(incomingTime) && !isNaN(currentTime) && incomingTime > currentTime;
 
-  // Determine preferred role: incoming role takes precedence if defined or elevated
   let preferredRole: 'admin' | 'operator' | 'user' = 'user';
-  if (incoming.role && incoming.role !== 'user') {
-    preferredRole = incoming.role as any;
-  } else if (current.role && current.role !== 'user') {
-    preferredRole = current.role as any;
-  } else if (incoming.role) {
+  if (incomingIsNewer && incoming.role) {
     preferredRole = incoming.role as any;
   } else {
-    preferredRole = (current.role as any) || 'user';
+    const currentPriority = rolePriority[current.role || 'user'] || 1;
+    const incomingPriority = rolePriority[incoming.role || 'user'] || 1;
+    if (incomingPriority > currentPriority) {
+      preferredRole = incoming.role as any;
+    } else if (currentPriority > incomingPriority) {
+      preferredRole = current.role as any;
+    } else {
+      preferredRole = incoming.role || current.role || 'user';
+    }
   }
 
   const preferredName =
@@ -129,5 +133,6 @@ export const mergeUserRecords = (current: User, incoming: User): User => {
     guild: incoming.guild || current.guild,
     customGuild: incoming.customGuild || current.customGuild,
     createdAt: incoming.createdAt || current.createdAt,
+    updatedAt: incoming.updatedAt || current.updatedAt || new Date().toISOString(),
   };
 };

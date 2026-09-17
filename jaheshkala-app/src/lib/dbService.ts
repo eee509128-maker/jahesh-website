@@ -944,10 +944,25 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
     if (!existing) {
       allOrdersMap.set(key, o);
     } else {
+      const oTime = o.statusUpdatedAt ? new Date(o.statusUpdatedAt).getTime() : 0;
+      const existingTime = existing.statusUpdatedAt ? new Date(existing.statusUpdatedAt).getTime() : 0;
+      let preferredStatus = existing.status;
+      if (oTime > existingTime) {
+        preferredStatus = o.status;
+      } else if (o.status && o.status !== 'در حال بررسی') {
+        preferredStatus = o.status;
+      } else if (existing.status && existing.status !== 'در حال بررسی') {
+        preferredStatus = existing.status;
+      } else {
+        preferredStatus = o.status || existing.status;
+      }
+
       // Keep most complete order details, preserve gateway fields
       allOrdersMap.set(key, {
         ...existing,
         ...o,
+        status: preferredStatus,
+        statusUpdatedAt: o.statusUpdatedAt || existing.statusUpdatedAt,
         trackingCode: o.trackingCode || existing.trackingCode || '',
         paymentRefId: o.paymentRefId || existing.paymentRefId || '',
         zibalTrackId: o.zibalTrackId || existing.zibalTrackId || o.trackingCode || existing.trackingCode,
@@ -1097,30 +1112,37 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
 
 export const updateOrderStatusInDb = async (orderId: string, status: string): Promise<boolean> => {
   let updated: Order[] = [];
+  const statusUpdatedAt = new Date().toISOString();
   try {
     const current = getLocalOrdersStore();
-    updated = current.map((o) => (o.id === orderId ? { ...o, status: status as any } : o));
+    updated = current.map((o) =>
+      o.id === orderId || o.trackingCode === orderId || o.paymentRefId === orderId || o.zibalTrackId === orderId
+        ? { ...o, status: status as any, statusUpdatedAt }
+        : o
+    );
     saveLocalOrdersStore(updated);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updated }));
     }
   } catch (e) {}
 
-  // Update in Firebase Firestore
+  // 1. Update in Node.js & PHP server API
   try {
-    await setDoc(doc(db, 'orders', String(orderId)), { status }, { merge: true });
+    await fetchUniversalApi('orders/update-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, status, statusUpdatedAt }),
+    });
+  } catch (e) {}
+
+  // 2. Update in Firebase Firestore
+  try {
+    await setDoc(doc(db, 'orders', String(orderId)), { status, statusUpdatedAt }, { merge: true });
   } catch (err) {
     console.warn('Firestore update order status notice:', err);
   }
 
-  try {
-    await fetch('/api/orders/update-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, status }),
-    });
-  } catch (e) {}
-
+  // 3. Update in Supabase chats table (zero-VPN persistent cloud)
   try {
     if (updated.length > 0) {
       await supabase.from('chats').upsert(
@@ -1128,7 +1150,7 @@ export const updateOrderStatusInDb = async (orderId: string, status: string): Pr
           user_id: 'SYSTEM_CONFIG_ORDERS',
           user_name: 'لیست تمام سفارشات فروشگاه',
           messages: updated,
-          last_updated: new Date().toISOString(),
+          last_updated: statusUpdatedAt,
           is_read_by_admin: true,
         },
         { onConflict: 'user_id' }
@@ -1136,6 +1158,7 @@ export const updateOrderStatusInDb = async (orderId: string, status: string): Pr
     }
   } catch (e) {}
 
+  // 4. Update in Supabase orders table
   try {
     await supabase.from('orders').update({ status }).eq('id', orderId);
   } catch (err) {}
@@ -1532,21 +1555,23 @@ export const deleteUserFromDb = async (userId: string): Promise<boolean> => {
 
 export const updateUserInDb = async (user: User): Promise<boolean> => {
   try {
+    const updatedAt = new Date().toISOString();
+    const cleanUser = {
+      ...user,
+      role: user.role || 'user',
+      updatedAt,
+    };
+
     // 1. Update in local users store
     const localUsers = getLocalUsersStore();
-    const userIndex = localUsers.findIndex((u) => areSameUser(u, user));
+    const userIndex = localUsers.findIndex((u) => areSameUser(u, cleanUser));
     if (userIndex >= 0) {
       localUsers[userIndex] = {
         ...localUsers[userIndex],
-        ...user,
-        role: user.role, // Explicitly ensure role is updated
-        updatedAt: new Date().toISOString(),
+        ...cleanUser,
       };
     } else {
-      localUsers.unshift({
-        ...user,
-        updatedAt: new Date().toISOString(),
-      });
+      localUsers.unshift(cleanUser);
     }
     saveLocalUsersStore(localUsers);
 
@@ -1559,11 +1584,10 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       const rawCurrent = localStorage.getItem('jahesh_current_user');
       if (rawCurrent) {
         const currentParsed: User = JSON.parse(rawCurrent);
-        if (areSameUser(currentParsed, user)) {
+        if (areSameUser(currentParsed, cleanUser)) {
           const updatedCurrent = {
             ...currentParsed,
-            ...user,
-            role: user.role,
+            ...cleanUser,
           };
           safeSetLocalStorage('jahesh_current_user', JSON.stringify(updatedCurrent));
           if (typeof window !== 'undefined') {
@@ -1580,23 +1604,52 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       await fetchUniversalApi('users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(user),
+        body: JSON.stringify(cleanUser),
       });
 
-      if (user.role) {
+      if (cleanUser.role) {
         await fetchUniversalApi('users/update-role', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: user.id,
-            username: user.username,
-            phone: user.phone,
-            role: user.role,
+            id: cleanUser.id,
+            username: cleanUser.username,
+            phone: cleanUser.phone,
+            role: cleanUser.role,
+            updatedAt,
           }),
         });
       }
     } catch (e) {
       console.warn('Universal API update user notice:', e);
+    }
+
+    // 4. Persist to Supabase chats table (zero-VPN cloud storage)
+    try {
+      if (localUsers.length > 0) {
+        await supabase.from('chats').upsert(
+          {
+            user_id: 'SYSTEM_CONFIG_USERS',
+            user_name: 'لیست تمام کاربران سایت',
+            messages: localUsers,
+            last_updated: updatedAt,
+            is_read_by_admin: true,
+          },
+          { onConflict: 'user_id' }
+        );
+      }
+    } catch (supaErr) {
+      console.warn('Supabase system users sync notice:', supaErr);
+    }
+
+    // 5. Persist to Firebase Firestore
+    try {
+      if (cleanUser.id) {
+        await setDoc(doc(db, 'users', String(cleanUser.id)), cleanUser, { merge: true });
+      }
+      await setDoc(doc(db, 'settings', 'users'), { users: localUsers, lastUpdated: updatedAt }, { merge: true });
+    } catch (fbErr) {
+      console.warn('Firebase Firestore update user notice:', fbErr);
     }
 
     return true;
@@ -1642,6 +1695,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
             guild: matched.guild,
             customGuild: matched.customGuild || matched.custom_guild,
             createdAt: matched.createdAt || matched.created_at,
+            updatedAt: matched.updatedAt || matched.updated_at,
             timestamp: matched.timestamp,
           };
           upsertToMergedList(uObj);
@@ -1650,6 +1704,38 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     }
   } catch (err) {
     console.warn('Fetch Universal API users exception:', err);
+  }
+
+  // 3. Load from Supabase chats table (SYSTEM_CONFIG_USERS)
+  try {
+    const { data: configData } = await supabase
+      .from('chats')
+      .select('messages')
+      .eq('user_id', 'SYSTEM_CONFIG_USERS')
+      .maybeSingle();
+
+    if (configData && Array.isArray(configData.messages)) {
+      for (const item of configData.messages) {
+        if (item && (item.id || item.username || item.phone)) {
+          upsertToMergedList(item as User);
+        }
+      }
+    }
+  } catch (supaErr) {
+    console.warn('Supabase fetch SYSTEM_CONFIG_USERS notice:', supaErr);
+  }
+
+  // 4. Load from Firebase Firestore
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    snap.forEach((d) => {
+      const dData = d.data();
+      if (dData) {
+        upsertToMergedList(dData as User);
+      }
+    });
+  } catch (fbErr) {
+    console.warn('Firestore fetch users notice:', fbErr);
   }
 
   const result = sortUsersNewestFirst(usersList);

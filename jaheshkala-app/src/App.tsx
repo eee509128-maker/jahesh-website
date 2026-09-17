@@ -1404,7 +1404,7 @@ export default function App() {
           else setUserOrdersModalOpen(true);
         }}
         onOpenAdmin={() => {
-          if (currentUser?.role === 'admin') {
+          if (currentUser?.role === 'admin' || currentUser?.role === 'operator') {
             setAdminModalOpen(true);
           } else {
             setAuthModalOpen(true);
@@ -1639,7 +1639,7 @@ export default function App() {
         onOpenTermsModal={() => setTermsModalOpen(true)}
         onOpenAuth={() => setAuthModalOpen(true)}
         onProceedToPayment={(appliedCoupon) => {
-          if (currentUser?.role === 'admin') {
+          if (currentUser?.role === 'admin' || currentUser?.role === 'operator') {
             handleAdminCartFreeCheckout(appliedCoupon);
             return;
           }
