@@ -24,6 +24,7 @@ import {
 import { Order, User, Product } from '../types';
 import { fetchOrdersFromDb, parseOrderTimestamp } from '../lib/dbService';
 import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
+import { hasAiAppInItems, generateAppLicense, checkLicenseStatus } from '../lib/appLicenseService';
 
 interface UserOrdersModalProps {
   isOpen: boolean;
@@ -616,6 +617,95 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                             <span>ورود به سامانه مدیریت املاک در تب جدید</span>
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* کارت اختصاصی مشخصات ورود به اپلیکیشن هوش مصنوعی (ویندوز / اندروید) */}
+                  {(order.appLicense || hasAiAppInItems(order.items)) && (() => {
+                    const license = order.appLicense || generateAppLicense(order, currentUser);
+                    const isUserCopied = copiedField === `ai-user-${order.id}`;
+                    const isPassCopied = copiedField === `ai-pass-${order.id}`;
+                    const isKeyCopied = copiedField === `ai-key-${order.id}`;
+                    const { isExpired, daysRemaining, formattedExpiryFa } = checkLicenseStatus(license);
+
+                    return (
+                      <div className="bg-gradient-to-br from-indigo-950/30 via-[#180f35] to-purple-950/40 border border-amber-400/70 rounded-2xl p-4 text-right space-y-3 shadow-md my-2 text-slate-100">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-purple-800/60">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">⚡</span>
+                            <div>
+                              <span className="font-black text-amber-300 text-xs sm:text-sm block">
+                                مشخصات ورود و لایسنس نرم‌افزار: {license.appName || license.productTitle}
+                              </span>
+                              <span className="text-[10px] text-purple-200">
+                                قابل استفاده در اپلیکیشن ویندوز و اندروید • شناسه: <strong className="font-mono text-amber-300">{license.licenseKey}</strong>
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 ${
+                              isExpired
+                                ? 'bg-rose-900/60 text-rose-200 border border-rose-600/50'
+                                : 'bg-emerald-900/60 text-emerald-200 border border-emerald-500/50'
+                            }`}>
+                              <span className={`w-2 h-2 rounded-full ${isExpired ? 'bg-rose-400' : 'bg-emerald-400 animate-pulse'}`} />
+                              <span>{isExpired ? 'اشتراک پایان یافته' : `اشتراک فعال (${daysRemaining} روز باقیمانده)`}</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {/* نام کاربری */}
+                          <div className="bg-[#110826] p-2.5 rounded-xl border border-purple-800/60 flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] text-slate-400 block font-sans">نام کاربری ورود (Username):</span>
+                              <span className="font-mono font-bold text-amber-300 text-xs">{license.username}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(license.username, `ai-user-${order.id}`)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-800/80 hover:bg-purple-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>{isUserCopied ? 'کپی شد!' : 'کپی'}</span>
+                            </button>
+                          </div>
+
+                          {/* رمز عبور */}
+                          <div className="bg-[#110826] p-2.5 rounded-xl border border-purple-800/60 flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] text-slate-400 block font-sans">رمز عبور ورود (Password):</span>
+                              <span className="font-mono font-bold text-emerald-300 text-xs tracking-wider">{license.password}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(license.password, `ai-pass-${order.id}`)}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-800/80 hover:bg-purple-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>{isPassCopied ? 'کپی شد!' : 'کپی'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1 text-xs">
+                          <span className="text-[11px] text-slate-300">
+                            مدت اشتراک: <strong>{license.days} روز</strong> • تاریخ انقضا: <strong className="text-amber-300">{formattedExpiryFa}</strong>
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const creds = `نرم‌افزار: ${license.appName || license.productTitle}\nنام کاربری: ${license.username}\nرمز عبور: ${license.password}\nکلید لایسنس: ${license.licenseKey}\nانقضا: ${formattedExpiryFa}`;
+                              handleCopyText(creds, `ai-key-${order.id}`);
+                            }}
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>{isKeyCopied ? 'همه مشخصات کپی شد!' : 'کپی کامل اطلاعات ورود به نرم‌افزار'}</span>
+                          </button>
                         </div>
                       </div>
                     );

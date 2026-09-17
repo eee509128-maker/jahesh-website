@@ -44,6 +44,11 @@ export interface Product {
   customPlansTitle?: string; // e.g. "پکیج‌های تبلیغات هوشمند"
   customPlansSubtitle?: string; // e.g. "انتخاب کنید و کمپین خود را به سطح بالاتری ببرید"
   subscriptionPlans?: SubscriptionPlan[]; // Array of custom tiers
+  isAiAppProduct?: boolean; // قابلیت اتصال به اپلیکیشن ویندوز/موبایل و تولید پرامپت هوش مصنوعی
+  aiAppName?: string; // نام اپلیکیشن یا نرم‌افزار در پرامپت
+  aiAppPlatform?: 'windows' | 'android' | 'cross-platform' | 'all'; // پلتفرم هدف
+  aiAppDefaultDays?: number; // مدت پیش‌فرض لایسنس به روز (مثلاً 7، 30، 365)
+  aiAppCustomPromptNote?: string; // نکات و قابلیت‌های اختصاصی برای درج در پرامپت هوش مصنوعی
   guild?: string; // صنف مرتبط با این خدمت یا کالا (مثلاً: املاک و مستغلات، طراحی سایت، رستوران...)
   targetGuilds?: string[]; // صنف‌های مرتبط
   painPointSolved?: string; // چالش و معضل اصلی صنف که این محصول حل می‌کند
@@ -163,6 +168,24 @@ export interface AmlakSubscriptionLicense {
   status: 'active' | 'expired';
 }
 
+export interface AppSubscriptionLicense {
+  id: string;
+  username: string;
+  password: string;
+  licenseKey: string;
+  productId: string;
+  productTitle: string;
+  appName?: string;
+  buyerName: string;
+  phone: string;
+  orderId: string;
+  days: number;
+  startDate: string;
+  expiresAt: string;
+  status: 'active' | 'expired';
+  apiEndpoint?: string;
+}
+
 export interface Order {
   id: string;
   trackingCode: string;
@@ -189,6 +212,7 @@ export interface Order {
   acceptedTerms: boolean;
   adminNotes?: string;
   amlakLicense?: AmlakSubscriptionLicense;
+  appLicense?: AppSubscriptionLicense;
 }
 
 export interface ChatMessage {
