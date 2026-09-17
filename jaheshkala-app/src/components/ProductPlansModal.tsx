@@ -21,8 +21,6 @@ export const ProductPlansModal: React.FC<ProductPlansModalProps> = ({
   onConfirm,
   onConfirmPlan,
 }) => {
-  if (!product) return null;
-
   const plans = product.subscriptionPlans || [];
   // Default to the popular plan or first plan
   const defaultPlan = plans.find((p) => p.isPopular) || plans[0] || null;
@@ -70,7 +68,7 @@ export const ProductPlansModal: React.FC<ProductPlansModalProps> = ({
 
           {/* Big Display Title */}
           <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-amber-400 tracking-tight leading-tight">
-            {product.customPlansTitle || product.title || 'تعرفه‌های نرم‌افزار جهش'}
+            {product.customPlansTitle || product.title}
           </h2>
 
           {/* Subtitle */}

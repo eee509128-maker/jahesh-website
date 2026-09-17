@@ -19,8 +19,6 @@ export const SubscriptionDurationModal: React.FC<SubscriptionDurationModalProps>
   onClose,
   onConfirm,
 }) => {
-  if (!product) return null;
-
   const [subscriptionDays, setSubscriptionDays] = useState<number>(30); // Default 1 month (30 days)
   const [isInstantBuyAction, setIsInstantBuyAction] = useState<boolean>(initialIsInstantBuy);
 
@@ -48,7 +46,7 @@ export const SubscriptionDurationModal: React.FC<SubscriptionDurationModalProps>
                 انتخاب مدت زمان اشتراک
               </h3>
               <p className="text-[11px] text-purple-200/90 font-medium truncate max-w-[240px] sm:max-w-xs mt-0.5">
-                {product.title || 'محصول جهش‌کالا'}
+                {product.title}
               </p>
             </div>
           </div>

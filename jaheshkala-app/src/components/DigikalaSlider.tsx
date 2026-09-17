@@ -146,7 +146,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
               {/* Full Banner Image respecting chosen Fit Mode */}
               <img
                 src={slide.image}
-                alt={slide.title || 'بنر جهش‌کالا'}
+                alt={slide.title}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
                     'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1600&q=80';

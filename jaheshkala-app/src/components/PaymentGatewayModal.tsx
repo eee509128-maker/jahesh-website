@@ -303,26 +303,22 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
 
             {/* List of items in cart */}
             <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-              {cartItems.map((item, idx) => {
-                const itemProd = item?.product;
-                const prodTitle = itemProd?.title || (item as any)?.title || 'محصول جهش‌کالا';
-                const planTitle = item?.selectedPlan?.name || item?.selectedPlan?.title;
-                const itemQty = Number(item?.quantity) || 1;
-                const unitPrice = item?.selectedPlan?.price !== undefined
+              {cartItems.map((item) => {
+                const unitPrice = item.selectedPlan?.price !== undefined
                   ? Number(item.selectedPlan.price)
-                  : (Number(itemProd?.price || (item as any)?.price) || 0);
+                  : (Number(item.product?.price) || 0);
                 return (
-                  <div key={itemProd?.id || idx} className="flex items-center justify-between text-xs py-1">
+                  <div key={item.product.id} className="flex items-center justify-between text-xs py-1">
                     <div className="flex items-center gap-2 truncate max-w-[200px] sm:max-w-[260px]">
                       <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0"></span>
                       <span className="text-white truncate">
-                        {prodTitle}
-                        {planTitle ? ` (${planTitle})` : ''}
+                        {item.product.title}
+                        {item.selectedPlan ? ` (${item.selectedPlan.name})` : ''}
                       </span>
-                      <span className="text-[10px] text-slate-400">({itemQty} عدد)</span>
+                      <span className="text-[10px] text-slate-400">({item.quantity} عدد)</span>
                     </div>
                     <span className="text-amber-300 font-bold shrink-0">
-                      {formatPrice(unitPrice * itemQty)}
+                      {formatPrice(unitPrice * item.quantity)}
                     </span>
                   </div>
                 );

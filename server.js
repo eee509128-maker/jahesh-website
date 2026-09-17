@@ -10,18 +10,6 @@ const app = express();
 const PORT = 3000;
 const HOST = '0.0.0.0';
 
-// Global CORS Middleware - Enables Cross-Origin API calls from Google AI Studio, Android, iOS, Windows and external apps
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
-
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -35,94 +23,7 @@ const PRODUCTS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'products');
 if (!fs.existsSync(PRODUCTS_UPLOADS_DIR)) {
   fs.mkdirSync(PRODUCTS_UPLOADS_DIR, { recursive: true });
 }
-const JAHESH_IMAGES_DIR = path.join(__dirname, 'jaheshkala', 'images');
-if (!fs.existsSync(JAHESH_IMAGES_DIR)) {
-  fs.mkdirSync(JAHESH_IMAGES_DIR, { recursive: true });
-}
 app.use('/uploads', express.static(UPLOADS_DIR));
-app.use('/jaheshkala/uploads', express.static(UPLOADS_DIR));
-app.use('/jaheshkala/images', express.static(JAHESH_IMAGES_DIR));
-app.use('/images', express.static(JAHESH_IMAGES_DIR));
-
-// ==========================================
-// Atomic JSON Disk Persistence & Backup Engine (Zero-Quota, High-Capacity)
-// ==========================================
-const DATA_DIR = path.join(__dirname, 'data');
-const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-if (!fs.existsSync(BACKUPS_DIR)) {
-  fs.mkdirSync(BACKUPS_DIR, { recursive: true });
-}
-
-function safeWriteJsonAtomic(targetPath, data) {
-  try {
-    const parent = path.dirname(targetPath);
-    if (!fs.existsSync(parent)) {
-      fs.mkdirSync(parent, { recursive: true });
-    }
-    const tempPath = `${targetPath}.${Date.now()}_${Math.random().toString(36).substring(2, 6)}.tmp`;
-    const jsonStr = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-    fs.writeFileSync(tempPath, jsonStr, 'utf8');
-    fs.renameSync(tempPath, targetPath);
-    return true;
-  } catch (err) {
-    console.error(`[SafeWriteJson] Failed to write ${targetPath}:`, err);
-    try {
-      const jsonStr = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-      fs.writeFileSync(targetPath, jsonStr, 'utf8');
-      return true;
-    } catch (directErr) {
-      console.error(`[SafeWriteJson] Direct fallback failed for ${targetPath}:`, directErr);
-      return false;
-    }
-  }
-}
-
-// ==========================================
-// High-Speed Zero-Quota Realtime Server-Sent Events (SSE) Engine
-// ==========================================
-const sseClients = new Set();
-
-export function broadcastServerEvent(eventType, payload) {
-  if (!sseClients || sseClients.size === 0) return;
-  const message = `event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`;
-  for (const client of sseClients) {
-    try {
-      client.write(message);
-    } catch (e) {
-      sseClients.delete(client);
-    }
-  }
-}
-
-app.get(['/api/realtime-stream', '/jaheshkala/api/realtime-stream'], (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders?.();
-
-  // Initial connection handshake
-  res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected', time: new Date().toISOString() })}\n\n`);
-
-  sseClients.add(res);
-
-  const keepAlive = setInterval(() => {
-    try {
-      res.write(': ping\n\n');
-    } catch {
-      clearInterval(keepAlive);
-      sseClients.delete(res);
-    }
-  }, 25000);
-
-  req.on('close', () => {
-    clearInterval(keepAlive);
-    sseClients.delete(res);
-  });
-});
 
 // Favicon and Web App Manifest routes for Googlebot, Search Engine Crawlers, browsers and mobile
 const faviconFiles = [
@@ -465,8 +366,11 @@ app.post('/api/banners', (req, res) => {
     if (!Array.isArray(banners)) {
       return res.status(400).json({ error: 'Expected array of banners' });
     }
-    safeWriteJsonAtomic(BANNERS_FILE, banners);
-    broadcastServerEvent('banners_updated', banners);
+    const dataDir = path.dirname(BANNERS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners, null, 2), 'utf8');
     console.log(`[Banners] Successfully persisted ${banners.length} banners across all devices.`);
     return res.json({ success: true, count: banners.length });
   } catch (err) {
@@ -515,8 +419,11 @@ app.post('/api/tools', (req, res) => {
     if (!Array.isArray(tools)) {
       return res.status(400).json({ error: 'Expected array of tools' });
     }
-    safeWriteJsonAtomic(TOOLS_FILE, tools);
-    broadcastServerEvent('tools_updated', tools);
+    const dataDir = path.dirname(TOOLS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
     console.log(`[Tools] Successfully persisted ${tools.length} dashboard tools.`);
     return res.json({ success: true, count: tools.length });
   } catch (err) {
@@ -544,8 +451,7 @@ app.post('/api/tools/save', (req, res) => {
       };
       tools.push(newTool);
     }
-    safeWriteJsonAtomic(TOOLS_FILE, tools);
-    broadcastServerEvent('tools_updated', tools);
+    fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
     return res.json({ success: true, tool });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -558,8 +464,7 @@ app.post('/api/tools/delete', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Tool id is required' });
     let tools = getStoredTools();
     tools = tools.filter(t => t.id !== id);
-    safeWriteJsonAtomic(TOOLS_FILE, tools);
-    broadcastServerEvent('tools_updated', tools);
+    fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
     return res.json({ success: true, remaining: tools.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -774,8 +679,11 @@ app.post('/api/products', (req, res) => {
     }
     const deletedIds = new Set(getDeletedProductIds());
     const filtered = products.filter((p) => p && p.id && !deletedIds.has(p.id));
-    safeWriteJsonAtomic(PRODUCTS_FILE, filtered);
-    broadcastServerEvent('products_updated', filtered);
+    const dataDir = path.dirname(PRODUCTS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
     console.log(`[Products] Successfully persisted ${filtered.length} products to disk.`);
     return res.json({ success: true, count: filtered.length });
   } catch (err) {
@@ -811,8 +719,11 @@ app.post('/api/products/save', (req, res) => {
     } else {
       list = [product, ...list];
     }
-    safeWriteJsonAtomic(PRODUCTS_FILE, list);
-    broadcastServerEvent('products_updated', list);
+    const dataDir = path.dirname(PRODUCTS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
     console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}`);
     return res.json({ success: true, products: list });
   } catch (err) {
@@ -840,8 +751,7 @@ app.post('/api/products/delete', (req, res) => {
       } catch {}
     }
     list = list.filter((p) => p.id !== productId);
-    safeWriteJsonAtomic(PRODUCTS_FILE, list);
-    broadcastServerEvent('products_updated', list);
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
     console.log(`[Products] Deleted product ${productId}. Total left: ${list.length}`);
     return res.json({ success: true, products: list });
   } catch (err) {
@@ -882,16 +792,19 @@ function readOrdersFromDisk() {
 
 function writeOrdersToDisk(orders) {
   try {
+    const dataDir = path.dirname(ORDERS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
     const sorted = sortOrdersNewestFirst(orders);
-    safeWriteJsonAtomic(ORDERS_FILE, sorted);
-    broadcastServerEvent('orders_updated', sorted);
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(sorted, null, 2), 'utf8');
   } catch (e) {
     console.error('Error writing orders.json:', e);
   }
 }
 
 // GET /api/orders
-app.get(['/api/orders', '/jaheshkala/api/orders'], (_req, res) => {
+app.get('/api/orders', (_req, res) => {
   try {
     const orders = readOrdersFromDisk();
     return res.json({ success: true, orders });
@@ -901,7 +814,7 @@ app.get(['/api/orders', '/jaheshkala/api/orders'], (_req, res) => {
 });
 
 // POST /api/orders
-app.post(['/api/orders', '/jaheshkala/api/orders'], (req, res) => {
+app.post('/api/orders', (req, res) => {
   try {
     let incoming = req.body;
     if (incoming && Array.isArray(incoming.orders)) {
@@ -930,72 +843,8 @@ app.post(['/api/orders', '/jaheshkala/api/orders'], (req, res) => {
   }
 });
 
-// Helper to automatically extract and register any app license from an order into app_licenses.json
-function syncOrderLicenseToDisk(order) {
-  if (!order) return;
-  try {
-    const licenses = readLicensesFromDisk();
-    let updated = false;
-
-    // 1. Direct appLicense attached to order
-    const candidateLic = order.appLicense || order.amlakLicense || order.softwareLicense;
-    if (candidateLic && (candidateLic.username || candidateLic.password || candidateLic.licenseKey)) {
-      const exists = licenses.some(
-        (l) => l.id === candidateLic.id || (l.username && candidateLic.username && l.username === candidateLic.username && l.productId === candidateLic.productId)
-      );
-      if (!exists) {
-        licenses.push({
-          id: candidateLic.id || `lic-${order.id}`,
-          username: candidateLic.username || order.customerPhone || order.customerName || 'customer',
-          password: candidateLic.password || candidateLic.licenseKey || 'JK-PASS',
-          licenseKey: candidateLic.licenseKey || candidateLic.password || 'JA-APP-KEY',
-          productId: candidateLic.productId || 'pkg-software',
-          productTitle: candidateLic.productTitle || order.items?.[0]?.title || 'محصول جهش‌کالا',
-          appName: candidateLic.appName || candidateLic.productTitle || 'اپلیکیشن جهش',
-          buyerName: candidateLic.buyerName || order.customerName || 'خریدار',
-          phone: candidateLic.phone || order.customerPhone || '',
-          days: candidateLic.days || (order.isSubscription ? order.subscriptionDays || 30 : 365),
-          startDate: candidateLic.startDate || order.createdAt || new Date().toISOString(),
-          expiresAt: candidateLic.expiresAt || new Date(Date.now() + (candidateLic.days || 30) * 86400000).toISOString(),
-          status: 'active',
-          orderId: order.id,
-        });
-        updated = true;
-      }
-    }
-
-    // 2. Scan items for subscriptions or software items
-    if (Array.isArray(order.items)) {
-      order.items.forEach((item, idx) => {
-        const itemLic = item.appLicense || item.amlakLicense;
-        if (itemLic) {
-          const exists = licenses.some(
-            (l) => l.id === itemLic.id || (l.username && itemLic.username && l.username === itemLic.username && l.productId === itemLic.productId)
-          );
-          if (!exists) {
-            licenses.push({
-              ...itemLic,
-              id: itemLic.id || `lic-${order.id}-${idx}`,
-              orderId: order.id,
-              status: 'active',
-            });
-            updated = true;
-          }
-        }
-      });
-    }
-
-    if (updated) {
-      writeLicensesToDisk(licenses);
-      console.log(`[LicenseSync] Auto-registered new app license from order ${order.id}. Total licenses: ${licenses.length}`);
-    }
-  } catch (err) {
-    console.warn('[LicenseSync] Warning during auto-syncing license:', err.message);
-  }
-}
-
 // POST /api/orders/save
-app.post(['/api/orders/save', '/jaheshkala/api/orders/save'], (req, res) => {
+app.post('/api/orders/save', (req, res) => {
   try {
     const order = req.body;
     if (!order || !order.id) {
@@ -1016,7 +865,6 @@ app.post(['/api/orders/save', '/jaheshkala/api/orders/save'], (req, res) => {
       updated = [order, ...current];
     }
     writeOrdersToDisk(updated);
-    syncOrderLicenseToDisk(order);
     console.log(`[Orders] Saved order ${order.id}. Total orders: ${updated.length}`);
     return res.json({ success: true, order, count: updated.length, orders: updated });
   } catch (err) {
@@ -1025,7 +873,7 @@ app.post(['/api/orders/save', '/jaheshkala/api/orders/save'], (req, res) => {
 });
 
 // POST /api/orders/update-status
-app.post(['/api/orders/update-status', '/jaheshkala/api/orders/update-status'], (req, res) => {
+app.post('/api/orders/update-status', (req, res) => {
   try {
     const { orderId, status } = req.body;
     if (!orderId || !status) {
@@ -1041,7 +889,7 @@ app.post(['/api/orders/update-status', '/jaheshkala/api/orders/update-status'], 
 });
 
 // POST /api/orders/delete
-app.post(['/api/orders/delete', '/jaheshkala/api/orders/delete'], (req, res) => {
+app.post('/api/orders/delete', (req, res) => {
   try {
     const { orderId } = req.body;
     if (!orderId) {
@@ -1057,7 +905,7 @@ app.post(['/api/orders/delete', '/jaheshkala/api/orders/delete'], (req, res) => 
 });
 
 // POST /api/orders/clear
-app.post(['/api/orders/clear', '/jaheshkala/api/orders/clear'], (_req, res) => {
+app.post('/api/orders/clear', (_req, res) => {
   try {
     writeOrdersToDisk([]);
     return res.json({ success: true, count: 0, orders: [] });
@@ -1120,15 +968,18 @@ function readUsersFromDisk() {
 
 function writeUsersToDisk(users) {
   try {
-    safeWriteJsonAtomic(USERS_FILE, users);
-    broadcastServerEvent('users_updated', users);
+    const dataDir = path.dirname(USERS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
   } catch (e) {
     console.error('Error writing users.json:', e);
   }
 }
 
 // GET /api/users
-app.get(['/api/users', '/jaheshkala/api/users'], (_req, res) => {
+app.get('/api/users', (_req, res) => {
   try {
     const users = readUsersFromDisk();
     return res.json({ success: true, users });
@@ -1138,7 +989,7 @@ app.get(['/api/users', '/jaheshkala/api/users'], (_req, res) => {
 });
 
 // POST /api/users/update-role
-app.post(['/api/users/update-role', '/jaheshkala/api/users/update-role'], (req, res) => {
+app.post('/api/users/update-role', (req, res) => {
   try {
     const { id, username, phone, role } = req.body || {};
     if (!role) {
@@ -1174,7 +1025,7 @@ app.post(['/api/users/update-role', '/jaheshkala/api/users/update-role'], (req, 
 });
 
 // POST /api/users (bulk or single user save/update)
-app.post(['/api/users', '/jaheshkala/api/users'], (req, res) => {
+app.post('/api/users', (req, res) => {
   try {
     let incoming = req.body;
     if (incoming && Array.isArray(incoming.users)) {
@@ -1204,7 +1055,7 @@ app.post(['/api/users', '/jaheshkala/api/users'], (req, res) => {
 });
 
 // POST /api/users/save
-app.post(['/api/users/save', '/jaheshkala/api/users/save'], (req, res) => {
+app.post('/api/users/save', (req, res) => {
   try {
     const user = req.body;
     if (!user || (!user.id && !user.username && !user.phone)) {
@@ -1219,643 +1070,6 @@ app.post(['/api/users/save', '/jaheshkala/api/users/save'], (req, res) => {
     }
     writeUsersToDisk(current);
     return res.json({ success: true, user, count: current.length });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/users/delete
-app.post(['/api/users/delete', '/jaheshkala/api/users/delete'], (req, res) => {
-  try {
-    const { id, username, phone } = req.body || {};
-    if (!id && !username && !phone) {
-      return res.status(400).json({ error: 'User identifier required' });
-    }
-    const current = readUsersFromDisk();
-    const target = { id, username, phone };
-    const filtered = current.filter((u) => !matchUser(u, target));
-    writeUsersToDisk(filtered);
-    console.log(`[Users] Deleted user ${username || phone || id}. Remaining: ${filtered.length}`);
-    return res.json({ success: true, count: filtered.length, users: filtered });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// ==========================================
-// Coupons Management API
-// ==========================================
-const COUPONS_FILE = path.join(__dirname, 'data', 'coupons.json');
-
-function readCouponsFromDisk() {
-  if (fs.existsSync(COUPONS_FILE)) {
-    try {
-      const raw = fs.readFileSync(COUPONS_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (e) {
-      console.warn('Error reading coupons.json:', e);
-    }
-  }
-  return [];
-}
-
-function writeCouponsToDisk(coupons) {
-  try {
-    safeWriteJsonAtomic(COUPONS_FILE, coupons);
-    broadcastServerEvent('coupons_updated', coupons);
-  } catch (e) {
-    console.error('Error writing coupons.json:', e);
-  }
-}
-
-app.get(['/api/coupons', '/jaheshkala/api/coupons'], (_req, res) => {
-  try {
-    const coupons = readCouponsFromDisk();
-    return res.json({ success: true, coupons });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-app.post(['/api/coupons', '/jaheshkala/api/coupons', '/api/coupons/save', '/jaheshkala/api/coupons/save'], (req, res) => {
-  try {
-    const coupon = req.body;
-    if (!coupon || !coupon.code) {
-      return res.status(400).json({ error: 'Invalid coupon' });
-    }
-    const current = readCouponsFromDisk();
-    const cleanCode = String(coupon.code).trim().toUpperCase();
-    const idx = current.findIndex((c) => c.code && c.code.toUpperCase() === cleanCode);
-    if (idx >= 0) {
-      current[idx] = { ...current[idx], ...coupon, code: cleanCode };
-    } else {
-      current.unshift({ ...coupon, id: coupon.id || `c-${Date.now()}`, code: cleanCode });
-    }
-    writeCouponsToDisk(current);
-    return res.json({ success: true, coupons: current });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-app.post(['/api/coupons/delete', '/jaheshkala/api/coupons/delete'], (req, res) => {
-  try {
-    const { code, id } = req.body || {};
-    const current = readCouponsFromDisk();
-    const filtered = current.filter((c) => c.id !== id && (!code || c.code?.toUpperCase() !== String(code).toUpperCase()));
-    writeCouponsToDisk(filtered);
-    return res.json({ success: true, count: filtered.length, coupons: filtered });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// ==========================================
-// Live Chat & Support Messages API (Zero-Quota Local Disk Persistence)
-// ==========================================
-const CHATS_FILE = path.join(__dirname, 'data', 'chats.json');
-
-function readChatsFromDisk() {
-  if (fs.existsSync(CHATS_FILE)) {
-    try {
-      const raw = fs.readFileSync(CHATS_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (e) {
-      console.warn('Error reading chats.json:', e);
-    }
-  }
-  return [];
-}
-
-function writeChatsToDisk(chats) {
-  try {
-    safeWriteJsonAtomic(CHATS_FILE, chats);
-    broadcastServerEvent('chats_updated', chats);
-  } catch (e) {
-    console.error('Error writing chats.json:', e);
-  }
-}
-
-app.get(['/api/chats', '/jaheshkala/api/chats'], (_req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  try {
-    const chats = readChatsFromDisk();
-    return res.json({ success: true, chats });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-app.post(['/api/chats', '/jaheshkala/api/chats', '/api/chats/save', '/jaheshkala/api/chats/save'], (req, res) => {
-  try {
-    const chat = req.body;
-    if (!chat || !chat.userId) {
-      return res.status(400).json({ error: 'Chat userId is required' });
-    }
-    const current = readChatsFromDisk();
-    const idx = current.findIndex((c) => c.userId === chat.userId);
-    if (idx >= 0) {
-      current[idx] = { ...current[idx], ...chat, lastUpdated: new Date().toISOString() };
-    } else {
-      current.unshift({ ...chat, lastUpdated: new Date().toISOString() });
-    }
-    writeChatsToDisk(current);
-    return res.json({ success: true, chat, count: current.length });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-app.post(['/api/chats/delete', '/jaheshkala/api/chats/delete'], (req, res) => {
-  try {
-    const { userId } = req.body || {};
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-    const current = readChatsFromDisk();
-    const filtered = current.filter((c) => c.userId !== userId);
-    writeChatsToDisk(filtered);
-    return res.json({ success: true, remaining: filtered.length });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// ==========================================
-// AI Application Authentication & Subscription License API (Windows, Android & Cross-Platform)
-// ==========================================
-const APP_LICENSES_FILE = path.join(__dirname, 'data', 'app_licenses.json');
-
-function readLicensesFromDisk() {
-  if (fs.existsSync(APP_LICENSES_FILE)) {
-    try {
-      const raw = fs.readFileSync(APP_LICENSES_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (e) {
-      console.warn('Error reading app_licenses.json:', e);
-    }
-  }
-  return [];
-}
-
-function writeLicensesToDisk(licenses) {
-  try {
-    const dataDir = path.dirname(APP_LICENSES_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(APP_LICENSES_FILE, JSON.stringify(licenses, null, 2), 'utf8');
-  } catch (e) {
-    console.error('Error writing app_licenses.json:', e);
-  }
-}
-
-// POST /api/app-auth - Core Login for Windows & Mobile Apps built with AI
-app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
-  try {
-    const body = req.body || {};
-    const rawUser = body.username || body.user || body.phone || body.mobile || body.login || body.identifier || '';
-    const rawPass = body.password || body.pass || body.licenseKey || body.license || body.key || body.token || '';
-    const rawProd = body.productId || body.product_id || body.appId || body.packageId || '';
-    const rawAppName = body.appName || body.productTitle || '';
-
-    if (!rawUser || !rawPass) {
-      return res.status(400).json({
-        success: false,
-        authenticated: false,
-        expired: false,
-        message: 'نام کاربری (یا شماره همراه) و رمز عبور (یا کلید لایسنس) الزامی است.',
-      });
-    }
-
-    const cleanUser = String(rawUser).trim().toLowerCase();
-    const cleanPass = String(rawPass).trim();
-    const cleanProd = String(rawProd).trim().toLowerCase();
-    const cleanPhone = normalizePhone(cleanUser);
-
-    // 1. Master administrator and Default VIP credentials (Lifetime access)
-    const isAdminUser =
-      cleanUser === 'jahesh' ||
-      cleanUser === 'admin' ||
-      cleanUser === 'jahesh_admin' ||
-      cleanUser === 'jahesh1395@gmail.com' ||
-      cleanUser === 'erfanmoghaddammotagi@gmail.com';
-    const isMasterPass = cleanPass === 'jahesh1395' || cleanPass.startsWith('JK-') || cleanPass.startsWith('JA-APP-') || cleanPass === 'JA-ADM-LIFETIME-VIP';
-    
-    if (isAdminUser && isMasterPass) {
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 3650 * 24 * 60 * 60 * 1000);
-      const token = Buffer.from(JSON.stringify({ u: cleanUser, role: 'admin', prod: cleanProd || 'pkg-amlak-jahesh', exp: expiresAt.getTime() })).toString('base64');
-      return res.json({
-        success: true,
-        authenticated: true,
-        expired: false,
-        status: 'active',
-        token,
-        daysRemaining: 3650,
-        startDate: now.toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        licenseKey: cleanPass.startsWith('JA-APP-') ? cleanPass : 'JA-APP-2026-PXGMZ8',
-        productId: cleanProd || 'pkg-amlak-jahesh',
-        productTitle: 'سامانه مدیریت املاک جهش (اشتراک آنلاین و ابری)',
-        user: {
-          username: cleanUser,
-          fullName: 'مدیر کل جهش‌کالا',
-          phone: '09364864663',
-          email: 'jahesh1395@gmail.com',
-        },
-        message: 'ورود موفقیت‌آمیز بود. دسترسی اشتراک فعال است.',
-      });
-    }
-
-    // Product matching helper (supports aliases and normalized IDs)
-    const matchesProduct = (licProdId) => {
-      if (!cleanProd || !licProdId) return true;
-      const lProd = String(licProdId).trim().toLowerCase();
-      if (lProd === cleanProd) return true;
-      if (cleanProd.includes('amlak') && lProd.includes('amlak')) return true;
-      if (cleanProd.includes('estate') && lProd.includes('estate')) return true;
-      return false;
-    };
-
-    // 2. Search in dedicated app licenses
-    const allLicenses = readLicensesFromDisk();
-    try {
-      const amlakLicenses = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'amlak_licenses.json'), 'utf8') || '[]');
-      if (Array.isArray(amlakLicenses)) {
-        allLicenses.push(...amlakLicenses.map(l => ({ ...l, productId: l.productId || 'pkg-amlak-jahesh' })));
-      }
-    } catch (e) {}
-
-    let targetLicense = allLicenses.find((l) => {
-      if (!l) return false;
-      const lUser = String(l.username || '').trim().toLowerCase();
-      const lPhone = normalizePhone(l.phone || '');
-      const lKey = String(l.licenseKey || '').trim().toLowerCase();
-      const userMatches = lUser === cleanUser || (cleanPhone && lPhone === cleanPhone) || lKey === cleanUser;
-      if (!userMatches) return false;
-      if (!matchesProduct(l.productId)) return false;
-      return true;
-    });
-
-    // 3. If not found in dedicated licenses, check orders for this product
-    if (!targetLicense) {
-      const allOrders = readOrdersFromDisk();
-      for (const order of allOrders) {
-        if (!order) continue;
-        const lic = order.appLicense || order.amlakLicense;
-        const licUser = String(lic?.username || '').trim().toLowerCase();
-        const custName = String(order.customerName || '').trim().toLowerCase();
-        const licPhone = normalizePhone(lic?.phone || order.customerPhone || '');
-        const licKey = String(lic?.licenseKey || '').trim().toLowerCase();
-        const tracking = String(order.trackingCode || '').trim().toLowerCase();
-
-        if (
-          (lic && (lic.username || lic.licenseKey)) || order.customerName || order.customerPhone
-        ) {
-          if (
-            licUser === cleanUser ||
-            custName === cleanUser ||
-            custName.includes(cleanUser) ||
-            cleanUser.includes(custName) ||
-            (cleanPhone && licPhone === cleanPhone) ||
-            (cleanPhone && normalizePhone(order.customerPhone) === cleanPhone) ||
-            licKey === cleanUser ||
-            tracking === cleanUser
-          ) {
-            targetLicense = {
-              ...(lic || {}),
-              username: lic?.username || order.customerPhone || cleanUser,
-              password: lic?.password || cleanPass || 'JK-PASS',
-              licenseKey: lic?.licenseKey || `JA-APP-2026-${order.id || 'GEN'}`,
-              productId: lic?.productId || cleanProd || 'pkg-amlak-jahesh',
-              productTitle: lic?.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع مدیریت املاک جهش',
-              appName: lic?.appName || 'سامانه مدیریت املاک جهش',
-              buyerName: order.customerName || 'مشتری جهش',
-              phone: order.customerPhone || '',
-              days: lic?.days || 30,
-              startDate: order.createdAt || new Date().toISOString(),
-              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-              status: 'active',
-              orderId: order.id,
-            };
-            break;
-          }
-        }
-      }
-    }
-
-    // 4. If still not found, check if credentials belong to a DIFFERENT product (Strict Product Isolation)
-    if (!targetLicense && cleanProd) {
-      const crossProductLicense = allLicenses.find((l) => {
-        if (!l) return false;
-        const lUser = String(l.username || '').trim().toLowerCase();
-        const lPhone = normalizePhone(l.phone || '');
-        const lKey = String(l.licenseKey || '').trim().toLowerCase();
-        const userMatches = lUser === cleanUser || (cleanPhone && lPhone === cleanPhone) || lKey === cleanUser;
-        return userMatches && l.productId && !matchesProduct(l.productId);
-      });
-
-      if (crossProductLicense) {
-        return res.status(401).json({
-          success: false,
-          authenticated: false,
-          expired: false,
-          productMismatch: true,
-          targetProductId: cleanProd,
-          ownedProductId: crossProductLicense.productId,
-          message: `این نام کاربری و رمز عبور برای «${crossProductLicense.productTitle || crossProductLicense.appName || 'محصول دیگری'}» خریداری شده است و اجازه ورود به این برنامه را ندارد.`,
-        });
-      }
-    }
-
-    // 5. AUTO-HEAL: If still not found, auto-create a valid active license for any login attempt so customer is never blocked
-    if (!targetLicense) {
-      const newAutoLicense = {
-        id: `lic_auto_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        username: cleanUser || 'customer',
-        password: cleanPass || 'JK-PASS',
-        licenseKey: `JA-APP-2026-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-        productId: cleanProd || 'pkg-amlak-jahesh',
-        productTitle: 'نرم‌افزار جامع مدیریت املاک جهش',
-        appName: 'سامانه مدیریت املاک جهش',
-        buyerName: cleanUser || 'مشتری جهش‌کالا',
-        phone: cleanPhone || '',
-        days: 30,
-        startDate: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'active',
-      };
-      const allLic = readLicensesFromDisk();
-      allLic.unshift(newAutoLicense);
-      writeLicensesToDisk(allLic);
-      targetLicense = newAutoLicense;
-    }
-
-    // Verify license password (accept password, licenseKey, or master bypass)
-    const licPass = String(targetLicense.password || '').trim();
-    const licKey = String(targetLicense.licenseKey || '').trim();
-    const passMatches =
-      licPass === cleanPass ||
-      licKey === cleanPass ||
-      cleanPass === 'jahesh1395' ||
-      cleanPass.toLowerCase() === licKey.toLowerCase();
-
-    if (!passMatches) {
-      return res.status(401).json({
-        success: false,
-        authenticated: false,
-        expired: false,
-        message: 'رمز عبور یا کلید لایسنس وارد شده نادرست است.',
-      });
-    }
-
-    // 6. Evaluate expiration & days remaining dynamically
-    const now = new Date();
-    let startDate = targetLicense.startDate ? new Date(targetLicense.startDate) : now;
-    if (isNaN(startDate.getTime())) {
-      startDate = targetLicense.createdAt ? new Date(targetLicense.createdAt) : now;
-      if (isNaN(startDate.getTime())) startDate = now;
-    }
-
-    let expiresAt = targetLicense.expiresAt ? new Date(targetLicense.expiresAt) : null;
-    if (!expiresAt || isNaN(expiresAt.getTime())) {
-      expiresAt = new Date(startDate.getTime() + (targetLicense.days || 7) * 24 * 60 * 60 * 1000);
-    }
-
-    const diffMs = expiresAt.getTime() - now.getTime();
-    const isExpired = diffMs <= 0;
-    const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    if (isExpired) {
-      return res.json({
-        success: false,
-        authenticated: true,
-        expired: true,
-        status: 'expired',
-        daysRemaining: 0,
-        startDate: startDate.toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        productId: targetLicense.productId || cleanProd,
-        productTitle: targetLicense.productTitle || appName || 'اپلیکیشن جهش',
-        renewUrl: 'https://jaheshit.ir/jaheshkala',
-        message: 'مدت زمان اشتراک شما برای این نرم‌افزار به پایان رسیده است. لطفاً جهت تمدید اشتراک به وب‌سایت جهش‌کالا مراجعه فرمایید.',
-      });
-    }
-
-    // 7. Return success with token & dynamic remaining days
-    const token = Buffer.from(
-      JSON.stringify({
-        u: targetLicense.username,
-        lic: targetLicense.licenseKey,
-        prod: targetLicense.productId,
-        exp: expiresAt.getTime(),
-      })
-    ).toString('base64');
-
-    return res.json({
-      success: true,
-      authenticated: true,
-      expired: false,
-      status: 'active',
-      token,
-      daysRemaining,
-      startDate: startDate.toISOString(),
-      expiresAt: expiresAt.toISOString(),
-      licenseKey: targetLicense.licenseKey || 'JA-APP-ACTIVE',
-      productId: targetLicense.productId || cleanProd || 'pkg-amlak-jahesh',
-      productTitle: targetLicense.productTitle || appName || 'سامانه مدیریت املاک جهش',
-      user: {
-        username: targetLicense.username,
-        fullName: targetLicense.buyerName || 'کاربر گرامی جهش',
-        phone: targetLicense.phone || '',
-      },
-      message: `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${daysRemaining} روز اعتبار می‌باشد.`,
-    });
-  } catch (err) {
-    console.error('Error in /api/app-auth:', err);
-    return res.status(500).json({
-      success: false,
-      error: 'خطای سرور در احراز هویت لایسنس',
-      details: err.message,
-    });
-  }
-});
-
-// POST /api/app-auth/verify - Heartbeat verification for running apps
-app.post(['/api/app-auth/verify', '/jaheshkala/api/app-auth/verify'], (req, res) => {
-  try {
-    let authHeader = req.headers['authorization'] || '';
-    let token = req.body?.token;
-    if (authHeader.startsWith('Bearer ')) {
-      token = authHeader.slice(7).trim();
-    }
-
-    const { username, licenseKey, productId } = req.body || {};
-    const cleanProd = String(productId || '').trim();
-
-    if (token) {
-      try {
-        const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf8'));
-        const now = Date.now();
-        if (cleanProd && decoded.prod && decoded.prod !== cleanProd) {
-          return res.status(401).json({
-            success: false,
-            productMismatch: true,
-            expired: false,
-            message: 'این نشست متعلق به محصول دیگری است.',
-          });
-        }
-        if (decoded.exp && decoded.exp < now) {
-          return res.json({
-            success: false,
-            expired: true,
-            status: 'expired',
-            daysRemaining: 0,
-            renewUrl: 'https://jaheshit.ir/jaheshkala',
-            message: 'مدت اعتبار توکن اشتراک به پایان رسیده است.',
-          });
-        }
-        const diffMs = (decoded.exp || now) - now;
-        const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-        return res.json({
-          success: true,
-          expired: false,
-          status: 'active',
-          daysRemaining,
-          username: decoded.u,
-          message: 'نشست و لایسنس معتبر است.',
-        });
-      } catch {}
-    }
-
-    if (!username && !licenseKey) {
-      return res.status(400).json({ success: false, message: 'توکن یا نام کاربری الزامی است.' });
-    }
-
-    const cleanUser = String(username || '').trim().toLowerCase();
-    const cleanPhone = normalizePhone(cleanUser);
-    const cleanKey = String(licenseKey || '').trim();
-
-    const allLicenses = readLicensesFromDisk();
-    const targetLicense = allLicenses.find((l) => {
-      if (!l) return false;
-      const lUser = String(l.username || '').trim().toLowerCase();
-      const lPhone = normalizePhone(l.phone || '');
-      const userMatches = lUser === cleanUser || (cleanPhone && lPhone === cleanPhone);
-      const keyMatches = cleanKey && l.licenseKey === cleanKey;
-      const pMatch = !cleanProd || l.productId === cleanProd;
-      return (userMatches || keyMatches) && pMatch;
-    });
-
-    if (!targetLicense) {
-      return res.json({
-        success: false,
-        expired: true,
-        status: 'not_found',
-        daysRemaining: 0,
-        renewUrl: 'https://jaheshit.ir/jaheshkala',
-        message: 'لایسنس فعالی برای این محصول یافت نشد.',
-      });
-    }
-
-    const now = new Date();
-    let startDate = targetLicense.startDate ? new Date(targetLicense.startDate) : now;
-    if (isNaN(startDate.getTime())) {
-      startDate = targetLicense.createdAt ? new Date(targetLicense.createdAt) : now;
-      if (isNaN(startDate.getTime())) startDate = now;
-    }
-
-    let expiresAt = targetLicense.expiresAt ? new Date(targetLicense.expiresAt) : null;
-    if (!expiresAt || isNaN(expiresAt.getTime())) {
-      expiresAt = new Date(startDate.getTime() + (targetLicense.days || 7) * 24 * 60 * 60 * 1000);
-    }
-
-    const diffMs = expiresAt.getTime() - now.getTime();
-    const isExpired = diffMs <= 0;
-    const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    if (isExpired) {
-      return res.json({
-        success: false,
-        expired: true,
-        status: 'expired',
-        daysRemaining: 0,
-        productId: targetLicense.productId,
-        renewUrl: 'https://jaheshit.ir/jaheshkala',
-        message: 'اشتراک شما منقضی شده است. جهت تمدید به سایت جهش کالا مراجعه فرمایید.',
-      });
-    }
-
-    return res.json({
-      success: true,
-      expired: false,
-      status: 'active',
-      daysRemaining,
-      productId: targetLicense.productId,
-      expiresAt: expiresAt.toISOString(),
-      message: `لایسنس معتبر است (${daysRemaining} روز باقیمانده).`,
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// POST /api/app-auth/register-license - Registers or updates a license
-app.post(['/api/app-auth/register-license', '/jaheshkala/api/app-auth/register-license'], (req, res) => {
-  try {
-    const license = req.body;
-    if (!license || !license.username || !license.password) {
-      return res.status(400).json({ error: 'اطلاعات لایسنس شامل نام کاربری و رمز الزامی است.' });
-    }
-
-    const licenses = readLicensesFromDisk();
-    const idx = licenses.findIndex(
-      (l) => l.id === license.id || (l.username === license.username && l.productId === license.productId)
-    );
-
-    if (idx >= 0) {
-      licenses[idx] = { ...licenses[idx], ...license };
-    } else {
-      licenses.unshift(license);
-    }
-
-    writeLicensesToDisk(licenses);
-    console.log(`[License Engine] Saved license for ${license.username} (${license.productTitle || 'App'}). Total: ${licenses.length}`);
-    return res.json({ success: true, count: licenses.length, license });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/app-auth & /api/app-auth/licenses - Returns all licenses with live expiration status
-app.get(['/api/app-auth', '/api/app-auth/licenses', '/jaheshkala/api/app-auth', '/jaheshkala/api/app-auth/licenses'], (_req, res) => {
-  try {
-    const licenses = readLicensesFromDisk();
-    const now = new Date();
-    const enriched = licenses.map((lic) => {
-      let startDate = lic.startDate ? new Date(lic.startDate) : now;
-      if (isNaN(startDate.getTime())) startDate = now;
-
-      let expiresAt = lic.expiresAt ? new Date(lic.expiresAt) : null;
-      if (!expiresAt || isNaN(expiresAt.getTime())) {
-        expiresAt = new Date(startDate.getTime() + (lic.days || 7) * 24 * 60 * 60 * 1000);
-      }
-
-      const diffMs = expiresAt ? expiresAt.getTime() - now.getTime() : 0;
-      const isExpired = !expiresAt || diffMs <= 0;
-      const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      return {
-        ...lic,
-        isExpired,
-        daysRemaining,
-        liveStatus: isExpired ? 'expired' : 'active',
-      };
-    });
-    return res.json({ success: true, count: enriched.length, licenses: enriched });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -2129,8 +1343,7 @@ function getAmlakLicensesFromServer() {
       password: 'jahesh1395',
       licenseKey: 'JA-ROOT-ADMIN-VIP',
       buyerName: 'مدیر کل فروشگاه جهش‌کالا',
-      phone: '09364864663',
-      email: 'jahesh1395@gmail.com',
+      phone: '09152331974',
       days: 365,
       startDate: '۱۴۰۴/۰۱/۰۱',
       expiresAt: '۱۴۰۵/۰۱/۰۱',

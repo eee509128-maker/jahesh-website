@@ -24,7 +24,6 @@ import {
 import { Order, User, Product } from '../types';
 import { fetchOrdersFromDb, parseOrderTimestamp } from '../lib/dbService';
 import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
-import { hasAiAppInItems, generateAppLicense, checkLicenseStatus } from '../lib/appLicenseService';
 
 interface UserOrdersModalProps {
   isOpen: boolean;
@@ -39,7 +38,7 @@ interface UserOrdersModalProps {
 export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   isOpen,
   onClose,
-  orders: initialOrders = [],
+  orders: initialOrders,
   currentUser,
   onOpenShop,
   products = [],
@@ -114,14 +113,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   const cleanUserId = currentUser?.id?.trim();
   const searchPhone = normalizeDigits(manualPhoneSearch);
 
-  const formatPersianDateSafe = (dateStr?: string) => {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' });
-  };
-
-  const userOrders = (currentOrders || [])
+  const userOrders = currentOrders
     .filter((o) => {
       if (currentUser?.role === 'admin') return true;
 
@@ -242,13 +234,13 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
     return 1; // در حال بررسی
   };
 
-  const getResolvedProduct = (itemProduct?: Product) => {
-    if (!itemProduct) return undefined;
-    const cleanItemTitle = itemProduct.title ? String(itemProduct.title).trim().toLowerCase() : '';
-    const live = (products || []).find(
+  const getResolvedProduct = (itemProduct: Product) => {
+    if (!itemProduct) return itemProduct;
+    const cleanItemTitle = itemProduct.title?.trim().toLowerCase();
+    const live = products.find(
       (p) =>
-        (p?.id && itemProduct?.id && p.id === itemProduct.id) ||
-        (cleanItemTitle && p?.title && p.title.trim().toLowerCase() === cleanItemTitle)
+        (p.id && itemProduct.id && p.id === itemProduct.id) ||
+        (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
     );
     return live ? { ...itemProduct, ...live } : itemProduct;
   };
@@ -320,7 +312,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
         {/* Orders List Content */}
         <div className="p-6 overflow-y-auto flex-1 space-y-4 text-right">
-          {(userOrders || []).length === 0 ? (
+          {userOrders.length === 0 ? (
             <div className="text-center py-12 space-y-3">
               <div className="w-14 h-14 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-400 flex items-center justify-center mx-auto border border-purple-200 dark:border-purple-800/40 shadow-sm">
                 <ShoppingBag className="w-6 h-6" />
@@ -342,7 +334,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
               </button>
             </div>
           ) : (
-            (userOrders || []).map((order) => {
+            userOrders.map((order) => {
               const stepIdx = getStepIndex(order.status);
               const isCanceled = order.status === 'لغو شده';
               const isPhysicalDelivery =
@@ -471,15 +463,9 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
                   {/* Items in order */}
                   <div className="space-y-2">
-                    {(order.items || []).map((item, idx) => {
-                      const prod = getResolvedProduct(item?.product);
-                      const prodTitle = prod?.title || item?.product?.title || (item as any)?.title || 'محصول جهش‌کالا';
-                      const prodImg = prod?.image || item?.product?.image;
-                      const planName = item?.selectedPlan?.name || item?.selectedPlan?.title;
-                      const itemQuantity = Number(item?.quantity) || 1;
-                      const unitPrice = item?.selectedPlan?.price !== undefined
-                        ? Number(item.selectedPlan.price)
-                        : (Number(prod?.price || item?.product?.price) || 0);
+                    {order.items.map((item, idx) => {
+                      const prod = getResolvedProduct(item.product);
+                      const prodImg = prod?.image || item.product?.image;
 
                       return (
                         <div
@@ -491,7 +477,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                               {prodImg ? (
                                 <img
                                   src={prodImg}
-                                  alt={prodTitle}
+                                  alt={prod.title}
                                   className="w-full h-full object-contain"
                                 />
                               ) : (
@@ -500,17 +486,17 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                             </div>
                             <div className="space-y-0.5">
                               <span className="text-slate-900 dark:text-white font-bold text-xs sm:text-sm block line-clamp-1">
-                                {prodTitle}
-                                {planName ? ` (${planName})` : ''}
+                                {prod.title}
+                                {item.selectedPlan ? ` (${item.selectedPlan.name})` : ''}
                               </span>
                               <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
-                                <span>تعداد: <strong className="text-purple-700 dark:text-purple-300 font-bold">{itemQuantity}</strong> عدد</span>
-                                {planName ? (
+                                <span>تعداد: <strong className="text-purple-700 dark:text-purple-300 font-bold">{item.quantity}</strong> عدد</span>
+                                {item.selectedPlan ? (
                                   <>
                                     <span>•</span>
-                                    <span className="text-amber-700 dark:text-amber-300 font-bold">تعرفه {planName}</span>
+                                    <span className="text-amber-700 dark:text-amber-300 font-bold">تعرفه {item.selectedPlan.name}</span>
                                   </>
-                                ) : prod?.category ? (
+                                ) : prod.category ? (
                                   <>
                                     <span>•</span>
                                     <span className="text-purple-700 dark:text-purple-400 font-bold">{prod.category}</span>
@@ -520,18 +506,11 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                             </div>
                           </div>
                           <span className="text-purple-900 dark:text-amber-300 font-black text-xs sm:text-sm shrink-0">
-                            {formatPrice(unitPrice * itemQuantity)}
+                            {formatPrice((item.selectedPlan?.price !== undefined ? item.selectedPlan.price : prod.price) * item.quantity)}
                           </span>
                         </div>
                       );
                     })}
-                    {(!order.items || order.items.length === 0) && (
-                      <div className="text-xs text-slate-400 bg-slate-50 dark:bg-purple-950/30 p-2.5 rounded-xl border border-slate-200 dark:border-purple-900/30">
-                        <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {order.appLicense?.productTitle || order.appLicense?.appName || 'سفارش ثبت‌شده جهش‌کالا'}
-                        </span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Details Footer */}
@@ -625,7 +604,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
                           <span className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">
-                            اعتبار اشتراک تا: <strong className="text-amber-800 dark:text-amber-300 font-bold">{formatPersianDateSafe(license.expiresAt)}</strong>
+                            اعتبار اشتراک تا: <strong className="text-amber-800 dark:text-amber-300 font-bold">{license.expiresAt}</strong>
                           </span>
 
                           <a
@@ -642,101 +621,12 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                     );
                   })()}
 
-                  {/* کارت اختصاصی مشخصات ورود به اپلیکیشن هوش مصنوعی (ویندوز / اندروید) */}
-                  {(order.appLicense || hasAiAppInItems(order.items)) && (() => {
-                    const license = order.appLicense || generateAppLicense(order, currentUser);
-                    const isUserCopied = copiedField === `ai-user-${order.id}`;
-                    const isPassCopied = copiedField === `ai-pass-${order.id}`;
-                    const isKeyCopied = copiedField === `ai-key-${order.id}`;
-                    const { isExpired, daysRemaining, formattedExpiryFa } = checkLicenseStatus(license);
-
-                    return (
-                      <div className="bg-gradient-to-br from-indigo-950/30 via-[#180f35] to-purple-950/40 border border-amber-400/70 rounded-2xl p-4 text-right space-y-3 shadow-md my-2 text-slate-100">
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-purple-800/60">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">⚡</span>
-                            <div>
-                              <span className="font-black text-amber-300 text-xs sm:text-sm block">
-                                مشخصات ورود و لایسنس نرم‌افزار: {license.appName || license.productTitle}
-                              </span>
-                              <span className="text-[10px] text-purple-200">
-                                قابل استفاده در اپلیکیشن ویندوز و اندروید • شناسه: <strong className="font-mono text-amber-300">{license.licenseKey}</strong>
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 ${
-                              isExpired
-                                ? 'bg-rose-900/60 text-rose-200 border border-rose-600/50'
-                                : 'bg-emerald-900/60 text-emerald-200 border border-emerald-500/50'
-                            }`}>
-                              <span className={`w-2 h-2 rounded-full ${isExpired ? 'bg-rose-400' : 'bg-emerald-400 animate-pulse'}`} />
-                              <span>{isExpired ? 'اشتراک پایان یافته' : `اشتراک فعال (${daysRemaining} روز باقیمانده)`}</span>
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                          {/* نام کاربری */}
-                          <div className="bg-[#110826] p-2.5 rounded-xl border border-purple-800/60 flex items-center justify-between">
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400 block font-sans">نام کاربری ورود (Username):</span>
-                              <span className="font-mono font-bold text-amber-300 text-xs">{license.username}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyText(license.username, `ai-user-${order.id}`)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-800/80 hover:bg-purple-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
-                            >
-                              <Copy className="w-3 h-3" />
-                              <span>{isUserCopied ? 'کپی شد!' : 'کپی'}</span>
-                            </button>
-                          </div>
-
-                          {/* رمز عبور */}
-                          <div className="bg-[#110826] p-2.5 rounded-xl border border-purple-800/60 flex items-center justify-between">
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400 block font-sans">رمز عبور ورود (Password):</span>
-                              <span className="font-mono font-bold text-emerald-300 text-xs tracking-wider">{license.password}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyText(license.password, `ai-pass-${order.id}`)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-800/80 hover:bg-purple-700 text-white text-[11px] font-bold transition-colors cursor-pointer"
-                            >
-                              <Copy className="w-3 h-3" />
-                              <span>{isPassCopied ? 'کپی شد!' : 'کپی'}</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
-                          <span className="text-[11px] text-slate-300">
-                            مدت اشتراک: <strong>{license.days} روز</strong> • تاریخ انقضا: <strong className="text-amber-300">{formattedExpiryFa}</strong>
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const creds = `نرم‌افزار: ${license.appName || license.productTitle}\nنام کاربری: ${license.username}\nرمز عبور: ${license.password}\nکلید لایسنس: ${license.licenseKey}\nانقضا: ${formattedExpiryFa}`;
-                              handleCopyText(creds, `ai-key-${order.id}`);
-                            }}
-                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg whitespace-nowrap bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-[11px] shadow-sm transition-all shrink-0 cursor-pointer"
-                          >
-                            <Copy className="w-3 h-3" />
-                            <span>{isKeyCopied ? 'کپی شد!' : 'کپی مشخصات ورود'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                       * جهت هماهنگی و ارسال سریع، پشتیبانی جهش همواره پاسخگوی شماست.
                     </span>
                     <div className="flex items-center gap-2">
-                      {(order.items || []).some(it => it?.product?.id === 'pkg-amlak-jahesh' || (it?.product?.title && it.product.title.includes('املاک')) || order.appLicense?.productId === 'pkg-amlak-jahesh') && onOpenAmlakApp && currentUser?.role === 'admin' && (
+                      {order.items.some(it => it.product?.id === 'pkg-amlak-jahesh' || it.product?.title?.includes('املاک')) && onOpenAmlakApp && currentUser?.role === 'admin' && (
                         <button
                           onClick={() => {
                             onClose();
@@ -832,12 +722,9 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
             <div className="space-y-1.5">
               <span className="text-xs font-bold text-purple-800 dark:text-purple-300 block">اقلام فاکتور:</span>
               <div className="max-h-48 overflow-y-auto space-y-1.5 text-xs">
-                {(invoiceOrder.items || []).map((item, idx) => {
-                  const prod = getResolvedProduct(item?.product);
-                  const prodTitle = prod?.title || item?.product?.title || (item as any)?.title || 'محصول جهش‌کالا';
-                  const prodImg = prod?.image || item?.product?.image;
-                  const itemPrice = Number(item?.selectedPlan?.price !== undefined ? item.selectedPlan.price : (prod?.price || item?.product?.price || (item as any)?.price || 0));
-                  const itemQty = Number(item?.quantity) || 1;
+                {invoiceOrder.items.map((item, idx) => {
+                  const prod = getResolvedProduct(item.product);
+                  const prodImg = prod?.image || item.product?.image;
 
                   return (
                     <div
@@ -847,33 +734,26 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-lg bg-white dark:bg-black/60 border border-slate-200 dark:border-purple-800/50 overflow-hidden flex items-center justify-center shrink-0 p-0.5">
                           {prodImg ? (
-                            <img src={prodImg} alt={prodTitle} className="w-full h-full object-contain" />
+                            <img src={prodImg} alt={prod.title} className="w-full h-full object-contain" />
                           ) : (
                             <Package className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                           )}
                         </div>
                         <div className="text-right">
                           <span className="font-bold text-slate-900 dark:text-white block text-xs">
-                            {prodTitle}
+                            {prod.title}
                           </span>
                           <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                            تعداد: {itemQty} عدد
+                            تعداد: {item.quantity} عدد
                           </span>
                         </div>
                       </div>
                       <span className="font-bold text-purple-900 dark:text-amber-300 text-xs">
-                        {formatPrice(itemPrice * itemQty)}
+                        {formatPrice(prod.price * item.quantity)}
                       </span>
                     </div>
                   );
                 })}
-                {(!invoiceOrder.items || invoiceOrder.items.length === 0) && (
-                  <div className="text-xs text-slate-400 bg-slate-50 dark:bg-purple-950/30 p-2.5 rounded-xl border border-slate-200 dark:border-purple-900/30">
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {invoiceOrder.appLicense?.productTitle || invoiceOrder.appLicense?.appName || 'سفارش خدمات جهش‌کالا'}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 

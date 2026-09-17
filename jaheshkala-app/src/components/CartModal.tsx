@@ -136,7 +136,7 @@ export const CartModal: React.FC<CartModalProps> = ({
         discountAmount: calcDiscount,
       });
       setCouponSuccess(
-        `کد تخفیف اختصاصی محصول «${matchedProductItem.product?.title || 'محصول'}» با ${discountPercent}% تخفیف اعمال شد!`
+        `کد تخفیف اختصاصی محصول «${matchedProductItem.product.title}» با ${discountPercent}% تخفیف اعمال شد!`
       );
       return;
     }
@@ -271,17 +271,17 @@ export const CartModal: React.FC<CartModalProps> = ({
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3.5">
                         <img
-                          src={prod?.image || getFallbackProductImage(prod?.title, prod?.category)}
-                          alt={prod?.title || 'محصول'}
+                          src={prod.image || getFallbackProductImage(prod.title, prod.category)}
+                          alt={prod.title || 'محصول'}
                           className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl object-cover border border-purple-200 dark:border-purple-700/60 shrink-0 bg-slate-100 dark:bg-black/40 shadow-sm"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = getFallbackProductImage(prod?.title, prod?.category);
+                            (e.target as HTMLImageElement).src = getFallbackProductImage(prod.title, prod.category);
                           }}
                         />
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-snug">
-                              {prod?.title || 'محصول بدون عنوان'}
+                              {prod.title || 'محصول بدون عنوان'}
                             </h4>
                             {prod.isGolden && (
                               <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-md shadow-sm">

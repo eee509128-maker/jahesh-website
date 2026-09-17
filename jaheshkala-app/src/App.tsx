@@ -1,6 +1,6 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, ExternalLink
+  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
@@ -27,8 +27,6 @@ import {
   parseOrderTimestamp,
   safeSetLocalStorage,
   subscribeToProductsRealtime,
-  subscribeToOrdersRealtime,
-  subscribeToUsersRealtime,
 } from './lib/dbService';
 import {
   verifyZibalPayment,
@@ -37,9 +35,6 @@ import {
   ZIBAL_DEFAULT_MERCHANT,
 } from './lib/zibalService';
 import { hasAmlakInItems, generateAmlakLicense } from './lib/amlakLicenseService';
-import { hasAiAppInItems, generateAppLicense, registerAppLicenseOnServer, checkLicenseStatus } from './lib/appLicenseService';
-import { AppSubscriptionLicense } from './types';
-import { AppLicenseModal } from './components/AppLicenseModal';
 import { isProductMatchingCategoryOrGuild, isProductMatchingSearchQuery } from './lib/guildMatcher';
 import confetti from 'canvas-confetti';
 
@@ -53,18 +48,19 @@ import { DigikalaFooter } from './components/DigikalaFooter';
 import { ProductCard } from './components/ProductCard';
 
 // Modals
-import { CartModal } from './components/CartModal';
+const CartModal = lazy(() => import('./components/CartModal').then(module => ({ default: module.CartModal })));
 import { TermsModal } from './components/TermsModal';
-import { PaymentGatewayModal } from './components/PaymentGatewayModal';
-import { AuthModal } from './components/AuthModal';
-import { AdminPanel } from './components/AdminPanel';
-import { UserOrdersModal } from './components/UserOrdersModal';
-import { UserProfileModal } from './components/UserProfileModal';
-import { ProductDetailModal } from './components/ProductDetailModal';
-import { LiveChatWidget } from './components/LiveChatWidget';
-import { FooterInfoModal } from './components/FooterInfoModal';
-import { AmlakAppModal } from './components/AmlakAppModal';
-import { SubscriptionDurationModal } from './components/SubscriptionDurationModal';
+const PaymentGatewayModal = lazy(() => import('./components/PaymentGatewayModal').then(module => ({ default: module.PaymentGatewayModal })));
+const AuthModal = lazy(() => import('./components/AuthModal').then(module => ({ default: module.AuthModal })));
+import { Suspense, lazy } from 'react';
+const AdminPanel = lazy(() => import('./components/AdminPanel').then(module => ({ default: module.AdminPanel })));
+const UserOrdersModal = lazy(() => import('./components/UserOrdersModal').then(module => ({ default: module.UserOrdersModal })));
+const UserProfileModal = lazy(() => import('./components/UserProfileModal').then(module => ({ default: module.UserProfileModal })));
+const ProductDetailModal = lazy(() => import('./components/ProductDetailModal').then(module => ({ default: module.ProductDetailModal })));
+const LiveChatWidget = lazy(() => import('./components/LiveChatWidget').then(module => ({ default: module.LiveChatWidget })));
+const FooterInfoModal = lazy(() => import('./components/FooterInfoModal').then(module => ({ default: module.FooterInfoModal })));
+const AmlakAppModal = lazy(() => import('./components/AmlakAppModal').then(module => ({ default: module.AmlakAppModal })));
+const SubscriptionDurationModal = lazy(() => import('./components/SubscriptionDurationModal').then(module => ({ default: module.SubscriptionDurationModal })));
 import { ProductPlansModal } from './components/ProductPlansModal';
 
 export function sanitizeProduct(p: any): Product | null {
@@ -227,7 +223,6 @@ export default function App() {
   const [footerInfoModalOpen, setFooterInfoModalOpen] = useState(false);
   const [amlakModalOpen, setAmlakModalOpen] = useState(false);
   const [guildsModalOpen, setGuildsModalOpen] = useState(false);
-  const [aiAppLicenseModalLicense, setAiAppLicenseModalLicense] = useState<AppSubscriptionLicense | null>(null);
   const [activeFooterTopic, setActiveFooterTopic] = useState('terms');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -402,13 +397,6 @@ export default function App() {
           finalOrder.amlakLicense = pendingOrder?.amlakLicense || generateAmlakLicense(finalOrder, activeUser);
         }
 
-        if (hasAiAppInItems(fallbackItems) && !finalOrder.appLicense) {
-          const generatedAppLic = pendingOrder?.appLicense || generateAppLicense(finalOrder, activeUser);
-          finalOrder.appLicense = generatedAppLic;
-          registerAppLicenseOnServer(generatedAppLic).catch(() => {});
-          setAiAppLicenseModalLicense(generatedAppLic);
-        }
-
         // 1. Save to DB (Supabase cloud), server disk and local storage
         await saveOrderToDb(finalOrder);
 
@@ -516,7 +504,7 @@ export default function App() {
             if (activeUser) {
               const cloudUser = allUsers.find((u) => areSameUser(u, activeUser));
               if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
-                const updated = { ...activeUser, role: cloudUser.role };
+                const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
                 setCurrentUser(updated);
                 safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
               }
@@ -531,32 +519,11 @@ export default function App() {
 
     loadCloudData();
 
-    // Auto-refresh orders and cloud data every 10 seconds to ensure newly placed orders appear instantly
-    const cloudInterval = setInterval(() => {
-      if (isMounted) {
-        loadCloudData();
-      }
-    }, 10000);
-
-    // 1. Subscribe to Supabase real-time cloud changes for instant multi-user products synchronization
+    // Subscribe to Supabase real-time cloud changes for instant multi-user synchronization
     const unsubscribeRealtimeProducts = subscribeToProductsRealtime((updatedList) => {
       if (isMounted && Array.isArray(updatedList) && updatedList.length > 0) {
         const cleaned = sanitizeProductsList(updatedList);
         setProducts(cleaned);
-      }
-    });
-
-    // 2. Subscribe to Supabase real-time cloud changes for orders (Digikala-like instantaneous updates across devices)
-    const unsubscribeRealtimeOrders = subscribeToOrdersRealtime((updatedOrders) => {
-      if (isMounted && Array.isArray(updatedOrders)) {
-        setOrders(updatedOrders);
-      }
-    });
-
-    // 3. Subscribe to Supabase real-time cloud changes for users & roles
-    const unsubscribeRealtimeUsers = subscribeToUsersRealtime((updatedUsers) => {
-      if (isMounted && Array.isArray(updatedUsers)) {
-        setUsersList(updatedUsers);
       }
     });
 
@@ -582,18 +549,8 @@ export default function App() {
 
     // Listen for real-time orders updates via window events
     const handleOrdersUpdatedEvent = (e: any) => {
-      if (e.detail) {
-        if (Array.isArray(e.detail)) {
-          setOrders(e.detail);
-        } else if (typeof e.detail === 'object' && e.detail.id) {
-          setOrders((prev) => {
-            const filtered = prev.filter(
-              (o) => o.id !== e.detail.id && (!e.detail.trackingCode || o.trackingCode !== e.detail.trackingCode)
-            );
-            const combined = [e.detail, ...filtered];
-            return combined.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
-          });
-        }
+      if (e.detail && Array.isArray(e.detail)) {
+        setOrders(e.detail);
       }
     };
     window.addEventListener('jahesh-orders-updated', handleOrdersUpdatedEvent);
@@ -619,10 +576,9 @@ export default function App() {
 
     return () => {
       isMounted = false;
-      clearInterval(cloudInterval);
-      if (typeof unsubscribeRealtimeProducts === 'function') unsubscribeRealtimeProducts();
-      if (typeof unsubscribeRealtimeOrders === 'function') unsubscribeRealtimeOrders();
-      if (typeof unsubscribeRealtimeUsers === 'function') unsubscribeRealtimeUsers();
+      if (typeof unsubscribeRealtimeProducts === 'function') {
+        unsubscribeRealtimeProducts();
+      }
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
       window.removeEventListener('jahesh-users-updated', handleUsersUpdatedEvent);
       window.removeEventListener('jahesh-products-updated', handleProductsUpdatedEvent);
@@ -892,12 +848,6 @@ export default function App() {
     if (hasAmlakInItems(newOrder.items) && !newOrder.amlakLicense) {
       newOrder.amlakLicense = generateAmlakLicense(newOrder, currentUser);
     }
-    if (hasAiAppInItems(newOrder.items) && !newOrder.appLicense) {
-      const generatedAppLic = generateAppLicense(newOrder, currentUser);
-      newOrder.appLicense = generatedAppLic;
-      registerAppLicenseOnServer(generatedAppLic).catch(() => {});
-      setAiAppLicenseModalLicense(generatedAppLic);
-    }
     setOrders((prev) => [newOrder, ...prev]);
     setCartItems([]);
     setPaymentModalOpen(false);
@@ -916,7 +866,7 @@ export default function App() {
       id: 'admin-jahesh',
       username: 'jahesh',
       fullName: 'مدیر فروشگاه جهش‌کالا',
-      phone: '09364864663',
+      phone: '09152331974',
       email: 'jahesh1395@gmail.com',
       role: 'admin' as const,
     };
@@ -930,7 +880,7 @@ export default function App() {
       paymentRefId: 'FREE-ADM-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
       userId: adminUser.id,
       customerName: adminUser.fullName || 'مدیر فروشگاه جهش‌کالا',
-      customerPhone: adminUser.phone || '09364864663',
+      customerPhone: adminUser.phone || '09152331974',
       customerEmail: adminUser.email || 'jahesh1395@gmail.com',
       requestedDomain: product.domainIncluded ? 'دامنه اختصاصی مدیریت' : undefined,
       clientNotes: `ثبت سفارش رایگان از پنل مدیریت توسط ${adminUser.fullName}`,
@@ -962,13 +912,6 @@ export default function App() {
       newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
     }
 
-    if (product.isAiAppProduct || hasAiAppInItems(newAdminOrder.items)) {
-      const generatedAppLic = generateAppLicense(newAdminOrder, adminUser);
-      newAdminOrder.appLicense = generatedAppLic;
-      registerAppLicenseOnServer(generatedAppLic).catch(() => {});
-      setAiAppLicenseModalLicense(generatedAppLic);
-    }
-
     setOrders((prev) => [newAdminOrder, ...prev]);
     await saveOrderToDb(newAdminOrder);
     showToast(`سفارش رایگان «${product.title}» برای حساب مدیریت با موفقیت در سیستم ثبت شد.`);
@@ -980,7 +923,7 @@ export default function App() {
       id: 'admin-jahesh',
       username: 'jahesh',
       fullName: 'مدیر فروشگاه جهش‌کالا',
-      phone: '09364864663',
+      phone: '09152331974',
       email: 'jahesh1395@gmail.com',
       role: 'admin' as const,
     };
@@ -1006,7 +949,7 @@ export default function App() {
       paymentRefId: 'FREE-ADM-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
       userId: adminUser.id,
       customerName: adminUser.fullName || 'مدیر فروشگاه جهش‌کالا',
-      customerPhone: adminUser.phone || '09364864663',
+      customerPhone: adminUser.phone || '09152331974',
       customerEmail: adminUser.email || 'jahesh1395@gmail.com',
       requestedDomain,
       clientNotes,
@@ -1028,13 +971,6 @@ export default function App() {
 
     if (hasAmlakInItems(safeItems)) {
       newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
-    }
-
-    if (hasAiAppInItems(safeItems)) {
-      const generatedAppLic = generateAppLicense(newAdminOrder, adminUser);
-      newAdminOrder.appLicense = generatedAppLic;
-      registerAppLicenseOnServer(generatedAppLic).catch(() => {});
-      setAiAppLicenseModalLicense(generatedAppLic);
     }
 
     setOrders((prev) => [newAdminOrder, ...prev]);
@@ -1063,23 +999,9 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch {}
-    try {
-      localStorage.removeItem('jahesh_current_user');
-      localStorage.removeItem('jahesh_user_session');
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (k && (k.includes('supabase') || k.startsWith('sb-') || k === 'jahesh_current_user' || k === 'jahesh_user_session')) {
-          localStorage.removeItem(k);
-        }
-      }
-    } catch {}
+    await supabase.auth.signOut();
+    localStorage.removeItem('jahesh_current_user');
     setCurrentUser(null);
-    setAdminModalOpen(false);
-    setUserProfileModalOpen(false);
-    setUserOrdersModalOpen(false);
     showToast('از حساب کاربری خارج شدید.');
   };
 
@@ -1103,12 +1025,9 @@ export default function App() {
   const handleClearAllOrders = async () => {
     if (confirm('آیا از پاکسازی تمام سفارشات اطمینان دارید؟')) {
       setOrders([]);
-      try {
-        localStorage.removeItem('jahesh_orders');
-        localStorage.removeItem('jahesh_orders_store');
-      } catch {}
+      localStorage.removeItem('jahesh_orders');
       await clearAllOrdersFromDb();
-      showToast('کلیه سفارشات تستی با موفقیت از سیستم و دیتابیس پاکسازی شدند.');
+      showToast('کلیه سفارشات با موفقیت از دیتابیس پاکسازی شدند.');
     }
   };
 
@@ -1380,13 +1299,7 @@ export default function App() {
           if (!currentUser) setAuthModalOpen(true);
           else setUserOrdersModalOpen(true);
         }}
-        onOpenAdmin={() => {
-          if (currentUser?.role === 'admin') {
-            setAdminModalOpen(true);
-          } else {
-            setAuthModalOpen(true);
-          }
-        }}
+        onOpenAdmin={() => setAdminModalOpen(true)}
         onOpenProfile={() => setUserProfileModalOpen(true)}
         onLogout={handleLogout}
         onScrollToIncredible={scrollToIncredible}
@@ -1652,7 +1565,7 @@ export default function App() {
       {/* Real Bank Payment Success Modal (Zibal / Shaparak) */}
       {completedOrderReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
-          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-[#100a26] border border-emerald-500/80 rounded-3xl shadow-2xl p-6 text-center space-y-4">
+          <div className="relative w-full max-w-md bg-[#100a26] border border-emerald-500/80 rounded-3xl shadow-2xl p-6 text-center space-y-4">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center mx-auto text-emerald-400">
               <CheckCircle2 className="w-9 h-9" />
             </div>
@@ -1744,68 +1657,6 @@ export default function App() {
               </div>
             )}
 
-            {/* کارت اختصاصی اطلاعات لایسنس و ورود به اپلیکیشن ویندوز / اندروید ساخته شده با هوش مصنوعی */}
-            {completedOrderReceipt.order.appLicense && (
-              <div className="bg-gradient-to-br from-indigo-950/40 via-[#180e38] to-purple-950/50 border border-amber-400/60 rounded-2xl p-4 text-right space-y-3 shadow-lg text-xs">
-                <div className="flex items-center justify-between pb-2 border-b border-purple-800/60">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">⚡</span>
-                    <span className="font-black text-amber-300">حساب کاربری ورود به نرم‌افزار / اپلیکیشن:</span>
-                  </div>
-                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                    اشتراک {completedOrderReceipt.order.appLicense.days} روزه فعال
-                  </span>
-                </div>
-
-                <div className="space-y-2 font-mono">
-                  <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
-                    <span className="text-slate-400 font-sans text-[11px]">نام کاربری ورود (Username):</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-300 font-bold text-xs">{completedOrderReceipt.order.appLicense.username}</span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(completedOrderReceipt.order.appLicense!.username);
-                          showToast('نام کاربری ورود کپی شد.');
-                        }}
-                        className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans bg-amber-500/20 px-1.5 py-0.5 rounded"
-                      >
-                        کپی
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-white/5">
-                    <span className="text-slate-400 font-sans text-[11px]">رمز عبور ورود (Password):</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-emerald-300 font-bold text-xs tracking-wider">{completedOrderReceipt.order.appLicense.password}</span>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(completedOrderReceipt.order.appLicense!.password);
-                          showToast('رمز عبور ورود کپی شد.');
-                        }}
-                        className="text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer font-sans bg-amber-500/20 px-1.5 py-0.5 rounded"
-                      >
-                        کپی
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (completedOrderReceipt.order.appLicense) {
-                      setAiAppLicenseModalLicense(completedOrderReceipt.order.appLicense);
-                    }
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span>مشاهده جزئیات کامل لایسنس و راهنمای ورود به اپ</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-
             <div className="flex gap-2.5 pt-2">
               <button
                 onClick={() => {
@@ -1835,36 +1686,34 @@ export default function App() {
       />
 
       {/* Admin Panel (Orders, New Product Form, Zibal Settings, Coupons, Users, Banners) */}
-      {adminModalOpen && (
-        <AdminPanel
-          isOpen={adminModalOpen}
-          onClose={() => setAdminModalOpen(false)}
-          currentUser={currentUser}
-          onAdminInstantPurchase={handleAdminInstantPurchase}
-          onOpenAmlakApp={() => setAmlakModalOpen(true)}
-          orders={orders}
-          onUpdateOrderStatus={handleUpdateOrderStatus}
-          onDeleteOrder={handleDeleteOrder}
-          onClearAllOrders={handleClearAllOrders}
-          products={products}
-          onAddNewProduct={handleAddNewProduct}
-          onUpdateProduct={handleUpdateProduct}
-          onDeleteProduct={handleDeleteProduct}
-          zibalMerchant={zibalMerchant}
-          onUpdateZibalMerchant={handleUpdateZibalMerchant}
-          coupons={coupons}
-          onAddNewCoupon={handleAddNewCoupon}
-          onDeleteCoupon={handleDeleteCoupon}
-          onToggleCoupon={handleToggleCoupon}
-          usersList={usersList}
-          onDeleteUser={handleDeleteUser}
-          onUpdateUser={handleUpdateUser}
-          onAddNewUser={handleAddNewUser}
-          banners={banners}
-          onSaveBanner={handleSaveBanner}
-          onDeleteBanner={handleDeleteBanner}
-        />
-      )}
+      <Suspense fallback={<div className="p-8 text-center text-white">در حال بارگذاری پنل مدیریت...</div>}><AdminPanel
+        isOpen={adminModalOpen}
+        onClose={() => setAdminModalOpen(false)}
+        currentUser={currentUser}
+        onAdminInstantPurchase={handleAdminInstantPurchase}
+        onOpenAmlakApp={() => setAmlakModalOpen(true)}
+        orders={orders}
+        onUpdateOrderStatus={handleUpdateOrderStatus}
+        onDeleteOrder={handleDeleteOrder}
+        onClearAllOrders={handleClearAllOrders}
+        products={products}
+        onAddNewProduct={handleAddNewProduct}
+        onUpdateProduct={handleUpdateProduct}
+        onDeleteProduct={handleDeleteProduct}
+        zibalMerchant={zibalMerchant}
+        onUpdateZibalMerchant={handleUpdateZibalMerchant}
+        coupons={coupons}
+        onAddNewCoupon={handleAddNewCoupon}
+        onDeleteCoupon={handleDeleteCoupon}
+        onToggleCoupon={handleToggleCoupon}
+        usersList={usersList}
+        onDeleteUser={handleDeleteUser}
+        onUpdateUser={handleUpdateUser}
+        onAddNewUser={handleAddNewUser}
+        banners={banners}
+        onSaveBanner={handleSaveBanner}
+        onDeleteBanner={handleDeleteBanner}
+      /></Suspense>
 
       {/* User Orders Modal */}
       {/* User Profile Modal */}
@@ -1931,14 +1780,6 @@ export default function App() {
           }}
         />
       )}
-
-      {/* AI App Subscription License Modal (Windows / Android) */}
-      <AppLicenseModal
-        isOpen={Boolean(aiAppLicenseModalLicense)}
-        license={aiAppLicenseModalLicense}
-        onClose={() => setAiAppLicenseModalLicense(null)}
-        onViewOrders={() => setUserOrdersModalOpen(true)}
-      />
 
       </Suspense>
     </div>

@@ -133,45 +133,5 @@
     "username": "erfan3365_motagi",
     "role": "admin",
     "createdAt": "۱۴۰۵/۶/۲۱"
-  },
-  {
-    "id": "usr-jahesh-super-admin",
-    "fullName": "مدیر کل جهش‌کالا",
-    "phone": "09364864663",
-    "email": "jahesh1395@gmail.com",
-    "username": "jahesh_admin",
-    "role": "admin",
-    "guild": "فناوری و مدیریت جهش",
-    "createdAt": "۱۴۰۵/۶/۱"
-  },
-  {
-    "id": "u-cscdas-17895968",
-    "fullName": "cscdas",
-    "phone": "09159423366",
-    "email": "cscdas@gmail.com",
-    "username": "cscdas",
-    "role": "user",
-    "guild": "املاک و مستغلات",
-    "createdAt": "۱۴۰۵/۶/۲۶"
-  },
-  {
-    "id": "u-zahra-marketing",
-    "fullName": "زهرا",
-    "phone": "09152331974",
-    "email": "zahra@gmail.com",
-    "username": "zahra",
-    "role": "user",
-    "guild": "دیجیتال مارکتینگ و تبلیغات",
-    "createdAt": "۱۴۰۵/۶/۲۴"
-  },
-  {
-    "id": "u-fatemeh-aria",
-    "fullName": "فاطمه اریا",
-    "phone": "09151544512",
-    "email": "fatemeh@gmail.com",
-    "username": "erfan3367",
-    "role": "user",
-    "guild": "فروش و بازاریابی",
-    "createdAt": "۱۴۰۵/۶/۲۵"
   }
 ]
