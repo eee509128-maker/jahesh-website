@@ -1045,6 +1045,7 @@
           if (tool.link) {
             btnEl.setAttribute('href', tool.link);
             btnEl.setAttribute('target', '_blank');
+            btnEl.setAttribute('rel', 'noopener noreferrer');
           }
           const btnSpan = btnEl.querySelector('span');
           if (btnSpan && tool.btnText && btnSpan.textContent !== tool.btnText) {
@@ -1060,7 +1061,6 @@
               sticker.innerHTML = `<img src="${tool.image}" alt="${tool.title || ''}" style="max-width:100%; max-height:100%; object-fit:contain; border-radius:12px;" />`;
             }
           } else if (tool.stickerSvg && !sticker.querySelector('img')) {
-            // Keep SVG updated if provided
             if (sticker.innerHTML.trim() !== tool.stickerSvg.trim()) {
               sticker.innerHTML = tool.stickerSvg;
             }
@@ -1095,18 +1095,28 @@
         }
       } catch {}
 
-      // 2. Fetch from /api/tools
-      try {
-        const res = await fetch('/api/tools', { cache: 'no-store' });
-        if (res.ok) {
-          const tools = await res.json();
-          if (Array.isArray(tools) && tools.length > 0) {
-            try { localStorage.setItem('jahesh_tools', JSON.stringify(tools)); } catch {}
-            applyToolsToCards(tools);
-            return;
+      // 2. Fetch from Universal Server API endpoints
+      const endpoints = [
+        '/api/tools',
+        '/jaheshkala/api/tools',
+        '/api.php?action=tools',
+        '/jaheshkala/api.php?action=tools'
+      ];
+
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep, { cache: 'no-store' });
+          if (res.ok) {
+            const tools = await res.json();
+            const list = Array.isArray(tools) ? tools : (tools && Array.isArray(tools.tools) ? tools.tools : null);
+            if (list && list.length > 0) {
+              try { localStorage.setItem('jahesh_tools', JSON.stringify(list)); } catch {}
+              applyToolsToCards(list);
+              return;
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      }
 
       // 3. Fallback: Supabase direct query
       try {
@@ -1149,14 +1159,20 @@
     } else {
       syncToolsWithDom();
     }
-    setTimeout(syncToolsWithDom, 300);
-    setTimeout(syncToolsWithDom, 800);
-    setTimeout(syncToolsWithDom, 1800);
-    setTimeout(syncToolsWithDom, 3500);
+    setTimeout(syncToolsWithDom, 200);
+    setTimeout(syncToolsWithDom, 600);
+    setTimeout(syncToolsWithDom, 1200);
+    setTimeout(syncToolsWithDom, 2500);
 
-    // Watch for Vike container mount
-    const container = document.querySelector('.c1sfgest') || document.body;
-    if (container && typeof MutationObserver !== 'undefined') {
+    // Periodic sync every 4 seconds for instant cross-client updates
+    setInterval(syncToolsWithDom, 4000);
+    window.addEventListener('focus', syncToolsWithDom);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') syncToolsWithDom();
+    });
+
+    // Watch for Vike dynamic container mounts
+    if (typeof MutationObserver !== 'undefined') {
       let syncTimeout = null;
       new MutationObserver(() => {
         if (syncTimeout) clearTimeout(syncTimeout);
@@ -1165,8 +1181,8 @@
             const cached = localStorage.getItem('jahesh_tools');
             if (cached) applyToolsToCards(JSON.parse(cached));
           } catch {}
-        }, 100);
-      }).observe(container, { childList: true, subtree: false });
+        }, 80);
+      }).observe(document.body, { childList: true, subtree: true });
     }
   })();
 </script></body></html>

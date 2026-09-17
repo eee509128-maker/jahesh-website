@@ -434,9 +434,23 @@ app.get('/api/tools', (req, res) => {
 
 app.post('/api/tools', (req, res) => {
   try {
-    const tools = req.body;
+    let tools = req.body;
+    if (tools && Array.isArray(tools.tools)) {
+      tools = tools.tools;
+    } else if (tools && !Array.isArray(tools) && (tools.id || tools.title)) {
+      // Single tool upsert
+      let current = getStoredTools();
+      const existingIdx = current.findIndex(t => t.id === tools.id);
+      if (existingIdx >= 0) {
+        current[existingIdx] = { ...current[existingIdx], ...tools };
+      } else {
+        current.unshift(tools);
+      }
+      tools = current;
+    }
+
     if (!Array.isArray(tools)) {
-      return res.status(400).json({ error: 'Expected array of tools' });
+      return res.status(400).json({ error: 'Expected array of tools or valid tool object' });
     }
     const dataDir = path.dirname(TOOLS_FILE);
     if (!fs.existsSync(dataDir)) {
@@ -444,7 +458,7 @@ app.post('/api/tools', (req, res) => {
     }
     fs.writeFileSync(TOOLS_FILE, JSON.stringify(tools, null, 2), 'utf8');
     console.log(`[Tools] Successfully persisted ${tools.length} dashboard tools.`);
-    return res.json({ success: true, count: tools.length });
+    return res.json({ success: true, count: tools.length, tools });
   } catch (err) {
     console.error('Error saving tools.json:', err);
     return res.status(500).json({ error: err.message });

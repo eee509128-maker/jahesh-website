@@ -39,7 +39,42 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const u = req.body || {};
+      let body = req.body || {};
+      if (body && Array.isArray(body.users)) {
+        body = body.users;
+      }
+
+      if (Array.isArray(body)) {
+        const results = [];
+        for (const u of body) {
+          if (!u) continue;
+          const cleanPhone = (u.phone || '').trim();
+          const cleanUsername = (u.username || '').trim().toLowerCase();
+          const userId = u.id || (cleanPhone ? `usr-${cleanPhone}` : (cleanUsername ? `usr-${cleanUsername}` : `usr-${Date.now()}`));
+
+          const userDoc = {
+            id: userId,
+            fullName: u.fullName || u.full_name || cleanUsername || 'کاربر جهش',
+            phone: cleanPhone,
+            email: (u.email || '').trim(),
+            username: cleanUsername,
+            role: u.role || 'user',
+            guild: u.guild || '',
+            customGuild: u.customGuild || u.custom_guild || '',
+            password: u.password || '',
+            createdAt: u.createdAt || u.created_at || new Date().toLocaleDateString('fa-IR'),
+            timestamp: u.timestamp || Date.now(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          const docRef = doc(db, 'users', userId);
+          await setDoc(docRef, userDoc, { merge: true });
+          results.push(userDoc);
+        }
+        return res.status(200).json({ success: true, count: results.length, users: results });
+      }
+
+      const u = body;
       const cleanPhone = (u.phone || '').trim();
       const cleanUsername = (u.username || '').trim().toLowerCase();
       const userId = u.id || (cleanPhone ? `usr-${cleanPhone}` : (cleanUsername ? `usr-${cleanUsername}` : `usr-${Date.now()}`));

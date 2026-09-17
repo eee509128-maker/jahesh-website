@@ -28,6 +28,8 @@ export default async function handler(req, res) {
         const item = d.data();
         if (item && item.id) tools.push(item);
       });
+      // Sort by order
+      tools.sort((a, b) => (typeof a.order === 'number' ? a.order : 999) - (typeof b.order === 'number' ? b.order : 999));
       return res.status(200).json(tools);
     } catch (err) {
       console.warn('API fetch tools error:', err);
@@ -37,7 +39,26 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const tool = req.body;
+      let body = req.body;
+      if (body && Array.isArray(body.tools)) {
+        body = body.tools;
+      }
+      
+      if (Array.isArray(body)) {
+        // Bulk save list of tools
+        const now = new Date().toISOString();
+        for (let i = 0; i < body.length; i++) {
+          const item = body[i];
+          if (item && item.id) {
+            item.order = i;
+            item.updatedAt = now;
+            await setDoc(doc(db, 'tools', String(item.id)), item, { merge: true });
+          }
+        }
+        return res.status(200).json({ success: true, count: body.length, tools: body });
+      }
+
+      const tool = body;
       if (!tool || !tool.id) {
         return res.status(400).json({ error: 'Tool ID is required' });
       }

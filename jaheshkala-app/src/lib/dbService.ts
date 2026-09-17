@@ -1575,12 +1575,29 @@ export const updateUserInDb = async (user: User): Promise<boolean> => {
       console.warn('Error updating current user session:', err);
     }
 
-    // 3. Persist to Server Cloud API
-    fetchUniversalApi('users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(user),
-    }).catch((e) => console.warn('Universal API update user notice:', e));
+    // 3. Persist to Server Cloud API (both generic user and explicit role endpoint)
+    try {
+      await fetchUniversalApi('users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user),
+      });
+
+      if (user.role) {
+        await fetchUniversalApi('users/update-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: user.id,
+            username: user.username,
+            phone: user.phone,
+            role: user.role,
+          }),
+        });
+      }
+    } catch (e) {
+      console.warn('Universal API update user notice:', e);
+    }
 
     return true;
   } catch (err) {
@@ -2312,21 +2329,23 @@ export const saveAllToolsToDb = async (tools: DashboardTool[]): Promise<boolean>
     safeSetLocalStorage('jahesh_tools', JSON.stringify(tools));
   } catch {}
 
-  // 2. Save to Universal Server Cloud API
-  try {
-    fetchUniversalApi('tools', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tools),
-    }).catch((e) => console.warn('Save Universal API tools error:', e));
-  } catch (err) {}
-
-  // 3. Trigger window event with full updated tools detail
+  // 2. Trigger window event with full updated tools detail
   try {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-tools-updated', { detail: tools }));
     }
   } catch {}
+
+  // 3. Save to Universal Server Cloud API
+  try {
+    await fetchUniversalApi('tools', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tools),
+    });
+  } catch (err) {
+    console.warn('Save Universal API tools error:', err);
+  }
 
   return true;
 };

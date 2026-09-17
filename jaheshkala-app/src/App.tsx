@@ -615,6 +615,62 @@ export default function App() {
     };
   }, []);
 
+  // Active Real-Time Periodic & Focus-Based Cloud Role & Data Sync
+  useEffect(() => {
+    let isMounted = true;
+
+    const syncActiveUserRole = async () => {
+      try {
+        const rawStored = localStorage.getItem('jahesh_current_user');
+        const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
+        if (!activeUser) return;
+
+        const { fetchAllUsersFromDb } = await import('./lib/dbService');
+        const freshUsers = await fetchAllUsersFromDb();
+        if (!isMounted || !freshUsers || freshUsers.length === 0) return;
+
+        setUsersList(freshUsers);
+
+        const cloudUser = freshUsers.find((u) => areSameUser(u, activeUser));
+        if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
+          const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
+          setCurrentUser(updated);
+          safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
+          const roleTitle =
+            cloudUser.role === 'admin'
+              ? 'مدیر ارشد'
+              : cloudUser.role === 'operator'
+              ? 'ادمین محدود (اپراتور)'
+              : 'کاربر عادی';
+          showToast(`نقش حساب شما به «${roleTitle}» به‌روزرسانی شد.`);
+        }
+      } catch (err) {
+        console.warn('Sync active user role notice:', err);
+      }
+    };
+
+    // Run every 4 seconds
+    const interval = setInterval(syncActiveUserRole, 4000);
+
+    const handleFocus = () => {
+      syncActiveUserRole();
+    };
+    window.addEventListener('focus', handleFocus);
+    const handleVis = () => {
+      if (document.visibilityState === 'visible') {
+        syncActiveUserRole();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVis);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVis);
+    };
+  }, [currentUser]);
+
   useEffect(() => {
     if (currentUser) {
       safeSetLocalStorage('jahesh_current_user', JSON.stringify(currentUser));

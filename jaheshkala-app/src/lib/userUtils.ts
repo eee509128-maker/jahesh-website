@@ -98,30 +98,36 @@ export const mergeUserRecords = (current: User, incoming: User): User => {
   const currentPriority = rolePriority[current.role || 'user'] || 1;
   const incomingPriority = rolePriority[incoming.role || 'user'] || 1;
 
-  // Determine preferred role: if incoming is newer or higher priority
-  let preferredRole: 'admin' | 'operator' | 'user' = (current.role as any) || 'user';
-  if (incoming.role && (incomingPriority > currentPriority || incomingPriority === 3)) {
+  // Determine preferred role: incoming role takes precedence if defined or elevated
+  let preferredRole: 'admin' | 'operator' | 'user' = 'user';
+  if (incoming.role && incoming.role !== 'user') {
     preferredRole = incoming.role as any;
-  } else if (currentPriority >= incomingPriority) {
+  } else if (current.role && current.role !== 'user') {
+    preferredRole = current.role as any;
+  } else if (incoming.role) {
+    preferredRole = incoming.role as any;
+  } else {
     preferredRole = (current.role as any) || 'user';
   }
 
   const preferredName =
-    current.fullName && current.fullName !== 'کاربر' && current.fullName !== 'کاربر جهش'
-      ? current.fullName
-      : incoming.fullName || current.fullName || 'کاربر جهش';
+    incoming.fullName && incoming.fullName !== 'کاربر' && incoming.fullName !== 'کاربر جهش'
+      ? incoming.fullName
+      : (current.fullName && current.fullName !== 'کاربر' && current.fullName !== 'کاربر جهش'
+        ? current.fullName
+        : incoming.fullName || current.fullName || 'کاربر جهش');
 
   return {
-    ...incoming,
     ...current,
-    id: current.id || incoming.id,
+    ...incoming,
+    id: incoming.id || current.id,
     fullName: preferredName,
-    phone: current.phone || incoming.phone || '',
-    email: current.email || incoming.email || '',
-    username: normalizeUsername(current.username) ? current.username : incoming.username,
+    phone: incoming.phone || current.phone || '',
+    email: incoming.email || current.email || '',
+    username: normalizeUsername(incoming.username) ? incoming.username : (normalizeUsername(current.username) ? current.username : incoming.username),
     role: preferredRole,
-    guild: current.guild || incoming.guild,
-    customGuild: current.customGuild || incoming.customGuild,
-    createdAt: current.createdAt || incoming.createdAt,
+    guild: incoming.guild || current.guild,
+    customGuild: incoming.customGuild || current.customGuild,
+    createdAt: incoming.createdAt || current.createdAt,
   };
 };

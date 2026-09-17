@@ -202,37 +202,173 @@ switch ($action) {
         break;
 
     // ==========================================
-    // TOOLS API
+    // TOOLS API (Technology Dashboard Showcase)
     // ==========================================
     case 'tools':
     case 'get_tools':
     case 'api/tools':
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    case 'tools/save':
+    case 'tools/delete':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'DELETE') {
+            $tools = readJsonFile($toolsFile, []);
+            if ($_SERVER['REQUEST_METHOD'] === 'DELETE' || $action === 'tools/delete' || isset($_GET['delete'])) {
+                $delId = isset($_GET['id']) ? (string)$_GET['id'] : (isset($inputData['id']) ? (string)$inputData['id'] : '');
+                if (!empty($delId)) {
+                    $tools = array_values(array_filter($tools, function($t) use ($delId) {
+                        return isset($t['id']) && (string)$t['id'] !== $delId;
+                    }));
+                    writeJsonFile($toolsFile, $tools);
+                    echo json_encode(['success' => true, 'count' => count($tools), 'tools' => $tools]);
+                    exit;
+                }
+            }
+
             if (is_array($inputData)) {
-                writeJsonFile($toolsFile, $inputData);
-                echo json_encode(['success' => true, 'count' => count($inputData)]);
-                exit;
+                // Check if sequential array of tools
+                $isSeqArray = array_keys($inputData) === range(0, count($inputData) - 1);
+                if ($isSeqArray) {
+                    writeJsonFile($toolsFile, $inputData);
+                    echo json_encode(['success' => true, 'count' => count($inputData), 'tools' => $inputData]);
+                    exit;
+                } else if (isset($inputData['tools']) && is_array($inputData['tools'])) {
+                    writeJsonFile($toolsFile, $inputData['tools']);
+                    echo json_encode(['success' => true, 'count' => count($inputData['tools']), 'tools' => $inputData['tools']]);
+                    exit;
+                } else if (isset($inputData['id']) || isset($inputData['title'])) {
+                    // Single tool upsert
+                    $toolId = isset($inputData['id']) ? (string)$inputData['id'] : 'tool_' . time();
+                    $inputData['id'] = $toolId;
+                    $foundIdx = -1;
+                    foreach ($tools as $idx => $t) {
+                        if (isset($t['id']) && (string)$t['id'] === $toolId) {
+                            $foundIdx = $idx;
+                            break;
+                        }
+                    }
+                    if ($foundIdx >= 0) {
+                        $tools[$foundIdx] = array_merge($tools[$foundIdx], $inputData);
+                    } else {
+                        array_unshift($tools, $inputData);
+                    }
+                    writeJsonFile($toolsFile, $tools);
+                    echo json_encode(['success' => true, 'tool' => $inputData, 'count' => count($tools), 'tools' => $tools]);
+                    exit;
+                }
             }
         }
         $tools = readJsonFile($toolsFile, []);
-        echo json_encode($tools);
+        echo json_encode(is_array($tools) ? $tools : []);
         exit;
         break;
 
     // ==========================================
-    // USERS API
+    // USERS & ROLES API
     // ==========================================
     case 'users':
     case 'get_users':
     case 'api/users':
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            if (is_array($inputData)) {
-                writeJsonFile($usersFile, $inputData);
-                echo json_encode(['success' => true, 'count' => count($inputData)]);
+    case 'users/update-role':
+    case 'update-role':
+    case 'users/save':
+    case 'users/delete':
+        $users = readJsonFile($usersFile, []);
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'DELETE') {
+            // Delete user
+            if ($_SERVER['REQUEST_METHOD'] === 'DELETE' || $action === 'users/delete' || isset($_GET['delete'])) {
+                $delId = isset($_GET['id']) ? (string)$_GET['id'] : (isset($inputData['id']) ? (string)$inputData['id'] : '');
+                if (!empty($delId)) {
+                    $users = array_values(array_filter($users, function($u) use ($delId) {
+                        return isset($u['id']) && (string)$u['id'] !== $delId;
+                    }));
+                    writeJsonFile($usersFile, $users);
+                    echo json_encode(['success' => true, 'count' => count($users), 'users' => $users]);
+                    exit;
+                }
+            }
+
+            // Update role specifically
+            if ($action === 'users/update-role' || $action === 'update-role' || isset($inputData['role']) && (isset($inputData['userId']) || isset($inputData['username']) || isset($inputData['phone']))) {
+                $targetRole = isset($inputData['role']) ? trim($inputData['role']) : 'user';
+                $targetId = isset($inputData['id']) ? (string)$inputData['id'] : (isset($inputData['userId']) ? (string)$inputData['userId'] : '');
+                $targetUser = isset($inputData['username']) ? strtolower(trim($inputData['username'], "@ \t\n\r\0\x0B")) : '';
+                $targetPhone = isset($inputData['phone']) ? preg_replace('/[^0-9]/', '', (string)$inputData['phone']) : '';
+
+                $matchedCount = 0;
+                foreach ($users as $idx => $u) {
+                    $uId = isset($u['id']) ? (string)$u['id'] : '';
+                    $uUser = isset($u['username']) ? strtolower(trim($u['username'], "@ \t\n\r\0\x0B")) : '';
+                    $uPhone = isset($u['phone']) ? preg_replace('/[^0-9]/', '', (string)$u['phone']) : '';
+
+                    if ((!empty($targetId) && $uId === $targetId) ||
+                        (!empty($targetUser) && $uUser === $targetUser) ||
+                        (!empty($targetPhone) && strlen($targetPhone) >= 10 && $uPhone === $targetPhone)) {
+                        $users[$idx]['role'] = $targetRole;
+                        $users[$idx]['updatedAt'] = date('c');
+                        $matchedCount++;
+                    }
+                }
+
+                if ($matchedCount === 0 && (!empty($targetId) || !empty($targetUser) || !empty($targetPhone))) {
+                    $newUser = array_merge($inputData, [
+                        'id' => !empty($targetId) ? $targetId : 'usr-' . time(),
+                        'role' => $targetRole,
+                        'createdAt' => date('c'),
+                        'updatedAt' => date('c')
+                    ]);
+                    array_unshift($users, $newUser);
+                }
+
+                writeJsonFile($usersFile, $users);
+                echo json_encode(['success' => true, 'role' => $targetRole, 'matched' => $matchedCount, 'count' => count($users), 'users' => $users]);
                 exit;
             }
+
+            if (is_array($inputData)) {
+                $isSeqArray = array_keys($inputData) === range(0, count($inputData) - 1);
+                if ($isSeqArray) {
+                    // Bulk users list replacement/merge
+                    writeJsonFile($usersFile, $inputData);
+                    echo json_encode(['success' => true, 'count' => count($inputData), 'users' => $inputData]);
+                    exit;
+                } else if (isset($inputData['users']) && is_array($inputData['users'])) {
+                    writeJsonFile($usersFile, $inputData['users']);
+                    echo json_encode(['success' => true, 'count' => count($inputData['users']), 'users' => $inputData['users']]);
+                    exit;
+                } else if (isset($inputData['id']) || isset($inputData['username']) || isset($inputData['phone'])) {
+                    // Single user save or update
+                    $targetId = isset($inputData['id']) ? (string)$inputData['id'] : '';
+                    $targetUser = isset($inputData['username']) ? strtolower(trim($inputData['username'], "@ \t\n\r\0\x0B")) : '';
+                    $targetPhone = isset($inputData['phone']) ? preg_replace('/[^0-9]/', '', (string)$inputData['phone']) : '';
+
+                    $foundIdx = -1;
+                    foreach ($users as $idx => $u) {
+                        $uId = isset($u['id']) ? (string)$u['id'] : '';
+                        $uUser = isset($u['username']) ? strtolower(trim($u['username'], "@ \t\n\r\0\x0B")) : '';
+                        $uPhone = isset($u['phone']) ? preg_replace('/[^0-9]/', '', (string)$u['phone']) : '';
+
+                        if ((!empty($targetId) && $uId === $targetId) ||
+                            (!empty($targetUser) && $uUser === $targetUser) ||
+                            (!empty($targetPhone) && strlen($targetPhone) >= 10 && $uPhone === $targetPhone)) {
+                            $foundIdx = $idx;
+                            break;
+                        }
+                    }
+
+                    if ($foundIdx >= 0) {
+                        $users[$foundIdx] = array_merge($users[$foundIdx], $inputData);
+                    } else {
+                        if (empty($inputData['id'])) {
+                            $inputData['id'] = 'usr-' . time();
+                        }
+                        array_unshift($users, $inputData);
+                    }
+
+                    writeJsonFile($usersFile, $users);
+                    echo json_encode(['success' => true, 'user' => $inputData, 'count' => count($users), 'users' => $users]);
+                    exit;
+                }
+            }
         }
-        $users = readJsonFile($usersFile, []);
         echo json_encode(['success' => true, 'users' => $users]);
         exit;
         break;
