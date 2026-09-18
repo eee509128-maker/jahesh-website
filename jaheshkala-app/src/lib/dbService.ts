@@ -1282,6 +1282,16 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
     console.warn('Firebase Firestore save order notice:', fbErr);
   }
 
+  // 6. If order has an attached app license, guarantee persistence to Firestore licenses collection
+  const attachedLic = order.appLicense || order.amlakLicense;
+  if (attachedLic && (attachedLic.username || attachedLic.licenseKey)) {
+    try {
+      if (attachedLic.id) {
+        await setDoc(doc(db, 'licenses', String(attachedLic.id)), attachedLic, { merge: true });
+      }
+    } catch {}
+  }
+
   return true;
 };
 

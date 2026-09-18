@@ -300,6 +300,30 @@ switch ($action) {
                     array_unshift($orders, $incoming);
                 }
                 writeJsonFile($ordersFile, $orders);
+
+                // Auto-sync attached app/amlak license to app_licenses.json & licenses.json
+                $attachedLic = !empty($incoming['appLicense']) ? $incoming['appLicense'] : (!empty($incoming['amlakLicense']) ? $incoming['amlakLicense'] : null);
+                if (!empty($attachedLic) && (!empty($attachedLic['username']) || !empty($attachedLic['licenseKey']))) {
+                    $appLicFile = $dataDir . '/app_licenses.json';
+                    $licList = readJsonFile($appLicFile, []);
+                    if (empty($licList)) $licList = readJsonFile($licensesFile, []);
+                    $tId = isset($attachedLic['id']) ? (string)$attachedLic['id'] : '';
+                    $foundLic = false;
+                    foreach ($licList as $idxLic => $lVal) {
+                        if ((!empty($tId) && isset($lVal['id']) && (string)$lVal['id'] === $tId) ||
+                            (isset($lVal['username'], $lVal['productId']) && $lVal['username'] === $attachedLic['username'] && $lVal['productId'] === ($attachedLic['productId'] ?? ''))) {
+                            $licList[$idxLic] = array_merge($licList[$idxLic], $attachedLic);
+                            $foundLic = true;
+                            break;
+                        }
+                    }
+                    if (!$foundLic) {
+                        array_unshift($licList, $attachedLic);
+                    }
+                    writeJsonFile($appLicFile, $licList);
+                    writeJsonFile($licensesFile, $licList);
+                }
+
                 echo json_encode(['success' => true, 'order' => $incoming, 'count' => count($orders), 'orders' => $orders]);
                 exit;
             } else if (is_array($incoming)) {
@@ -541,6 +565,24 @@ switch ($action) {
         $licenses = readJsonFile($appLicensesFile, []);
         if (empty($licenses)) {
             $licenses = readJsonFile($licensesFile, []);
+        }
+
+        // Merge any licenses attached to orders
+        $orderList = readJsonFile($ordersFile, []);
+        $seenLicKeys = [];
+        foreach ($licenses as $l) {
+            $k = isset($l['id']) ? (string)$l['id'] : ((isset($l['username'], $l['productId']) ? $l['username'].'_'.$l['productId'] : ''));
+            if ($k) $seenLicKeys[$k] = true;
+        }
+        foreach ($orderList as $o) {
+            $lic = !empty($o['appLicense']) ? $o['appLicense'] : (!empty($o['amlakLicense']) ? $o['amlakLicense'] : null);
+            if (!empty($lic) && (!empty($lic['username']) || !empty($lic['licenseKey']))) {
+                $k = isset($lic['id']) ? (string)$lic['id'] : ((isset($lic['username'], $lic['productId']) ? $lic['username'].'_'.$lic['productId'] : ''));
+                if ($k && !isset($seenLicKeys[$k])) {
+                    $seenLicKeys[$k] = true;
+                    $licenses[] = $lic;
+                }
+            }
         }
 
         // Register / Save License

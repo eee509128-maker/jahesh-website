@@ -1,5 +1,20 @@
 [
   {
+    "id": "lic-erfanaydam-ul6t8c",
+    "username": "erfanaydam",
+    "password": "JK-8178CN7F",
+    "licenseKey": "JA-APP-2026-UL6T8C",
+    "productId": "pkg-amlak-jahesh",
+    "productTitle": "نرم‌افزار جامع مدیریت املاک جهش (اشتراک آنلاین و ابری)",
+    "appName": "سامانه مدیریت املاک جهش",
+    "buyerName": "عرفان مقدم",
+    "phone": "09152331974",
+    "days": 7,
+    "startDate": "2026-09-18T10:33:00.000Z",
+    "expiresAt": "2026-09-25T10:33:00.000Z",
+    "status": "active"
+  },
+  {
     "id": "lic-admin-master",
     "username": "jahesh",
     "password": "jahesh1395",

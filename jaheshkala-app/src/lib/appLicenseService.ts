@@ -183,29 +183,31 @@ export function saveAppLicenseLocally(license: AppSubscriptionLicense) {
 export async function saveAppLicenseToServer(license: AppSubscriptionLicense): Promise<boolean> {
   let ok = false;
 
-  // 1. Try Node / Express API
-  try {
-    const res = await fetch('/api/app-auth/register-license', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(license),
-    });
-    if (res.ok) ok = true;
-  } catch {}
+  const endpoints = [
+    '/api/app-auth/register-license',
+    '/jaheshkala/api/app-auth/register-license',
+    '/jaheshkala/api.php?action=app-auth/register-license',
+    'api.php?action=app-auth/register-license',
+    '/api.php?action=app-auth/register-license',
+    '/api/app-auth',
+    '/jaheshkala/api/app-auth',
+  ];
 
-  // 2. Fallback to PHP sync API
-  if (!ok) {
+  for (const url of endpoints) {
     try {
-      const res2 = await fetch('/api.php?action=app-auth/register-license', {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(license),
       });
-      if (res2.ok) ok = true;
+      if (res.ok) {
+        ok = true;
+        break;
+      }
     } catch {}
   }
 
-  // 3. Save to Firebase Firestore cloud database
+  // Save to Firebase Firestore cloud database
   try {
     if (license.id) {
       await setDoc(doc(db, 'licenses', license.id), license, { merge: true });

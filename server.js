@@ -1212,6 +1212,26 @@ app.post(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.ph
         orders.unshift(incoming);
       }
       writeOrdersToDisk(orders);
+
+      // CRITICAL: If the order contains an app license or amlak license, automatically persist into app_licenses.json
+      const attachedLic = incoming.appLicense || incoming.amlakLicense;
+      if (attachedLic && (attachedLic.username || attachedLic.licenseKey)) {
+        try {
+          const lics = readLicensesFromDisk();
+          const existingLicIdx = lics.findIndex(
+            (l) => l.id === attachedLic.id || (l.username === attachedLic.username && l.productId === attachedLic.productId)
+          );
+          if (existingLicIdx >= 0) {
+            lics[existingLicIdx] = { ...lics[existingLicIdx], ...attachedLic };
+          } else {
+            lics.unshift(attachedLic);
+          }
+          writeLicensesToDisk(lics);
+        } catch (licErr) {
+          console.warn('Notice syncing order license to disk:', licErr);
+        }
+      }
+
       return res.json({ success: true, order: incoming, count: orders.length, orders });
     }
 
@@ -1489,6 +1509,39 @@ function readLicensesFromDisk() {
       }
     }
   }
+
+  // Also include any licenses attached to orders
+  try {
+    const orders = readOrdersFromDisk();
+    for (const order of orders) {
+      if (!order) continue;
+      const lic = order.appLicense || order.amlakLicense;
+      if (lic && (lic.username || lic.licenseKey)) {
+        const key = lic.id || `${lic.username}_${lic.productId || ''}`;
+        if (!seenIds.has(key)) {
+          seenIds.add(key);
+          all.push({
+            id: lic.id || `lic-order-${order.id}`,
+            username: lic.username,
+            password: lic.password,
+            licenseKey: lic.licenseKey,
+            productId: lic.productId || 'pkg-amlak-jahesh',
+            productTitle: lic.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع مدیریت املاک جهش',
+            appName: lic.appName || 'سامانه مدیریت املاک جهش',
+            buyerName: lic.buyerName || order.customerName || 'کاربر جهش',
+            phone: lic.phone || order.customerPhone || '',
+            days: lic.days || 30,
+            startDate: lic.startDate || order.createdAt || new Date().toISOString(),
+            expiresAt: lic.expiresAt || new Date(Date.now() + 30 * 86400000).toISOString(),
+            status: lic.status || 'active',
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Notice scanning orders for licenses:', e);
+  }
+
   return all;
 }
 
