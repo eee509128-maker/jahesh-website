@@ -738,24 +738,174 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
   }
 };
 
+// ========================================================
+// DELETED ORDERS BLACKLIST (Tombstone synchronization)
+// Guarantees deleted orders NEVER resurrect on any device or refresh
+// ========================================================
+const DELETED_ORDERS_KEY = 'jahesh_deleted_orders';
+
+export const getLocalDeletedOrderIds = (): string[] => {
+  try {
+    const raw = localStorage.getItem(DELETED_ORDERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((id: any) => String(id).trim()).filter(Boolean);
+    }
+  } catch {}
+  return [];
+};
+
+export const getDeletedOrderIds = async (): Promise<string[]> => {
+  let deletedIds: string[] = getLocalDeletedOrderIds();
+
+  // 1. Fetch from Supabase SYSTEM_DELETED_ORDER_IDS
+  try {
+    const { data, error } = await supabase
+      .from('chats')
+      .select('messages')
+      .eq('user_id', 'SYSTEM_DELETED_ORDER_IDS')
+      .maybeSingle();
+    if (!error && data && Array.isArray(data.messages)) {
+      const cloudIds: string[] = data.messages.map((id: any) => String(id).trim()).filter(Boolean);
+      deletedIds = Array.from(new Set([...deletedIds, ...cloudIds]));
+    }
+  } catch {}
+
+  // 2. Fetch from Universal API orders/deleted
+  try {
+    const res = await fetchUniversalApi('orders/deleted', { cache: 'no-store' });
+    if (res && res.ok) {
+      const serverIds = await res.json();
+      if (Array.isArray(serverIds)) {
+        deletedIds = Array.from(new Set([...deletedIds, ...serverIds.map((id: any) => String(id).trim()).filter(Boolean)]));
+      }
+    }
+  } catch {}
+
+  // 3. Fetch from Firebase Firestore
+  try {
+    const snap = await getDoc(doc(db, 'system_configs', 'deleted_orders'));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && Array.isArray(data.orderIds)) {
+        const firestoreIds = data.orderIds.map((id: any) => String(id).trim()).filter(Boolean);
+        deletedIds = Array.from(new Set([...deletedIds, ...firestoreIds]));
+      }
+    }
+  } catch {}
+
+  try {
+    safeSetLocalStorage(DELETED_ORDERS_KEY, JSON.stringify(deletedIds));
+  } catch {}
+
+  return deletedIds;
+};
+
+export const markOrderIdAsDeleted = async (orderId: string, additionalKeys: string[] = []): Promise<void> => {
+  if (!orderId) return;
+  const keysToAdd = [orderId, ...additionalKeys].filter(Boolean).map((k) => String(k).trim());
+
+  try {
+    const current = getLocalDeletedOrderIds();
+    const updated = Array.from(new Set([...current, ...keysToAdd]));
+    safeSetLocalStorage(DELETED_ORDERS_KEY, JSON.stringify(updated));
+
+    // Supabase
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_DELETED_ORDER_IDS',
+          user_name: 'لیست سیاه سفارشات حذف شده',
+          messages: updated,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch {}
+
+    // Universal API
+    try {
+      await fetchUniversalApi('orders/deleted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderIds: keysToAdd }),
+      });
+    } catch {}
+
+    // Firebase Firestore
+    try {
+      await setDoc(doc(db, 'system_configs', 'deleted_orders'), {
+        orderIds: updated,
+        lastUpdated: new Date().toISOString(),
+      }, { merge: true });
+    } catch {}
+  } catch {}
+};
+
+export const unmarkOrderIdAsDeleted = async (orderId: string): Promise<void> => {
+  if (!orderId) return;
+  try {
+    const current = getLocalDeletedOrderIds();
+    if (current.includes(orderId)) {
+      const updated = current.filter((id) => id !== orderId);
+      safeSetLocalStorage(DELETED_ORDERS_KEY, JSON.stringify(updated));
+
+      try {
+        await supabase.from('chats').upsert(
+          {
+            user_id: 'SYSTEM_DELETED_ORDER_IDS',
+            user_name: 'لیست سیاه سفارشات حذف شده',
+            messages: updated,
+            last_updated: new Date().toISOString(),
+            is_read_by_admin: true,
+          },
+          { onConflict: 'user_id' }
+        );
+      } catch {}
+
+      try {
+        await setDoc(doc(db, 'system_configs', 'deleted_orders'), {
+          orderIds: updated,
+          lastUpdated: new Date().toISOString(),
+        }, { merge: true });
+      } catch {}
+    }
+  } catch {}
+};
+
 // 2. ORDERS DB SERVICE WITH HYBRID LOCAL & CLOUD SYNC
 const LOCAL_ORDERS_KEY = 'jahesh_orders_store';
 
 export const getLocalOrdersStore = (): Order[] => {
+  const deletedSet = new Set(getLocalDeletedOrderIds());
+  const isDeleted = (o: any) => {
+    if (!o) return true;
+    if (o.id && deletedSet.has(String(o.id).trim())) return true;
+    if (o.trackingCode && deletedSet.has(String(o.trackingCode).trim())) return true;
+    if (o.zibalTrackId && deletedSet.has(String(o.zibalTrackId).trim())) return true;
+    if (o.paymentRefId && deletedSet.has(String(o.paymentRefId).trim())) return true;
+    return false;
+  };
+
   try {
     const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Ensure restored Zibal orders are merged if not present
+      if (Array.isArray(parsed)) {
+        // Ensure restored Zibal orders are merged if not deleted
         const map = new Map<string, Order>();
-        RESTORED_ZIBAL_ORDERS.forEach((o) => map.set(o.id || o.trackingCode || '', o));
+        RESTORED_ZIBAL_ORDERS.forEach((o) => {
+          if (!isDeleted(o)) {
+            map.set(o.id || o.trackingCode || '', o);
+          }
+        });
         parsed.forEach((o) => {
-          if (o && (o.id || o.trackingCode)) {
+          if (o && (o.id || o.trackingCode) && !isDeleted(o)) {
             map.set(o.id || o.trackingCode || '', { ...map.get(o.id || o.trackingCode || ''), ...o });
           }
         });
-        const merged = Array.from(map.values());
+        const merged = Array.from(map.values()).filter((o) => !isDeleted(o));
         merged.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
         return merged;
       }
@@ -763,15 +913,19 @@ export const getLocalOrdersStore = (): Order[] => {
     const legacyRaw = localStorage.getItem('jahesh_orders');
     if (legacyRaw) {
       const parsedLegacy = JSON.parse(legacyRaw);
-      if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+      if (Array.isArray(parsedLegacy)) {
         const map = new Map<string, Order>();
-        RESTORED_ZIBAL_ORDERS.forEach((o) => map.set(o.id || o.trackingCode || '', o));
+        RESTORED_ZIBAL_ORDERS.forEach((o) => {
+          if (!isDeleted(o)) {
+            map.set(o.id || o.trackingCode || '', o);
+          }
+        });
         parsedLegacy.forEach((o) => {
-          if (o && (o.id || o.trackingCode)) {
+          if (o && (o.id || o.trackingCode) && !isDeleted(o)) {
             map.set(o.id || o.trackingCode || '', { ...map.get(o.id || o.trackingCode || ''), ...o });
           }
         });
-        const merged = Array.from(map.values());
+        const merged = Array.from(map.values()).filter((o) => !isDeleted(o));
         merged.sort((a, b) => parseOrderTimestamp(b) - parseOrderTimestamp(a));
         return merged;
       }
@@ -779,7 +933,7 @@ export const getLocalOrdersStore = (): Order[] => {
   } catch (e) {
     console.warn('Error reading local orders store:', e);
   }
-  return [...RESTORED_ZIBAL_ORDERS];
+  return RESTORED_ZIBAL_ORDERS.filter((o) => !isDeleted(o));
 };
 
 export const saveLocalOrdersStore = (orders: Order[]) => {
@@ -847,7 +1001,18 @@ export const parseOrderTimestamp = (order: Partial<Order>): number => {
 };
 
 export const fetchOrdersFromDb = async (): Promise<Order[]> => {
-  const localOrders = getLocalOrdersStore();
+  const deletedIdsList = await getDeletedOrderIds();
+  const deletedIds = new Set(deletedIdsList);
+  const isDeleted = (o: any) => {
+    if (!o) return true;
+    if (o.id && deletedIds.has(String(o.id).trim())) return true;
+    if (o.trackingCode && deletedIds.has(String(o.trackingCode).trim())) return true;
+    if (o.zibalTrackId && deletedIds.has(String(o.zibalTrackId).trim())) return true;
+    if (o.paymentRefId && deletedIds.has(String(o.paymentRefId).trim())) return true;
+    return false;
+  };
+
+  const localOrders = getLocalOrdersStore().filter((o) => !isDeleted(o));
   let serverDiskOrders: Order[] = [];
   let chatConfigOrders: Order[] = [];
   let tableOrders: Order[] = [];
@@ -858,7 +1023,7 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
     if (res && res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.orders)) {
-        serverDiskOrders = data.orders;
+        serverDiskOrders = data.orders.filter((o: any) => !isDeleted(o));
       }
     }
   } catch (err) {
@@ -874,7 +1039,7 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
       .maybeSingle();
 
     if (!configError && configData && Array.isArray(configData.messages)) {
-      chatConfigOrders = configData.messages;
+      chatConfigOrders = configData.messages.filter((o: any) => !isDeleted(o));
     }
   } catch (e) {
     console.warn('Check SYSTEM_CONFIG_ORDERS notice:', e);
@@ -884,38 +1049,40 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
   try {
     const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
     if (!error && data) {
-      tableOrders = data.map((item) => {
-        let parsedItems = item.items;
-        if (typeof item.items === 'string') {
-          try {
-            parsedItems = JSON.parse(item.items);
-          } catch {
-            parsedItems = [];
+      tableOrders = data
+        .map((item) => {
+          let parsedItems = item.items;
+          if (typeof item.items === 'string') {
+            try {
+              parsedItems = JSON.parse(item.items);
+            } catch {
+              parsedItems = [];
+            }
           }
-        }
-        return {
-          id: item.id,
-          trackingCode: item.tracking_code || item.id,
-          paymentRefId: item.payment_ref_id || '',
-          userId: item.user_id || '',
-          customerName: item.customer_name || 'مشتری گرامی',
-          customerPhone: item.customer_phone || '',
-          customerEmail: item.customer_email || '',
-          requestedDomain: item.requested_domain || '',
-          clientNotes: item.client_notes || '',
-          items: Array.isArray(parsedItems) ? parsedItems : [],
-          totalAmount: Number(item.total_amount) || 0,
-          discountAmount: Number(item.discount_amount) || 0,
-          appliedCouponCode: item.applied_coupon_code || '',
-          status: item.status || 'در حال بررسی',
-          paymentGateway: item.payment_gateway || 'زیبال (Zibal)',
-          date: item.date || new Date().toLocaleDateString('fa-IR'),
-          createdAt: item.created_at,
-          zibalTrackId: item.tracking_code || '',
-          zibalRefNumber: item.payment_ref_id || '',
-          acceptedTerms: true,
-        };
-      });
+          return {
+            id: item.id,
+            trackingCode: item.tracking_code || item.id,
+            paymentRefId: item.payment_ref_id || '',
+            userId: item.user_id || '',
+            customerName: item.customer_name || 'مشتری گرامی',
+            customerPhone: item.customer_phone || '',
+            customerEmail: item.customer_email || '',
+            requestedDomain: item.requested_domain || '',
+            clientNotes: item.client_notes || '',
+            items: Array.isArray(parsedItems) ? parsedItems : [],
+            totalAmount: Number(item.total_amount) || 0,
+            discountAmount: Number(item.discount_amount) || 0,
+            appliedCouponCode: item.applied_coupon_code || '',
+            status: item.status || 'در حال بررسی',
+            paymentGateway: item.payment_gateway || 'زیبال (Zibal)',
+            date: item.date || new Date().toLocaleDateString('fa-IR'),
+            createdAt: item.created_at,
+            zibalTrackId: item.tracking_code || '',
+            zibalRefNumber: item.payment_ref_id || '',
+            acceptedTerms: true,
+          };
+        })
+        .filter((o) => !isDeleted(o));
     }
   } catch (err) {
     console.warn('Supabase fetch orders table notice:', err);
@@ -927,7 +1094,7 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
     const snap = await getDocs(collection(db, 'orders'));
     snap.forEach((d) => {
       const o = d.data() as Order;
-      if (o && (o.id || o.trackingCode)) {
+      if (o && (o.id || o.trackingCode) && !isDeleted(o)) {
         firestoreOrders.push(o);
       }
     });
@@ -938,7 +1105,7 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
   // Merge all sources into a single deduplicated list
   const allOrdersMap = new Map<string, Order>();
   const addOrderToMap = (o: Order) => {
-    if (!o || (!o.id && !o.trackingCode)) return;
+    if (!o || (!o.id && !o.trackingCode) || isDeleted(o)) return;
     const key = o.id || o.trackingCode;
     const existing = allOrdersMap.get(key);
     if (!existing) {
@@ -974,7 +1141,7 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
     }
   };
 
-  RESTORED_ZIBAL_ORDERS.forEach(addOrderToMap);
+  RESTORED_ZIBAL_ORDERS.filter((o) => !isDeleted(o)).forEach(addOrderToMap);
   firestoreOrders.forEach(addOrderToMap);
   tableOrders.forEach(addOrderToMap);
   chatConfigOrders.forEach(addOrderToMap);
@@ -1000,6 +1167,14 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
     order.zibalRefNumber = String(order.paymentRefId);
   }
 
+  // Unmark newly saved or updated order from deleted tombstone
+  if (order.id) {
+    unmarkOrderIdAsDeleted(String(order.id));
+  }
+  if (order.trackingCode) {
+    unmarkOrderIdAsDeleted(String(order.trackingCode));
+  }
+
   // 1. Save locally & broadcast immediately
   let updatedList: Order[] = [];
   try {
@@ -1023,15 +1198,15 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
     console.warn('Local save order warning:', localErr);
   }
 
-  // 2. Persist to server disk via /api/orders/save
+  // 2. Persist to server disk via Universal API
   try {
-    await fetch('/api/orders/save', {
+    await fetchUniversalApi('orders/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(order),
     });
   } catch (e) {
-    console.warn('Persist order to /api/orders/save notice:', e);
+    console.warn('Persist order to Universal API notice:', e);
   }
 
   // 3. Primary Cloud: Merge into Supabase SYSTEM_CONFIG_ORDERS in chats table (NEVER wipe other orders)
@@ -1167,24 +1342,65 @@ export const updateOrderStatusInDb = async (orderId: string, status: string): Pr
 };
 
 export const deleteOrderFromDb = async (orderId: string): Promise<boolean> => {
-  let updated: Order[] = [];
-  try {
-    const current = getLocalOrdersStore();
-    updated = current.filter((o) => o.id !== orderId && o.trackingCode !== orderId);
-    saveLocalOrdersStore(updated);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updated }));
-    }
-  } catch (e) {}
+  if (!orderId) return false;
 
+  let current = getLocalOrdersStore();
+  const target = current.find(
+    (o) =>
+      o.id === orderId ||
+      o.trackingCode === orderId ||
+      o.paymentRefId === orderId ||
+      o.zibalTrackId === orderId
+  );
+  const allKeys = [
+    orderId,
+    target?.id,
+    target?.trackingCode,
+    target?.paymentRefId,
+    target?.zibalTrackId,
+    target?.zibalRefNumber,
+  ]
+    .filter((k): k is string => Boolean(k))
+    .map((k) => String(k).trim());
+
+  // 1. Mark as deleted in persistent tombstone blacklist (LocalStorage, Supabase chats, Universal API)
+  await markOrderIdAsDeleted(orderId, allKeys);
+
+  // 2. Remove from LocalStorage immediately & broadcast event
+  const keySet = new Set(allKeys);
+  const updated = current.filter(
+    (o) =>
+      !keySet.has(String(o.id).trim()) &&
+      (!o.trackingCode || !keySet.has(String(o.trackingCode).trim())) &&
+      (!o.zibalTrackId || !keySet.has(String(o.zibalTrackId).trim())) &&
+      (!o.paymentRefId || !keySet.has(String(o.paymentRefId).trim()))
+  );
+  saveLocalOrdersStore(updated);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updated }));
+  }
+
+  // 3. Delete from Server Disk via Universal API
   try {
-    await fetch('/api/orders/delete', {
+    await fetchUniversalApi(`orders/delete?id=${encodeURIComponent(orderId)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId }),
+      body: JSON.stringify({ orderId, id: orderId, allKeys }),
     });
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Universal API delete order notice:', e);
+  }
 
+  // 4. Delete from Google Firebase Firestore Cloud Database
+  try {
+    for (const key of allKeys) {
+      await deleteDoc(doc(db, 'orders', String(key))).catch(() => {});
+    }
+  } catch (e) {
+    console.warn('Firebase delete order notice:', e);
+  }
+
+  // 5. Update Supabase SYSTEM_CONFIG_ORDERS in chats table
   try {
     await supabase.from('chats').upsert(
       {
@@ -1196,43 +1412,80 @@ export const deleteOrderFromDb = async (orderId: string): Promise<boolean> => {
       },
       { onConflict: 'user_id' }
     );
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Supabase SYSTEM_CONFIG_ORDERS delete notice:', e);
+  }
 
+  // 6. Delete from Supabase orders table
   try {
-    await supabase.from('orders').delete().eq('id', orderId);
-  } catch (err) {}
+    for (const key of allKeys) {
+      await supabase.from('orders').delete().eq('id', key).catch(() => {});
+      await supabase.from('orders').delete().eq('tracking_code', key).catch(() => {});
+    }
+  } catch (err) {
+    console.warn('Supabase orders table delete notice:', err);
+  }
 
   return true;
 };
 
 export const clearAllOrdersFromDb = async (): Promise<boolean> => {
   try {
+    const current = getLocalOrdersStore();
+    const allKeys: string[] = [];
+    current.forEach((o) => {
+      if (o.id) allKeys.push(String(o.id).trim());
+      if (o.trackingCode) allKeys.push(String(o.trackingCode).trim());
+      if (o.paymentRefId) allKeys.push(String(o.paymentRefId).trim());
+      if (o.zibalTrackId) allKeys.push(String(o.zibalTrackId).trim());
+    });
+
+    if (allKeys.length > 0) {
+      await markOrderIdAsDeleted(allKeys[0], allKeys);
+    }
+
     saveLocalOrdersStore([]);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: [] }));
     }
-  } catch (e) {}
 
-  try {
-    await fetch('/api/orders/clear', { method: 'POST' });
-  } catch (e) {}
+    // 1. Universal API
+    try {
+      await fetchUniversalApi('orders/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allKeys }),
+      });
+    } catch (e) {}
 
-  try {
-    await supabase.from('chats').upsert(
-      {
-        user_id: 'SYSTEM_CONFIG_ORDERS',
-        user_name: 'لیست تمام سفارشات فروشگاه',
-        messages: [],
-        last_updated: new Date().toISOString(),
-        is_read_by_admin: true,
-      },
-      { onConflict: 'user_id' }
-    );
-  } catch (e) {}
+    // 2. Firebase Firestore
+    try {
+      for (const key of allKeys) {
+        await deleteDoc(doc(db, 'orders', String(key))).catch(() => {});
+      }
+    } catch (e) {}
 
-  try {
-    await supabase.from('orders').delete().neq('id', '___non_existent___');
-  } catch (err) {}
+    // 3. Supabase chats config
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_ORDERS',
+          user_name: 'لیست تمام سفارشات فروشگاه',
+          messages: [],
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch (e) {}
+
+    // 4. Supabase orders table
+    try {
+      await supabase.from('orders').delete().neq('id', '___non_existent___');
+    } catch (err) {}
+  } catch (e) {
+    console.warn('Clear all orders notice:', e);
+  }
 
   return true;
 };

@@ -66,6 +66,7 @@ if (empty($action) && isset($inputData['action'])) {
 // 3. Router Actions
 $chatsFile    = $dataDir . '/chats.json';
 $ordersFile   = $dataDir . '/orders.json';
+$deletedOrdersFile = $dataDir . '/deleted_orders.json';
 $productsFile = $dataDir . '/products.json';
 $bannersFile  = $dataDir . '/banners.json';
 $toolsFile    = $dataDir . '/tools.json';
@@ -136,6 +137,33 @@ switch ($action) {
         break;
 
     // ==========================================
+    // DELETED ORDERS API (Blacklist sync)
+    // ==========================================
+    case 'orders/deleted':
+    case 'deleted_orders':
+    case 'api/orders/deleted':
+        $deletedOrders = readJsonFile($deletedOrdersFile, []);
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $incoming = $inputData;
+            $newIds = [];
+            if (isset($incoming['orderIds']) && is_array($incoming['orderIds'])) {
+                $newIds = $incoming['orderIds'];
+            } else if (isset($incoming['orderId'])) {
+                $newIds = [(string)$incoming['orderId']];
+            } else if (isset($incoming['id'])) {
+                $newIds = [(string)$incoming['id']];
+            }
+            $newIds = array_map('strval', array_filter($newIds));
+            $deletedOrders = array_values(array_unique(array_merge($deletedOrders, $newIds)));
+            writeJsonFile($deletedOrdersFile, $deletedOrders);
+            echo json_encode(['success' => true, 'count' => count($deletedOrders), 'deleted' => $deletedOrders]);
+            exit;
+        }
+        echo json_encode($deletedOrders);
+        exit;
+        break;
+
+    // ==========================================
     // ORDERS API
     // ==========================================
     case 'orders':
@@ -146,27 +174,65 @@ switch ($action) {
     case 'update-status':
     case 'orders/save':
     case 'orders/delete':
+    case 'delete_order':
+    case 'api/orders/delete':
     case 'orders/clear':
+    case 'api/orders/clear':
         $orders = readJsonFile($ordersFile, []);
+        $deletedOrders = readJsonFile($deletedOrdersFile, []);
+        $delSet = !empty($deletedOrders) ? array_flip(array_map('strval', $deletedOrders)) : [];
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'DELETE') {
             $incoming = $inputData;
 
             // Delete single order
-            if ($action === 'orders/delete' || isset($_GET['delete'])) {
-                $delId = isset($_GET['id']) ? (string)$_GET['id'] : (isset($incoming['id']) ? (string)$incoming['id'] : (isset($incoming['orderId']) ? (string)$incoming['orderId'] : ''));
+            if ($action === 'orders/delete' || $action === 'delete_order' || $action === 'api/orders/delete' || isset($_GET['delete'])) {
+                $delId = isset($_GET['id']) ? (string)$_GET['id'] : (isset($_GET['orderId']) ? (string)$_GET['orderId'] : (isset($incoming['id']) ? (string)$incoming['id'] : (isset($incoming['orderId']) ? (string)$incoming['orderId'] : '')));
+                $allKeys = isset($incoming['allKeys']) && is_array($incoming['allKeys']) ? $incoming['allKeys'] : [];
                 if (!empty($delId)) {
-                    $orders = array_values(array_filter($orders, function($o) use ($delId) {
-                        return (isset($o['id']) && (string)$o['id'] === $delId) ||
-                               (isset($o['trackingCode']) && (string)$o['trackingCode'] === $delId) ? false : true;
+                    $allKeys[] = $delId;
+                }
+                $allKeys = array_values(array_unique(array_filter(array_map('strval', $allKeys))));
+
+                if (!empty($allKeys)) {
+                    $keyCheck = array_flip($allKeys);
+                    $orders = array_values(array_filter($orders, function($o) use ($keyCheck) {
+                        $oId = isset($o['id']) ? (string)$o['id'] : '';
+                        $oTrack = isset($o['trackingCode']) ? (string)$o['trackingCode'] : '';
+                        $oRef = isset($o['paymentRefId']) ? (string)$o['paymentRefId'] : '';
+                        $oZibal = isset($o['zibalTrackId']) ? (string)$o['zibalTrackId'] : '';
+                        if (isset($keyCheck[$oId]) || isset($keyCheck[$oTrack]) || isset($keyCheck[$oRef]) || isset($keyCheck[$oZibal])) {
+                            return false;
+                        }
+                        return true;
                     }));
                     writeJsonFile($ordersFile, $orders);
+
+                    // Add to persistent tombstone blacklist
+                    $deletedOrders = array_values(array_unique(array_merge($deletedOrders, $allKeys)));
+                    writeJsonFile($deletedOrdersFile, $deletedOrders);
+
                     echo json_encode(['success' => true, 'count' => count($orders), 'orders' => $orders]);
                     exit;
                 }
             }
 
             // Clear all orders
-            if ($action === 'orders/clear' || isset($_GET['clear'])) {
+            if ($action === 'orders/clear' || $action === 'api/orders/clear' || isset($_GET['clear'])) {
+                $keysToBlacklist = [];
+                foreach ($orders as $o) {
+                    if (!empty($o['id'])) $keysToBlacklist[] = (string)$o['id'];
+                    if (!empty($o['trackingCode'])) $keysToBlacklist[] = (string)$o['trackingCode'];
+                    if (!empty($o['paymentRefId'])) $keysToBlacklist[] = (string)$o['paymentRefId'];
+                    if (!empty($o['zibalTrackId'])) $keysToBlacklist[] = (string)$o['zibalTrackId'];
+                }
+                if (isset($incoming['allKeys']) && is_array($incoming['allKeys'])) {
+                    $keysToBlacklist = array_merge($keysToBlacklist, $incoming['allKeys']);
+                }
+                $keysToBlacklist = array_values(array_unique(array_filter(array_map('strval', $keysToBlacklist))));
+                $deletedOrders = array_values(array_unique(array_merge($deletedOrders, $keysToBlacklist)));
+                writeJsonFile($deletedOrdersFile, $deletedOrders);
+
                 $orders = [];
                 writeJsonFile($ordersFile, $orders);
                 echo json_encode(['success' => true, 'count' => 0, 'orders' => []]);
@@ -212,6 +278,15 @@ switch ($action) {
 
             if (isset($incoming['id'])) {
                 $orderId = (string)$incoming['id'];
+                // If this order was previously deleted, unmark it
+                if (isset($delSet[$orderId])) {
+                    $deletedOrders = array_values(array_filter($deletedOrders, function($id) use ($orderId) {
+                        return (string)$id !== $orderId;
+                    }));
+                    writeJsonFile($deletedOrdersFile, $deletedOrders);
+                    $delSet = !empty($deletedOrders) ? array_flip(array_map('strval', $deletedOrders)) : [];
+                }
+
                 $foundIndex = -1;
                 foreach ($orders as $idx => $o) {
                     if (isset($o['id']) && (string)$o['id'] === $orderId) {
@@ -245,6 +320,17 @@ switch ($action) {
             }
         }
         $orders = readJsonFile($ordersFile, []);
+        $deletedOrders = readJsonFile($deletedOrdersFile, []);
+        if (!empty($deletedOrders)) {
+            $delSet = array_flip(array_map('strval', $deletedOrders));
+            $orders = array_values(array_filter($orders, function($o) use ($delSet) {
+                $oId = isset($o['id']) ? (string)$o['id'] : '';
+                $oTrack = isset($o['trackingCode']) ? (string)$o['trackingCode'] : '';
+                $oRef = isset($o['paymentRefId']) ? (string)$o['paymentRefId'] : '';
+                $oZibal = isset($o['zibalTrackId']) ? (string)$o['zibalTrackId'] : '';
+                return !isset($delSet[$oId]) && !isset($delSet[$oTrack]) && !isset($delSet[$oRef]) && !isset($delSet[$oZibal]);
+            }));
+        }
         echo json_encode(['success' => true, 'orders' => $orders]);
         exit;
         break;

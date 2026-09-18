@@ -806,6 +806,33 @@ app.post('/api/products/delete', (req, res) => {
 // Orders Persistence API
 // ==========================================
 const ORDERS_FILE = path.join(__dirname, 'data', 'orders.json');
+const DELETED_ORDERS_FILE = path.join(__dirname, 'data', 'deleted_orders.json');
+
+function readDeletedOrdersFromDisk() {
+  if (fs.existsSync(DELETED_ORDERS_FILE)) {
+    try {
+      const raw = fs.readFileSync(DELETED_ORDERS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((id) => String(id).trim()).filter(Boolean);
+    } catch (e) {
+      console.warn('Error reading deleted_orders.json:', e);
+    }
+  }
+  return [];
+}
+
+function writeDeletedOrdersToDisk(ids) {
+  try {
+    const dataDir = path.dirname(DELETED_ORDERS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    const cleanIds = Array.from(new Set((Array.isArray(ids) ? ids : []).map((id) => String(id).trim()).filter(Boolean)));
+    fs.writeFileSync(DELETED_ORDERS_FILE, JSON.stringify(cleanIds, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error writing deleted_orders.json:', e);
+  }
+}
 
 function sortOrdersNewestFirst(orders) {
   if (!Array.isArray(orders)) return [];
@@ -824,7 +851,18 @@ function readOrdersFromDisk() {
     try {
       const raw = fs.readFileSync(ORDERS_FILE, 'utf8');
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return sortOrdersNewestFirst(parsed);
+      if (Array.isArray(parsed)) {
+        const deleted = new Set(readDeletedOrdersFromDisk());
+        const cleaned = parsed.filter(
+          (o) =>
+            o &&
+            !deleted.has(String(o.id).trim()) &&
+            (!o.trackingCode || !deleted.has(String(o.trackingCode).trim())) &&
+            (!o.zibalTrackId || !deleted.has(String(o.zibalTrackId).trim())) &&
+            (!o.paymentRefId || !deleted.has(String(o.paymentRefId).trim()))
+        );
+        return sortOrdersNewestFirst(cleaned);
+      }
     } catch (e) {
       console.warn('Error reading orders.json:', e);
     }
@@ -845,11 +883,33 @@ function writeOrdersToDisk(orders) {
   }
 }
 
-// GET /api/orders
-app.get('/api/orders', (_req, res) => {
+// GET /api/orders & /jaheshkala/api/orders
+app.get(['/api/orders', '/jaheshkala/api/orders'], (_req, res) => {
   try {
     const orders = readOrdersFromDisk();
     return res.json({ success: true, orders });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET & POST /api/orders/deleted (Tombstone blacklist sync)
+app.get(['/api/orders/deleted', '/jaheshkala/api/orders/deleted'], (_req, res) => {
+  return res.json(readDeletedOrdersFromDisk());
+});
+
+app.post(['/api/orders/deleted', '/jaheshkala/api/orders/deleted'], (req, res) => {
+  try {
+    const { orderIds, orderId, id } = req.body || {};
+    const newKeys = [
+      ...(Array.isArray(orderIds) ? orderIds : []),
+      orderId,
+      id,
+    ].filter(Boolean).map((k) => String(k).trim());
+    const current = readDeletedOrdersFromDisk();
+    const updated = Array.from(new Set([...current, ...newKeys]));
+    writeDeletedOrdersToDisk(updated);
+    return res.json({ success: true, count: updated.length, deleted: updated });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -1040,9 +1100,12 @@ function writeChatsToDisk(chats) {
 app.get(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.php'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const action = req.query.action || req.query.endpoint || 'chats';
-  if (action === 'orders' || action === 'get_orders') {
+  if (action === 'orders' || action === 'get_orders' || action === 'api/orders') {
     const orders = readOrdersFromDisk();
     return res.json({ success: true, orders });
+  }
+  if (action === 'orders/deleted' || action === 'deleted_orders' || action === 'api/orders/deleted') {
+    return res.json(readDeletedOrdersFromDisk());
   }
   if (action === 'banners' || action === 'get_banners') {
     return res.json(DEFAULT_SERVER_BANNERS);
@@ -1060,9 +1123,71 @@ app.post(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.ph
   try {
     const incoming = req.body;
     const action = req.query.action || req.query.endpoint || (incoming && incoming.action);
+
+    // Delete single order via api.php emulator
+    if (action === 'orders/delete' || action === 'delete_order' || action === 'api/orders/delete') {
+      const orderId = (req.query && req.query.id) || (incoming && (incoming.orderId || incoming.id));
+      const allKeys = Array.isArray(incoming && incoming.allKeys) ? incoming.allKeys : [];
+      if (orderId) allKeys.push(orderId);
+      const cleanKeys = Array.from(new Set(allKeys.filter(Boolean).map(k => String(k).trim())));
+
+      if (cleanKeys.length > 0) {
+        const currentDeleted = readDeletedOrdersFromDisk();
+        writeDeletedOrdersToDisk([...currentDeleted, ...cleanKeys]);
+      }
+
+      const current = readOrdersFromDisk();
+      const keySet = new Set(cleanKeys);
+      const updated = current.filter(
+        (o) =>
+          !keySet.has(String(o.id).trim()) &&
+          (!o.trackingCode || !keySet.has(String(o.trackingCode).trim())) &&
+          (!o.zibalTrackId || !keySet.has(String(o.zibalTrackId).trim())) &&
+          (!o.paymentRefId || !keySet.has(String(o.paymentRefId).trim()))
+      );
+      writeOrdersToDisk(updated);
+      return res.json({ success: true, count: updated.length, orders: updated });
+    }
+
+    // Clear all orders via api.php emulator
+    if (action === 'orders/clear' || action === 'clear_orders' || action === 'api/orders/clear') {
+      const current = readOrdersFromDisk();
+      const allKeys = [];
+      current.forEach((o) => {
+        if (o.id) allKeys.push(String(o.id).trim());
+        if (o.trackingCode) allKeys.push(String(o.trackingCode).trim());
+      });
+      if (incoming && Array.isArray(incoming.allKeys)) {
+        allKeys.push(...incoming.allKeys);
+      }
+      const currentDeleted = readDeletedOrdersFromDisk();
+      writeDeletedOrdersToDisk([...currentDeleted, ...allKeys]);
+      writeOrdersToDisk([]);
+      return res.json({ success: true, count: 0, orders: [] });
+    }
+
+    // Sync deleted orders blacklist
+    if (action === 'orders/deleted' || action === 'deleted_orders' || action === 'api/orders/deleted') {
+      const { orderIds, orderId, id } = incoming || {};
+      const newKeys = [
+        ...(Array.isArray(orderIds) ? orderIds : []),
+        orderId,
+        id,
+      ].filter(Boolean).map((k) => String(k).trim());
+      const current = readDeletedOrdersFromDisk();
+      const updated = Array.from(new Set([...current, ...newKeys]));
+      writeDeletedOrdersToDisk(updated);
+      return res.json({ success: true, count: updated.length, deleted: updated });
+    }
+
     if (action === 'orders' || action === 'save_order' || (incoming && incoming.id && !incoming.userId)) {
       // Forward to order saving logic
       const orders = readOrdersFromDisk();
+      // If saving an order, unmark from deleted tombstone
+      if (incoming && incoming.id) {
+        const deleted = readDeletedOrdersFromDisk().filter(d => d !== String(incoming.id).trim());
+        writeDeletedOrdersToDisk(deleted);
+      }
       const existingIdx = orders.findIndex(o => o.id === incoming.id);
       if (existingIdx >= 0) {
         orders[existingIdx] = { ...orders[existingIdx], ...incoming };
@@ -1101,15 +1226,32 @@ app.post(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.ph
   }
 });
 
-// POST /api/orders/delete
-app.post('/api/orders/delete', (req, res) => {
+// POST /api/orders/delete & /jaheshkala/api/orders/delete
+app.post(['/api/orders/delete', '/jaheshkala/api/orders/delete'], (req, res) => {
   try {
-    const { orderId } = req.body;
-    if (!orderId) {
-      return res.status(400).json({ error: 'orderId required' });
+    const { orderId, id, allKeys } = req.body || {};
+    const targetId = orderId || id || (req.query && req.query.id);
+    const keys = Array.isArray(allKeys) ? [...allKeys] : [];
+    if (targetId) keys.push(targetId);
+
+    const cleanKeys = Array.from(new Set(keys.filter(Boolean).map(k => String(k).trim())));
+    if (cleanKeys.length === 0) {
+      return res.status(400).json({ error: 'orderId or allKeys required' });
     }
+
+    // Persist into tombstone blacklist
+    const currentDeleted = readDeletedOrdersFromDisk();
+    writeDeletedOrdersToDisk([...currentDeleted, ...cleanKeys]);
+
     const current = readOrdersFromDisk();
-    const updated = current.filter((o) => o.id !== orderId && o.trackingCode !== orderId);
+    const keySet = new Set(cleanKeys);
+    const updated = current.filter(
+      (o) =>
+        !keySet.has(String(o.id).trim()) &&
+        (!o.trackingCode || !keySet.has(String(o.trackingCode).trim())) &&
+        (!o.zibalTrackId || !keySet.has(String(o.zibalTrackId).trim())) &&
+        (!o.paymentRefId || !keySet.has(String(o.paymentRefId).trim()))
+    );
     writeOrdersToDisk(updated);
     return res.json({ success: true, count: updated.length, orders: updated });
   } catch (err) {
@@ -1117,9 +1259,22 @@ app.post('/api/orders/delete', (req, res) => {
   }
 });
 
-// POST /api/orders/clear
-app.post('/api/orders/clear', (_req, res) => {
+// POST /api/orders/clear & /jaheshkala/api/orders/clear
+app.post(['/api/orders/clear', '/jaheshkala/api/orders/clear'], (req, res) => {
   try {
+    const current = readOrdersFromDisk();
+    const allKeys = [];
+    current.forEach((o) => {
+      if (o.id) allKeys.push(String(o.id).trim());
+      if (o.trackingCode) allKeys.push(String(o.trackingCode).trim());
+      if (o.paymentRefId) allKeys.push(String(o.paymentRefId).trim());
+      if (o.zibalTrackId) allKeys.push(String(o.zibalTrackId).trim());
+    });
+    if (req.body && Array.isArray(req.body.allKeys)) {
+      allKeys.push(...req.body.allKeys);
+    }
+    const currentDeleted = readDeletedOrdersFromDisk();
+    writeDeletedOrdersToDisk([...currentDeleted, ...allKeys]);
     writeOrdersToDisk([]);
     return res.json({ success: true, count: 0, orders: [] });
   } catch (err) {

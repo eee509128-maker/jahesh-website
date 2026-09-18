@@ -1801,11 +1801,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               >
                                 جزئیات
                               </button>
-                              {onDeleteOrder && currentUser?.role === 'admin' && (
+                              {onDeleteOrder && currentUser?.role !== 'operator' && (
                                 <button
                                   onClick={() => onDeleteOrder(order.id)}
-                                  className="p-1 rounded-lg hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors"
-                                  title="حذف سفارش"
+                                  className="p-1.5 rounded-lg hover:bg-rose-950/80 text-slate-400 hover:text-rose-400 transition-colors border border-transparent hover:border-rose-700/50"
+                                  title="حذف دائمی سفارش از دیتابیس"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -6662,12 +6662,27 @@ on public.users for delete using (true);`;
                 )}
               </div>
 
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="w-full py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-xl font-bold text-xs"
-              >
-                بستن پنجره
-              </button>
+              <div className="flex items-center gap-2 pt-2">
+                {onDeleteOrder && currentUser?.role !== 'operator' && (
+                  <button
+                    onClick={() => {
+                      onDeleteOrder(selectedOrder.id);
+                      setSelectedOrder(null);
+                    }}
+                    className="px-4 py-2.5 bg-rose-950/70 hover:bg-rose-900 border border-rose-700/60 text-rose-200 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors"
+                    title="حذف کامل این سفارش از سرور و دیتابیس"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    حذف سفارش
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className="flex-1 py-2.5 bg-purple-700 hover:bg-purple-600 text-white rounded-xl font-bold text-xs transition-colors"
+                >
+                  بستن پنجره
+                </button>
+              </div>
             </div>
           </div>
         )}

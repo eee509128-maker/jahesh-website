@@ -1119,20 +1119,37 @@ export default function App() {
   };
 
   const handleDeleteOrder = async (orderId: string) => {
-    if (confirm(`آیا از حذف سفارش ${orderId} اطمینان دارید؟`)) {
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
-      await deleteOrderFromDb(orderId);
-      showToast(`سفارش ${orderId} از دیتابیس حذف شد.`);
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      try {
+        const ok = window.confirm(`آیا از حذف سفارش ${orderId} اطمینان دارید؟`);
+        if (!ok) return;
+      } catch {}
     }
+    setOrders((prev) =>
+      prev.filter(
+        (o) =>
+          o.id !== orderId &&
+          o.trackingCode !== orderId &&
+          o.paymentRefId !== orderId &&
+          o.zibalTrackId !== orderId
+      )
+    );
+    await deleteOrderFromDb(orderId);
+    showToast(`سفارش ${orderId} برای همیشه از دیتابیس و سرور حذف شد.`);
   };
 
   const handleClearAllOrders = async () => {
-    if (confirm('آیا از پاکسازی تمام سفارشات اطمینان دارید؟')) {
-      setOrders([]);
-      localStorage.removeItem('jahesh_orders');
-      await clearAllOrdersFromDb();
-      showToast('کلیه سفارشات با موفقیت از دیتابیس پاکسازی شدند.');
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      try {
+        const ok = window.confirm('آیا از پاکسازی تمام سفارشات اطمینان دارید؟');
+        if (!ok) return;
+      } catch {}
     }
+    setOrders([]);
+    localStorage.removeItem('jahesh_orders');
+    localStorage.removeItem('jahesh_orders_store');
+    await clearAllOrdersFromDb();
+    showToast('کلیه سفارشات با موفقیت از دیتابیس و سرور پاکسازی شدند.');
   };
 
   const handleAddNewProduct = async (newProduct: Product) => {
