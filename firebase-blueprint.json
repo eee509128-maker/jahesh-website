@@ -82,12 +82,37 @@
         "url": { "type": "string" }
       },
       "required": ["id", "title"]
+    },
+    "License": {
+      "title": "License",
+      "description": "Software subscription and app licenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "licenseKey": { "type": "string" },
+        "productId": { "type": "string" },
+        "productTitle": { "type": "string" },
+        "appName": { "type": "string" },
+        "buyerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "days": { "type": "number" },
+        "startDate": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["username", "licenseKey"]
     }
   },
   "firestore": {
     "/orders/{orderId}": {
       "schema": "Order",
       "description": "Store customer orders"
+    },
+    "/licenses/{licenseId}": {
+      "schema": "License",
+      "description": "Store software licenses"
     },
     "/products/{productId}": {
       "schema": "Product",

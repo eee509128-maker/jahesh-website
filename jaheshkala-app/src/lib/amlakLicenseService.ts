@@ -1,5 +1,7 @@
 import { safeSetLocalStorage } from './dbService';
 import { CartItem, Order, User, AmlakSubscriptionLicense } from '../types';
+import { db } from './firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 const STORAGE_KEY = 'jahesh_amlak_licenses';
 
@@ -182,13 +184,47 @@ export function getLocalAmlakLicenses(): AmlakSubscriptionLicense[] {
 export async function syncAmlakLicenseWithServer(
   license: AmlakSubscriptionLicense
 ): Promise<void> {
+  const licId = license.licenseKey || `lic-${license.username}`;
+  const payload = {
+    id: licId,
+    username: license.username,
+    password: license.password,
+    licenseKey: license.licenseKey,
+    productId: 'pkg-amlak-jahesh',
+    productTitle: 'نرم‌افزار جامع مدیریت املاک جهش (اشتراک آنلاین و ابری)',
+    appName: 'سامانه مدیریت املاک جهش',
+    buyerName: license.buyerName,
+    phone: license.phone,
+    days: license.days,
+    startDate: license.startDate,
+    expiresAt: license.expiresAt,
+    status: license.status || 'active',
+    updatedAt: new Date().toISOString(),
+  };
+
+  // 1. Direct real-time persistence to Firebase Firestore
   try {
-    await fetch('/api/amlak/licenses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(license),
-    });
+    await setDoc(doc(db, 'licenses', licId), payload, { merge: true });
   } catch (err) {
-    console.warn('Failed to sync license with server:', err);
+    console.warn('Firestore save amlak license error:', err);
+  }
+
+  // 2. Multi-endpoint server registration
+  const endpoints = [
+    '/api/app-auth/register-license',
+    '/api/amlak/licenses',
+    '/jaheshkala/api/app-auth/register-license',
+    '/jaheshkala/api.php?action=app-auth/register-license',
+    '/api.php?action=app-auth/register-license',
+  ];
+
+  for (const url of endpoints) {
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch {}
   }
 }

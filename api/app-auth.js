@@ -1,7 +1,22 @@
 import fs from 'fs';
 import path from 'path';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, collection, getDocs, doc, setDoc } from 'firebase/firestore';
+
+const firebaseConfig = {
+  projectId: "tranquil-keyword-5ggh3",
+  appId: "1:39375983688:web:640573d31d23e5fe43b47d",
+  apiKey: "AIzaSyBoilrOWTMjbpG1IHvKDkRD9Dm20Pl7UW8",
+  authDomain: "tranquil-keyword-5ggh3.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-jaheshwebsite-13126c61-5143-4f84-b87e-dcc220de14bc",
+};
+
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 const LICENSES_FILE = path.join(process.cwd(), 'data', 'app_licenses.json');
+const ALT_LICENSES_FILE = path.join(process.cwd(), 'data', 'licenses.json');
+const AMLAK_LICENSES_FILE = path.join(process.cwd(), 'data', 'amlak_licenses.json');
 
 function hashString(str) {
   let hash = 5381;
@@ -12,40 +27,105 @@ function hashString(str) {
   return Math.abs(hash);
 }
 
-function generateDeterministicAppPassword(seed) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const cleanSeed = (seed || 'jahesh').toLowerCase().trim();
-  const num = hashString(cleanSeed + '_jahesh_app_secret_salt_2026');
-  const digits = 1000 + (num % 9000);
-  let letters = '';
-  let temp = Math.floor(num / 17);
-  for (let i = 0; i < 4; i++) {
-    letters += chars[temp % chars.length];
-    temp = Math.floor(temp / chars.length) + (i * 5) + 2;
-  }
-  return `JK-${digits}${letters}`;
+function parseExpiryDate(dateStr, fallbackDays = 30) {
+  if (!dateStr) return new Date(Date.now() + fallbackDays * 86400000);
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) return parsed;
+  return new Date(Date.now() + fallbackDays * 86400000);
 }
 
-function readLicenses() {
-  if (fs.existsSync(LICENSES_FILE)) {
-    try {
-      const raw = fs.readFileSync(LICENSES_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (e) {
-      console.warn('Licenses read error:', e);
+async function readAllLicenses() {
+  const all = [];
+  const seenKeys = new Set();
+
+  // 1. Fetch from live Firestore 'licenses' collection
+  try {
+    const licSnap = await getDocs(collection(db, 'licenses'));
+    licSnap.forEach((d) => {
+      const data = d.data();
+      if (data && (data.username || data.licenseKey)) {
+        const item = {
+          id: d.id || data.id,
+          ...data,
+        };
+        const key = item.licenseKey || item.id || `${item.username}_${item.productId || ''}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          all.push(item);
+        }
+      }
+    });
+  } catch (e) {
+    console.warn('Firestore licenses read error:', e);
+  }
+
+  // 2. Fetch from live Firestore 'orders' collection (scan for amlakLicense & appLicense)
+  try {
+    const orderSnap = await getDocs(collection(db, 'orders'));
+    orderSnap.forEach((d) => {
+      const order = d.data();
+      if (!order) return;
+      const attached = [order.appLicense, order.amlakLicense].filter(Boolean);
+      for (const lic of attached) {
+        if (lic && (lic.username || lic.licenseKey)) {
+          const key = lic.licenseKey || lic.id || `order_${order.id}_${lic.username}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            all.push({
+              id: lic.id || `lic-${lic.licenseKey || order.id}`,
+              username: lic.username,
+              password: lic.password,
+              licenseKey: lic.licenseKey,
+              productId: lic.productId || 'pkg-amlak-jahesh',
+              productTitle: lic.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع مدیریت املاک جهش (اشتراک آنلاین و ابری)',
+              appName: lic.appName || 'سامانه مدیریت املاک جهش',
+              buyerName: lic.buyerName || order.customerName || 'کاربر جهش',
+              phone: lic.phone || order.customerPhone || '',
+              days: Number(lic.days) || 30,
+              startDate: lic.startDate || order.createdAt || new Date().toISOString(),
+              expiresAt: lic.expiresAt || new Date(Date.now() + (Number(lic.days) || 30) * 86400000).toISOString(),
+              status: lic.status || 'active',
+              orderId: order.id,
+            });
+          }
+        }
+      }
+    });
+  } catch (e) {
+    console.warn('Firestore orders read error:', e);
+  }
+
+  // 3. Fallback to local files if any pre-seeded licenses are on disk
+  for (const fpath of [LICENSES_FILE, ALT_LICENSES_FILE, AMLAK_LICENSES_FILE]) {
+    if (fs.existsSync(fpath)) {
+      try {
+        const raw = fs.readFileSync(fpath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            const key = item.licenseKey || item.id || `${item.username}_${item.productId || ''}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              all.push(item);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Disk licenses read error:', e);
+      }
     }
   }
-  return [];
+
+  return all;
 }
 
-function writeLicenses(licenses) {
+function writeLicensesToDisk(licenses) {
   try {
     const dir = path.dirname(LICENSES_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(LICENSES_FILE, JSON.stringify(licenses, null, 2), 'utf8');
   } catch (e) {
-    console.warn('Licenses write error:', e);
+    // Ephemeral on Vercel, ignore
   }
 }
 
@@ -53,6 +133,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -63,43 +144,71 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const body = req.body || {};
 
+    // Register / Save License
     if (isRegister) {
-      if (!body.id || !body.username) {
-        return res.status(400).json({ success: false, error: 'Invalid license payload' });
+      if (!body.username && !body.licenseKey) {
+        return res.status(400).json({ success: false, error: 'اطلاعات لایسنس ناقص است' });
       }
-      const list = readLicenses();
-      const idx = list.findIndex((l) => l.id === body.id || (l.username === body.username && l.productId === body.productId));
-      let updated;
-      if (idx >= 0) {
-        updated = [...list];
-        updated[idx] = { ...list[idx], ...body };
-      } else {
-        updated = [body, ...list];
+
+      const licId = body.id || (body.licenseKey ? `lic-${body.licenseKey}` : `lic-${Date.now()}`);
+      const cleanLicense = {
+        ...body,
+        id: licId,
+        status: body.status || 'active',
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        await setDoc(doc(db, 'licenses', String(licId)), cleanLicense, { merge: true });
+      } catch (err) {
+        console.warn('Error saving license to Firestore:', err);
       }
-      writeLicenses(updated);
-      return res.status(200).json({ success: true, count: updated.length, license: body });
+
+      // Also write to local disk
+      const list = await readAllLicenses();
+      writeLicensesToDisk(list);
+
+      return res.status(200).json({ success: true, license: cleanLicense });
     }
 
     // Authenticate or Verify
-    const { username, password, productId, token } = body;
-    const cleanUser = String(username || '').trim();
+    const { username, password, productId, token, licenseKey } = body;
+    const cleanUser = String(username || '').trim().toLowerCase();
     const cleanPass = String(password || '').trim();
     const cleanProd = String(productId || '').trim();
+    const cleanKey = String(licenseKey || token || '').trim().toLowerCase();
 
-    const list = readLicenses();
+    const list = await readAllLicenses();
 
-    // 1. Check for exact match on THIS productId
+    // 1. Check for exact match on THIS productId or license key
     const found = list.find((lic) => {
-      const uMatch = lic.username && (lic.username === cleanUser || lic.phone === cleanUser);
-      const pMatch = !cleanProd || lic.productId === cleanProd;
-      const passMatch = !cleanPass || lic.password === cleanPass || lic.licenseKey === cleanPass;
-      const tokenMatch = Boolean(token && (lic.id === token || lic.licenseKey === token));
-      return (uMatch || tokenMatch) && (passMatch || tokenMatch) && pMatch;
+      const licUser = String(lic.username || '').trim().toLowerCase();
+      const licPhone = String(lic.phone || '').trim().replace(/[^0-9]/g, '');
+      const licKey = String(lic.licenseKey || '').trim().toLowerCase();
+      const licId = String(lic.id || '').trim().toLowerCase();
+      const licPass = String(lic.password || '').trim();
+
+      const userMatch = cleanUser && (licUser === cleanUser || (licPhone && licPhone === cleanUser));
+      const keyMatch = cleanKey && (licKey === cleanKey || licId === cleanKey);
+      const passMatch = cleanPass && (licPass === cleanPass || licKey === cleanPass.toLowerCase());
+
+      const credsMatch = (userMatch && passMatch) || keyMatch;
+      if (!credsMatch) return false;
+
+      // Product isolation check: If product is specified, allow if matching or standard amlak/app
+      if (cleanProd && lic.productId && lic.productId !== cleanProd) {
+        // If it's the general amlak package, allow
+        if (lic.productId !== 'pkg-amlak-jahesh') {
+          return false;
+        }
+      }
+
+      return true;
     });
 
     if (found) {
       const now = new Date();
-      const expiry = new Date(found.expiresAt || now.toISOString());
+      const expiry = parseExpiryDate(found.expiresAt, found.days || 30);
       const diffMs = expiry.getTime() - now.getTime();
       const isExpired = diffMs <= 0;
       const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -140,28 +249,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. Strict Product Isolation Check: Check if user exists for a DIFFERENT product
-    if (cleanProd) {
-      const crossProductMatch = list.find((lic) => {
-        const uMatch = lic.username && (lic.username === cleanUser || lic.phone === cleanUser);
-        const passMatch = !cleanPass || lic.password === cleanPass || lic.licenseKey === cleanPass;
-        return uMatch && passMatch && lic.productId !== cleanProd;
-      });
-
-      if (crossProductMatch) {
-        return res.status(401).json({
-          success: false,
-          authenticated: false,
-          expired: false,
-          productMismatch: true,
-          targetProductId: cleanProd,
-          ownedProductId: crossProductMatch.productId,
-          message: `این نام کاربری و رمز عبور برای «${crossProductMatch.productTitle || crossProductMatch.appName || 'محصول دیگری'}» خریداری شده است و اجازه ورود به این برنامه را ندارد.`,
-        });
-      }
-    }
-
-    // 3. Fallback: Invalid Credentials
+    // 2. Fallback: Invalid Credentials
     return res.status(401).json({
       success: false,
       authenticated: false,
@@ -171,7 +259,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const list = readLicenses();
+    const list = await readAllLicenses();
     return res.status(200).json({ success: true, count: list.length, licenses: list });
   }
 

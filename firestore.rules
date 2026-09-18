@@ -29,6 +29,9 @@ service cloud.firestore {
       allow create: if true;
       allow update, delete: if true;
     }
+    match /licenses/{licenseId} {
+      allow read, write: if true;
+    }
     match /users/{userId} {
       allow read: if true;
       allow write: if true;

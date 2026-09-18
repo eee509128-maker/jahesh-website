@@ -567,20 +567,24 @@ switch ($action) {
             $licenses = readJsonFile($licensesFile, []);
         }
 
+        header('Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate');
+
         // Merge any licenses attached to orders
         $orderList = readJsonFile($ordersFile, []);
         $seenLicKeys = [];
         foreach ($licenses as $l) {
-            $k = isset($l['id']) ? (string)$l['id'] : ((isset($l['username'], $l['productId']) ? $l['username'].'_'.$l['productId'] : ''));
+            $k = !empty($l['licenseKey']) ? (string)$l['licenseKey'] : (!empty($l['id']) ? (string)$l['id'] : ((isset($l['username'], $l['productId']) ? $l['username'].'_'.$l['productId'].'_'.($l['password'] ?? '') : '')));
             if ($k) $seenLicKeys[$k] = true;
         }
         foreach ($orderList as $o) {
-            $lic = !empty($o['appLicense']) ? $o['appLicense'] : (!empty($o['amlakLicense']) ? $o['amlakLicense'] : null);
-            if (!empty($lic) && (!empty($lic['username']) || !empty($lic['licenseKey']))) {
-                $k = isset($lic['id']) ? (string)$lic['id'] : ((isset($lic['username'], $lic['productId']) ? $lic['username'].'_'.$lic['productId'] : ''));
-                if ($k && !isset($seenLicKeys[$k])) {
-                    $seenLicKeys[$k] = true;
-                    $licenses[] = $lic;
+            $attachedLics = array_filter([$o['appLicense'] ?? null, $o['amlakLicense'] ?? null]);
+            foreach ($attachedLics as $lic) {
+                if (!empty($lic) && (!empty($lic['username']) || !empty($lic['licenseKey']))) {
+                    $k = !empty($lic['licenseKey']) ? (string)$lic['licenseKey'] : (!empty($lic['id']) ? (string)$lic['id'] : ((isset($lic['username'], $lic['productId']) ? $lic['username'].'_'.$lic['productId'].'_'.($lic['password'] ?? '') : 'order_'.$o['id'])));
+                    if ($k && !isset($seenLicKeys[$k])) {
+                        $seenLicKeys[$k] = true;
+                        $licenses[] = $lic;
+                    }
                 }
             }
         }

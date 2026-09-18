@@ -59,6 +59,30 @@ export default async function handler(req, res) {
       const docRef = doc(db, 'orders', String(order.id));
       await setDoc(docRef, order, { merge: true });
 
+      // Automatically sync any attached licenses into the Firestore 'licenses' collection
+      const attachedLics = [order.appLicense, order.amlakLicense].filter(Boolean);
+      for (const lic of attachedLics) {
+        if (lic && (lic.username || lic.licenseKey)) {
+          const licId = lic.id || (lic.licenseKey ? `lic-${lic.licenseKey}` : `lic-${order.id}`);
+          try {
+            await setDoc(
+              doc(db, 'licenses', String(licId)),
+              {
+                ...lic,
+                id: licId,
+                orderId: order.id,
+                buyerName: lic.buyerName || order.customerName,
+                phone: lic.phone || order.customerPhone,
+                updatedAt: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+          } catch (licSyncErr) {
+            console.warn('Notice saving order license to Firestore:', licSyncErr);
+          }
+        }
+      }
+
       return res.status(200).json({ success: true, order });
     } catch (err) {
       console.error('Vercel API save order error:', err);

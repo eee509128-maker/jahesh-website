@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import appAuthHandler from './api/app-auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1497,7 +1498,7 @@ function readLicensesFromDisk() {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           for (const item of parsed) {
-            const key = item.id || `${item.username}_${item.productId}`;
+            const key = item.licenseKey || item.id || `${item.username}_${item.productId || ''}_${item.password || ''}`;
             if (!seenIds.has(key)) {
               seenIds.add(key);
               all.push(item);
@@ -1515,26 +1516,29 @@ function readLicensesFromDisk() {
     const orders = readOrdersFromDisk();
     for (const order of orders) {
       if (!order) continue;
-      const lic = order.appLicense || order.amlakLicense;
-      if (lic && (lic.username || lic.licenseKey)) {
-        const key = lic.id || `${lic.username}_${lic.productId || ''}`;
-        if (!seenIds.has(key)) {
-          seenIds.add(key);
-          all.push({
-            id: lic.id || `lic-order-${order.id}`,
-            username: lic.username,
-            password: lic.password,
-            licenseKey: lic.licenseKey,
-            productId: lic.productId || 'pkg-amlak-jahesh',
-            productTitle: lic.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع مدیریت املاک جهش',
-            appName: lic.appName || 'سامانه مدیریت املاک جهش',
-            buyerName: lic.buyerName || order.customerName || 'کاربر جهش',
-            phone: lic.phone || order.customerPhone || '',
-            days: lic.days || 30,
-            startDate: lic.startDate || order.createdAt || new Date().toISOString(),
-            expiresAt: lic.expiresAt || new Date(Date.now() + 30 * 86400000).toISOString(),
-            status: lic.status || 'active',
-          });
+      const attached = [order.appLicense, order.amlakLicense].filter(Boolean);
+      for (const lic of attached) {
+        if (lic && (lic.username || lic.licenseKey)) {
+          const key = lic.licenseKey || lic.id || `order_${order.id}_${lic.username}`;
+          if (!seenIds.has(key)) {
+            seenIds.add(key);
+            all.push({
+              id: lic.id || (lic.licenseKey ? `lic-${lic.licenseKey}` : `lic-order-${order.id}`),
+              username: lic.username,
+              password: lic.password,
+              licenseKey: lic.licenseKey,
+              productId: lic.productId || 'pkg-amlak-jahesh',
+              productTitle: lic.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع مدیریت املاک جهش',
+              appName: lic.appName || 'سامانه مدیریت املاک جهش',
+              buyerName: lic.buyerName || order.customerName || 'کاربر جهش',
+              phone: lic.phone || order.customerPhone || '',
+              days: Number(lic.days) || 30,
+              startDate: lic.startDate || order.createdAt || new Date().toISOString(),
+              expiresAt: lic.expiresAt || new Date(Date.now() + 30 * 86400000).toISOString(),
+              status: lic.status || 'active',
+              orderId: order.id,
+            });
+          }
         }
       }
     }
@@ -1906,50 +1910,18 @@ app.post(['/api/app-auth/verify', '/jaheshkala/api/app-auth/verify'], (req, res)
 });
 
 // POST /api/app-auth/register-license - Registers or updates a license
-app.post(['/api/app-auth/register-license', '/jaheshkala/api/app-auth/register-license'], (req, res) => {
+app.post(['/api/app-auth/register-license', '/jaheshkala/api/app-auth/register-license'], async (req, res) => {
   try {
-    const license = req.body;
-    if (!license || !license.username || !license.password) {
-      return res.status(400).json({ error: 'اطلاعات لایسنس شامل نام کاربری و رمز الزامی است.' });
-    }
-
-    const licenses = readLicensesFromDisk();
-    const idx = licenses.findIndex(
-      (l) => l.id === license.id || (l.username === license.username && l.productId === license.productId)
-    );
-
-    if (idx >= 0) {
-      licenses[idx] = { ...licenses[idx], ...license };
-    } else {
-      licenses.unshift(license);
-    }
-
-    writeLicensesToDisk(licenses);
-    console.log(`[License Engine] Saved license for ${license.username} (${license.productTitle || 'App'}). Total: ${licenses.length}`);
-    return res.json({ success: true, count: licenses.length, license });
+    await appAuthHandler(req, res);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/app-auth & /api/app-auth/licenses - Returns all licenses with live expiration status
-app.get(['/api/app-auth', '/api/app-auth/licenses', '/jaheshkala/api/app-auth', '/jaheshkala/api/app-auth/licenses'], (_req, res) => {
+app.get(['/api/app-auth', '/api/app-auth/licenses', '/jaheshkala/api/app-auth', '/jaheshkala/api/app-auth/licenses'], async (req, res) => {
   try {
-    const licenses = readLicensesFromDisk();
-    const now = new Date();
-    const enriched = licenses.map((lic) => {
-      const expiresAt = lic.expiresAt ? new Date(lic.expiresAt) : null;
-      const diffMs = expiresAt ? expiresAt.getTime() - now.getTime() : 0;
-      const isExpired = !expiresAt || diffMs <= 0;
-      const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      return {
-        ...lic,
-        isExpired,
-        daysRemaining,
-        liveStatus: isExpired ? 'expired' : 'active',
-      };
-    });
-    return res.json({ success: true, count: enriched.length, licenses: enriched });
+    await appAuthHandler(req, res);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
