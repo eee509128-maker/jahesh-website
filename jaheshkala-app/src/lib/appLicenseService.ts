@@ -1,5 +1,7 @@
 import { CartItem, Order, User, Product, AppSubscriptionLicense } from '../types';
 import { safeSetLocalStorage } from './dbService';
+import { db } from './firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 const STORAGE_KEY = 'jahesh_app_licenses';
 
@@ -9,8 +11,7 @@ const STORAGE_KEY = 'jahesh_app_licenses';
  */
 export function isAiAppProduct(prod?: Product | null): boolean {
   if (!prod) return false;
-  // Ensure we only grant app licenses to products that EXPLICITLY have isAiAppProduct toggled on.
-  return Boolean(prod.isAiAppProduct);
+  return Boolean(prod.isAiAppProduct || prod.isSubscription || prod.id === 'pkg-amlak-jahesh');
 }
 
 export function isAiAppItem(item?: CartItem | null): boolean {
@@ -177,20 +178,44 @@ export function saveAppLicenseLocally(license: AppSubscriptionLicense) {
 }
 
 /**
- * Sends license to server persistence (data/app_licenses.json)
+ * Sends license to server persistence (data/app_licenses.json and Firebase Firestore)
  */
 export async function saveAppLicenseToServer(license: AppSubscriptionLicense): Promise<boolean> {
+  let ok = false;
+
+  // 1. Try Node / Express API
   try {
     const res = await fetch('/api/app-auth/register-license', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(license),
     });
-    return res.ok;
-  } catch (e) {
-    console.warn('Network notice saving license to server:', e);
-    return false;
+    if (res.ok) ok = true;
+  } catch {}
+
+  // 2. Fallback to PHP sync API
+  if (!ok) {
+    try {
+      const res2 = await fetch('/api.php?action=app-auth/register-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(license),
+      });
+      if (res2.ok) ok = true;
+    } catch {}
   }
+
+  // 3. Save to Firebase Firestore cloud database
+  try {
+    if (license.id) {
+      await setDoc(doc(db, 'licenses', license.id), license, { merge: true });
+      ok = true;
+    }
+  } catch (err) {
+    console.warn('Firestore license sync notice:', err);
+  }
+
+  return ok;
 }
 
 export const registerAppLicenseOnServer = saveAppLicenseToServer;

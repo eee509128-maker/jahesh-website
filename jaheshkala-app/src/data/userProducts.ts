@@ -87,7 +87,10 @@ export const USER_RESTORED_PRODUCTS: Product[] = [
     "isSubscription": true,
     "pricePerDay": 250000,
     "hasCustomPlans": false,
-    "isAiAppProduct": false,
+    "isAiAppProduct": true,
+    "aiAppName": "سامانه مدیریت املاک جهش",
+    "aiAppPlatform": "cross-platform",
+    "aiAppDefaultDays": 30,
     "updatedAt": "2026-09-16T13:47:12.815Z"
   },
   {

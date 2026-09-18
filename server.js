@@ -1100,6 +1100,23 @@ function writeChatsToDisk(chats) {
 app.get(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.php'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const action = req.query.action || req.query.endpoint || 'chats';
+  if (action === 'app-auth' || action === 'licenses' || action === 'api/app-auth' || action === 'api/licenses') {
+    const licenses = readLicensesFromDisk();
+    const now = new Date();
+    const enriched = licenses.map((lic) => {
+      const expiresAt = lic.expiresAt ? new Date(lic.expiresAt) : null;
+      const diffMs = expiresAt ? expiresAt.getTime() - now.getTime() : 0;
+      const isExpired = !expiresAt || diffMs <= 0;
+      const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      return {
+        ...lic,
+        isExpired,
+        daysRemaining,
+        liveStatus: isExpired ? 'expired' : 'active',
+      };
+    });
+    return res.json({ success: true, count: enriched.length, licenses: enriched });
+  }
   if (action === 'orders' || action === 'get_orders' || action === 'api/orders') {
     const orders = readOrdersFromDisk();
     return res.json({ success: true, orders });
@@ -1447,18 +1464,32 @@ app.post(['/api/users/save', '/jaheshkala/api/users/save'], (req, res) => {
 // AI Application Authentication & Subscription License API (Windows, Android & Cross-Platform)
 // ==========================================
 const APP_LICENSES_FILE = path.join(__dirname, 'data', 'app_licenses.json');
+const ALT_LICENSES_FILE = path.join(__dirname, 'data', 'licenses.json');
 
 function readLicensesFromDisk() {
-  if (fs.existsSync(APP_LICENSES_FILE)) {
-    try {
-      const raw = fs.readFileSync(APP_LICENSES_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (e) {
-      console.warn('Error reading app_licenses.json:', e);
+  const all = [];
+  const seenIds = new Set();
+
+  for (const fpath of [APP_LICENSES_FILE, ALT_LICENSES_FILE]) {
+    if (fs.existsSync(fpath)) {
+      try {
+        const raw = fs.readFileSync(fpath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            const key = item.id || `${item.username}_${item.productId}`;
+            if (!seenIds.has(key)) {
+              seenIds.add(key);
+              all.push(item);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`Error reading ${fpath}:`, e);
+      }
     }
   }
-  return [];
+  return all;
 }
 
 function writeLicensesToDisk(licenses) {
@@ -1468,8 +1499,9 @@ function writeLicensesToDisk(licenses) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
     fs.writeFileSync(APP_LICENSES_FILE, JSON.stringify(licenses, null, 2), 'utf8');
+    fs.writeFileSync(ALT_LICENSES_FILE, JSON.stringify(licenses, null, 2), 'utf8');
   } catch (e) {
-    console.error('Error writing app_licenses.json:', e);
+    console.error('Error writing licenses files:', e);
   }
 }
 
