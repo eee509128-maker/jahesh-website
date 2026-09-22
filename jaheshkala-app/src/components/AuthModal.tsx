@@ -160,8 +160,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     return [
       'jahesh',
       'jahesh_admin',
+      'jahesh1395',
       'admin',
-      '09152331974',
       'jahesh1395@gmail.com',
       'erfanmoghaddammotagi@gmail.com',
       'erfanmoghaddammotagicrypto@gmail.com'
@@ -170,16 +170,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const loginAsAdmin = () => {
     const adminUser: UserType = {
-      id: 'admin-jahesh-main',
-      fullName: 'مدیر فروشگاه جهش‌کالا',
-      phone: '09152331974',
+      id: 'usr-jahesh-master',
+      fullName: 'مدیر کل جهش‌کالا',
+      phone: '09964201441',
       email: 'jahesh1395@gmail.com',
-      username: 'jahesh_admin',
+      username: 'jahesh1395',
       role: 'admin',
       guild: 'فناوری اطلاعات و مدیریت جهش',
-      createdAt: new Date().toLocaleDateString('fa-IR'),
+      createdAt: '۱۴۰۵/۶/۱',
     };
-    setSuccessMsg('خوش آمدید مدیر گرامی! در حال ورود به پنل مدیریت...');
+    try {
+      localStorage.setItem('jahesh_current_user', JSON.stringify(adminUser));
+    } catch {}
+    setSuccessMsg('خوش آمدید مدیر کل گرامی! در حال ورود به پنل مدیریت...');
     setTimeout(() => {
       onLoginSuccess(adminUser);
       onClose();

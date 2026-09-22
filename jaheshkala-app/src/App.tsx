@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
-import { areSameUser } from './lib/userUtils';
+import { areSameUser, isMasterAdminUser } from './lib/userUtils';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS } from './data/initialData';
 import { RESTORED_ZIBAL_ORDERS } from './data/restoredOrders';
 import {
@@ -529,10 +529,10 @@ export default function App() {
             // Auto synchronize current logged in user's role from cloud
             const rawStored = localStorage.getItem('jahesh_current_user');
             const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
-            if (activeUser) {
+            if (activeUser && !isMasterAdminUser(activeUser)) {
               const cloudUser = allUsers.find((u) => areSameUser(u, activeUser));
               if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
-                const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
+                const updated = { ...activeUser, role: cloudUser.role };
                 setCurrentUser(updated);
                 safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
               }
@@ -624,6 +624,7 @@ export default function App() {
         const rawStored = localStorage.getItem('jahesh_current_user');
         const activeUser = currentUser || (rawStored ? JSON.parse(rawStored) : null);
         if (!activeUser) return;
+        if (isMasterAdminUser(activeUser)) return;
 
         const { fetchAllUsersFromDb } = await import('./lib/dbService');
         const freshUsers = await fetchAllUsersFromDb();
@@ -633,7 +634,7 @@ export default function App() {
 
         const cloudUser = freshUsers.find((u) => areSameUser(u, activeUser));
         if (cloudUser && cloudUser.role && cloudUser.role !== activeUser.role) {
-          const updated = { ...activeUser, ...cloudUser, role: cloudUser.role };
+          const updated = { ...activeUser, role: cloudUser.role };
           setCurrentUser(updated);
           safeSetLocalStorage('jahesh_current_user', JSON.stringify(updated));
           const roleTitle =

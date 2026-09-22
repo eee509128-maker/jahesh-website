@@ -1586,7 +1586,12 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
     const cleanPhone = normalizePhone(cleanUser);
 
     // 1. Master administrator and Default VIP credentials (Lifetime access)
-    const isAdminUser = cleanUser === 'jahesh' || cleanUser === 'admin' || cleanUser === 'jahesh_admin' || cleanPhone === '09152331974';
+    const isAdminUser =
+      cleanUser === 'jahesh1395@gmail.com' ||
+      cleanUser === 'jahesh1395' ||
+      cleanUser === 'jahesh' ||
+      cleanUser === 'admin' ||
+      cleanUser === 'jahesh_admin';
     const isMasterPass = cleanPass === 'jahesh1395' || cleanPass.startsWith('JK-') || cleanPass.startsWith('JA-APP-') || cleanPass === 'JA-ADM-LIFETIME-VIP';
     
     if (isAdminUser && isMasterPass) {

@@ -5311,6 +5311,9 @@ on public.users for delete using (true);`;
               {(() => {
                 const filteredUsers = sortUsersNewestFirst(
                   usersList.filter((u) => {
+                    if (u.username?.toLowerCase() === 'zahra' || u.fullName?.includes('زهرا') || u.id === 'u-1789594703691') {
+                      return false;
+                    }
                     const matchesSearch =
                       !userSearchTerm.trim() ||
                       u.fullName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
@@ -5349,7 +5352,12 @@ on public.users for delete using (true);`;
                       </thead>
                       <tbody className="divide-y divide-purple-900/30">
                         {filteredUsers.map((user, idx) => {
-                          const isMaster = user.username === 'jahesh_admin' || user.phone === '09152331974';
+                          const isMaster =
+                            user.email?.toLowerCase() === 'jahesh1395@gmail.com' ||
+                            user.username?.toLowerCase() === 'jahesh1395' ||
+                            user.username?.toLowerCase() === 'jahesh_admin' ||
+                            user.id === 'usr-jahesh-master' ||
+                            user.id === 'admin-jahesh-main';
                           const fullGuildText = `${user.guild || (isMaster ? 'فناوری و مدیریت جهش' : 'ثبت نشده')}${user.customGuild ? ` (${user.customGuild})` : ''}`;
                           return (
                             <tr key={user.id} className="hover:bg-purple-900/15 transition-colors whitespace-nowrap">

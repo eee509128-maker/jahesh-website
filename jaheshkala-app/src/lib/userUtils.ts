@@ -45,9 +45,26 @@ export const normalizeUsername = (username?: string | null): string => {
     .trim();
 };
 
+export const isMasterAdminUser = (u: any): boolean => {
+  if (!u) return false;
+  const id = String(u.id || '').trim().toLowerCase();
+  const username = normalizeUsername(u.username);
+  const email = String(u.email || '').trim().toLowerCase();
+  return (
+    id === 'usr-jahesh-master' ||
+    id === 'admin-jahesh-main' ||
+    username === 'jahesh1395' ||
+    username === 'jahesh_admin' ||
+    username === 'jahesh' ||
+    email === 'jahesh1395@gmail.com' ||
+    email === 'admin@jaheshkala.ir'
+  );
+};
+
 /**
  * Accurately determines if two user representations represent the exact same person,
  * preventing identity fragmentation across ID variations, @ prefixes, and phone number formatting.
+ * Never collides different usernames/emails or mixes master admin with regular customers.
  */
 export const areSameUser = (a: any, b: any): boolean => {
   if (!a || !b) return false;
@@ -57,24 +74,45 @@ export const areSameUser = (a: any, b: any): boolean => {
     return true;
   }
 
-  // 2. Normalized Username match (e.g. "@erfan33657" === "erfan33657")
+  const aIsMaster = isMasterAdminUser(a);
+  const bIsMaster = isMasterAdminUser(b);
+
+  // Master Admin is uniquely isolated: never match master admin with any regular user
+  if (aIsMaster !== bIsMaster) {
+    return false;
+  }
+  if (aIsMaster && bIsMaster) {
+    return true;
+  }
+
+  // 2. Check usernames if both exist
   const u1 = normalizeUsername(a.username);
   const u2 = normalizeUsername(b.username);
+  if (u1 && u2 && u1 !== u2) {
+    return false; // Conflicting non-empty usernames -> definitely different users
+  }
+
+  // 3. Check emails if both exist
+  const e1 = a.email?.trim().toLowerCase();
+  const e2 = b.email?.trim().toLowerCase();
+  if (e1 && e2 && e1.includes('@') && e2.includes('@') && e1 !== e2) {
+    return false; // Conflicting non-empty emails -> definitely different users
+  }
+
+  // Normalized Username match
   if (u1 && u2 && u1 === u2) {
     return true;
   }
 
-  // 3. Normalized Phone match (e.g. "+989026542016" === "09026542016")
-  const p1 = normalizePhone(a.phone);
-  const p2 = normalizePhone(b.phone);
-  if (p1 && p2 && p1 === p2 && p1.length >= 10) {
+  // Valid Email match
+  if (e1 && e2 && e1 === e2 && e1.includes('@') && !e1.includes('example.com')) {
     return true;
   }
 
-  // 4. Valid Email match
-  const e1 = a.email?.trim().toLowerCase();
-  const e2 = b.email?.trim().toLowerCase();
-  if (e1 && e2 && e1 === e2 && e1.includes('@') && !e1.includes('example.com')) {
+  // Normalized Phone match ONLY if neither has a conflicting username/email
+  const p1 = normalizePhone(a.phone);
+  const p2 = normalizePhone(b.phone);
+  if (p1 && p2 && p1 === p2 && p1.length >= 10) {
     return true;
   }
 
@@ -87,6 +125,22 @@ export const areSameUser = (a: any, b: any): boolean => {
 export const mergeUserRecords = (current: User, incoming: User): User => {
   if (!current) return incoming;
   if (!incoming) return current;
+
+  // Master Admin protection
+  if (isMasterAdminUser(current) || isMasterAdminUser(incoming)) {
+    return {
+      ...current,
+      ...incoming,
+      id: 'usr-jahesh-master',
+      fullName: 'مدیر کل جهش‌کالا',
+      email: 'jahesh1395@gmail.com',
+      username: 'jahesh1395',
+      role: 'admin',
+      phone: current.phone || incoming.phone || '09964201441',
+      guild: 'فناوری و مدیریت جهش',
+      createdAt: current.createdAt || incoming.createdAt || '۱۴۰۵/۶/۱',
+    };
+  }
 
   // Role hierarchy: admin > operator > user
   const rolePriority: Record<string, number> = {
