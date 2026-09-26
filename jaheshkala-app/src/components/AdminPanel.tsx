@@ -2429,56 +2429,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             className="p-4 rounded-2xl bg-[#140b2f] border border-purple-900/50 hover:border-purple-600/60 transition-all flex flex-col justify-between shadow-lg relative group"
                           >
                             <div>
-                              {/* Badges, Rank and Category Row */}
+                              {/* Badges and Category Row */}
                               <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2.5">
                                 <div className="flex flex-wrap items-center gap-1">
-                                  {/* Product Rank Manager Controls */}
-                                  <div className="flex items-center gap-1 bg-[#1c0e44] border border-amber-500/40 px-2 py-0.5 rounded-lg">
-                                    <span className="text-[10px] text-amber-300 font-bold">رتبه:</span>
-                                    {currentUser?.role === 'admin' ? (
-                                      <div className="flex items-center gap-0.5">
-                                        <input
-                                          type="number"
-                                          min="1"
-                                          key={`${prod.id}-${prod.displayOrder || prod.displayRank}`}
-                                          defaultValue={prod.displayOrder || prod.displayRank || (products.findIndex(p => p.id === prod.id) + 1)}
-                                          onBlur={(e) => {
-                                            const val = parseInt(e.target.value, 10);
-                                            if (!isNaN(val) && val > 0) handleSetProductRank(prod.id, val);
-                                          }}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                              const val = parseInt((e.target as HTMLInputElement).value, 10);
-                                              if (!isNaN(val) && val > 0) handleSetProductRank(prod.id, val);
-                                            }
-                                          }}
-                                          className="w-8 bg-black/70 border border-purple-600 rounded px-1 py-0.2 text-center text-[11px] font-mono font-black text-amber-300 focus:border-amber-400 focus:outline-none"
-                                          title="تغییر شماره رتبه نمایش"
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() => handleMoveProductOrder(prod.id, 'up')}
-                                          className="p-0.5 hover:bg-purple-800 rounded text-purple-200 hover:text-white transition-colors cursor-pointer"
-                                          title="یک پله بالاتر در لیست"
-                                        >
-                                          <ChevronUp className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleMoveProductOrder(prod.id, 'down')}
-                                          className="p-0.5 hover:bg-purple-800 rounded text-purple-200 hover:text-white transition-colors cursor-pointer"
-                                          title="یک پله پایین‌تر در لیست"
-                                        >
-                                          <ChevronDown className="w-3 h-3" />
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <span className="text-[11px] font-mono font-black text-amber-300">
-                                        #{prod.displayOrder || (products.findIndex(p => p.id === prod.id) + 1)}
-                                      </span>
-                                    )}
-                                  </div>
-
                                   <span className="text-[10px] bg-purple-950 border border-purple-800/40 px-2 py-0.5 rounded text-purple-300 font-bold">
                                     {prod.category}
                                   </span>
