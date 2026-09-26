@@ -11,7 +11,7 @@ import {
   Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool } from '../types';
-import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
@@ -30,6 +30,7 @@ interface AdminPanelProps {
   onAddNewProduct: (newProduct: Product) => void;
   onUpdateProduct?: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
+  onReorderProducts?: (orderedList: Product[]) => void;
   coupons?: Coupon[];
   onAddNewCoupon?: (newCoupon: Coupon) => void;
   onDeleteCoupon?: (couponId: string) => void;
@@ -59,6 +60,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onAddNewProduct,
   onUpdateProduct,
   onDeleteProduct,
+  onReorderProducts,
   coupons = [],
   onAddNewCoupon,
   onDeleteCoupon,
@@ -740,7 +742,76 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [prodFilterTab, setProdFilterTab] = useState<'all' | 'guilds' | 'categories' | 'popular' | 'incredible' | 'subscription'>('all');
   const [prodSelectedGuild, setProdSelectedGuild] = useState<string>('all');
   const [prodSelectedCategory, setProdSelectedCategory] = useState<string>('all');
-  const [prodSortBy, setProdSortBy] = useState<'newest' | 'price_desc' | 'price_asc' | 'title'>('newest');
+  const [prodSortBy, setProdSortBy] = useState<'rank' | 'newest' | 'price_desc' | 'price_asc' | 'title'>('rank');
+  const [newDisplayOrder, setNewDisplayOrder] = useState<number | ''>('');
+  const [isSavingProductOrder, setIsSavingProductOrder] = useState(false);
+  const [rankSyncSuccessMsg, setRankSyncSuccessMsg] = useState<string | null>(null);
+
+  const handleMoveProductOrder = async (productId: string, direction: 'up' | 'down') => {
+    const list = [...products];
+    const index = list.findIndex((p) => p.id === productId);
+    if (index < 0) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= list.length) return;
+
+    const [moved] = list.splice(index, 1);
+    list.splice(targetIndex, 0, moved);
+
+    // Re-assign displayOrder sequentially 1, 2, 3...
+    const updated = list.map((item, idx) => ({
+      ...item,
+      displayOrder: idx + 1,
+      displayRank: idx + 1,
+    }));
+
+    if (onReorderProducts) {
+      onReorderProducts(updated);
+    } else {
+      await saveAllProductsOrderToDb(updated);
+    }
+  };
+
+  const handleSetProductRank = async (productId: string, rankInput: number) => {
+    if (isNaN(rankInput) || rankInput < 1) return;
+    const list = [...products];
+    const target = list.find((p) => p.id === productId);
+    if (!target) return;
+    target.displayOrder = rankInput;
+    target.displayRank = rankInput;
+
+    const sorted = sortProductsByRank(list);
+    const updated = sorted.map((item, idx) => ({
+      ...item,
+      displayOrder: item.id === productId ? rankInput : (typeof item.displayOrder === 'number' ? item.displayOrder : idx + 1),
+      displayRank: item.id === productId ? rankInput : (typeof item.displayRank === 'number' ? item.displayRank : idx + 1),
+    }));
+
+    if (onReorderProducts) {
+      onReorderProducts(updated);
+    } else {
+      await saveAllProductsOrderToDb(updated);
+    }
+  };
+
+  const handleSyncAllProductsToAllUsers = async () => {
+    setIsSavingProductOrder(true);
+    try {
+      const ordered = products.map((item, idx) => ({
+        ...item,
+        displayOrder: typeof item.displayOrder === 'number' ? item.displayOrder : idx + 1,
+        displayRank: typeof item.displayRank === 'number' ? item.displayRank : idx + 1,
+      }));
+      await saveAllProductsOrderToDb(ordered);
+      if (onReorderProducts) onReorderProducts(ordered);
+      setRankSyncSuccessMsg('ترتیب و رتبه‌بندی محصولات در فایربیس و برای تمام کاربران و مهمانان ذخیره شد.');
+      setTimeout(() => setRankSyncSuccessMsg(null), 4000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingProductOrder(false);
+    }
+  };
+
   const [quickViewEditModal, setQuickViewEditModal] = useState<{
     isOpen: boolean;
     product: Product | null;
@@ -1132,6 +1203,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewPainPointSolved('');
     setNewProductCouponCode('');
     setNewProductCouponPercent('');
+    setNewDisplayOrder('');
     setFormSuccess('');
     setActiveTab('new-product');
   };
@@ -1140,6 +1212,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditingProductId(prod.id);
     setNewTitle(prod.title);
     setNewBrand(prod.brand || '');
+    setNewDisplayOrder(typeof prod.displayOrder === 'number' ? prod.displayOrder : (typeof prod.displayRank === 'number' ? prod.displayRank : ''));
     
     if (existingCategories.includes(prod.category)) {
       setIsCustomCategory(false);
@@ -1332,6 +1405,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       aiAppPlatform: isAiAppProduct ? aiAppPlatform : undefined,
       aiAppDefaultDays: isAiAppProduct ? Math.max(1, aiAppDefaultDays || 7) : undefined,
       aiAppCustomPromptNote: isAiAppProduct ? aiAppCustomPromptNote.trim() : undefined,
+      displayOrder: typeof newDisplayOrder === 'number' && newDisplayOrder > 0 ? newDisplayOrder : (existingProduct?.displayOrder || existingProduct?.displayRank || undefined),
+      displayRank: typeof newDisplayOrder === 'number' && newDisplayOrder > 0 ? newDisplayOrder : (existingProduct?.displayRank || existingProduct?.displayOrder || undefined),
       updatedAt: new Date().toISOString(),
     };
 
@@ -1886,6 +1961,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     return true;
                   })
                   .sort((a, b) => {
+                    if (prodSortBy === 'rank') {
+                      const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
+                      const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
+                      if (orderA !== orderB) return orderA - orderB;
+                      if (Boolean(a.isGolden) !== Boolean(b.isGolden)) return a.isGolden ? -1 : 1;
+                      return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+                    }
                     if (prodSortBy === 'price_desc') return b.price - a.price;
                     if (prodSortBy === 'price_asc') return a.price - b.price;
                     if (prodSortBy === 'title') return a.title.localeCompare(b.title, 'fa');
@@ -1894,6 +1976,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 return (
                   <div className="space-y-4">
+                    {rankSyncSuccessMsg && (
+                      <div className="p-3 rounded-2xl bg-emerald-950/80 border border-emerald-500/60 text-xs text-emerald-300 flex items-center gap-2 animate-in fade-in shadow-lg font-bold">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>{rankSyncSuccessMsg}</span>
+                      </div>
+                    )}
+
                     {/* 2. ADVANCED CATEGORIZATION & FILTER CONTROL PANEL */}
                     <div className="p-4 rounded-2xl bg-[#150d33] border border-purple-900/60 shadow-xl space-y-3.5">
                       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-purple-900/40">
@@ -1901,20 +1990,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <div className="w-7 h-7 rounded-lg bg-purple-600/30 text-purple-300 flex items-center justify-center">
                             <Filter className="w-4 h-4" />
                           </div>
-                          <h3 className="text-xs sm:text-sm font-black text-white">دسته‌بندی و مدیریت محصولات</h3>
+                          <h3 className="text-xs sm:text-sm font-black text-white">دسته‌بندی، رتبه‌بندی و مدیریت محصولات</h3>
                           <span className="text-[10px] bg-purple-950 px-2 py-0.5 rounded-full text-purple-300 border border-purple-800/50 font-bold">
                             {processedProducts.length} از {products.length} کالا
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {currentUser?.role === 'admin' && (
+                            <button
+                              onClick={handleSyncAllProductsToAllUsers}
+                              disabled={isSavingProductOrder}
+                              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition-all cursor-pointer disabled:opacity-50"
+                              title="ذخیره و همگام‌سازی فوری لیست و ترتیب محصولات با تمام مرورگرها و مهمانان"
+                            >
+                              <Upload className={`w-3.5 h-3.5 ${isSavingProductOrder ? 'animate-spin' : ''}`} />
+                              <span>{isSavingProductOrder ? 'در حال ثبت...' : '🚀 ذخیره سراسری برای همه کاربران'}</span>
+                            </button>
+                          )}
+
                           <button
                             onClick={() => {
                               setProdSearchQuery('');
                               setProdFilterTab('all');
                               setProdSelectedGuild('all');
                               setProdSelectedCategory('all');
-                              setProdSortBy('newest');
+                              setProdSortBy('rank');
                             }}
                             className="text-[11px] text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 transition-colors flex items-center gap-1 cursor-pointer"
                             title="پاک کردن تمام فیلترها"
@@ -1938,7 +2039,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <button
                           onClick={() => {
                             setProdFilterTab('all');
-                            setProdSortBy('newest');
+                            setProdSortBy('rank');
                           }}
                           className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                             prodFilterTab === 'all'
@@ -2065,8 +2166,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <select
                             value={prodSortBy}
                             onChange={(e) => setProdSortBy(e.target.value as any)}
-                            className="w-full px-3 py-2 bg-[#1b103e] border border-purple-900/60 rounded-xl text-xs text-purple-200 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
+                            className="w-full px-3 py-2 bg-[#1b103e] border border-purple-900/60 rounded-xl text-xs text-amber-300 font-bold focus:outline-none focus:border-purple-500 cursor-pointer"
                           >
+                            <option value="rank">⭐ رتبه و اولویت نمایش (پیش‌فرض)</option>
                             <option value="newest">⏱️ جدیدترین به‌روزرسانی</option>
                             <option value="price_desc">💰 بالاترین قیمت</option>
                             <option value="price_asc">🏷️ مناسب‌ترین قیمت</option>
@@ -2090,6 +2192,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             setProdFilterTab('all');
                             setProdSelectedGuild('all');
                             setProdSelectedCategory('all');
+                            setProdSortBy('rank');
                           }}
                           className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
                         >
@@ -2105,9 +2208,55 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             className="p-4 rounded-2xl bg-[#140b2f] border border-purple-900/50 hover:border-purple-600/60 transition-all flex flex-col justify-between shadow-lg relative group"
                           >
                             <div>
-                              {/* Badges and Category Row */}
+                              {/* Badges, Rank and Category Row */}
                               <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2.5">
                                 <div className="flex flex-wrap items-center gap-1">
+                                  {/* Product Rank Manager Controls */}
+                                  <div className="flex items-center gap-1 bg-[#1c0e44] border border-amber-500/40 px-2 py-0.5 rounded-lg">
+                                    <span className="text-[10px] text-amber-300 font-bold">رتبه:</span>
+                                    {currentUser?.role === 'admin' ? (
+                                      <div className="flex items-center gap-0.5">
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          defaultValue={prod.displayOrder || prod.displayRank || (products.findIndex(p => p.id === prod.id) + 1)}
+                                          onBlur={(e) => {
+                                            const val = parseInt(e.target.value, 10);
+                                            if (!isNaN(val) && val > 0) handleSetProductRank(prod.id, val);
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              const val = parseInt((e.target as HTMLInputElement).value, 10);
+                                              if (!isNaN(val) && val > 0) handleSetProductRank(prod.id, val);
+                                            }
+                                          }}
+                                          className="w-8 bg-black/70 border border-purple-600 rounded px-1 py-0.2 text-center text-[11px] font-mono font-black text-amber-300 focus:border-amber-400 focus:outline-none"
+                                          title="تغییر شماره رتبه نمایش"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleMoveProductOrder(prod.id, 'up')}
+                                          className="p-0.5 hover:bg-purple-800 rounded text-purple-200 hover:text-white transition-colors cursor-pointer"
+                                          title="یک پله بالاتر در لیست"
+                                        >
+                                          <ChevronUp className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleMoveProductOrder(prod.id, 'down')}
+                                          className="p-0.5 hover:bg-purple-800 rounded text-purple-200 hover:text-white transition-colors cursor-pointer"
+                                          title="یک پله پایین‌تر در لیست"
+                                        >
+                                          <ChevronDown className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[11px] font-mono font-black text-amber-300">
+                                        #{prod.displayOrder || (products.findIndex(p => p.id === prod.id) + 1)}
+                                      </span>
+                                    )}
+                                  </div>
+
                                   <span className="text-[10px] bg-purple-950 border border-purple-800/40 px-2 py-0.5 rounded text-purple-300 font-bold">
                                     {prod.category}
                                   </span>
@@ -2716,6 +2865,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       onChange={(e) => setNewBadge(e.target.value)}
                       className="w-full bg-black/50 border border-purple-800 rounded-xl px-3.5 py-2 text-xs text-white focus:border-amber-400 focus:outline-none"
                     />
+                  </div>
+                </div>
+
+                {/* 5.05 Product Display Rank & Ordering */}
+                <div className="p-4 bg-gradient-to-r from-[#170a2f] via-[#210c44] to-[#120826] border border-amber-500/50 rounded-2xl space-y-2 shadow-md">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>رتبه و اولویت نمایش در فروشگاه (Display Rank):</span>
+                    </label>
+                    <span className="text-[10px] text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/30 font-bold">
+                      عدد ۱ یعنی اولین محصول در کل فروشگاه
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                    <div>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="مثلاً: 1 (اولین کالا)، 2، 3..."
+                        value={newDisplayOrder}
+                        onChange={(e) => setNewDisplayOrder(e.target.value ? parseInt(e.target.value, 10) : '')}
+                        className="w-full bg-black/60 border border-amber-400/60 rounded-xl px-3.5 py-2 text-xs text-amber-300 font-mono font-bold focus:border-amber-400 focus:outline-none"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-tight">
+                      ترتیب نمایش تمام محصولات بر اساس این رتبه در ویترین اصلی و دسته‌بندی‌ها تنظیم می‌شود.
+                    </p>
                   </div>
                 </div>
 

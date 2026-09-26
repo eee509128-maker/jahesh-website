@@ -285,6 +285,9 @@ export function cleanProductItem(p: any): Product | null {
   const rawOrig = p.originalPrice;
   const safeOriginalPrice = typeof rawOrig === 'number' && !isNaN(rawOrig) ? rawOrig : (rawOrig ? Number(rawOrig) : undefined);
   const safeDiscount = typeof p.discountPercent === 'number' ? p.discountPercent : undefined;
+  const safeOrder = typeof p.displayOrder === 'number' && !isNaN(p.displayOrder) 
+    ? p.displayOrder 
+    : (typeof p.displayRank === 'number' && !isNaN(p.displayRank) ? p.displayRank : undefined);
 
   return {
     ...p,
@@ -294,6 +297,8 @@ export function cleanProductItem(p: any): Product | null {
     price: safePrice,
     originalPrice: safeOriginalPrice,
     discountPercent: safeDiscount,
+    displayOrder: safeOrder,
+    displayRank: safeOrder,
     rating: typeof p.rating === 'number' ? p.rating : 5,
     reviewsCount: typeof p.reviewsCount === 'number' ? p.reviewsCount : 1,
     image: p.image || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
@@ -305,6 +310,23 @@ export function cleanProductItem(p: any): Product | null {
     isIncredible: Boolean(p.isIncredible),
   };
 }
+
+// Function to sort products by displayOrder / displayRank ascending
+export const sortProductsByRank = (productsList: Product[]): Product[] => {
+  if (!Array.isArray(productsList)) return [];
+  return [...productsList].sort((a, b) => {
+    const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
+    const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    // If rank is identical or default, sort golden items first
+    if (Boolean(a.isGolden) !== Boolean(b.isGolden)) {
+      return a.isGolden ? -1 : 1;
+    }
+    return 0;
+  });
+};
 
 export const fetchProductsFromDb = async (): Promise<Product[]> => {
   const deletedIdsList = await getDeletedProductIds();
@@ -331,15 +353,39 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     const docSnap = await getDoc(doc(db, 'settings', 'products'));
     if (docSnap.exists()) {
       const data = docSnap.data();
-      if (data && Array.isArray(data.products)) {
+      if (data && Array.isArray(data.products) && data.products.length > 0) {
         const cleaned = data.products
           .map(cleanProductItem)
           .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-        authoritativeList = cleaned;
+        if (cleaned.length > 0) {
+          authoritativeList = cleaned;
+        }
       }
     }
   } catch (fbErr) {
-    console.warn('Firestore fetch products notice:', fbErr);
+    console.warn('Firestore fetch settings products notice:', fbErr);
+  }
+
+  // 0.1 Layer 0.1: Check Firestore products collection directly
+  if (!authoritativeList || authoritativeList.length === 0) {
+    try {
+      const colSnap = await getDocs(collection(db, 'products'));
+      if (!colSnap.empty) {
+        const colList: Product[] = [];
+        colSnap.forEach((d) => {
+          const item = d.data();
+          if (item && item.id && !deletedIds.has(String(item.id))) {
+            const cleaned = cleanProductItem(item);
+            if (cleaned) colList.push(cleaned);
+          }
+        });
+        if (colList.length > 0) {
+          authoritativeList = colList;
+        }
+      }
+    } catch (fbErr) {
+      console.warn('Firestore fetch collection products notice:', fbErr);
+    }
   }
 
   // 1. Layer 1: Universal Server Cloud API (Vercel Serverless + PHP Proxy)
@@ -412,7 +458,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
       }
     }
 
-    const finalProducts = Array.from(mergedProductsMap.values());
+    const finalProducts = sortProductsByRank(Array.from(mergedProductsMap.values()));
 
     // Update local storage so state is synchronized
     try {
@@ -423,11 +469,13 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
   }
 
   // Fallback if cloud was offline/empty and no deleted products
-  const fallbackList = localProducts.length > 0
+  const rawFallback = localProducts.length > 0
     ? localProducts.filter((p) => !deletedIds.has(p.id))
     : INITIAL_PRODUCTS
         .map(cleanProductItem)
         .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+
+  const fallbackList = sortProductsByRank(rawFallback);
 
   try {
     safeSetLocalStorage('jahesh_products', JSON.stringify(fallbackList));
@@ -839,6 +887,87 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
     return true;
   } catch (err) {
     console.warn('Delete product exception:', err);
+    return false;
+  }
+};
+
+// ========================================================
+// SAVE ALL PRODUCTS ORDER & DISPLAY RANK TO DB (CLOUD SYNC)
+// ========================================================
+export const saveAllProductsOrderToDb = async (orderedProducts: Product[]): Promise<boolean> => {
+  try {
+    if (!Array.isArray(orderedProducts)) return false;
+    const deletedIds = new Set(await getDeletedProductIds());
+
+    // Normalize and stamp order index
+    const processedList: Product[] = orderedProducts
+      .filter((p) => p && p.id && !deletedIds.has(String(p.id).trim()))
+      .map((p, idx) => {
+        const orderNum = typeof p.displayOrder === 'number' && !isNaN(p.displayOrder) ? p.displayOrder : idx + 1;
+        return {
+          ...p,
+          displayOrder: orderNum,
+          displayRank: orderNum,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+
+    const finalList = sortProductsByRank(processedList);
+
+    // 1. LocalStorage
+    try {
+      safeSetLocalStorage('jahesh_products', JSON.stringify(finalList));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: finalList }));
+      }
+    } catch {}
+
+    // 2. Firebase Firestore sync
+    try {
+      await setDoc(
+        doc(db, 'settings', 'products'),
+        {
+          products: finalList,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+      for (const prod of finalList) {
+        setDoc(doc(db, 'products', prod.id), prod, { merge: true }).catch(() => {});
+      }
+    } catch (fbErr) {
+      console.warn('Firestore save all products order notice:', fbErr);
+    }
+
+    // 3. Supabase SYSTEM_CONFIG_PRODUCTS
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_PRODUCTS',
+          user_name: 'تنظیمات محصولات فروشگاه',
+          messages: finalList,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+      broadcastProductsUpdate(finalList);
+    } catch (err) {
+      console.warn('Supabase save all products order notice:', err);
+    }
+
+    // 4. Server disk
+    try {
+      await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalList),
+      });
+    } catch {}
+
+    return true;
+  } catch (err) {
+    console.error('Error in saveAllProductsOrderToDb:', err);
     return false;
   }
 };

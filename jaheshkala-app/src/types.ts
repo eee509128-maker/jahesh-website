@@ -53,6 +53,8 @@ export interface Product {
   targetGuilds?: string[]; // صنف‌های مرتبط
   painPointSolved?: string; // چالش و معضل اصلی صنف که این محصول حل می‌کند
   viewsCount?: number; // تعداد کل بازدیدها و دیده‌شدن‌های محصول توسط مشتریان
+  displayOrder?: number; // اولویت و ترتیب رتبه‌بندی نمایش محصول (عدد ۱ یعنی اولین محصول)
+  displayRank?: number; // رتبه نمایش محصول
   updatedAt?: string; // ISO date timestamp for conflict resolution and persistent updates
 }
 

@@ -802,6 +802,29 @@ app.post('/api/products/delete', (req, res) => {
   }
 });
 
+// POST /api/products/order & /api/products/save-all - saves ordered/re-ranked products on disk
+app.post(['/api/products/order', '/api/products/save-all', '/api/products/reorder'], (req, res) => {
+  try {
+    const products = req.body?.products || req.body;
+    if (!Array.isArray(products)) {
+      return res.status(400).json({ error: 'Expected array of products' });
+    }
+    const deletedIds = new Set(getDeletedProductIds());
+    const filtered = products.filter((p) => p && p.id && !deletedIds.has(p.id));
+    const dataDir = path.dirname(PRODUCTS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+    console.log(`[Products] Successfully updated and ordered ${filtered.length} products on disk.`);
+    return res.json({ success: true, count: filtered.length, products: filtered });
+  } catch (err) {
+    console.error('Error in /api/products/order:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ==========================================
 // Orders Persistence API
 // ==========================================

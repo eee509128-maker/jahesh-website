@@ -28,6 +28,8 @@ import {
   parseOrderTimestamp,
   safeSetLocalStorage,
   subscribeToProductsRealtime,
+  sortProductsByRank,
+  saveAllProductsOrderToDb,
 } from './lib/dbService';
 import {
   verifyZibalPayment,
@@ -80,6 +82,7 @@ export function sanitizeProduct(p: any): Product | null {
   const rawOrig = p.originalPrice;
   const safeOriginalPrice = typeof rawOrig === 'number' && !isNaN(rawOrig) ? rawOrig : (rawOrig ? Number(rawOrig) : undefined);
   const safeDiscount = typeof p.discountPercent === 'number' ? p.discountPercent : undefined;
+  const safeDisplayOrder = typeof p.displayOrder === 'number' && !isNaN(p.displayOrder) ? p.displayOrder : (typeof p.displayRank === 'number' && !isNaN(p.displayRank) ? p.displayRank : undefined);
 
   return {
     ...p,
@@ -89,6 +92,8 @@ export function sanitizeProduct(p: any): Product | null {
     price: safePrice,
     originalPrice: safeOriginalPrice,
     discountPercent: safeDiscount,
+    displayOrder: safeDisplayOrder,
+    displayRank: safeDisplayOrder,
     rating: typeof p.rating === 'number' ? p.rating : 5,
     reviewsCount: typeof p.reviewsCount === 'number' ? p.reviewsCount : 1,
     image: p.image || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
@@ -101,9 +106,10 @@ export function sanitizeProduct(p: any): Product | null {
 }
 
 export function sanitizeProductsList(list: any[]): Product[] {
-  if (!Array.isArray(list)) return INITIAL_PRODUCTS;
+  if (!Array.isArray(list)) return sortProductsByRank(INITIAL_PRODUCTS);
   const cleaned = list.map(sanitizeProduct).filter((p): p is Product => p !== null);
-  return cleaned.length > 0 ? cleaned : INITIAL_PRODUCTS;
+  const finalList = cleaned.length > 0 ? cleaned : INITIAL_PRODUCTS;
+  return sortProductsByRank(finalList);
 }
 
 export default function App() {
@@ -126,13 +132,13 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = parsed.map(sanitizeProduct).filter((p): p is Product => p !== null);
           if (cleaned.length > 0) {
-            return cleaned;
+            return sortProductsByRank(cleaned);
           }
         }
       }
-      return INITIAL_PRODUCTS;
+      return sortProductsByRank(INITIAL_PRODUCTS);
     } catch {
-      return INITIAL_PRODUCTS;
+      return sortProductsByRank(INITIAL_PRODUCTS);
     }
   });
 
@@ -1156,7 +1162,7 @@ export default function App() {
   const handleAddNewProduct = async (newProduct: Product) => {
     setProducts((prev) => {
       const filtered = prev.filter((p) => p.id !== newProduct.id);
-      const updated = [newProduct, ...filtered];
+      const updated = sortProductsByRank([newProduct, ...filtered]);
       try {
         safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       } catch {}
@@ -1168,7 +1174,7 @@ export default function App() {
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
     setProducts((prev) => {
-      const updated = prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p));
+      const updated = sortProductsByRank(prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
       try {
         safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       } catch {}
@@ -1176,6 +1182,16 @@ export default function App() {
     });
     await saveProductToDb(updatedProduct);
     showToast(`محصول «${updatedProduct.title}» و تصویر آن در دیتابیس به‌روزرسانی شد.`);
+  };
+
+  const handleReorderProducts = async (orderedList: Product[]) => {
+    const sorted = sortProductsByRank(orderedList);
+    setProducts(sorted);
+    try {
+      safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+    } catch {}
+    await saveAllProductsOrderToDb(sorted);
+    showToast('ترتیب و رتبه‌بندی محصولات در دیتابیس ابری برای تمام کاربران ذخیره شد.');
   };
 
   const handleDeleteProduct = async (productId: string) => {
@@ -1898,6 +1914,7 @@ export default function App() {
           onAddNewProduct={handleAddNewProduct}
           onUpdateProduct={handleUpdateProduct}
           onDeleteProduct={handleDeleteProduct}
+          onReorderProducts={handleReorderProducts}
           zibalMerchant={zibalMerchant}
           onUpdateZibalMerchant={handleUpdateZibalMerchant}
           coupons={coupons}
