@@ -586,6 +586,17 @@ function removeDeletedProductId(id) {
   }
 }
 
+function sortProductsByOrder(list) {
+  if (!Array.isArray(list)) return [];
+  return [...list].sort((a, b) => {
+    const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
+    const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
+    if (orderA !== orderB) return orderA - orderB;
+    if (Boolean(a.isGolden) !== Boolean(b.isGolden)) return a.isGolden ? -1 : 1;
+    return 0;
+  });
+}
+
 function getDefaultProducts() {
   try {
     const deletedIds = new Set(getDeletedProductIds());
@@ -593,7 +604,7 @@ function getDefaultProducts() {
       const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.filter((p) => p && p.id && !deletedIds.has(p.id));
+        return sortProductsByOrder(parsed.filter((p) => p && p.id && !deletedIds.has(p.id)));
       }
     }
   } catch (e) {
@@ -702,14 +713,14 @@ app.get('/api/products', (_req, res) => {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         const filtered = parsed.filter((p) => p && p.id && !deletedIds.has(p.id));
-        return res.json(filtered);
+        return res.json(sortProductsByOrder(filtered));
       }
     }
   } catch (err) {
     console.error('Error reading products.json:', err);
   }
 
-  return res.json(DEFAULT_SERVER_PRODUCTS.filter((p) => p && p.id && !deletedIds.has(p.id)));
+  return res.json(sortProductsByOrder(getDefaultProducts().filter((p) => p && p.id && !deletedIds.has(p.id))));
 });
 
 // POST /api/products - replaces entire list on disk

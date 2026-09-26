@@ -47,8 +47,14 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Filter products that explicitly have isIncredible === true
-  const incredibleProducts = products.filter((p) => p && Boolean(p.isIncredible));
+  // Filter products that explicitly have isIncredible === true and sort by rank
+  const incredibleProducts = [...products]
+    .filter((p) => p && Boolean(p.isIncredible))
+    .sort((a, b) => {
+      const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
+      const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
+      return orderA - orderB;
+    });
 
   const safeIndex = incredibleProducts.length > 0 ? (currentIndex % incredibleProducts.length) : 0;
   const activeProduct = incredibleProducts[safeIndex];

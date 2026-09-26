@@ -430,37 +430,13 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   }
 
-  // 3. Base Products List: Cloud authoritative list merged intelligently with local edits
-  if (authoritativeList && Array.isArray(authoritativeList)) {
-    const localMap = new Map<string, Product>();
-    for (const lp of localProducts) {
-      if (lp && lp.id && !deletedIds.has(lp.id)) localMap.set(lp.id, lp);
-    }
+  // 3. Base Products List: Cloud authoritative list
+  if (authoritativeList && Array.isArray(authoritativeList) && authoritativeList.length > 0) {
+    const finalProducts = sortProductsByRank(
+      authoritativeList.filter((p) => p && p.id && !deletedIds.has(p.id))
+    );
 
-    const mergedProductsMap = new Map<string, Product>();
-
-    // Start by merging each cloud product with any local counterpart
-    for (const cp of authoritativeList) {
-      if (!cp || !cp.id || deletedIds.has(cp.id)) continue;
-      const localItem = localMap.get(cp.id);
-      if (localItem) {
-        mergedProductsMap.set(cp.id, mergeTwoProducts(cp, localItem));
-      } else {
-        mergedProductsMap.set(cp.id, cp);
-      }
-    }
-
-    // Preserve any local products that are not yet in cloud
-    for (const lp of localProducts) {
-      if (!lp || !lp.id || deletedIds.has(lp.id)) continue;
-      if (!mergedProductsMap.has(lp.id)) {
-        mergedProductsMap.set(lp.id, lp);
-      }
-    }
-
-    const finalProducts = sortProductsByRank(Array.from(mergedProductsMap.values()));
-
-    // Update local storage so state is synchronized
+    // Update local storage so state is synchronized and stale items are cleaned out
     try {
       safeSetLocalStorage('jahesh_products', JSON.stringify(finalProducts));
     } catch {}
@@ -468,12 +444,10 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     return finalProducts;
   }
 
-  // Fallback if cloud was offline/empty and no deleted products
-  const rawFallback = localProducts.length > 0
-    ? localProducts.filter((p) => !deletedIds.has(p.id))
-    : INITIAL_PRODUCTS
-        .map(cleanProductItem)
-        .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+  // Fallback if cloud was offline/empty
+  const rawFallback = (localProducts.length > 0 ? localProducts : INITIAL_PRODUCTS)
+    .map(cleanProductItem)
+    .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
 
   const fallbackList = sortProductsByRank(rawFallback);
 
@@ -486,6 +460,40 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
 
 // Real-time subscription to products across all clients and devices
 export const subscribeToProductsRealtime = (callback: (products: Product[]) => void) => {
+  // 1. Instant window event for current browser tabs
+  const handleLocalEvent = (e: any) => {
+    if (e.detail && Array.isArray(e.detail)) {
+      callback(sortProductsByRank(e.detail));
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('jahesh-products-updated', handleLocalEvent);
+  }
+
+  // 2. Google Firebase Firestore live onSnapshot listener (Zero latency cross-device sync)
+  let unsubFirestore: (() => void) | null = null;
+  try {
+    unsubFirestore = onSnapshot(doc(db, 'settings', 'products'), async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && Array.isArray(data.products)) {
+          const deletedIds = new Set(await getDeletedProductIds());
+          const cleaned = data.products
+            .map(cleanProductItem)
+            .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
+          const sorted = sortProductsByRank(cleaned);
+          safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+          callback(sorted);
+        }
+      }
+    }, (err) => {
+      console.warn('Firestore products onSnapshot notice:', err);
+    });
+  } catch (err) {
+    console.warn('Firestore onSnapshot init notice:', err);
+  }
+
+  // 3. Supabase channel
   const channel = supabase
     .channel('jahesh-products-sync')
     .on(
@@ -502,8 +510,9 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
           const cleaned = payload.new.messages
             .map(cleanProductItem)
             .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
-          safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
-          callback(cleaned);
+          const sorted = sortProductsByRank(cleaned);
+          safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+          callback(sorted);
         }
       }
     )
@@ -513,13 +522,20 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
         const cleaned = payload.payload
           .map(cleanProductItem)
           .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
-        safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
-        callback(cleaned);
+        const sorted = sortProductsByRank(cleaned);
+        safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+        callback(sorted);
       }
     })
     .subscribe();
 
   return () => {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('jahesh-products-updated', handleLocalEvent);
+    }
+    if (typeof unsubFirestore === 'function') {
+      unsubFirestore();
+    }
     supabase.removeChannel(channel);
   };
 };

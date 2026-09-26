@@ -1330,22 +1330,24 @@ export default function App() {
     }
   };
 
-  // Filtered products by search AND category
-  const filteredProducts = products.filter((p) => {
-    if (!p) return false;
+  // Filtered products by search AND category, strictly sorted by display rank
+  const filteredProducts = sortProductsByRank(
+    products.filter((p) => {
+      if (!p) return false;
 
-    // 1. Category / Guild Filter
-    if (selectedCategory && !isProductMatchingCategoryOrGuild(p, selectedCategory)) {
-      return false;
-    }
+      // 1. Category / Guild Filter
+      if (selectedCategory && !isProductMatchingCategoryOrGuild(p, selectedCategory)) {
+        return false;
+      }
 
-    // 2. Search query filter
-    if (searchQuery.trim() && !isProductMatchingSearchQuery(p, searchQuery)) {
-      return false;
-    }
+      // 2. Search query filter
+      if (searchQuery.trim() && !isProductMatchingSearchQuery(p, searchQuery)) {
+        return false;
+      }
 
-    return true;
-  });
+      return true;
+    })
+  );
 
   // Responsive pagination: Exactly divisible by columns (2 cols on mobile -> 12, 4 cols on desktop -> 24)
   // to guarantee rows are always 100% full with NO awkward single overflowing cards!

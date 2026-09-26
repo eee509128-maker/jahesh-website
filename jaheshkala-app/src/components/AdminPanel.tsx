@@ -8,7 +8,7 @@ import {
   Flame, Percent, Truck, Check, Ticket, ToggleLeft, ToggleRight, ArrowDownRight, Calculator, Users, MessageCircle, ArrowLeft, Reply, Paperclip, Image as ImageIcon, CornerUpRight, Download,
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
   ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette, BarChart3, TrendingUp, Filter, ArrowUpDown,
-  Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown
+  Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool } from '../types';
 import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank } from '../lib/dbService';
@@ -746,13 +746,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newDisplayOrder, setNewDisplayOrder] = useState<number | ''>('');
   const [isSavingProductOrder, setIsSavingProductOrder] = useState(false);
   const [rankSyncSuccessMsg, setRankSyncSuccessMsg] = useState<string | null>(null);
+  const [showRankManagerTable, setShowRankManagerTable] = useState(true);
 
-  const handleMoveProductOrder = async (productId: string, direction: 'up' | 'down') => {
-    const list = [...products];
+  const handleMoveProductOrder = async (productId: string, direction: 'up' | 'down' | 'top' | 'bottom') => {
+    const list = sortProductsByRank(products);
     const index = list.findIndex((p) => p.id === productId);
     if (index < 0) return;
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= list.length) return;
+    let targetIndex = index;
+    if (direction === 'up') targetIndex = index - 1;
+    else if (direction === 'down') targetIndex = index + 1;
+    else if (direction === 'top') targetIndex = 0;
+    else if (direction === 'bottom') targetIndex = list.length - 1;
+
+    if (targetIndex < 0 || targetIndex >= list.length || targetIndex === index) return;
 
     const [moved] = list.splice(index, 1);
     list.splice(targetIndex, 0, moved);
@@ -762,6 +768,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ...item,
       displayOrder: idx + 1,
       displayRank: idx + 1,
+      updatedAt: new Date().toISOString(),
     }));
 
     if (onReorderProducts) {
@@ -773,17 +780,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleSetProductRank = async (productId: string, rankInput: number) => {
     if (isNaN(rankInput) || rankInput < 1) return;
-    const list = [...products];
-    const target = list.find((p) => p.id === productId);
-    if (!target) return;
-    target.displayOrder = rankInput;
-    target.displayRank = rankInput;
+    const list = sortProductsByRank(products);
+    const index = list.findIndex((p) => p.id === productId);
+    if (index < 0) return;
 
-    const sorted = sortProductsByRank(list);
-    const updated = sorted.map((item, idx) => ({
+    const [moved] = list.splice(index, 1);
+    const targetIndex = Math.min(Math.max(rankInput - 1, 0), list.length);
+    list.splice(targetIndex, 0, moved);
+
+    const updated = list.map((item, idx) => ({
       ...item,
-      displayOrder: item.id === productId ? rankInput : (typeof item.displayOrder === 'number' ? item.displayOrder : idx + 1),
-      displayRank: item.id === productId ? rankInput : (typeof item.displayRank === 'number' ? item.displayRank : idx + 1),
+      displayOrder: idx + 1,
+      displayRank: idx + 1,
+      updatedAt: new Date().toISOString(),
     }));
 
     if (onReorderProducts) {
@@ -793,18 +802,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleAutoRenumberRanks = async () => {
+    const list = sortProductsByRank(products);
+    const updated = list.map((item, idx) => ({
+      ...item,
+      displayOrder: idx + 1,
+      displayRank: idx + 1,
+      updatedAt: new Date().toISOString(),
+    }));
+    if (onReorderProducts) {
+      onReorderProducts(updated);
+    } else {
+      await saveAllProductsOrderToDb(updated);
+    }
+    setRankSyncSuccessMsg(`تمام ${updated.length} محصول با موفقیت به ترتیب شماره‌گذاری و ذخیره شدند.`);
+    setTimeout(() => setRankSyncSuccessMsg(null), 4000);
+  };
+
   const handleSyncAllProductsToAllUsers = async () => {
     setIsSavingProductOrder(true);
     try {
-      const ordered = products.map((item, idx) => ({
+      const list = sortProductsByRank(products);
+      const ordered = list.map((item, idx) => ({
         ...item,
-        displayOrder: typeof item.displayOrder === 'number' ? item.displayOrder : idx + 1,
-        displayRank: typeof item.displayRank === 'number' ? item.displayRank : idx + 1,
+        displayOrder: typeof item.displayOrder === 'number' && item.displayOrder > 0 ? item.displayOrder : idx + 1,
+        displayRank: typeof item.displayRank === 'number' && item.displayRank > 0 ? item.displayRank : idx + 1,
+        updatedAt: new Date().toISOString(),
       }));
       await saveAllProductsOrderToDb(ordered);
       if (onReorderProducts) onReorderProducts(ordered);
-      setRankSyncSuccessMsg('ترتیب و رتبه‌بندی محصولات در فایربیس و برای تمام کاربران و مهمانان ذخیره شد.');
-      setTimeout(() => setRankSyncSuccessMsg(null), 4000);
+      setRankSyncSuccessMsg('✅ رتبه‌بندی محصولات در دیتابیس ابری فایربیس و برای تمام کاربران و مهمانان ذخیره و اعمال شد.');
+      setTimeout(() => setRankSyncSuccessMsg(null), 4500);
     } catch (e) {
       console.error(e);
     } finally {
@@ -1999,6 +2027,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <div className="flex items-center gap-2 flex-wrap">
                           {currentUser?.role === 'admin' && (
                             <button
+                              type="button"
+                              onClick={() => setShowRankManagerTable((prev) => !prev)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer border ${
+                                showRankManagerTable
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-amber-950/40'
+                                  : 'bg-purple-950/60 hover:bg-purple-900/60 text-slate-300 border-purple-800/40'
+                              }`}
+                              title="نمایش یا پنهان‌سازی بخش تخصصی مدیریت رتبه‌بندی محصولات"
+                            >
+                              <ArrowUpDown className="w-3.5 h-3.5 text-amber-400" />
+                              <span>{showRankManagerTable ? 'بستن پنل رتبه‌بندی' : '🎯 مدیریت رتبه‌بندی محصولات'}</span>
+                            </button>
+                          )}
+
+                          {currentUser?.role === 'admin' && (
+                            <button
                               onClick={handleSyncAllProductsToAllUsers}
                               disabled={isSavingProductOrder}
                               className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition-all cursor-pointer disabled:opacity-50"
@@ -2178,6 +2222,183 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
 
+                    {/* 2.5 DEDICATED PRODUCT RANKING & ORDER MANAGER */}
+                    {currentUser?.role === 'admin' && showRankManagerTable && products.length > 0 && (
+                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#1a0e3f] via-[#140b33] to-[#0e0724] border-2 border-amber-500/50 shadow-2xl space-y-4 animate-in fade-in">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-purple-800/60">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-center shrink-0 shadow-md">
+                              <ArrowUpDown className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-black text-white flex items-center gap-2">
+                                <span>سیستم مدیریت رتبه‌بندی و ترتیب نمایش محصولات</span>
+                                <span className="text-[10px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/40 font-bold">
+                                  {products.length} کالا فعال
+                                </span>
+                              </h4>
+                              <p className="text-[11px] text-slate-300 mt-0.5">
+                                رتبه هر کالا اولویت نمایش آن را در ویترین اصلی فروشگاه، دسته‌بندی‌ها و پیشنهادهای شگفت‌انگیز تعیین می‌کند (عدد ۱ = رتبه اول و ابتدای فروشگاه).
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={handleAutoRenumberRanks}
+                              className="px-3 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800/80 text-purple-200 hover:text-white text-xs font-bold border border-purple-700/60 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                              title="مرتب‌سازی خودکار و بازنشانی شماره رتبه‌ها از ۱ تا N"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 text-purple-300" />
+                              <span>شماره‌گذاری خودکار (۱ تا {products.length})</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleSyncAllProductsToAllUsers}
+                              disabled={isSavingProductOrder}
+                              className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-lg shadow-emerald-950/60 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              title="ذخیره در دیتابیس ابری فایربیس و همگام‌سازی لحظه‌ای برای تمام کاربران و مهمانان"
+                            >
+                              <Upload className={`w-3.5 h-3.5 ${isSavingProductOrder ? 'animate-spin' : ''}`} />
+                              <span>{isSavingProductOrder ? 'در حال ثبت...' : '🚀 ذخیره و انتشار سراسری'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* List of ranked products */}
+                        <div className="grid grid-cols-1 gap-2.5 max-h-96 overflow-y-auto pr-1">
+                          {sortProductsByRank(products).map((prod, index) => {
+                            const currentRank = typeof prod.displayOrder === 'number' && prod.displayOrder > 0
+                              ? prod.displayOrder
+                              : (typeof prod.displayRank === 'number' && prod.displayRank > 0 ? prod.displayRank : index + 1);
+
+                            return (
+                              <div
+                                key={prod.id}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-[#150a2e] hover:bg-[#1c0e3d] border border-purple-900/80 hover:border-amber-500/60 transition-all shadow-md group"
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  {/* Rank Badge */}
+                                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
+                                    #{currentRank}
+                                  </div>
+
+                                  {/* Product Thumbnail */}
+                                  <img
+                                    src={prod.image}
+                                    alt={prod.title}
+                                    className="w-11 h-11 rounded-lg object-cover border border-purple-800 shrink-0 shadow"
+                                  />
+
+                                  {/* Product Info */}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h5 className="text-xs font-bold text-white truncate max-w-sm sm:max-w-md">{prod.title}</h5>
+                                      {prod.badge && (
+                                        <span className="text-[9px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded">
+                                          {prod.badge}
+                                        </span>
+                                      )}
+                                      {prod.isGolden && (
+                                        <span className="text-[9px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-500/30">
+                                          پیشنهاد طلایی
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1 flex-wrap">
+                                      <span className="bg-purple-950 px-2 py-0.2 rounded border border-purple-800/40 text-purple-300 font-medium">
+                                        {prod.category}
+                                      </span>
+                                      <span className="text-amber-300 font-bold font-mono">
+                                        {formatPrice(prod.price)}
+                                      </span>
+                                      {prod.isIncredible && (
+                                        <span className="text-rose-300 bg-rose-950/80 px-1.5 py-0.2 rounded border border-rose-500/40 text-[9px] font-bold">
+                                          شگفت‌انگیز
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Reorder Controls & Direct Numeric Input */}
+                                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                                  <div className="flex items-center gap-1.5 bg-black/70 border border-amber-500/50 px-2.5 py-1 rounded-xl shadow-inner">
+                                    <span className="text-[11px] text-amber-300 font-black whitespace-nowrap">رتبه:</span>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max={products.length + 10}
+                                      key={`${prod.id}-${currentRank}`}
+                                      defaultValue={currentRank}
+                                      onBlur={(e) => {
+                                        const val = parseInt(e.target.value, 10);
+                                        if (!isNaN(val) && val > 0) {
+                                          handleSetProductRank(prod.id, val);
+                                        }
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          const val = parseInt((e.target as HTMLInputElement).value, 10);
+                                          if (!isNaN(val) && val > 0) {
+                                            handleSetProductRank(prod.id, val);
+                                          }
+                                        }
+                                      }}
+                                      className="w-10 bg-purple-950/90 border border-purple-600 rounded-lg px-1.5 py-0.5 text-center text-xs font-mono font-black text-amber-300 focus:border-amber-400 focus:outline-none"
+                                      title="شماره رتبه را وارد کرده و Enter بزنید"
+                                    />
+                                  </div>
+
+                                  {/* Movement Buttons */}
+                                  <div className="flex items-center gap-1 bg-[#1a0f35] p-1 rounded-xl border border-purple-800/60">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveProductOrder(prod.id, 'top')}
+                                      disabled={index === 0}
+                                      className="p-1 rounded-lg bg-purple-900/60 hover:bg-purple-800 disabled:opacity-20 disabled:cursor-not-allowed text-amber-300 hover:text-white transition-colors cursor-pointer"
+                                      title="انتقال به اول ویترین (رتبه ۱)"
+                                    >
+                                      <ChevronsUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveProductOrder(prod.id, 'up')}
+                                      disabled={index === 0}
+                                      className="p-1 rounded-lg bg-purple-900/60 hover:bg-purple-800 disabled:opacity-20 disabled:cursor-not-allowed text-slate-200 hover:text-white transition-colors cursor-pointer"
+                                      title="یک پله بالاتر"
+                                    >
+                                      <ChevronUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveProductOrder(prod.id, 'down')}
+                                      disabled={index === products.length - 1}
+                                      className="p-1 rounded-lg bg-purple-900/60 hover:bg-purple-800 disabled:opacity-20 disabled:cursor-not-allowed text-slate-200 hover:text-white transition-colors cursor-pointer"
+                                      title="یک پله پایین‌تر"
+                                    >
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveProductOrder(prod.id, 'bottom')}
+                                      disabled={index === products.length - 1}
+                                      className="p-1 rounded-lg bg-purple-900/60 hover:bg-purple-800 disabled:opacity-20 disabled:cursor-not-allowed text-slate-400 hover:text-white transition-colors cursor-pointer"
+                                      title="انتقال به انتهای ویترین"
+                                    >
+                                      <ChevronsDown className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* 3. PRODUCTS GRID */}
                     {processedProducts.length === 0 ? (
                       <div className="p-8 text-center bg-[#150d33] border border-purple-900/50 rounded-2xl space-y-3">
@@ -2219,6 +2440,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                         <input
                                           type="number"
                                           min="1"
+                                          key={`${prod.id}-${prod.displayOrder || prod.displayRank}`}
                                           defaultValue={prod.displayOrder || prod.displayRank || (products.findIndex(p => p.id === prod.id) + 1)}
                                           onBlur={(e) => {
                                             const val = parseInt(e.target.value, 10);
