@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: "tranquil-keyword-5ggh3",
@@ -22,11 +22,36 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      // 1. Check settings/deleted_products
+      let deletedIds = new Set();
+      try {
+        const delSnap = await getDoc(doc(db, 'settings', 'deleted_products'));
+        if (delSnap.exists()) {
+          const dData = delSnap.data();
+          if (dData && Array.isArray(dData.deletedIds)) {
+            deletedIds = new Set(dData.deletedIds.map((id) => String(id).trim()));
+          }
+        }
+      } catch {}
+
+      // 2. Check settings/products first
+      try {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'products'));
+        if (settingsSnap.exists()) {
+          const sData = settingsSnap.data();
+          if (sData && Array.isArray(sData.products)) {
+            const filtered = sData.products.filter((p) => p && p.id && !deletedIds.has(String(p.id)));
+            return res.status(200).json({ success: true, count: filtered.length, products: filtered });
+          }
+        }
+      } catch {}
+
+      // 3. Fallback to individual docs collection
       const snap = await getDocs(collection(db, 'products'));
       const products = [];
       snap.forEach((d) => {
         const item = d.data();
-        if (item && item.id) products.push(item);
+        if (item && item.id && !deletedIds.has(String(item.id))) products.push(item);
       });
       return res.status(200).json({ success: true, count: products.length, products });
     } catch (err) {
@@ -46,6 +71,18 @@ export default async function handler(req, res) {
       const docRef = doc(db, 'products', String(product.id));
       await setDoc(docRef, product, { merge: true });
 
+      // Remove from settings/deleted_products if present
+      try {
+        const delSnap = await getDoc(doc(db, 'settings', 'deleted_products'));
+        if (delSnap.exists()) {
+          const dData = delSnap.data();
+          if (dData && Array.isArray(dData.deletedIds) && dData.deletedIds.includes(String(product.id))) {
+            const updated = dData.deletedIds.filter((x) => x !== String(product.id));
+            await setDoc(doc(db, 'settings', 'deleted_products'), { deletedIds: updated, updatedAt: new Date().toISOString() }, { merge: true });
+          }
+        }
+      } catch {}
+
       return res.status(200).json({ success: true, product });
     } catch (err) {
       console.error('Save product error:', err);
@@ -55,9 +92,39 @@ export default async function handler(req, res) {
 
   if (req.method === 'DELETE') {
     try {
-      const { id } = req.query;
+      const id = req.query?.id || req.body?.id || req.body?.productId;
       if (!id) return res.status(400).json({ error: 'Product ID is required' });
-      await deleteDoc(doc(db, 'products', String(id)));
+      const cleanId = String(id).trim();
+
+      // 1. Delete individual product doc
+      await deleteDoc(doc(db, 'products', cleanId));
+
+      // 2. Add to settings/deleted_products
+      try {
+        const delSnap = await getDoc(doc(db, 'settings', 'deleted_products'));
+        let delIds = [];
+        if (delSnap.exists()) {
+          const dData = delSnap.data();
+          if (dData && Array.isArray(dData.deletedIds)) delIds = dData.deletedIds;
+        }
+        if (!delIds.includes(cleanId)) {
+          delIds.push(cleanId);
+          await setDoc(doc(db, 'settings', 'deleted_products'), { deletedIds: delIds, updatedAt: new Date().toISOString() }, { merge: true });
+        }
+      } catch {}
+
+      // 3. Filter out from settings/products
+      try {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'products'));
+        if (settingsSnap.exists()) {
+          const sData = settingsSnap.data();
+          if (sData && Array.isArray(sData.products)) {
+            const filtered = sData.products.filter((p) => p && p.id !== cleanId);
+            await setDoc(doc(db, 'settings', 'products'), { products: filtered, updatedAt: new Date().toISOString() }, { merge: true });
+          }
+        }
+      } catch {}
+
       return res.status(200).json({ success: true });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to delete product', details: String(err) });

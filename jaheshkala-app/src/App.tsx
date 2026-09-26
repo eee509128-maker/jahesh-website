@@ -1179,17 +1179,24 @@ export default function App() {
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    if (confirm('آیا از حذف این محصول اطمینان دارید؟')) {
-      setProducts((prev) => {
-        const updated = prev.filter((p) => p.id !== productId);
-        try {
-          safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-      await deleteProductFromDb(productId);
-      showToast('محصول از دیتابیس حذف شد.');
-    }
+    if (!productId) return;
+    const cleanId = String(productId).trim();
+
+    // 1. Immediately update products state
+    setProducts((prev) => {
+      const updated = prev.filter((p) => p.id !== cleanId);
+      try {
+        safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 2. Remove from cart if present
+    setCartItems((prev) => prev.filter((item) => item.product.id !== cleanId));
+
+    // 3. Delete across all cloud layers, tombstone blacklist, and server disk
+    await deleteProductFromDb(cleanId);
+    showToast('محصول با موفقیت از فروشگاه و دیتابیس حذف گردید.');
   };
 
   // Coupon Admin actions (Connected with Supabase Cloud DB)

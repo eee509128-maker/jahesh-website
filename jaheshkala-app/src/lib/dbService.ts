@@ -90,7 +90,20 @@ export const getDeletedProductIds = async (): Promise<string[]> => {
     }
   } catch {}
 
-  // 2. Fetch from Supabase SYSTEM_DELETED_PRODUCT_IDS
+  // 2. Fetch from Firebase Firestore settings/deleted_products
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'deleted_products'));
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data && Array.isArray(data.deletedIds)) {
+        deletedIds = Array.from(new Set([...deletedIds, ...data.deletedIds.map((id: any) => String(id).trim()).filter(Boolean)]));
+      }
+    }
+  } catch (fbErr) {
+    console.warn('Firestore deleted_products fetch notice:', fbErr);
+  }
+
+  // 3. Fetch from Supabase SYSTEM_DELETED_PRODUCT_IDS
   try {
     const { data, error } = await supabase
       .from('chats')
@@ -103,13 +116,13 @@ export const getDeletedProductIds = async (): Promise<string[]> => {
     }
   } catch {}
 
-  // 3. Fallback check server endpoint
+  // 4. Fallback check server endpoint
   try {
     const res = await fetch('/api/products/deleted');
     if (res.ok) {
       const serverIds = await res.json();
       if (Array.isArray(serverIds)) {
-        deletedIds = Array.from(new Set([...deletedIds, ...serverIds]));
+        deletedIds = Array.from(new Set([...deletedIds, ...serverIds.map((id: any) => String(id).trim()).filter(Boolean)]));
       }
     }
   } catch {}
@@ -123,46 +136,81 @@ export const getDeletedProductIds = async (): Promise<string[]> => {
 
 export const markProductIdAsDeleted = async (productId: string): Promise<void> => {
   if (!productId) return;
+  const cleanId = String(productId).trim();
+  if (!cleanId) return;
+
   try {
     const current = await getDeletedProductIds();
-    if (!current.includes(productId)) {
-      const updated = [...current, productId];
-      safeSetLocalStorage('jahesh_deleted_products', JSON.stringify(updated));
+    const updated = Array.from(new Set([...current, cleanId]));
+    safeSetLocalStorage('jahesh_deleted_products', JSON.stringify(updated));
 
-      // Supabase
-      try {
-        await supabase.from('chats').upsert(
-          {
-            user_id: 'SYSTEM_DELETED_PRODUCT_IDS',
-            user_name: 'لیست سیاه محصولات حذف شده',
-            messages: updated,
-            last_updated: new Date().toISOString(),
-            is_read_by_admin: true,
-          },
-          { onConflict: 'user_id' }
-        );
-      } catch {}
-
-      // Server disk
-      try {
-        await fetch('/api/products/deleted', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId }),
-        });
-      } catch {}
+    // 1. Firebase Firestore sync
+    try {
+      await setDoc(
+        doc(db, 'settings', 'deleted_products'),
+        {
+          deletedIds: updated,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (fbErr) {
+      console.warn('Firestore mark deleted error:', fbErr);
     }
-  } catch {}
+
+    // 2. Supabase sync
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_DELETED_PRODUCT_IDS',
+          user_name: 'لیست سیاه محصولات حذف شده',
+          messages: updated,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch {}
+
+    // 3. Server disk sync
+    try {
+      await fetch('/api/products/deleted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: cleanId }),
+      });
+    } catch {}
+  } catch (err) {
+    console.warn('markProductIdAsDeleted exception:', err);
+  }
 };
 
 export const unmarkProductIdAsDeleted = async (productId: string): Promise<void> => {
   if (!productId) return;
+  const cleanId = String(productId).trim();
+  if (!cleanId) return;
+
   try {
     const current = await getDeletedProductIds();
-    if (current.includes(productId)) {
-      const updated = current.filter((id) => id !== productId);
+    if (current.includes(cleanId)) {
+      const updated = current.filter((id) => id !== cleanId);
       safeSetLocalStorage('jahesh_deleted_products', JSON.stringify(updated));
 
+      // 1. Firebase Firestore
+      try {
+        await setDoc(
+          doc(db, 'settings', 'deleted_products'),
+          {
+            deletedIds: updated,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } catch (fbErr) {
+        console.warn('Firestore unmark deleted notice:', fbErr);
+      }
+
+      // 2. Supabase
       try {
         await supabase.from('chats').upsert(
           {
@@ -174,6 +222,15 @@ export const unmarkProductIdAsDeleted = async (productId: string): Promise<void>
           },
           { onConflict: 'user_id' }
         );
+      } catch {}
+
+      // 3. Server disk
+      try {
+        await fetch('/api/products/deleted/remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId: cleanId }),
+        });
       } catch {}
     }
   } catch {}
@@ -274,13 +331,11 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     const docSnap = await getDoc(doc(db, 'settings', 'products'));
     if (docSnap.exists()) {
       const data = docSnap.data();
-      if (data && Array.isArray(data.products) && data.products.length > 0) {
+      if (data && Array.isArray(data.products)) {
         const cleaned = data.products
           .map(cleanProductItem)
           .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-        if (cleaned.length > 0) {
-          authoritativeList = cleaned;
-        }
+        authoritativeList = cleaned;
       }
     }
   } catch (fbErr) {
@@ -294,11 +349,11 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
       if (res && res.ok) {
         const data = await res.json();
         const serverProducts = Array.isArray(data) ? data : (data?.products || []);
-        if (Array.isArray(serverProducts) && serverProducts.length > 0) {
+        if (Array.isArray(serverProducts)) {
           const cleaned = serverProducts
             .map(cleanProductItem)
             .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-          if (cleaned.length > 0) {
+          if (cleaned.length > 0 || (authoritativeList === null && serverProducts.length === 0)) {
             authoritativeList = cleaned;
           }
         }
@@ -308,11 +363,32 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   }
 
+  // 2. Layer 2: Supabase SYSTEM_CONFIG_PRODUCTS
+  if (!authoritativeList || authoritativeList.length === 0) {
+    try {
+      const { data: cloudRow } = await supabase
+        .from('chats')
+        .select('messages')
+        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+        .maybeSingle();
+      if (cloudRow && Array.isArray(cloudRow.messages)) {
+        const cleaned = cloudRow.messages
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+        if (cleaned.length > 0 || (authoritativeList === null && cloudRow.messages.length === 0)) {
+          authoritativeList = cleaned;
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase fetch products error:', err);
+    }
+  }
+
   // 3. Base Products List: Cloud authoritative list merged intelligently with local edits
-  if (authoritativeList && authoritativeList.length > 0) {
+  if (authoritativeList && Array.isArray(authoritativeList)) {
     const localMap = new Map<string, Product>();
     for (const lp of localProducts) {
-      if (lp && lp.id) localMap.set(lp.id, lp);
+      if (lp && lp.id && !deletedIds.has(lp.id)) localMap.set(lp.id, lp);
     }
 
     const mergedProductsMap = new Map<string, Product>();
@@ -346,7 +422,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     return finalProducts;
   }
 
-  // Fallback if cloud was offline/empty
+  // Fallback if cloud was offline/empty and no deleted products
   const fallbackList = localProducts.length > 0
     ? localProducts.filter((p) => !deletedIds.has(p.id))
     : INITIAL_PRODUCTS
@@ -378,10 +454,8 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
           const cleaned = payload.new.messages
             .map(cleanProductItem)
             .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
-          if (cleaned.length > 0) {
-            safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
-            callback(cleaned);
-          }
+          safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
+          callback(cleaned);
         }
       }
     )
@@ -391,10 +465,8 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
         const cleaned = payload.payload
           .map(cleanProductItem)
           .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
-        if (cleaned.length > 0) {
-          safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
-          callback(cleaned);
-        }
+        safeSetLocalStorage('jahesh_products', JSON.stringify(cleaned));
+        callback(cleaned);
       }
     })
     .subscribe();
@@ -606,7 +678,22 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       console.warn('Supabase save product to SYSTEM_CONFIG_PRODUCTS notice:', err);
     }
 
-    // 5. Secondary: Upsert to relational products table
+    // 5. Firebase Firestore sync: settings/products and products collection doc
+    try {
+      await setDoc(
+        doc(db, 'settings', 'products'),
+        {
+          products: masterList,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+      await setDoc(doc(db, 'products', product.id), productWithTimestamp, { merge: true });
+    } catch (fbErr) {
+      console.warn('Firestore save product notice:', fbErr);
+    }
+
+    // 6. Secondary: Upsert to relational products table
     try {
       const payloadWithGallery: Record<string, any> = {
         id: product.id,
@@ -655,34 +742,37 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
 
 export const deleteProductFromDb = async (productId: string): Promise<boolean> => {
   try {
-    // 1. Immediately blacklist this product ID so it can NEVER be resurrected
-    await markProductIdAsDeleted(productId);
+    const cleanId = String(productId).trim();
+    if (!cleanId) return false;
 
-    // 2. Fetch authoritative cloud list
+    // 1. Immediately blacklist this product ID so it can NEVER be resurrected
+    await markProductIdAsDeleted(cleanId);
+
+    // 2. Fetch authoritative list starting from local cache
     let masterList: Product[] = [];
     try {
-      const { data: cloudRow } = await supabase
-        .from('chats')
-        .select('messages')
-        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
-        .maybeSingle();
-      if (cloudRow && Array.isArray(cloudRow.messages) && cloudRow.messages.length > 0) {
-        masterList = cloudRow.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
+      const saved = localStorage.getItem('jahesh_products');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          masterList = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
+        }
       }
-    } catch (e) {
-      console.warn('Fetch cloud in deleteProductFromDb notice:', e);
-    }
+    } catch {}
 
     if (masterList.length === 0) {
       try {
-        const saved = localStorage.getItem('jahesh_products');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            masterList = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
-          }
+        const { data: cloudRow } = await supabase
+          .from('chats')
+          .select('messages')
+          .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+          .maybeSingle();
+        if (cloudRow && Array.isArray(cloudRow.messages) && cloudRow.messages.length > 0) {
+          masterList = cloudRow.messages.map(cleanProductItem).filter((p): p is Product => p !== null);
         }
-      } catch {}
+      } catch (e) {
+        console.warn('Fetch cloud in deleteProductFromDb notice:', e);
+      }
     }
 
     if (masterList.length === 0) {
@@ -690,7 +780,7 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
     }
 
     // Filter out the deleted product
-    const updated = masterList.filter((p) => p.id !== productId);
+    const updated = masterList.filter((p) => p.id !== cleanId);
 
     // 3. Update local storage & broadcast event immediately
     try {
@@ -700,7 +790,22 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
       }
     } catch {}
 
-    // 4. Persist updated list to Supabase SYSTEM_CONFIG_PRODUCTS
+    // 4. Firebase Firestore sync: Update settings/products AND delete individual doc
+    try {
+      await setDoc(
+        doc(db, 'settings', 'products'),
+        {
+          products: updated,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+      await deleteDoc(doc(db, 'products', cleanId));
+    } catch (fbErr) {
+      console.warn('Firestore delete products notice:', fbErr);
+    }
+
+    // 5. Persist updated list to Supabase SYSTEM_CONFIG_PRODUCTS
     try {
       await supabase.from('chats').upsert(
         {
@@ -717,18 +822,18 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
       console.warn('Delete product from SYSTEM_CONFIG_PRODUCTS notice:', err);
     }
 
-    // 5. Delete from server disk via /api/products/delete
+    // 6. Delete from server disk via /api/products/delete
     try {
       await fetch('/api/products/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({ productId: cleanId }),
       });
     } catch (e) {}
 
-    // 6. Delete from relational products table
+    // 7. Delete from relational products table
     try {
-      await supabase.from('products').delete().eq('id', productId);
+      await supabase.from('products').delete().eq('id', cleanId);
     } catch {}
 
     return true;

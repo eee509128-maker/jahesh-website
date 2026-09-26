@@ -680,6 +680,16 @@ app.post('/api/products/deleted', (req, res) => {
   return res.json({ success: true, deleted: getDeletedProductIds() });
 });
 
+// POST /api/products/deleted/remove - un-blacklists a product ID
+app.post(['/api/products/deleted/remove', '/api/products/unmark-deleted'], (req, res) => {
+  const productId = req.body?.productId || req.body?.id;
+  if (!productId) {
+    return res.status(400).json({ error: 'productId is required' });
+  }
+  removeDeletedProductId(productId);
+  return res.json({ success: true, deleted: getDeletedProductIds() });
+});
+
 // GET /api/products - returns persisted products on disk
 app.get('/api/products', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -690,24 +700,13 @@ app.get('/api/products', (_req, res) => {
     if (fs.existsSync(PRODUCTS_FILE)) {
       const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         const filtered = parsed.filter((p) => p && p.id && !deletedIds.has(p.id));
         return res.json(filtered);
       }
     }
   } catch (err) {
     console.error('Error reading products.json:', err);
-  }
-
-  // Initialize products.json if missing
-  try {
-    const dataDir = path.dirname(PRODUCTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(DEFAULT_SERVER_PRODUCTS, null, 2), 'utf8');
-  } catch (e) {
-    console.warn('Could not initialize products.json:', e);
   }
 
   return res.json(DEFAULT_SERVER_PRODUCTS.filter((p) => p && p.id && !deletedIds.has(p.id)));

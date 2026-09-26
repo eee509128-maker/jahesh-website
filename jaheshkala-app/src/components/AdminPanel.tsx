@@ -89,6 +89,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isCreatingNewTool, setIsCreatingNewTool] = useState(false);
   const [toolActionMessage, setToolActionMessage] = useState<string | null>(null);
   const [toolDeleteConfirmId, setToolDeleteConfirmId] = useState<string | null>(null);
+  const [productDeleteConfirmId, setProductDeleteConfirmId] = useState<string | null>(null);
 
   // Form fields for adding/editing tool
   const [toolTitle, setToolTitle] = useState('');
@@ -2182,13 +2183,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   )}
 
                                   {currentUser?.role === 'admin' ? (
-                                    <button
-                                      onClick={() => onDeleteProduct(prod.id)}
-                                      className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-purple-900/40"
-                                      title="حذف این کالا"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    productDeleteConfirmId === prod.id ? (
+                                      <div className="flex items-center gap-1 bg-rose-950/90 border border-rose-600/70 rounded-lg p-1 animate-in fade-in">
+                                        <span className="text-[10px] text-rose-200 font-bold px-1">حذف؟</span>
+                                        <button
+                                          onClick={() => {
+                                            setProductDeleteConfirmId(null);
+                                            onDeleteProduct(prod.id);
+                                          }}
+                                          className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-[10px] font-black cursor-pointer shadow-xs transition-colors"
+                                          title="بله، حذف قطعی شود"
+                                        >
+                                          بله
+                                        </button>
+                                        <button
+                                          onClick={() => setProductDeleteConfirmId(null)}
+                                          className="px-1.5 py-0.5 bg-purple-900/80 hover:bg-purple-800 text-slate-200 rounded text-[10px] cursor-pointer transition-colors"
+                                          title="انصراف"
+                                        >
+                                          لغو
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => setProductDeleteConfirmId(prod.id)}
+                                        className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-purple-900/40 cursor-pointer"
+                                        title="حذف این کالا"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    )
                                   ) : (
                                     <button
                                       disabled
