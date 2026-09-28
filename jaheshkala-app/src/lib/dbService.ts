@@ -332,125 +332,94 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
   const deletedIdsList = await getDeletedProductIds();
   const deletedIds = new Set(deletedIdsList);
 
-  let authoritativeList: Product[] | null = null;
+  const productMap = new Map<string, Product>();
 
-  // 0. Read current local products cache
-  let localProducts: Product[] = [];
-  try {
-    const rawLocal = localStorage.getItem('jahesh_products');
-    if (rawLocal) {
-      const parsed = JSON.parse(rawLocal);
-      if (Array.isArray(parsed)) {
-        localProducts = parsed
-          .map(cleanProductItem)
-          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-      }
+  const addOrUpdate = (item: any) => {
+    if (!item || !item.id || deletedIds.has(String(item.id).trim())) return;
+    const cleaned = cleanProductItem(item);
+    if (!cleaned) return;
+    const existing = productMap.get(cleaned.id);
+    if (!existing) {
+      productMap.set(cleaned.id, cleaned);
+    } else {
+      productMap.set(cleaned.id, mergeTwoProducts(existing, cleaned));
     }
-  } catch {}
+  };
 
-  // 0. Layer 0: Google Firebase Firestore (Realtime Cloud Database)
-  try {
-    const docSnap = await getDoc(doc(db, 'settings', 'products'));
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      if (data && Array.isArray(data.products) && data.products.length > 0) {
-        const cleaned = data.products
-          .map(cleanProductItem)
-          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-        if (cleaned.length > 0) {
-          authoritativeList = cleaned;
-        }
-      }
-    }
-  } catch (fbErr) {
-    console.warn('Firestore fetch settings products notice:', fbErr);
-  }
-
-  // 0.1 Layer 0.1: Check Firestore products collection directly
-  if (!authoritativeList || authoritativeList.length === 0) {
+  // 1. Fetch from Firestore collection and settings document concurrently (with 2500ms timeout)
+  const firestoreFetch = async () => {
     try {
-      const colSnap = await getDocs(collection(db, 'products'));
-      if (!colSnap.empty) {
-        const colList: Product[] = [];
-        colSnap.forEach((d) => {
-          const item = d.data();
-          if (item && item.id && !deletedIds.has(String(item.id))) {
-            const cleaned = cleanProductItem(item);
-            if (cleaned) colList.push(cleaned);
-          }
-        });
-        if (colList.length > 0) {
-          authoritativeList = colList;
+      const [settingsSnap, colSnap] = await Promise.allSettled([
+        getDoc(doc(db, 'settings', 'products')),
+        getDocs(collection(db, 'products')),
+      ]);
+
+      if (settingsSnap.status === 'fulfilled' && settingsSnap.value.exists()) {
+        const data = settingsSnap.value.data();
+        if (data && Array.isArray(data.products)) {
+          data.products.forEach(addOrUpdate);
         }
+      }
+
+      if (colSnap.status === 'fulfilled' && !colSnap.value.empty) {
+        colSnap.value.forEach((d) => addOrUpdate(d.data()));
       }
     } catch (fbErr) {
-      console.warn('Firestore fetch collection products notice:', fbErr);
+      console.warn('Firestore fetch products notice:', fbErr);
     }
-  }
+  };
 
-  // 1. Layer 1: Universal Server Cloud API (Vercel Serverless + PHP Proxy)
-  if (!authoritativeList || authoritativeList.length === 0) {
+  // 2. Fetch from Universal Server API (/api/products) concurrently (with 2000ms timeout)
+  const serverFetch = async () => {
     try {
       const res = await fetchUniversalApi('products', { cache: 'no-store' });
       if (res && res.ok) {
         const data = await res.json();
         const serverProducts = Array.isArray(data) ? data : (data?.products || []);
         if (Array.isArray(serverProducts)) {
-          const cleaned = serverProducts
-            .map(cleanProductItem)
-            .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-          if (cleaned.length > 0 || (authoritativeList === null && serverProducts.length === 0)) {
-            authoritativeList = cleaned;
-          }
+          serverProducts.forEach(addOrUpdate);
         }
       }
     } catch (err) {
-      console.warn('Fetch Universal API products error:', err);
+      console.warn('Fetch Universal API products notice:', err);
     }
+  };
+
+  // Execute both concurrently
+  await Promise.allSettled([
+    withTimeout(firestoreFetch(), 2500, null),
+    withTimeout(serverFetch(), 2000, null),
+  ]);
+
+  // If both cloud & server yielded products, assemble authoritative list
+  if (productMap.size > 0) {
+    const list = Array.from(productMap.values()).filter((p) => p && p.id && !deletedIds.has(p.id));
+    const sorted = sortProductsByRank(list);
+    try {
+      safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+    } catch {}
+    return sorted;
   }
 
-  // 2. Layer 2: Supabase SYSTEM_CONFIG_PRODUCTS
-  if (!authoritativeList || authoritativeList.length === 0) {
-    try {
-      const { data: cloudRow } = await supabase
-        .from('chats')
-        .select('messages')
-        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
-        .maybeSingle();
-      if (cloudRow && Array.isArray(cloudRow.messages)) {
-        const cleaned = cloudRow.messages
+  // Fallback: Read current local products cache or INITIAL_PRODUCTS
+  let localFallback: Product[] = [];
+  try {
+    const rawLocal = localStorage.getItem('jahesh_products');
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        localFallback = parsed
           .map(cleanProductItem)
           .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-        if (cleaned.length > 0 || (authoritativeList === null && cloudRow.messages.length === 0)) {
-          authoritativeList = cleaned;
-        }
       }
-    } catch (err) {
-      console.warn('Supabase fetch products error:', err);
     }
-  }
+  } catch {}
 
-  // 3. Base Products List: Cloud authoritative list
-  if (authoritativeList && Array.isArray(authoritativeList) && authoritativeList.length > 0) {
-    const finalProducts = sortProductsByRank(
-      authoritativeList.filter((p) => p && p.id && !deletedIds.has(p.id))
-    );
-
-    // Update local storage so state is synchronized and stale items are cleaned out
-    try {
-      safeSetLocalStorage('jahesh_products', JSON.stringify(finalProducts));
-    } catch {}
-
-    return finalProducts;
-  }
-
-  // Fallback if cloud was offline/empty
-  const rawFallback = (localProducts.length > 0 ? localProducts : INITIAL_PRODUCTS)
+  const rawFallback = (localFallback.length > 0 ? localFallback : INITIAL_PRODUCTS)
     .map(cleanProductItem)
     .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
 
   const fallbackList = sortProductsByRank(rawFallback);
-
   try {
     safeSetLocalStorage('jahesh_products', JSON.stringify(fallbackList));
   } catch {}
@@ -458,9 +427,9 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
   return fallbackList;
 };
 
-// Real-time subscription to products across all clients and devices
+// Real-time subscription to products across all clients and devices (Zero Lag)
 export const subscribeToProductsRealtime = (callback: (products: Product[]) => void) => {
-  // 1. Instant window event for current browser tabs
+  // 1. Instant window event for current browser tabs (0ms)
   const handleLocalEvent = (e: any) => {
     if (e.detail && Array.isArray(e.detail)) {
       callback(sortProductsByRank(e.detail));
@@ -470,13 +439,13 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
     window.addEventListener('jahesh-products-updated', handleLocalEvent);
   }
 
-  // 2. Google Firebase Firestore live onSnapshot listener (Zero latency cross-device sync)
-  let unsubFirestore: (() => void) | null = null;
+  // 2. Google Firebase Firestore live onSnapshot listener for settings/products
+  let unsubFirestoreSettings: (() => void) | null = null;
   try {
-    unsubFirestore = onSnapshot(doc(db, 'settings', 'products'), async (docSnap) => {
+    unsubFirestoreSettings = onSnapshot(doc(db, 'settings', 'products'), async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        if (data && Array.isArray(data.products)) {
+        if (data && Array.isArray(data.products) && data.products.length > 0) {
           const deletedIds = new Set(await getDeletedProductIds());
           const cleaned = data.products
             .map(cleanProductItem)
@@ -493,61 +462,72 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
     console.warn('Firestore onSnapshot init notice:', err);
   }
 
-  // 3. Supabase channel
-  const channel = supabase
-    .channel('jahesh-products-sync')
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'chats',
-        filter: 'user_id=eq.SYSTEM_CONFIG_PRODUCTS',
-      },
-      async (payload: any) => {
-        if (payload?.new && Array.isArray(payload.new.messages)) {
-          const deletedIds = new Set(await getDeletedProductIds());
-          const cleaned = payload.new.messages
-            .map(cleanProductItem)
-            .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
-          const sorted = sortProductsByRank(cleaned);
+  // 3. Google Firebase Firestore live onSnapshot on collection('products') to catch new additions immediately
+  let unsubFirestoreCol: (() => void) | null = null;
+  try {
+    unsubFirestoreCol = onSnapshot(collection(db, 'products'), async (colSnap) => {
+      if (!colSnap.empty) {
+        const deletedIds = new Set(await getDeletedProductIds());
+        const list: Product[] = [];
+        colSnap.forEach((d) => {
+          const p = cleanProductItem(d.data());
+          if (p && !deletedIds.has(p.id)) {
+            list.push(p);
+          }
+        });
+        if (list.length > 0) {
+          const sorted = sortProductsByRank(list);
           safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
           callback(sorted);
         }
       }
-    )
-    .on('broadcast', { event: 'products_updated' }, async (payload: any) => {
-      if (payload?.payload && Array.isArray(payload.payload)) {
-        const deletedIds = new Set(await getDeletedProductIds());
-        const cleaned = payload.payload
-          .map(cleanProductItem)
-          .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
-        const sorted = sortProductsByRank(cleaned);
-        safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
-        callback(sorted);
+    }, () => {});
+  } catch {}
+
+  // 4. Ultra-lightweight background server poller (every 4 seconds)
+  // Ensures users in Iran without VPN (where Google Firestore WebSockets might be blocked or throttled)
+  // receive every newly added or modified product globally within 4 seconds without any lag!
+  let lastProductFingerprint = '';
+  const pollInterval = setInterval(async () => {
+    try {
+      const res = await fetchUniversalApi('products', { cache: 'no-store' });
+      if (res && res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data?.products || []);
+        if (Array.isArray(list) && list.length > 0) {
+          const deletedIds = new Set(await getDeletedProductIds());
+          const cleaned = list.map(cleanProductItem).filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+          const fingerprint = cleaned.map((p) => `${p.id}:${p.updatedAt || ''}:${p.price}:${p.displayOrder || ''}`).join('|');
+          if (lastProductFingerprint && fingerprint !== lastProductFingerprint) {
+            const sorted = sortProductsByRank(cleaned);
+            safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+            callback(sorted);
+          }
+          lastProductFingerprint = fingerprint;
+        }
       }
-    })
-    .subscribe();
+    } catch {}
+  }, 4000);
 
   return () => {
     if (typeof window !== 'undefined') {
       window.removeEventListener('jahesh-products-updated', handleLocalEvent);
     }
-    if (typeof unsubFirestore === 'function') {
-      unsubFirestore();
+    if (typeof unsubFirestoreSettings === 'function') {
+      unsubFirestoreSettings();
     }
-    supabase.removeChannel(channel);
+    if (typeof unsubFirestoreCol === 'function') {
+      unsubFirestoreCol();
+    }
+    clearInterval(pollInterval);
   };
 };
 
 export const broadcastProductsUpdate = (products: Product[]) => {
   try {
-    const channel = supabase.channel('jahesh-products-sync');
-    channel.send({
-      type: 'broadcast',
-      event: 'products_updated',
-      payload: products,
-    });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: products }));
+    }
   } catch {}
 };
 
@@ -555,18 +535,20 @@ export const saveAllProductsToDb = async (products: Product[]): Promise<boolean>
   const deletedIds = new Set(await getDeletedProductIds());
   const stampedProducts = products
     .filter((p) => p && p.id && !deletedIds.has(p.id))
-    .map((p) => ({
+    .map((p, idx) => ({
       ...p,
+      displayOrder: typeof p.displayOrder === 'number' && p.displayOrder > 0 ? p.displayOrder : idx + 1,
+      displayRank: typeof p.displayRank === 'number' && p.displayRank > 0 ? p.displayRank : idx + 1,
       isIncredible: Boolean(p.isIncredible),
       updatedAt: p.updatedAt || new Date().toISOString(),
     }));
 
-  // 1. Immediately cache locally & dispatch update event
+  const sorted = sortProductsByRank(stampedProducts);
+
+  // 1. Immediately cache locally & dispatch update event (0ms)
   try {
-    safeSetLocalStorage('jahesh_products', JSON.stringify(stampedProducts));
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: stampedProducts }));
-    }
+    safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+    broadcastProductsUpdate(sorted);
   } catch {}
 
   // 2. Persist to server disk via /api/products
@@ -574,38 +556,25 @@ export const saveAllProductsToDb = async (products: Product[]): Promise<boolean>
     await fetch('/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(stampedProducts),
+      body: JSON.stringify(sorted),
     });
   } catch (e) {
     console.warn('Persist to /api/products notice:', e);
   }
 
-  // 3. Primary Cloud: Save to Supabase SYSTEM_CONFIG_PRODUCTS (instant global sync across all devices)
-  try {
-    await supabase.from('chats').upsert(
-      {
-        user_id: 'SYSTEM_CONFIG_PRODUCTS',
-        user_name: 'تنظیمات محصولات فروشگاه',
-        messages: stampedProducts,
-        last_updated: new Date().toISOString(),
-        is_read_by_admin: true,
-      },
-      { onConflict: 'user_id' }
-    );
-  } catch (err) {
-    console.warn('Save products to SYSTEM_CONFIG_PRODUCTS notice:', err);
-  }
-
-  // 4. Primary Cloud Database 2: Google Firebase Firestore
+  // 3. Primary Cloud Database: Google Firebase Firestore
   try {
     await setDoc(
       doc(db, 'settings', 'products'),
       {
-        products: stampedProducts,
+        products: sorted,
         updatedAt: new Date().toISOString(),
       },
       { merge: true }
     );
+    sorted.forEach((p) => {
+      setDoc(doc(db, 'products', p.id), p, { merge: true }).catch(() => {});
+    });
   } catch (fbErr) {
     console.warn('Save products to Firestore notice:', fbErr);
   }
@@ -652,12 +621,17 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       }
     }
 
-    // 1. Direct Server Disk Persistence (/api/products/save)
+    const productWithTimestamp: Product = {
+      ...product,
+      updatedAt: product.updatedAt || new Date().toISOString(),
+    };
+
+    // 1. Direct Server Disk Persistence (/api/products/save) - Instant disk write
     try {
       await fetch('/api/products/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(product),
+        body: JSON.stringify(productWithTimestamp),
       });
     } catch (e) {
       console.warn('Persist to /api/products/save notice:', e);
@@ -678,36 +652,6 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       }
     } catch {}
 
-    // Merge in any other products from cloud without overriding existing items
-    try {
-      const { data: cloudRow } = await supabase
-        .from('chats')
-        .select('messages')
-        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
-        .maybeSingle();
-      if (cloudRow && Array.isArray(cloudRow.messages)) {
-        for (const cloudP of cloudRow.messages) {
-          const cleaned = cleanProductItem(cloudP);
-          if (cleaned && !deletedIds.has(cleaned.id) && !masterList.some((p) => p.id === cleaned.id)) {
-            masterList.push(cleaned);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Fetch cloud in saveProductToDb notice:', e);
-    }
-
-    if (masterList.length === 0) {
-      masterList = INITIAL_PRODUCTS
-        .map(cleanProductItem)
-        .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-    }
-
-    // Update or insert the specified product in the master list using mergeTwoProducts
-    const productWithTimestamp: Product = {
-      ...product,
-      updatedAt: product.updatedAt || new Date().toISOString(),
-    };
     const idx = masterList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
       masterList[idx] = mergeTwoProducts(masterList[idx], productWithTimestamp);
@@ -715,86 +659,31 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       masterList = [productWithTimestamp, ...masterList];
     }
 
-    // 3. Update local storage & broadcast event immediately
+    const sortedMaster = sortProductsByRank(masterList);
+
+    // 3. Update local storage & broadcast event immediately (0ms)
     try {
-      safeSetLocalStorage('jahesh_products', JSON.stringify(masterList));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: masterList }));
-      }
+      safeSetLocalStorage('jahesh_products', JSON.stringify(sortedMaster));
+      broadcastProductsUpdate(sortedMaster);
     } catch (err) {
       console.warn('LocalStorage save product warning:', err);
     }
 
-    // 4. Primary: Save full updated products list to Supabase cloud JSON store (bulletproof across all devices & browsers)
+    // 4. Firebase Firestore sync: Save BOTH individual doc in products collection AND settings/products
     try {
-      await supabase.from('chats').upsert(
-        {
-          user_id: 'SYSTEM_CONFIG_PRODUCTS',
-          user_name: 'تنظیمات محصولات فروشگاه',
-          messages: masterList,
-          last_updated: new Date().toISOString(),
-          is_read_by_admin: true,
-        },
-        { onConflict: 'user_id' }
-      );
-      broadcastProductsUpdate(masterList);
-    } catch (err) {
-      console.warn('Supabase save product to SYSTEM_CONFIG_PRODUCTS notice:', err);
-    }
-
-    // 5. Firebase Firestore sync: settings/products and products collection doc
-    try {
-      await setDoc(
-        doc(db, 'settings', 'products'),
-        {
-          products: masterList,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-      await setDoc(doc(db, 'products', product.id), productWithTimestamp, { merge: true });
+      await Promise.allSettled([
+        setDoc(doc(db, 'products', product.id), productWithTimestamp, { merge: true }),
+        setDoc(
+          doc(db, 'settings', 'products'),
+          {
+            products: sortedMaster,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        ),
+      ]);
     } catch (fbErr) {
       console.warn('Firestore save product notice:', fbErr);
-    }
-
-    // 6. Secondary: Upsert to relational products table
-    try {
-      const payloadWithGallery: Record<string, any> = {
-        id: product.id,
-        title: product.title,
-        category: product.category,
-        brand: product.brand || '',
-        price: product.price,
-        original_price: product.originalPrice || null,
-        discount_percent: product.discountPercent || null,
-        badge: product.badge || '',
-        is_popular: Boolean(product.isPopular),
-        is_golden: Boolean(product.isGolden),
-        rating: product.rating || 5.0,
-        reviews_count: product.reviewsCount || 0,
-        delivery_days: product.deliveryDays || '',
-        warranty: product.warranty || '',
-        short_description: product.shortDescription || '',
-        full_description: product.fullDescription || '',
-        features: product.features || [],
-        image: product.image || '',
-        gallery: product.gallery || [],
-        coupon_code: product.couponCode || null,
-        coupon_discount_percent: product.couponDiscountPercent || null,
-        is_incredible: Boolean(product.isIncredible),
-        incredible_expires_at: product.incredibleExpiresAt || null,
-        incredible_timer_duration: product.incredibleTimerDuration || null,
-        is_subscription: Boolean(product.isSubscription),
-        price_per_day: product.pricePerDay || null,
-      };
-
-      const { error } = await supabase.from('products').upsert(payloadWithGallery, { onConflict: 'id' });
-      if (error) {
-        const { gallery, is_incredible, incredible_expires_at, incredible_timer_duration, is_subscription, price_per_day, ...fallbackPayload } = payloadWithGallery;
-        await supabase.from('products').upsert(fallbackPayload, { onConflict: 'id' });
-      }
-    } catch (err) {
-      console.warn('Relational products upsert notice:', err);
     }
 
     return true;
@@ -856,37 +745,22 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
 
     // 4. Firebase Firestore sync: Update settings/products AND delete individual doc
     try {
-      await setDoc(
-        doc(db, 'settings', 'products'),
-        {
-          products: updated,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-      await deleteDoc(doc(db, 'products', cleanId));
+      await Promise.allSettled([
+        setDoc(
+          doc(db, 'settings', 'products'),
+          {
+            products: updated,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        ),
+        deleteDoc(doc(db, 'products', cleanId)),
+      ]);
     } catch (fbErr) {
       console.warn('Firestore delete products notice:', fbErr);
     }
 
-    // 5. Persist updated list to Supabase SYSTEM_CONFIG_PRODUCTS
-    try {
-      await supabase.from('chats').upsert(
-        {
-          user_id: 'SYSTEM_CONFIG_PRODUCTS',
-          user_name: 'تنظیمات محصولات فروشگاه',
-          messages: updated,
-          last_updated: new Date().toISOString(),
-          is_read_by_admin: true,
-        },
-        { onConflict: 'user_id' }
-      );
-      broadcastProductsUpdate(updated);
-    } catch (err) {
-      console.warn('Delete product from SYSTEM_CONFIG_PRODUCTS notice:', err);
-    }
-
-    // 6. Delete from server disk via /api/products/delete
+    // 5. Delete from server disk via /api/products/delete
     try {
       await fetch('/api/products/delete', {
         method: 'POST',
@@ -894,11 +768,6 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
         body: JSON.stringify({ productId: cleanId }),
       });
     } catch (e) {}
-
-    // 7. Delete from relational products table
-    try {
-      await supabase.from('products').delete().eq('id', cleanId);
-    } catch {}
 
     return true;
   } catch (err) {
@@ -930,15 +799,22 @@ export const saveAllProductsOrderToDb = async (orderedProducts: Product[]): Prom
 
     const finalList = sortProductsByRank(processedList);
 
-    // 1. LocalStorage
+    // 1. LocalStorage & local event (0ms)
     try {
       safeSetLocalStorage('jahesh_products', JSON.stringify(finalList));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: finalList }));
-      }
+      broadcastProductsUpdate(finalList);
     } catch {}
 
-    // 2. Firebase Firestore sync
+    // 2. Server disk
+    try {
+      await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalList),
+      });
+    } catch {}
+
+    // 3. Firebase Firestore sync
     try {
       await setDoc(
         doc(db, 'settings', 'products'),
@@ -948,38 +824,12 @@ export const saveAllProductsOrderToDb = async (orderedProducts: Product[]): Prom
         },
         { merge: true }
       );
-      for (const prod of finalList) {
+      finalList.forEach((prod) => {
         setDoc(doc(db, 'products', prod.id), prod, { merge: true }).catch(() => {});
-      }
+      });
     } catch (fbErr) {
       console.warn('Firestore save all products order notice:', fbErr);
     }
-
-    // 3. Supabase SYSTEM_CONFIG_PRODUCTS
-    try {
-      await supabase.from('chats').upsert(
-        {
-          user_id: 'SYSTEM_CONFIG_PRODUCTS',
-          user_name: 'تنظیمات محصولات فروشگاه',
-          messages: finalList,
-          last_updated: new Date().toISOString(),
-          is_read_by_admin: true,
-        },
-        { onConflict: 'user_id' }
-      );
-      broadcastProductsUpdate(finalList);
-    } catch (err) {
-      console.warn('Supabase save all products order notice:', err);
-    }
-
-    // 4. Server disk
-    try {
-      await fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(finalList),
-      });
-    } catch {}
 
     return true;
   } catch (err) {

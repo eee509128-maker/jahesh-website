@@ -3043,34 +3043,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
                 </div>
 
-                {/* 5.05 Product Display Rank & Ordering */}
-                <div className="p-4 bg-gradient-to-r from-[#170a2f] via-[#210c44] to-[#120826] border border-amber-500/50 rounded-2xl space-y-2 shadow-md">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
-                      <span>رتبه و اولویت نمایش در فروشگاه (Display Rank):</span>
-                    </label>
-                    <span className="text-[10px] text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/30 font-bold">
-                      عدد ۱ یعنی اولین محصول در کل فروشگاه
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                    <div>
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="مثلاً: 1 (اولین کالا)، 2، 3..."
-                        value={newDisplayOrder}
-                        onChange={(e) => setNewDisplayOrder(e.target.value ? parseInt(e.target.value, 10) : '')}
-                        className="w-full bg-black/60 border border-amber-400/60 rounded-xl px-3.5 py-2 text-xs text-amber-300 font-mono font-bold focus:border-amber-400 focus:outline-none"
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-300 leading-tight">
-                      ترتیب نمایش تمام محصولات بر اساس این رتبه در ویترین اصلی و دسته‌بندی‌ها تنظیم می‌شود.
-                    </p>
-                  </div>
-                </div>
-
                 {/* 5.1 DIGIKALA-GRADE REAL IMAGE UPLOAD & GALLERY (بدون نیاز به فیلترشکن برای کاربر ایران) */}
                 <div className="p-4 bg-[#140c30] border border-purple-800/80 rounded-2xl space-y-4">
                   {/* Hidden File Inputs */}
