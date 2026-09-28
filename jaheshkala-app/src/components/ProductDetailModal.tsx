@@ -40,7 +40,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   useEffect(() => {
     if (product) {
-      setActiveImage(product.image);
+      setActiveImage(product.image || (product.gallery && product.gallery[0]) || '');
       setSelectedColor(product.colors && product.colors.length > 0 ? product.colors[0] : null);
       if (product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار') {
         setSubscriptionDays(30);
@@ -65,7 +65,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!product) return null;
 
-  const allImages = [product.image, ...(product.gallery || [])].filter((url, idx, arr) => url && arr.indexOf(url) === idx);
+  const allImages = [product.image, ...(product.gallery || [])].filter(
+    (url, idx, arr) => url && typeof url === 'string' && url.trim() !== '' && arr.indexOf(url) === idx
+  );
 
   // Dynamic calculated price for display
   const calculatedPrice = hasCustomPlans && currentPlan
@@ -143,7 +145,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div className="md:col-span-5 space-y-3">
               <div className="relative rounded-2xl overflow-hidden border border-purple-800/50 h-64 sm:h-72 bg-purple-950/40 group">
                 <img
-                  src={activeImage || product.image}
+                  src={activeImage || product.image || getFallbackProductImage(product.title, product.category)}
                   alt={product.title}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = getFallbackProductImage(product.title, product.category);

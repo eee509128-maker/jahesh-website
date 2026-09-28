@@ -244,25 +244,24 @@ export const mergeTwoProducts = (current: Product, incoming: Product): Product =
   // Compare timestamps
   const incomingTime = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
   const currentTime = current.updatedAt ? new Date(current.updatedAt).getTime() : 0;
-  const incomingIsNewer = !isNaN(incomingTime) && !isNaN(currentTime) && incomingTime > currentTime;
+  const incomingIsNewer = isNaN(currentTime) || (!isNaN(incomingTime) && incomingTime >= currentTime);
 
   const primary = incomingIsNewer ? incoming : current;
   const secondary = incomingIsNewer ? current : incoming;
 
-  // Image preservation: Never downgrade from a valid real image to an empty string or placeholder
-  let preferredImage = primary.image;
-  if (!preferredImage || preferredImage.trim() === '' || !isRealCustomImage(preferredImage)) {
-    if (secondary.image && isRealCustomImage(secondary.image)) {
-      preferredImage = secondary.image;
-    } else {
-      preferredImage = primary.image || secondary.image;
-    }
-  }
+  // Image: Authoritative from primary if present
+  const preferredImage = (primary.image && primary.image.trim() !== '')
+    ? primary.image.trim()
+    : (secondary.image ? secondary.image.trim() : '');
 
-  // Gallery preservation: keep rich gallery if present
-  const preferredGallery = (primary.gallery && primary.gallery.length > 0)
-    ? primary.gallery
-    : (secondary.gallery && secondary.gallery.length > 0 ? secondary.gallery : [preferredImage].filter(Boolean));
+  // Gallery: If primary explicitly provides an array (even empty [] because user deleted photos),
+  // RESPECT primary's array and NEVER revive secondary's deleted photos!
+  let preferredGallery: string[] = [];
+  if (Array.isArray(primary.gallery)) {
+    preferredGallery = primary.gallery.filter((g) => typeof g === 'string' && g.trim() !== '' && g.trim() !== preferredImage);
+  } else if (Array.isArray(secondary.gallery)) {
+    preferredGallery = secondary.gallery.filter((g) => typeof g === 'string' && g.trim() !== '' && g.trim() !== preferredImage);
+  }
 
   return {
     ...secondary,
@@ -289,6 +288,19 @@ export function cleanProductItem(p: any): Product | null {
     ? p.displayOrder 
     : (typeof p.displayRank === 'number' && !isNaN(p.displayRank) ? p.displayRank : undefined);
 
+  const mainImage = (p.image || '').trim() || getFallbackProductImage(title, p.category);
+
+  // Gallery: only keep distinct images that are NOT identical to mainImage
+  let rawGallery: any[] = [];
+  if (Array.isArray(p.gallery)) {
+    rawGallery = p.gallery;
+  } else if (Array.isArray(p.images)) {
+    rawGallery = p.images;
+  }
+  const cleanGallery = rawGallery.filter(
+    (img): img is string => typeof img === 'string' && img.trim() !== '' && img.trim() !== mainImage
+  );
+
   return {
     ...p,
     id,
@@ -301,8 +313,8 @@ export function cleanProductItem(p: any): Product | null {
     displayRank: safeOrder,
     rating: typeof p.rating === 'number' ? p.rating : 5,
     reviewsCount: typeof p.reviewsCount === 'number' ? p.reviewsCount : 1,
-    image: p.image || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
-    images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []),
+    image: mainImage,
+    gallery: cleanGallery,
     description: p.description || '',
     features: Array.isArray(p.features) ? p.features : [],
     inStock: p.inStock !== false,
@@ -626,12 +638,20 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       updatedAt: product.updatedAt || new Date().toISOString(),
     };
 
+    const cleanGallery = Array.isArray(productWithTimestamp.gallery)
+      ? productWithTimestamp.gallery.filter((g) => typeof g === 'string' && g.trim() !== '' && g.trim() !== productWithTimestamp.image)
+      : [];
+    const authoritativeProduct: Product = {
+      ...productWithTimestamp,
+      gallery: cleanGallery,
+    };
+
     // 1. Direct Server Disk Persistence (/api/products/save) - Instant disk write
     try {
       await fetch('/api/products/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productWithTimestamp),
+        body: JSON.stringify(authoritativeProduct),
       });
     } catch (e) {
       console.warn('Persist to /api/products/save notice:', e);
@@ -654,9 +674,14 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
 
     const idx = masterList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
-      masterList[idx] = mergeTwoProducts(masterList[idx], productWithTimestamp);
+      masterList[idx] = {
+        ...masterList[idx],
+        ...authoritativeProduct,
+        image: authoritativeProduct.image,
+        gallery: authoritativeProduct.gallery,
+      };
     } else {
-      masterList = [productWithTimestamp, ...masterList];
+      masterList = [authoritativeProduct, ...masterList];
     }
 
     const sortedMaster = sortProductsByRank(masterList);
@@ -672,7 +697,7 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
     // 4. Firebase Firestore sync: Save BOTH individual doc in products collection AND settings/products
     try {
       await Promise.allSettled([
-        setDoc(doc(db, 'products', product.id), productWithTimestamp, { merge: true }),
+        setDoc(doc(db, 'products', product.id), authoritativeProduct, { merge: true }),
         setDoc(
           doc(db, 'settings', 'products'),
           {

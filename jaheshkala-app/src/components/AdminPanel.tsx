@@ -1141,6 +1141,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewGallery((prev) => prev.filter((_, idx) => idx !== idxToRemove));
   };
 
+  const handleSetGalleryAsMain = (idx: number) => {
+    const chosen = newGallery[idx];
+    if (!chosen) return;
+    const oldMain = newImage;
+    setNewImage(chosen);
+    setNewGallery((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      if (oldMain && oldMain.trim() !== '' && oldMain !== chosen) {
+        return [oldMain, ...next];
+      }
+      return next;
+    });
+  };
+
+  const handleRemoveMainImage = () => {
+    if (newGallery.length > 0) {
+      const [first, ...rest] = newGallery;
+      setNewImage(first);
+      setNewGallery(rest);
+    } else {
+      setNewImage('');
+    }
+  };
+
   const handleSetFallbackImage = () => {
     const finalCategory = isCustomCategory ? (customCategoryName.trim() || 'عمومی') : selectedExistingCategory;
     setNewImage(getFallbackProductImage(newTitle.trim() || 'محصول جهش‌کالا', finalCategory));
@@ -1261,8 +1285,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewDeliveryDays(prod.deliveryDays || 'ارسال در ۱ تا ۳ روز کاری');
     setNewWarranty(prod.warranty || '۷ روز ضمانت بازگشت کالا');
     setNewBadge(prod.badge || '');
-    setNewImage(prod.image || '');
-    setNewGallery(prod.gallery || []);
+    const currentImg = (prod.image || '').trim();
+    setNewImage(currentImg);
+    // Filter out any duplicate of currentImg from gallery so user never sees duplicate photos
+    const cleanGal = (prod.gallery || []).filter((g) => g && typeof g === 'string' && g.trim() !== '' && g.trim() !== currentImg);
+    setNewGallery(cleanGal);
     setShowUrlInput(false);
     setNewShortDesc(prod.shortDescription || '');
     setNewFullDesc(prod.fullDescription || '');
@@ -1373,7 +1400,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const prodCouponPercent = newProductCouponPercent ? Math.min(100, Math.max(1, parseInt(newProductCouponPercent.replace(/[^0-9]/g, ''), 10) || 10)) : undefined;
 
     const existingProduct = editingProductId ? products.find((p) => p.id === editingProductId) : undefined;
-    const finalImage = newImage.trim() || (existingProduct ? existingProduct.image : '') || getFallbackProductImage(newTitle.trim(), finalCategory);
+    
+    // Resolve final main image and clean gallery:
+    // If user cleared newImage, check if there are images in newGallery to use first one as main image.
+    // Otherwise fallback to getFallbackProductImage. NEVER resurrect the deleted existingProduct.image!
+    let finalImage = newImage.trim();
+    let finalGallery = newGallery.filter((g) => typeof g === 'string' && g.trim() !== '');
+
+    if (!finalImage) {
+      if (finalGallery.length > 0) {
+        finalImage = finalGallery[0];
+        finalGallery = finalGallery.slice(1);
+      } else {
+        finalImage = getFallbackProductImage(newTitle.trim(), finalCategory);
+      }
+    } else {
+      finalGallery = finalGallery.filter((g) => g !== finalImage);
+    }
 
     let finalGuild: string | undefined = undefined;
     if (selectedGuildMode === '25guilds') {
@@ -1407,7 +1450,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       fullDescription: newFullDesc.trim() || newShortDesc.trim() || newTitle.trim(),
       features: newFeatures.split('\n').map((s) => s.trim()).filter(Boolean),
       image: finalImage,
-      gallery: newGallery,
+      gallery: finalGallery,
       isIncredible: Boolean(isIncredible),
       incredibleTimerDuration: isIncredible ? (incredibleTimerDuration || 'permanent') : undefined,
       incredibleExpiresAt: isIncredible
@@ -3175,8 +3218,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             <button
                               type="button"
-                              onClick={() => setNewImage('')}
+                              onClick={handleRemoveMainImage}
                               className="px-2.5 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800/60 text-rose-300 hover:text-white font-medium text-xs transition-colors flex items-center gap-1"
+                              title={newGallery.length > 0 ? 'حذف تصویر اصلی (جایگزینی با اولین عکس گالری)' : 'حذف تصویر اصلی کالا'}
                             >
                               <Trash2 className="w-3 h-3" />
                               <span>حذف</span>
@@ -3216,7 +3260,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                   {/* PART B: Digikala Product Gallery (Multiple Images) */}
                   <div className="space-y-2 pt-2 border-t border-purple-900/50">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
                         <label className="text-xs font-bold text-white flex items-center gap-1.5">
                           <Images className="w-3.5 h-3.5 text-cyan-400" />
@@ -3227,15 +3271,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => galleryImageInputRef.current?.click()}
-                        disabled={isUploadingImage}
-                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>افزودن عکس به گالری</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {newGallery.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setNewGallery([])}
+                            className="px-2.5 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-800/70 text-rose-300 hover:text-white font-bold text-xs flex items-center gap-1 shadow-md transition-all cursor-pointer"
+                            title="حذف تمام عکس‌های این گالری"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>پاک کردن کل گالری ({newGallery.length})</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => galleryImageInputRef.current?.click()}
+                          disabled={isUploadingImage}
+                          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>افزودن عکس به گالری</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Gallery Thumbnails List */}
@@ -3252,11 +3309,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 alt={`گالری ${idx + 1}`}
                                 className="w-full h-full object-cover"
                               />
-                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1.5 transition-opacity p-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetGalleryAsMain(idx)}
+                                  className="w-7 h-7 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center shadow-md transition-transform hover:scale-110"
+                                  title="تبدیل به تصویر اصلی (کاور) کالا"
+                                >
+                                  <Star className="w-3.5 h-3.5 fill-current" />
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveGalleryImage(idx)}
-                                  className="w-7 h-7 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-md hover:bg-rose-500"
+                                  className="w-7 h-7 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-md transition-transform hover:scale-110"
                                   title="حذف این عکس از گالری"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
