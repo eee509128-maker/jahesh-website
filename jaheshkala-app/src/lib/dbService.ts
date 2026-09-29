@@ -481,9 +481,7 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
               .map(cleanProductItem)
               .filter((p): p is Product => p !== null);
             if (cleaned.length > 0) {
-              const fingerprint = cleaned
-                .map((p) => `${p.id}:${p.updatedAt || ''}:${p.price}:${p.image || ''}:${p.displayOrder || ''}`)
-                .join('|');
+              const fingerprint = JSON.stringify(cleaned);
               if (fingerprint !== lastProductFingerprint) {
                 lastProductFingerprint = fingerprint;
                 const sorted = sortProductsByRank(cleaned);
@@ -515,9 +513,7 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
           const cleaned = list
             .map(cleanProductItem)
             .filter((p): p is Product => p !== null);
-          const fingerprint = cleaned
-            .map((p) => `${p.id}:${p.updatedAt || ''}:${p.price}:${p.image || ''}:${p.displayOrder || ''}`)
-            .join('|');
+          const fingerprint = JSON.stringify(cleaned);
 
           if (fingerprint !== lastProductFingerprint) {
             lastProductFingerprint = fingerprint;
