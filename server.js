@@ -701,25 +701,37 @@ app.post(['/api/products/deleted/remove', '/api/products/unmark-deleted'], (req,
   return res.json({ success: true, deleted: getDeletedProductIds() });
 });
 
-// GET /api/products & /jaheshkala/api/products - returns persisted products on disk
-app.get(['/api/products', '/jaheshkala/api/products'], (_req, res) => {
+let productsVersion = Date.now();
+
+// GET /api/products/version & /jaheshkala/api/products/version - ultra-lightweight 20-byte change detector
+app.get(['/api/products/version', '/jaheshkala/api/products/version'], (_req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  const deletedIds = new Set(getDeletedProductIds());
+  return res.json({ version: productsVersion });
+});
+
+// GET /api/products & /jaheshkala/api/products - returns persisted products on disk
+app.get(['/api/products', '/jaheshkala/api/products'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('x-products-version', String(productsVersion));
+
   try {
     if (fs.existsSync(PRODUCTS_FILE)) {
       const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const filtered = parsed.filter((p) => p && p.id && !deletedIds.has(p.id));
-        return res.json(sortProductsByOrder(filtered));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const valid = parsed.filter((p) => p && p.id);
+        return res.json(sortProductsByOrder(valid));
       }
     }
   } catch (err) {
     console.error('Error reading products.json:', err);
   }
 
+  const deletedIds = new Set(getDeletedProductIds());
   return res.json(sortProductsByOrder(getDefaultProducts().filter((p) => p && p.id && !deletedIds.has(p.id))));
 });
 
@@ -743,8 +755,9 @@ app.post(['/api/products', '/jaheshkala/api/products'], (req, res) => {
         fs.writeFileSync(distData, JSON.stringify(filtered, null, 2), 'utf8');
       }
     } catch {}
-    console.log(`[Products] Successfully persisted ${filtered.length} products to disk.`);
-    return res.json({ success: true, count: filtered.length });
+    productsVersion = Date.now();
+    console.log(`[Products] Successfully persisted ${filtered.length} products to disk. Version: ${productsVersion}`);
+    return res.json({ success: true, count: filtered.length, version: productsVersion });
   } catch (err) {
     console.error('Error saving products.json:', err);
     return res.status(500).json({ error: err.message });
@@ -789,8 +802,9 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
         fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
       }
     } catch {}
-    console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}`);
-    return res.json({ success: true, products: list, product });
+    productsVersion = Date.now();
+    console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}. Version: ${productsVersion}`);
+    return res.json({ success: true, products: list, product, version: productsVersion });
   } catch (err) {
     console.error('Error in /api/products/save:', err);
     return res.status(500).json({ error: err.message });
@@ -823,8 +837,9 @@ app.post(['/api/products/delete', '/jaheshkala/api/products/delete'], (req, res)
         fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
       }
     } catch {}
-    console.log(`[Products] Deleted product ${productId}. Total left: ${list.length}`);
-    return res.json({ success: true, products: list });
+    productsVersion = Date.now();
+    console.log(`[Products] Deleted product ${productId}. Total left: ${list.length}. Version: ${productsVersion}`);
+    return res.json({ success: true, products: list, version: productsVersion });
   } catch (err) {
     console.error('Error in /api/products/delete:', err);
     return res.status(500).json({ error: err.message });
@@ -851,8 +866,9 @@ app.post(['/api/products/order', '/api/products/save-all', '/api/products/reorde
         fs.writeFileSync(distData, JSON.stringify(filtered, null, 2), 'utf8');
       }
     } catch {}
-    console.log(`[Products] Successfully updated and ordered ${filtered.length} products on disk.`);
-    return res.json({ success: true, count: filtered.length, products: filtered });
+    productsVersion = Date.now();
+    console.log(`[Products] Successfully updated and ordered ${filtered.length} products on disk. Version: ${productsVersion}`);
+    return res.json({ success: true, count: filtered.length, products: filtered, version: productsVersion });
   } catch (err) {
     console.error('Error in /api/products/order:', err);
     return res.status(500).json({ error: err.message });

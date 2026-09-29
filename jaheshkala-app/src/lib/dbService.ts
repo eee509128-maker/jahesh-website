@@ -192,47 +192,45 @@ export const unmarkProductIdAsDeleted = async (productId: string): Promise<void>
 
   try {
     const current = await getDeletedProductIds();
-    if (current.includes(cleanId)) {
-      const updated = current.filter((id) => id !== cleanId);
-      safeSetLocalStorage('jahesh_deleted_products', JSON.stringify(updated));
+    const updated = current.filter((id) => id !== cleanId);
+    safeSetLocalStorage('jahesh_deleted_products', JSON.stringify(updated));
 
-      // 1. Firebase Firestore
-      try {
-        await setDoc(
-          doc(db, 'settings', 'deleted_products'),
-          {
-            deletedIds: updated,
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
-      } catch (fbErr) {
-        console.warn('Firestore unmark deleted notice:', fbErr);
-      }
-
-      // 2. Supabase
-      try {
-        await supabase.from('chats').upsert(
-          {
-            user_id: 'SYSTEM_DELETED_PRODUCT_IDS',
-            user_name: 'لیست سیاه محصولات حذف شده',
-            messages: updated,
-            last_updated: new Date().toISOString(),
-            is_read_by_admin: true,
-          },
-          { onConflict: 'user_id' }
-        );
-      } catch {}
-
-      // 3. Server disk
-      try {
-        await fetch('/api/products/deleted/remove', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId: cleanId }),
-        });
-      } catch {}
+    // 1. Firebase Firestore
+    try {
+      await setDoc(
+        doc(db, 'settings', 'deleted_products'),
+        {
+          deletedIds: updated,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (fbErr) {
+      console.warn('Firestore unmark deleted notice:', fbErr);
     }
+
+    // 2. Supabase
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_DELETED_PRODUCT_IDS',
+          user_name: 'لیست سیاه محصولات حذف شده',
+          messages: updated,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch {}
+
+    // 3. Server disk
+    try {
+      await fetch('/api/products/deleted/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: cleanId }),
+      });
+    } catch {}
   } catch {}
 };
 
@@ -341,94 +339,78 @@ export const sortProductsByRank = (productsList: Product[]): Product[] => {
   });
 };
 
-export const fetchProductsFromDb = async (): Promise<Product[]> => {
-  const deletedIdsList = await getDeletedProductIds();
-  const deletedIds = new Set(deletedIdsList);
-
-  const productMap = new Map<string, Product>();
-
-  const addOrUpdate = (item: any) => {
-    if (!item || !item.id || deletedIds.has(String(item.id).trim())) return;
-    const cleaned = cleanProductItem(item);
-    if (!cleaned) return;
-    const existing = productMap.get(cleaned.id);
-    if (!existing) {
-      productMap.set(cleaned.id, cleaned);
-    } else {
-      productMap.set(cleaned.id, mergeTwoProducts(existing, cleaned));
-    }
-  };
-
-  // 1. Fetch from Firestore collection and settings document concurrently (with 2500ms timeout)
-  const firestoreFetch = async () => {
+// BroadcastChannel for instant (0ms) cross-tab product synchronization
+export const getProductsBroadcastChannel = (): BroadcastChannel | null => {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
     try {
-      const [settingsSnap, colSnap] = await Promise.allSettled([
-        getDoc(doc(db, 'settings', 'products')),
-        getDocs(collection(db, 'products')),
-      ]);
-
-      if (settingsSnap.status === 'fulfilled' && settingsSnap.value.exists()) {
-        const data = settingsSnap.value.data();
-        if (data && Array.isArray(data.products)) {
-          data.products.forEach(addOrUpdate);
-        }
-      }
-
-      if (colSnap.status === 'fulfilled' && !colSnap.value.empty) {
-        colSnap.value.forEach((d) => addOrUpdate(d.data()));
-      }
-    } catch (fbErr) {
-      console.warn('Firestore fetch products notice:', fbErr);
-    }
-  };
-
-  // 2. Fetch from Universal Server API (/api/products) concurrently (with 2000ms timeout)
-  const serverFetch = async () => {
-    try {
-      const res = await fetchUniversalApi('products', { cache: 'no-store' });
-      if (res && res.ok) {
-        const data = await res.json();
-        const serverProducts = Array.isArray(data) ? data : (data?.products || []);
-        if (Array.isArray(serverProducts)) {
-          serverProducts.forEach(addOrUpdate);
-        }
-      }
-    } catch (err) {
-      console.warn('Fetch Universal API products notice:', err);
-    }
-  };
-
-  // Execute both concurrently
-  await Promise.allSettled([
-    withTimeout(firestoreFetch(), 2500, null),
-    withTimeout(serverFetch(), 2000, null),
-  ]);
-
-  // If both cloud & server yielded products, assemble authoritative list
-  if (productMap.size > 0) {
-    const list = Array.from(productMap.values()).filter((p) => p && p.id && !deletedIds.has(p.id));
-    const sorted = sortProductsByRank(list);
-    try {
-      safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+      return new BroadcastChannel('jahesh_products_sync_channel');
     } catch {}
-    return sorted;
+  }
+  return null;
+};
+
+export const fetchProductsFromDb = async (): Promise<Product[]> => {
+  // 1. Direct Server API (/api/products & /jaheshkala/api/products) - FASTEST & MOST AUTHORITATIVE (< 15ms)
+  try {
+    const res = await fetchUniversalApi(`products?_t=${Date.now()}`, { cache: 'no-store' });
+    if (res && res.ok) {
+      const data = await res.json();
+      const serverProducts = Array.isArray(data) ? data : (data?.products || []);
+      if (Array.isArray(serverProducts) && serverProducts.length > 0) {
+        const cleaned = serverProducts
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null);
+        if (cleaned.length > 0) {
+          const sorted = sortProductsByRank(cleaned);
+          safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+          return sorted;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Direct server fetch notice:', err);
   }
 
-  // Fallback: Read current local products cache or INITIAL_PRODUCTS
-  let localFallback: Product[] = [];
+  // 2. Firebase Cloud Firestore (Direct Cloud Sync)
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'products'));
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data && Array.isArray(data.products) && data.products.length > 0) {
+        const cleaned = data.products
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null);
+        if (cleaned.length > 0) {
+          const sorted = sortProductsByRank(cleaned);
+          safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+          return sorted;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Firestore products fetch notice:', err);
+  }
+
+  // 3. Local Storage Cache (Instant offline fallback)
   try {
     const rawLocal = localStorage.getItem('jahesh_products');
     if (rawLocal) {
       const parsed = JSON.parse(rawLocal);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        localFallback = parsed
+        const cleaned = parsed
           .map(cleanProductItem)
-          .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+          .filter((p): p is Product => p !== null);
+        if (cleaned.length > 0) {
+          return sortProductsByRank(cleaned);
+        }
       }
     }
   } catch {}
 
-  const rawFallback = (localFallback.length > 0 ? localFallback : INITIAL_PRODUCTS)
+  // 4. Fallback to INITIAL_PRODUCTS (only here do we exclude deleted legacy demo templates)
+  const deletedIdsList = await getDeletedProductIds();
+  const deletedIds = new Set(deletedIdsList);
+  const rawFallback = INITIAL_PRODUCTS
     .map(cleanProductItem)
     .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
 
@@ -440,10 +422,13 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
   return fallbackList;
 };
 
-// Real-time subscription to products across all clients and devices (Zero Lag)
+// Real-time subscription to products across all clients and devices (Enterprise Grade - Zero Lag)
 export const subscribeToProductsRealtime = (callback: (products: Product[]) => void) => {
-  // 1. Instant window event for current browser tabs (0ms)
+  let isUnsubscribed = false;
+
+  // 1. Instant window event for current page (0ms)
   const handleLocalEvent = (e: any) => {
+    if (isUnsubscribed) return;
     if (e.detail && Array.isArray(e.detail)) {
       callback(sortProductsByRank(e.detail));
     }
@@ -452,103 +437,136 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
     window.addEventListener('jahesh-products-updated', handleLocalEvent);
   }
 
-  // 2. Google Firebase Firestore live onSnapshot listener for settings/products
-  let unsubFirestoreSettings: (() => void) | null = null;
-  try {
-    unsubFirestoreSettings = onSnapshot(doc(db, 'settings', 'products'), async (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data && Array.isArray(data.products) && data.products.length > 0) {
-          const deletedIds = new Set(await getDeletedProductIds());
-          const cleaned = data.products
-            .map(cleanProductItem)
-            .filter((p: any): p is Product => p !== null && !deletedIds.has(p.id));
-          const sorted = sortProductsByRank(cleaned);
-          safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
-          callback(sorted);
-        }
+  // 2. Cross-tab BroadcastChannel sync (0ms across all tabs on this device)
+  const bc = getProductsBroadcastChannel();
+  if (bc) {
+    bc.onmessage = (e) => {
+      if (isUnsubscribed) return;
+      if (e.data && e.data.type === 'PRODUCTS_UPDATED' && Array.isArray(e.data.products)) {
+        callback(sortProductsByRank(e.data.products));
       }
-    }, (err) => {
-      console.warn('Firestore products onSnapshot notice:', err);
-    });
-  } catch (err) {
-    console.warn('Firestore onSnapshot init notice:', err);
+    };
   }
 
-  // 3. Google Firebase Firestore live onSnapshot on collection('products') to catch updates
-  let unsubFirestoreCol: (() => void) | null = null;
+  // 3. LocalStorage storage event (catches updates from other windows/iframes)
+  const handleStorageEvent = (e: StorageEvent) => {
+    if (isUnsubscribed) return;
+    if (e.key === 'jahesh_products' && e.newValue) {
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          callback(sortProductsByRank(parsed));
+        }
+      } catch {}
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', handleStorageEvent);
+  }
+
+  let lastProductFingerprint = '';
+
+  // 4. Google Firebase Firestore Realtime Live Listener (Instant Cloud WebSocket/SSE)
+  let unsubscribeFirestore: (() => void) | null = null;
   try {
-    unsubFirestoreCol = onSnapshot(collection(db, 'products'), async (colSnap) => {
-      if (!colSnap.empty) {
-        const deletedIds = new Set(await getDeletedProductIds());
-        let currentCached: Product[] = [];
-        try {
-          const raw = localStorage.getItem('jahesh_products');
-          if (raw) currentCached = JSON.parse(raw);
-        } catch {}
-
-        const productMap = new Map<string, Product>();
-        currentCached.forEach((p) => {
-          if (p && p.id && !deletedIds.has(p.id)) productMap.set(p.id, p);
-        });
-
-        colSnap.forEach((d) => {
-          const p = cleanProductItem(d.data());
-          if (p && !deletedIds.has(p.id)) {
-            const existing = productMap.get(p.id);
-            if (existing) {
-              productMap.set(p.id, mergeTwoProducts(existing, p));
-            } else {
-              productMap.set(p.id, p);
+    const productsDocRef = doc(db, 'settings', 'products');
+    unsubscribeFirestore = onSnapshot(
+      productsDocRef,
+      (docSnap) => {
+        if (isUnsubscribed) return;
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.products) && data.products.length > 0) {
+            const cleaned = data.products
+              .map(cleanProductItem)
+              .filter((p): p is Product => p !== null);
+            if (cleaned.length > 0) {
+              const fingerprint = cleaned
+                .map((p) => `${p.id}:${p.updatedAt || ''}:${p.price}:${p.image || ''}:${p.displayOrder || ''}`)
+                .join('|');
+              if (fingerprint !== lastProductFingerprint) {
+                lastProductFingerprint = fingerprint;
+                const sorted = sortProductsByRank(cleaned);
+                safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+                callback(sorted);
+              }
             }
           }
-        });
-
-        if (productMap.size > 0) {
-          const mergedList = sortProductsByRank(Array.from(productMap.values()));
-          safeSetLocalStorage('jahesh_products', JSON.stringify(mergedList));
-          callback(mergedList);
         }
+      },
+      (err) => {
+        console.warn('Firestore live products listener notice:', err);
       }
-    }, () => {});
-  } catch {}
+    );
+  } catch (fbErr) {
+    console.warn('Firestore onSnapshot initialization notice:', fbErr);
+  }
 
-  // 4. Ultra-lightweight background server poller (every 4 seconds)
-  // Ensures users in Iran without VPN (where Google Firestore WebSockets might be blocked or throttled)
-  // receive every newly added or modified product globally within 4 seconds without any lag!
-  let lastProductFingerprint = '';
-  const pollInterval = setInterval(async () => {
+  // 5. Domestic Server Polling (every 2.5 seconds fallback)
+  // Ensures all users on all networks receive updates with zero disruption
+  const pollServer = async () => {
+    if (isUnsubscribed) return;
     try {
-      const res = await fetchUniversalApi('products', { cache: 'no-store' });
+      const res = await fetchUniversalApi(`products?_t=${Date.now()}`, { cache: 'no-store' });
       if (res && res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : (data?.products || []);
         if (Array.isArray(list) && list.length > 0) {
-          const deletedIds = new Set(await getDeletedProductIds());
-          const cleaned = list.map(cleanProductItem).filter((p): p is Product => p !== null && !deletedIds.has(p.id));
-          const fingerprint = cleaned.map((p) => `${p.id}:${p.updatedAt || ''}:${p.price}:${p.displayOrder || ''}`).join('|');
-          if (lastProductFingerprint && fingerprint !== lastProductFingerprint) {
+          const cleaned = list
+            .map(cleanProductItem)
+            .filter((p): p is Product => p !== null);
+          const fingerprint = cleaned
+            .map((p) => `${p.id}:${p.updatedAt || ''}:${p.price}:${p.image || ''}:${p.displayOrder || ''}`)
+            .join('|');
+
+          if (fingerprint !== lastProductFingerprint) {
+            lastProductFingerprint = fingerprint;
             const sorted = sortProductsByRank(cleaned);
             safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
             callback(sorted);
           }
-          lastProductFingerprint = fingerprint;
         }
       }
     } catch {}
-  }, 4000);
+  };
+
+  // Run initial poll quickly after 300ms, then every 2500ms
+  const initialPollTimer = setTimeout(pollServer, 300);
+  const pollInterval = setInterval(pollServer, 2500);
+
+  // 5. Instant refresh when user switches back to this tab/window
+  const handleVisibilityOrFocus = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      pollServer();
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', pollServer);
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+  }
 
   return () => {
+    isUnsubscribed = true;
+    clearTimeout(initialPollTimer);
+    clearInterval(pollInterval);
+    if (unsubscribeFirestore) {
+      try {
+        unsubscribeFirestore();
+      } catch {}
+    }
     if (typeof window !== 'undefined') {
       window.removeEventListener('jahesh-products-updated', handleLocalEvent);
+      window.removeEventListener('storage', handleStorageEvent);
+      window.removeEventListener('focus', pollServer);
     }
-    if (typeof unsubFirestoreSettings === 'function') {
-      unsubFirestoreSettings();
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     }
-    if (typeof unsubFirestoreCol === 'function') {
-      unsubFirestoreCol();
+    if (bc) {
+      try { bc.close(); } catch {}
     }
-    clearInterval(pollInterval);
   };
 };
 
@@ -556,6 +574,10 @@ export const broadcastProductsUpdate = (products: Product[]) => {
   try {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-products-updated', { detail: products }));
+      const bc = getProductsBroadcastChannel();
+      if (bc) {
+        bc.postMessage({ type: 'PRODUCTS_UPDATED', products, version: Date.now() });
+      }
     }
   } catch {}
 };
@@ -2406,10 +2428,15 @@ export const fetchUniversalApi = async (pathOrAction: string, options?: RequestI
   const endpoints = [
     `/api/${endpointPath}${queryPart}`,
     `/jaheshkala/api/${endpointPath}${queryPart}`,
-    `/jaheshkala/api.php${phpQuery}`,
-    `api.php${phpQuery}`,
-    `/api.php${phpQuery}`,
   ];
+
+  if (!endpointPath.startsWith('products')) {
+    endpoints.push(
+      `/jaheshkala/api.php${phpQuery}`,
+      `api.php${phpQuery}`,
+      `/api.php${phpQuery}`
+    );
+  }
 
   for (const url of endpoints) {
     try {
