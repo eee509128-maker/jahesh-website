@@ -89,11 +89,16 @@ export function sanitizeProduct(p: any): Product | null {
     ? p.gallery.filter((g: any) => typeof g === 'string' && g.trim() !== '' && g.trim() !== mainImage)
     : [];
 
+  const subPlans = Array.isArray(p.subscriptionPlans) && p.subscriptionPlans.length > 0 ? p.subscriptionPlans : undefined;
+  const hasPlans = Boolean(p.hasCustomPlans || (subPlans && subPlans.length > 0));
+  const isSub = Boolean(p.isSubscription || p.id === 'pkg-amlak-jahesh' || hasPlans);
+
   return {
     ...p,
     id,
     title,
     category: p.category || 'کالای دیجیتال',
+    brand: p.brand || undefined,
     price: safePrice,
     originalPrice: safeOriginalPrice,
     discountPercent: safeDiscount,
@@ -101,13 +106,38 @@ export function sanitizeProduct(p: any): Product | null {
     displayRank: safeDisplayOrder,
     rating: typeof p.rating === 'number' ? p.rating : 5,
     reviewsCount: typeof p.reviewsCount === 'number' ? p.reviewsCount : 1,
+    deliveryDays: p.deliveryDays || 'ارسال در ۱ تا ۳ روز کاری',
     image: mainImage,
     gallery: cleanGallery,
-    images: cleanGallery.length > 0 ? [mainImage, ...cleanGallery].filter(Boolean) : (mainImage ? [mainImage] : []),
+    images: cleanGallery.length > 0 ? [mainImage, ...cleanGallery] : (mainImage ? [mainImage] : []),
     description: p.description || '',
+    shortDescription: p.shortDescription || p.description || title,
+    fullDescription: p.fullDescription || p.shortDescription || p.description || title,
     features: Array.isArray(p.features) ? p.features : [],
     inStock: p.inStock !== false,
     warranty: p.warranty || 'گارانتی اصالت و سلامت جهش',
+    badge: p.badge || undefined,
+    couponCode: p.couponCode || undefined,
+    couponDiscountPercent: typeof p.couponDiscountPercent === 'number' ? p.couponDiscountPercent : undefined,
+    isIncredible: Boolean(p.isIncredible),
+    incredibleTimerDuration: p.incredibleTimerDuration || undefined,
+    incredibleExpiresAt: p.incredibleExpiresAt || undefined,
+    isSubscription: isSub,
+    pricePerDay: typeof p.pricePerDay === 'number' && !isNaN(p.pricePerDay) ? p.pricePerDay : (isSub ? (safePrice || 35000) : undefined),
+    hasCustomPlans: hasPlans,
+    customPlansTitle: p.customPlansTitle || undefined,
+    customPlansSubtitle: p.customPlansSubtitle || undefined,
+    subscriptionPlans: subPlans,
+    isAiAppProduct: Boolean(p.isAiAppProduct || isSub || p.id === 'pkg-amlak-jahesh'),
+    aiAppName: p.aiAppName || title,
+    aiAppPlatform: p.aiAppPlatform || 'all',
+    aiAppDefaultDays: typeof p.aiAppDefaultDays === 'number' ? p.aiAppDefaultDays : 7,
+    aiAppCustomPromptNote: p.aiAppCustomPromptNote || undefined,
+    guild: p.guild || undefined,
+    targetGuilds: Array.isArray(p.targetGuilds) ? p.targetGuilds : (p.guild ? [p.guild] : undefined),
+    painPointSolved: p.painPointSolved || undefined,
+    viewsCount: typeof p.viewsCount === 'number' ? p.viewsCount : undefined,
+    updatedAt: p.updatedAt || new Date().toISOString(),
   };
 }
 

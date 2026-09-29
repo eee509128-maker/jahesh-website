@@ -300,11 +300,16 @@ export function cleanProductItem(p: any): Product | null {
     (img): img is string => typeof img === 'string' && img.trim() !== '' && img.trim() !== mainImage
   );
 
+  const subPlans = Array.isArray(p.subscriptionPlans) && p.subscriptionPlans.length > 0 ? p.subscriptionPlans : undefined;
+  const hasPlans = Boolean(p.hasCustomPlans || (subPlans && subPlans.length > 0));
+  const isSub = Boolean(p.isSubscription || p.id === 'pkg-amlak-jahesh' || hasPlans);
+
   return {
     ...p,
     id,
     title,
     category: p.category || 'کالای دیجیتال',
+    brand: p.brand || undefined,
     price: safePrice,
     originalPrice: safeOriginalPrice,
     discountPercent: safeDiscount,
@@ -312,13 +317,38 @@ export function cleanProductItem(p: any): Product | null {
     displayRank: safeOrder,
     rating: typeof p.rating === 'number' ? p.rating : 5,
     reviewsCount: typeof p.reviewsCount === 'number' ? p.reviewsCount : 1,
+    deliveryDays: p.deliveryDays || 'ارسال در ۱ تا ۳ روز کاری',
     image: mainImage,
     gallery: cleanGallery,
+    images: cleanGallery.length > 0 ? [mainImage, ...cleanGallery] : (mainImage ? [mainImage] : []),
     description: p.description || '',
+    shortDescription: p.shortDescription || p.description || title,
+    fullDescription: p.fullDescription || p.shortDescription || p.description || title,
     features: Array.isArray(p.features) ? p.features : [],
     inStock: p.inStock !== false,
     warranty: p.warranty || 'گارانتی اصالت و سلامت جهش',
+    badge: p.badge || undefined,
+    couponCode: p.couponCode || undefined,
+    couponDiscountPercent: typeof p.couponDiscountPercent === 'number' ? p.couponDiscountPercent : undefined,
     isIncredible: Boolean(p.isIncredible),
+    incredibleTimerDuration: p.incredibleTimerDuration || undefined,
+    incredibleExpiresAt: p.incredibleExpiresAt || undefined,
+    isSubscription: isSub,
+    pricePerDay: typeof p.pricePerDay === 'number' && !isNaN(p.pricePerDay) ? p.pricePerDay : (isSub ? (safePrice || 35000) : undefined),
+    hasCustomPlans: hasPlans,
+    customPlansTitle: p.customPlansTitle || undefined,
+    customPlansSubtitle: p.customPlansSubtitle || undefined,
+    subscriptionPlans: subPlans,
+    isAiAppProduct: Boolean(p.isAiAppProduct || isSub || p.id === 'pkg-amlak-jahesh'),
+    aiAppName: p.aiAppName || title,
+    aiAppPlatform: p.aiAppPlatform || 'all',
+    aiAppDefaultDays: typeof p.aiAppDefaultDays === 'number' ? p.aiAppDefaultDays : 7,
+    aiAppCustomPromptNote: p.aiAppCustomPromptNote || undefined,
+    guild: p.guild || undefined,
+    targetGuilds: Array.isArray(p.targetGuilds) ? p.targetGuilds : (p.guild ? [p.guild] : undefined),
+    painPointSolved: p.painPointSolved || undefined,
+    viewsCount: typeof p.viewsCount === 'number' ? p.viewsCount : undefined,
+    updatedAt: p.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -579,9 +609,8 @@ export const broadcastProductsUpdate = (products: Product[]) => {
 };
 
 export const saveAllProductsToDb = async (products: Product[]): Promise<boolean> => {
-  const deletedIds = new Set(await getDeletedProductIds());
   const stampedProducts = products
-    .filter((p) => p && p.id && !deletedIds.has(p.id))
+    .filter((p) => p && p.id)
     .map((p, idx) => ({
       ...p,
       displayOrder: typeof p.displayOrder === 'number' && p.displayOrder > 0 ? p.displayOrder : idx + 1,
@@ -625,6 +654,20 @@ export const saveAllProductsToDb = async (products: Product[]): Promise<boolean>
   } catch (fbErr) {
     console.warn('Save products to Firestore notice:', fbErr);
   }
+
+  // 4. Supabase cloud sync
+  try {
+    await supabase.from('chats').upsert(
+      {
+        user_id: 'SYSTEM_CONFIG_PRODUCTS',
+        user_name: 'لیست محصولات سامانه',
+        messages: sorted,
+        last_updated: new Date().toISOString(),
+        is_read_by_admin: true,
+      },
+      { onConflict: 'user_id' }
+    );
+  } catch {}
 
   return true;
 };
@@ -706,7 +749,6 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
     }
 
     // 2. Build authoritative list starting with the active local products
-    const deletedIds = new Set(await getDeletedProductIds());
     let masterList: Product[] = [];
     try {
       const saved = localStorage.getItem('jahesh_products');
@@ -715,19 +757,14 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
         if (Array.isArray(parsed) && parsed.length > 0) {
           masterList = parsed
             .map(cleanProductItem)
-            .filter((p): p is Product => p !== null && (p.id === product.id || !deletedIds.has(p.id)));
+            .filter((p): p is Product => p !== null);
         }
       }
     } catch {}
 
     const idx = masterList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
-      masterList[idx] = {
-        ...masterList[idx],
-        ...authoritativeProduct,
-        image: authoritativeProduct.image,
-        gallery: authoritativeProduct.gallery,
-      };
+      masterList[idx] = authoritativeProduct;
     } else {
       masterList = [authoritativeProduct, ...masterList];
     }
@@ -745,7 +782,7 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
     // 4. Firebase Firestore sync: Save BOTH individual doc in products collection AND settings/products
     try {
       await Promise.allSettled([
-        setDoc(doc(db, 'products', product.id), authoritativeProduct, { merge: true }),
+        setDoc(doc(db, 'products', product.id), authoritativeProduct),
         setDoc(
           doc(db, 'settings', 'products'),
           {
@@ -758,6 +795,20 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
     } catch (fbErr) {
       console.warn('Firestore save product notice:', fbErr);
     }
+
+    // 5. Supabase sync
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_PRODUCTS',
+          user_name: 'لیست محصولات سامانه',
+          messages: sortedMaster,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch {}
 
     return true;
   } catch (err) {

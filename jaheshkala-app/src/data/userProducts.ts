@@ -212,7 +212,7 @@ export const USER_RESTORED_PRODUCTS: Product[] = [
     "discountPercent": 22,
     "deliveryDays": "تحویل آنی و فعال‌سازی آنلاین (کمتر از ۱ ساعت)",
     "id": "prod-1790538341809",
-    "pricePerDay": 250000,
+    "pricePerDay": 35000,
     "category": "کالای دیجیتال",
     "reviewsCount": 18,
     "updatedAt": "2026-09-29T18:48:00.000Z",
