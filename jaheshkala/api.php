@@ -68,12 +68,186 @@ $chatsFile    = $dataDir . '/chats.json';
 $ordersFile   = $dataDir . '/orders.json';
 $deletedOrdersFile = $dataDir . '/deleted_orders.json';
 $productsFile = $dataDir . '/products.json';
+$deletedProductsFile = $dataDir . '/deleted_products.json';
 $bannersFile  = $dataDir . '/banners.json';
 $toolsFile    = $dataDir . '/tools.json';
 $usersFile    = $dataDir . '/users.json';
 $licensesFile = $dataDir . '/licenses.json';
 
 switch ($action) {
+
+    // ==========================================
+    // PRODUCTS API (Zero-VPN, cPanel & Serverless)
+    // ==========================================
+    case 'products':
+    case 'get_products':
+    case 'api/products':
+    case 'products/save':
+    case 'api/products/save':
+    case 'products/delete':
+    case 'api/products/delete':
+    case 'products/order':
+    case 'api/products/order':
+    case 'products/reorder':
+    case 'api/products/reorder':
+    case 'products/save-all':
+    case 'api/products/save-all':
+    case 'products/deleted':
+    case 'api/products/deleted':
+        $deletedProducts = readJsonFile($deletedProductsFile, []);
+        $delProdSet = !empty($deletedProducts) ? array_flip(array_map('strval', $deletedProducts)) : [];
+
+        // 1. Deleted IDs endpoint
+        if ($action === 'products/deleted' || $action === 'api/products/deleted') {
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                $pId = isset($inputData['productId']) ? (string)$inputData['productId'] : (isset($inputData['id']) ? (string)$inputData['id'] : '');
+                if (!empty($pId)) {
+                    $deletedProducts = array_values(array_unique(array_merge($deletedProducts, [$pId])));
+                    writeJsonFile($deletedProductsFile, $deletedProducts);
+                }
+                echo json_encode($deletedProducts);
+                exit;
+            }
+            echo json_encode($deletedProducts);
+            exit;
+        }
+
+        // 2. Delete single product endpoint
+        if ($action === 'products/delete' || $action === 'api/products/delete' || isset($_GET['delete'])) {
+            $delId = isset($_GET['id']) ? (string)$_GET['id'] : (isset($_GET['productId']) ? (string)$_GET['productId'] : (isset($inputData['id']) ? (string)$inputData['id'] : (isset($inputData['productId']) ? (string)$inputData['productId'] : '')));
+            if (!empty($delId)) {
+                $deletedProducts = array_values(array_unique(array_merge($deletedProducts, [$delId])));
+                writeJsonFile($deletedProductsFile, $deletedProducts);
+
+                $prods = readJsonFile($productsFile, []);
+                $prods = array_values(array_filter($prods, function($p) use ($delId) {
+                    return isset($p['id']) && (string)$p['id'] !== $delId;
+                }));
+                writeJsonFile($productsFile, $prods);
+                echo json_encode(['success' => true, 'count' => count($prods), 'products' => $prods]);
+                exit;
+            }
+            http_response_code(400);
+            echo json_encode(['error' => 'id or productId required']);
+            exit;
+        }
+
+        // 3. Upsert Single Product (Save / Update)
+        if ($action === 'products/save' || $action === 'api/products/save') {
+            $product = $inputData;
+            if (empty($product) || !is_array($product) || (empty($product['id']) && empty($product['title']))) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid product payload']);
+                exit;
+            }
+
+            $pId = !empty($product['id']) ? (string)$product['id'] : 'prod-' . time();
+            $product['id'] = $pId;
+
+            // Un-blacklist this product ID if it was marked as deleted
+            if (isset($delProdSet[$pId])) {
+                $deletedProducts = array_values(array_filter($deletedProducts, function($id) use ($pId) {
+                    return (string)$id !== $pId;
+                }));
+                writeJsonFile($deletedProductsFile, $deletedProducts);
+                $delProdSet = !empty($deletedProducts) ? array_flip(array_map('strval', $deletedProducts)) : [];
+            }
+
+            $prods = readJsonFile($productsFile, []);
+            $foundIndex = -1;
+            foreach ($prods as $idx => $p) {
+                if (isset($p['id']) && (string)$p['id'] === $pId) {
+                    $foundIndex = $idx;
+                    break;
+                }
+            }
+
+            if ($foundIndex >= 0) {
+                $prods[$foundIndex] = array_merge($prods[$foundIndex], $product);
+            } else {
+                array_unshift($prods, $product);
+            }
+
+            writeJsonFile($productsFile, $prods);
+            echo json_encode(['success' => true, 'product' => $product, 'count' => count($prods), 'products' => $prods]);
+            exit;
+        }
+
+        // 4. Save Ordered Products list
+        if ($action === 'products/order' || $action === 'api/products/order' || $action === 'products/reorder' || $action === 'api/products/reorder' || $action === 'products/save-all' || $action === 'api/products/save-all') {
+            $incomingList = isset($inputData['products']) && is_array($inputData['products']) ? $inputData['products'] : (is_array($inputData) ? $inputData : []);
+            if (!empty($incomingList)) {
+                $cleanList = array_values(array_filter($incomingList, function($p) use ($delProdSet) {
+                    $id = isset($p['id']) ? (string)$p['id'] : '';
+                    return !empty($id) && !isset($delProdSet[$id]);
+                }));
+                writeJsonFile($productsFile, $cleanList);
+                echo json_encode(['success' => true, 'count' => count($cleanList), 'products' => $cleanList]);
+                exit;
+            }
+        }
+
+        // 5. General GET / POST products
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $incomingList = isset($inputData['products']) && is_array($inputData['products']) ? $inputData['products'] : (is_array($inputData) ? $inputData : []);
+            if (!empty($incomingList)) {
+                $cleanList = array_values(array_filter($incomingList, function($p) use ($delProdSet) {
+                    $id = isset($p['id']) ? (string)$p['id'] : '';
+                    return !empty($id) && !isset($delProdSet[$id]);
+                }));
+                writeJsonFile($productsFile, $cleanList);
+                echo json_encode(['success' => true, 'count' => count($cleanList), 'products' => $cleanList]);
+                exit;
+            }
+        }
+
+        // GET products
+        $prods = readJsonFile($productsFile, []);
+        if (!empty($deletedProducts)) {
+            $prods = array_values(array_filter($prods, function($p) use ($delProdSet) {
+                $id = isset($p['id']) ? (string)$p['id'] : '';
+                return !empty($id) && !isset($delProdSet[$id]);
+            }));
+        }
+        echo json_encode($prods);
+        exit;
+        break;
+
+    // ==========================================
+    // UPLOAD IMAGE API (Direct Server Upload)
+    // ==========================================
+    case 'upload-product-image':
+    case 'api/upload-product-image':
+    case 'upload':
+    case 'api/upload':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $rawImg = isset($inputData['image']) ? $inputData['image'] : '';
+            $filename = isset($inputData['filename']) ? $inputData['filename'] : ('prod_' . time() . '.webp');
+            if (!empty($rawImg) && strpos($rawImg, 'data:image') === 0) {
+                $commaPos = strpos($rawImg, ',');
+                if ($commaPos !== false) {
+                    $base64Data = substr($rawImg, $commaPos + 1);
+                    $decoded = base64_decode($base64Data);
+                    if ($decoded !== false) {
+                        $uploadsDir = __DIR__ . '/uploads/products';
+                        if (!is_dir($uploadsDir)) {
+                            @mkdir($uploadsDir, 0777, true);
+                        }
+                        $cleanName = preg_replace('/[^a-zA-Z0-9_\-\.]/', '_', $filename);
+                        $destPath = $uploadsDir . '/' . $cleanName;
+                        @file_put_contents($destPath, $decoded);
+                        
+                        $url = '/jaheshkala/uploads/products/' . $cleanName;
+                        echo json_encode(['success' => true, 'url' => $url, 'filename' => $cleanName]);
+                        exit;
+                    }
+                }
+            }
+        }
+        http_response_code(400);
+        echo json_encode(['error' => 'image base64 data required']);
+        exit;
+        break;
 
     // ==========================================
     // CHATS API (Live Support & AI Assistant)

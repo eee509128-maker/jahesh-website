@@ -84,6 +84,11 @@ export function sanitizeProduct(p: any): Product | null {
   const safeDiscount = typeof p.discountPercent === 'number' ? p.discountPercent : undefined;
   const safeDisplayOrder = typeof p.displayOrder === 'number' && !isNaN(p.displayOrder) ? p.displayOrder : (typeof p.displayRank === 'number' && !isNaN(p.displayRank) ? p.displayRank : undefined);
 
+  const mainImage = typeof p.image === 'string' ? p.image.trim() : '';
+  const cleanGallery = Array.isArray(p.gallery)
+    ? p.gallery.filter((g: any) => typeof g === 'string' && g.trim() !== '' && g.trim() !== mainImage)
+    : [];
+
   return {
     ...p,
     id,
@@ -96,8 +101,9 @@ export function sanitizeProduct(p: any): Product | null {
     displayRank: safeDisplayOrder,
     rating: typeof p.rating === 'number' ? p.rating : 5,
     reviewsCount: typeof p.reviewsCount === 'number' ? p.reviewsCount : 1,
-    image: p.image || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
-    images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []),
+    image: mainImage,
+    gallery: cleanGallery,
+    images: cleanGallery.length > 0 ? [mainImage, ...cleanGallery].filter(Boolean) : (mainImage ? [mainImage] : []),
     description: p.description || '',
     features: Array.isArray(p.features) ? p.features : [],
     inStock: p.inStock !== false,

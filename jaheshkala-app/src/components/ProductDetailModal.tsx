@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X, Sparkles, CheckCircle2, Globe, ShieldCheck,
   ShoppingBag, Gift, Truck, RotateCcw, Headphones, Star, Ticket, Images, Zap, CreditCard, Check,
-  ChevronDown, ChevronUp, Info, ListChecks
+  ChevronDown, ChevronUp, Info, ListChecks, Package
 } from 'lucide-react';
 import { Product, User, SubscriptionPlan } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
@@ -144,14 +144,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {/* Image & Main stats */}
             <div className="md:col-span-5 space-y-3">
               <div className="relative rounded-2xl overflow-hidden border border-purple-800/50 h-64 sm:h-72 bg-purple-950/40 group">
-                <img
-                  src={activeImage || product.image || getFallbackProductImage(product.title, product.category)}
-                  alt={product.title}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = getFallbackProductImage(product.title, product.category);
-                  }}
-                  className="w-full h-full object-contain p-2 bg-black/40 transition-transform duration-300 group-hover:scale-105"
-                />
+                {allImages.length > 0 ? (
+                  <img
+                    src={activeImage || allImages[0]}
+                    alt={product.title}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = getFallbackProductImage(product.title, product.category);
+                    }}
+                    className="w-full h-full object-contain p-2 bg-black/40 transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-purple-950/60 via-purple-900/30 to-indigo-950/60">
+                    <Package className="w-16 h-16 text-purple-400/50 mb-2" />
+                    <span className="text-sm font-bold text-purple-200">{product.category}</span>
+                    <span className="text-xs text-slate-400 mt-1">جهش‌کالا</span>
+                  </div>
+                )}
                 <div className="absolute bottom-2 right-2 left-2 flex items-center justify-between pointer-events-none">
                   <span className="text-[11px] font-bold text-amber-300 bg-black/75 px-2.5 py-1 rounded-lg border border-white/10">
                     {product.deliveryDays}

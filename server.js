@@ -616,7 +616,7 @@ function getDefaultProducts() {
 const DEFAULT_SERVER_PRODUCTS = getDefaultProducts();
 
 // Endpoint to upload image file directly to server (returns a permanent, lightweight URL)
-app.post(['/api/upload-product-image', '/api/upload'], (req, res) => {
+app.post(['/api/upload-product-image', '/api/upload', '/jaheshkala/api/upload-product-image', '/jaheshkala/api/upload'], (req, res) => {
   const type = req.query?.type || req.body?.type;
   const isBanner = type === 'banners' || (req.url && req.url.includes('banner'));
   const isTool = type === 'tools' || (req.url && req.url.includes('tool'));
@@ -701,8 +701,8 @@ app.post(['/api/products/deleted/remove', '/api/products/unmark-deleted'], (req,
   return res.json({ success: true, deleted: getDeletedProductIds() });
 });
 
-// GET /api/products - returns persisted products on disk
-app.get('/api/products', (_req, res) => {
+// GET /api/products & /jaheshkala/api/products - returns persisted products on disk
+app.get(['/api/products', '/jaheshkala/api/products'], (_req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -724,7 +724,7 @@ app.get('/api/products', (_req, res) => {
 });
 
 // POST /api/products - replaces entire list on disk
-app.post('/api/products', (req, res) => {
+app.post(['/api/products', '/jaheshkala/api/products'], (req, res) => {
   try {
     const products = req.body;
     if (!Array.isArray(products)) {
@@ -737,6 +737,12 @@ app.post('/api/products', (req, res) => {
       fs.mkdirSync(dataDir, { recursive: true });
     }
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+    try {
+      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
+      if (fs.existsSync(path.dirname(distData))) {
+        fs.writeFileSync(distData, JSON.stringify(filtered, null, 2), 'utf8');
+      }
+    } catch {}
     console.log(`[Products] Successfully persisted ${filtered.length} products to disk.`);
     return res.json({ success: true, count: filtered.length });
   } catch (err) {
@@ -746,7 +752,7 @@ app.post('/api/products', (req, res) => {
 });
 
 // POST /api/products/save - upserts a single product on disk
-app.post('/api/products/save', (req, res) => {
+app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => {
   try {
     const product = req.body;
     if (!product || !product.id) {
@@ -777,8 +783,14 @@ app.post('/api/products/save', (req, res) => {
       fs.mkdirSync(dataDir, { recursive: true });
     }
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    try {
+      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
+      if (fs.existsSync(path.dirname(distData))) {
+        fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
+      }
+    } catch {}
     console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}`);
-    return res.json({ success: true, products: list });
+    return res.json({ success: true, products: list, product });
   } catch (err) {
     console.error('Error in /api/products/save:', err);
     return res.status(500).json({ error: err.message });
@@ -786,7 +798,7 @@ app.post('/api/products/save', (req, res) => {
 });
 
 // POST /api/products/delete - deletes a product by id from disk
-app.post('/api/products/delete', (req, res) => {
+app.post(['/api/products/delete', '/jaheshkala/api/products/delete'], (req, res) => {
   try {
     const productId = req.body?.productId || req.body?.id;
     if (!productId) {
@@ -805,6 +817,12 @@ app.post('/api/products/delete', (req, res) => {
     }
     list = list.filter((p) => p.id !== productId);
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    try {
+      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
+      if (fs.existsSync(path.dirname(distData))) {
+        fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
+      }
+    } catch {}
     console.log(`[Products] Deleted product ${productId}. Total left: ${list.length}`);
     return res.json({ success: true, products: list });
   } catch (err) {
@@ -814,7 +832,7 @@ app.post('/api/products/delete', (req, res) => {
 });
 
 // POST /api/products/order & /api/products/save-all - saves ordered/re-ranked products on disk
-app.post(['/api/products/order', '/api/products/save-all', '/api/products/reorder'], (req, res) => {
+app.post(['/api/products/order', '/api/products/save-all', '/api/products/reorder', '/jaheshkala/api/products/order', '/jaheshkala/api/products/save-all', '/jaheshkala/api/products/reorder'], (req, res) => {
   try {
     const products = req.body?.products || req.body;
     if (!Array.isArray(products)) {
@@ -827,6 +845,12 @@ app.post(['/api/products/order', '/api/products/save-all', '/api/products/reorde
       fs.mkdirSync(dataDir, { recursive: true });
     }
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+    try {
+      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
+      if (fs.existsSync(path.dirname(distData))) {
+        fs.writeFileSync(distData, JSON.stringify(filtered, null, 2), 'utf8');
+      }
+    } catch {}
     console.log(`[Products] Successfully updated and ordered ${filtered.length} products on disk.`);
     return res.json({ success: true, count: filtered.length, products: filtered });
   } catch (err) {
@@ -1158,6 +1182,20 @@ app.get(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.php
   if (action === 'orders/deleted' || action === 'deleted_orders' || action === 'api/orders/deleted') {
     return res.json(readDeletedOrdersFromDisk());
   }
+  if (action === 'products' || action === 'get_products' || action === 'api/products') {
+    const deletedIds = new Set(getDeletedProductIds());
+    let list = [];
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      try {
+        const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch {}
+    }
+    if (list.length === 0) list = [...DEFAULT_SERVER_PRODUCTS];
+    const filtered = list.filter((p) => p && p.id && !deletedIds.has(p.id));
+    return res.json(sortProductsByOrder(filtered));
+  }
   if (action === 'banners' || action === 'get_banners') {
     return res.json(DEFAULT_SERVER_BANNERS);
   }
@@ -1174,6 +1212,62 @@ app.post(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.ph
   try {
     const incoming = req.body;
     const action = req.query.action || req.query.endpoint || (incoming && incoming.action);
+
+    // Products upsert & delete via api.php emulator
+    if (action === 'products/save' || action === 'save_product' || action === 'api/products/save') {
+      const product = incoming;
+      if (!product || !product.id) {
+        return res.status(400).json({ error: 'Invalid product data' });
+      }
+      removeDeletedProductId(product.id);
+      let list = [];
+      if (fs.existsSync(PRODUCTS_FILE)) {
+        try {
+          const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) list = parsed;
+        } catch {}
+      }
+      if (list.length === 0) list = [...DEFAULT_SERVER_PRODUCTS];
+      const idx = list.findIndex((p) => p.id === product.id);
+      if (idx >= 0) list[idx] = product;
+      else list = [product, ...list];
+      const dataDir = path.dirname(PRODUCTS_FILE);
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+      try {
+        const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
+        if (fs.existsSync(path.dirname(distData))) {
+          fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
+        }
+      } catch {}
+      return res.json({ success: true, products: list, product });
+    }
+
+    if (action === 'products/delete' || action === 'delete_product' || action === 'api/products/delete') {
+      const productId = (req.query && req.query.id) || (incoming && (incoming.productId || incoming.id));
+      if (!productId) {
+        return res.status(400).json({ error: 'productId or id required' });
+      }
+      addDeletedProductId(productId);
+      let list = [];
+      if (fs.existsSync(PRODUCTS_FILE)) {
+        try {
+          const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) list = parsed;
+        } catch {}
+      }
+      list = list.filter((p) => p.id !== productId);
+      fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+      try {
+        const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
+        if (fs.existsSync(path.dirname(distData))) {
+          fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
+        }
+      } catch {}
+      return res.json({ success: true, products: list });
+    }
 
     // Delete single order via api.php emulator
     if (action === 'orders/delete' || action === 'delete_order' || action === 'api/orders/delete') {

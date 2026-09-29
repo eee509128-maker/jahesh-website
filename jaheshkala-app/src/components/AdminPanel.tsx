@@ -1156,13 +1156,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const handleRemoveMainImage = () => {
-    if (newGallery.length > 0) {
-      const [first, ...rest] = newGallery;
-      setNewImage(first);
-      setNewGallery(rest);
-    } else {
-      setNewImage('');
-    }
+    setNewImage('');
   };
 
   const handleSetFallbackImage = () => {
@@ -1403,18 +1397,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     
     // Resolve final main image and clean gallery:
     // If user cleared newImage, check if there are images in newGallery to use first one as main image.
-    // Otherwise fallback to getFallbackProductImage. NEVER resurrect the deleted existingProduct.image!
+    // If user cleared everything, finalImage stays empty. NEVER resurrect deleted images!
     let finalImage = newImage.trim();
     let finalGallery = newGallery.filter((g) => typeof g === 'string' && g.trim() !== '');
 
-    if (!finalImage) {
-      if (finalGallery.length > 0) {
-        finalImage = finalGallery[0];
-        finalGallery = finalGallery.slice(1);
-      } else {
-        finalImage = getFallbackProductImage(newTitle.trim(), finalCategory);
-      }
-    } else {
+    if (!finalImage && finalGallery.length > 0) {
+      finalImage = finalGallery[0];
+      finalGallery = finalGallery.slice(1);
+    } else if (finalImage) {
       finalGallery = finalGallery.filter((g) => g !== finalImage);
     }
 
@@ -1491,6 +1481,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     
     setTimeout(() => {
       setFormSuccess('');
+      handleStartNew();
       setActiveTab('products');
     }, 1200);
   };
@@ -1632,19 +1623,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
 
             <button
-              onClick={() => {
-                if (!editingProductId) handleStartNew();
-                else setActiveTab('new-product');
-              }}
+              onClick={handleStartNew}
               className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
-                activeTab === 'new-product'
+                activeTab === 'new-product' && !editingProductId
                   ? 'border-amber-400 text-amber-300'
                   : 'border-transparent text-slate-400 hover:text-white'
               }`}
             >
               <PlusCircle className="w-4 h-4" />
-              <span>{editingProductId ? 'ویرایش کالا' : 'ثبت کالای جدید'}</span>
+              <span>ثبت کالای جدید</span>
             </button>
+
+            {editingProductId && (
+              <button
+                onClick={() => setActiveTab('new-product')}
+                className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                  activeTab === 'new-product'
+                    ? 'border-amber-400 text-amber-300 bg-amber-400/10 rounded-t-lg'
+                    : 'border-transparent text-amber-400/80 hover:text-amber-300'
+                }`}
+              >
+                <Edit className="w-4 h-4 text-amber-400" />
+                <span>ویرایش کالا</span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab('coupons')}

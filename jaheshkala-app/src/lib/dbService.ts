@@ -249,10 +249,11 @@ export const mergeTwoProducts = (current: Product, incoming: Product): Product =
   const primary = incomingIsNewer ? incoming : current;
   const secondary = incomingIsNewer ? current : incoming;
 
-  // Image: Authoritative from primary if present
-  const preferredImage = (primary.image && primary.image.trim() !== '')
+  // Image: Authoritative from primary! If primary has an image property (even if empty because user deleted it),
+  // we RESPECT primary's decision and NEVER resurrect the old deleted image from secondary!
+  const preferredImage = typeof primary.image === 'string'
     ? primary.image.trim()
-    : (secondary.image ? secondary.image.trim() : '');
+    : (typeof secondary.image === 'string' ? secondary.image.trim() : '');
 
   // Gallery: If primary explicitly provides an array (even empty [] because user deleted photos),
   // RESPECT primary's array and NEVER revive secondary's deleted photos!
@@ -474,23 +475,39 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
     console.warn('Firestore onSnapshot init notice:', err);
   }
 
-  // 3. Google Firebase Firestore live onSnapshot on collection('products') to catch new additions immediately
+  // 3. Google Firebase Firestore live onSnapshot on collection('products') to catch updates
   let unsubFirestoreCol: (() => void) | null = null;
   try {
     unsubFirestoreCol = onSnapshot(collection(db, 'products'), async (colSnap) => {
       if (!colSnap.empty) {
         const deletedIds = new Set(await getDeletedProductIds());
-        const list: Product[] = [];
+        let currentCached: Product[] = [];
+        try {
+          const raw = localStorage.getItem('jahesh_products');
+          if (raw) currentCached = JSON.parse(raw);
+        } catch {}
+
+        const productMap = new Map<string, Product>();
+        currentCached.forEach((p) => {
+          if (p && p.id && !deletedIds.has(p.id)) productMap.set(p.id, p);
+        });
+
         colSnap.forEach((d) => {
           const p = cleanProductItem(d.data());
           if (p && !deletedIds.has(p.id)) {
-            list.push(p);
+            const existing = productMap.get(p.id);
+            if (existing) {
+              productMap.set(p.id, mergeTwoProducts(existing, p));
+            } else {
+              productMap.set(p.id, p);
+            }
           }
         });
-        if (list.length > 0) {
-          const sorted = sortProductsByRank(list);
-          safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
-          callback(sorted);
+
+        if (productMap.size > 0) {
+          const mergedList = sortProductsByRank(Array.from(productMap.values()));
+          safeSetLocalStorage('jahesh_products', JSON.stringify(mergedList));
+          callback(mergedList);
         }
       }
     }, () => {});
@@ -646,15 +663,28 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       gallery: cleanGallery,
     };
 
-    // 1. Direct Server Disk Persistence (/api/products/save) - Instant disk write
+    // 1. Direct Server Disk Persistence (/api/products/save & /jaheshkala/api/products/save) - Instant disk write
     try {
-      await fetch('/api/products/save', {
+      const res = await fetch('/api/products/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(authoritativeProduct),
       });
+      if (!res.ok) {
+        await fetchUniversalApi('products/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(authoritativeProduct),
+        });
+      }
     } catch (e) {
-      console.warn('Persist to /api/products/save notice:', e);
+      try {
+        await fetchUniversalApi('products/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(authoritativeProduct),
+        });
+      } catch {}
     }
 
     // 2. Build authoritative list starting with the active local products
@@ -785,14 +815,29 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
       console.warn('Firestore delete products notice:', fbErr);
     }
 
-    // 5. Delete from server disk via /api/products/delete
+    // 5. Delete from server disk via /api/products/delete & /jaheshkala/api/products/delete
     try {
-      await fetch('/api/products/delete', {
+      const res = await fetch('/api/products/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId: cleanId }),
       });
-    } catch (e) {}
+      if (!res.ok) {
+        await fetchUniversalApi(`products/delete?id=${encodeURIComponent(cleanId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId: cleanId }),
+        });
+      }
+    } catch (e) {
+      try {
+        await fetchUniversalApi(`products/delete?id=${encodeURIComponent(cleanId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId: cleanId }),
+        });
+      } catch {}
+    }
 
     return true;
   } catch (err) {

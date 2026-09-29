@@ -245,43 +245,12 @@
     "title": "بانک جامع اطلاعات مشاغل و اصناف کشور"
   },
   {
-    "gallery": [],
-    "title": "تحریم شکن",
-    "brand": "جهش لاک",
-    "fullDescription": "تحریم شکن",
-    "aiAppPlatform": "windows",
-    "shortDescription": "تحریم شکن",
-    "isGolden": false,
-    "hasCustomPlans": false,
-    "isIncredible": false,
-    "displayOrder": 6,
-    "discountPercent": 90,
-    "deliveryDays": "ارسال در ۱ تا ۳ روز کاری",
     "id": "prod-1789798520429",
-    "pricePerDay": 350000,
-    "category": "کالای دیجیتال",
-    "reviewsCount": 21,
-    "updatedAt": "2026-09-19T06:15:22.994Z",
-    "rating": 5,
-    "isAiAppProduct": true,
-    "warranty": "۷ روز ضمانت بازگشت کالا",
-    "badge": "90% تخفیف",
-    "isPopular": false,
-    "displayRank": 6,
-    "price": 2500000,
+    "title": "تحریم شکن",
+    "category": "نرم‌افزار و سامانه‌های هوشمند",
+    "price": 150000,
     "image": "/uploads/products/prod-1789798520429.webp",
-    "features": [
-      "کیفیت ساخت درجه یک و استاندارد",
-      "دارای گارانتی سلامت فیزیکی",
-      "ارسال با بسته‌بندی ایمن سراسر کشور"
-    ],
-    "aiAppDefaultDays": 7,
-    "isSubscription": true,
-    "targetGuilds": [
-      "دیجیتال مارکتینگ، تبلیغات، برندینگ و شبکه‌های اجتماعی"
-    ],
-    "aiAppName": "تحریم شکن",
-    "guild": "دیجیتال مارکتینگ، تبلیغات، برندینگ و شبکه‌های اجتماعی",
-    "aiAppCustomPromptNote": ""
+    "gallery": [],
+    "updatedAt": "2026-09-29T17:51:26.264Z"
   }
 ]

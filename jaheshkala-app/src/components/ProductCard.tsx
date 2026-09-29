@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Star, Check, ShoppingBag, Eye, Truck, ShieldCheck, Ticket, Images, Zap } from 'lucide-react';
+import { Sparkles, Star, Check, ShoppingBag, Eye, Truck, ShieldCheck, Ticket, Images, Zap, Package } from 'lucide-react';
 import { Product } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
 
@@ -20,6 +20,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     (g) => g && typeof g === 'string' && g.trim() !== '' && g.trim() !== product.image
   );
   const totalImagesCount = (product.image ? 1 : 0) + distinctGallery.length;
+  const displayImage = product.image?.trim() || (distinctGallery.length > 0 ? distinctGallery[0] : '');
   const safePrice = typeof product.price === 'number' && !isNaN(product.price) ? product.price : 0;
   const safeOriginalPrice = typeof product.originalPrice === 'number' && !isNaN(product.originalPrice) ? product.originalPrice : undefined;
 
@@ -33,15 +34,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         onClick={() => onViewDetails(product)}
         className="relative h-36 sm:h-48 rounded-xl overflow-hidden bg-purple-50 dark:bg-[#181138] mb-2 sm:mb-2.5 cursor-pointer border border-purple-100 dark:border-purple-900/20 shrink-0"
       >
-        <img
-          src={product.image || getFallbackProductImage(product.title, product.category)}
-          alt={product.title}
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = getFallbackProductImage(product.title, product.category);
-          }}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          loading="lazy"
-        />
+        {displayImage ? (
+          <img
+            src={displayImage}
+            alt={product.title}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = getFallbackProductImage(product.title, product.category);
+            }}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-gradient-to-br from-purple-950/40 via-purple-900/20 to-indigo-950/40 border border-purple-500/20">
+            <Package className="w-9 h-9 text-purple-400/60 mb-1" />
+            <span className="text-[11px] font-bold text-purple-300/80 line-clamp-1">{product.category}</span>
+            <span className="text-[9px] text-slate-400 mt-0.5">جهش‌کالا</span>
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none"></div>
 
         {/* Digikala-style Top Badges */}
