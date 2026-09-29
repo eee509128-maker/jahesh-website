@@ -719,7 +719,7 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
         if (Array.isArray(parsed) && parsed.length > 0) {
           masterList = parsed
             .map(cleanProductItem)
-            .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
+            .filter((p): p is Product => p !== null && (p.id === product.id || !deletedIds.has(p.id)));
         }
       }
     } catch {}
@@ -2428,15 +2428,10 @@ export const fetchUniversalApi = async (pathOrAction: string, options?: RequestI
   const endpoints = [
     `/api/${endpointPath}${queryPart}`,
     `/jaheshkala/api/${endpointPath}${queryPart}`,
+    `/jaheshkala/api.php${phpQuery}`,
+    `api.php${phpQuery}`,
+    `/api.php${phpQuery}`,
   ];
-
-  if (!endpointPath.startsWith('products')) {
-    endpoints.push(
-      `/jaheshkala/api.php${phpQuery}`,
-      `api.php${phpQuery}`,
-      `/api.php${phpQuery}`
-    );
-  }
 
   for (const url of endpoints) {
     try {

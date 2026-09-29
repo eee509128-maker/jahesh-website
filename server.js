@@ -1199,18 +1199,16 @@ app.get(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.php
     return res.json(readDeletedOrdersFromDisk());
   }
   if (action === 'products' || action === 'get_products' || action === 'api/products') {
-    const deletedIds = new Set(getDeletedProductIds());
     let list = [];
     if (fs.existsSync(PRODUCTS_FILE)) {
       try {
         const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) list = parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
       } catch {}
     }
     if (list.length === 0) list = [...DEFAULT_SERVER_PRODUCTS];
-    const filtered = list.filter((p) => p && p.id && !deletedIds.has(p.id));
-    return res.json(sortProductsByOrder(filtered));
+    return res.json(sortProductsByOrder(list.filter((p) => p && p.id)));
   }
   if (action === 'banners' || action === 'get_banners') {
     return res.json(DEFAULT_SERVER_BANNERS);
