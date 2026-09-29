@@ -1643,7 +1643,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     : 'border-transparent text-amber-400/80 hover:text-amber-300'
                 }`}
               >
-                <Edit className="w-4 h-4 text-amber-400" />
+                <Edit3 className="w-4 h-4 text-amber-400" />
                 <span>ویرایش کالا</span>
               </button>
             )}
