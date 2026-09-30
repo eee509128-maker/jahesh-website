@@ -3,6 +3,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import appAuthHandler from './api/app-auth.js';
+import {
+  readVetDepartments,
+  readVetProfessors,
+  writeVetProfessors,
+  readVetAppointments,
+  writeVetAppointments,
+  performAiVeterinaryTriage
+} from './api/vet-hospital.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -956,6 +964,240 @@ function writeOrdersToDisk(orders) {
     console.error('Error writing orders.json:', e);
   }
 }
+
+// ==========================================
+// Veterinary Faculty Hospital APIs (سامانه جامع بیمارستان دانشکده دامپزشکی)
+// ==========================================
+// GET /api/vet/departments
+app.get(['/api/vet/departments', '/vet-hospital/api/departments'], (_req, res) => {
+  const departments = readVetDepartments();
+  return res.json({ success: true, count: departments.length, departments });
+});
+
+// GET /api/vet/professors
+app.get(['/api/vet/professors', '/vet-hospital/api/professors'], (req, res) => {
+  const { department, status, all } = req.query;
+  let professors = readVetProfessors();
+  if (status && status !== 'all') {
+    professors = professors.filter((p) => p.status === status);
+  }
+  if (department) {
+    professors = professors.filter((p) => p.departmentId === department);
+  }
+  return res.json({ success: true, count: professors.length, professors });
+});
+
+// POST /api/vet/professors/register
+app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register'], (req, res) => {
+  try {
+    const incoming = req.body;
+    if (!incoming || !incoming.name || !incoming.departmentId) {
+      return res.status(400).json({ success: false, error: 'نام استاد و بخش تخصصی الزامی است.' });
+    }
+    const professors = readVetProfessors();
+    const newProf = {
+      id: 'prof-' + Date.now(),
+      name: incoming.name.trim(),
+      academicRank: incoming.academicRank || 'استادیار',
+      departmentId: incoming.departmentId,
+      departmentName: incoming.departmentName || '',
+      subSpecialty: incoming.subSpecialty || '',
+      medicalCouncilNo: incoming.medicalCouncilNo || '',
+      nationalId: incoming.nationalId || '',
+      phone: incoming.phone || '',
+      email: incoming.email || '',
+      avatar: incoming.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
+      bio: incoming.bio || '',
+      visitFee: Number(incoming.visitFee) || 300000,
+      onlineConsultFee: Number(incoming.onlineConsultFee) || 200000,
+      schedule: Array.isArray(incoming.schedule) ? incoming.schedule : ['شنبه تا چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰'],
+      status: 'pending', // Awaiting Management Approval
+      rating: 5.0,
+      totalVisits: 0,
+      badges: ['عضو جدید هیئت علمی'],
+      registeredAt: new Date().toISOString()
+    };
+    professors.unshift(newProf);
+    writeVetProfessors(professors);
+    return res.json({ success: true, professor: newProf, message: 'ثبت‌نام استاد با موفقیت انجام شد و پس از بررسی تیم مدیریت بیمارستان تایید خواهد شد.' });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/vet/professors/verify
+app.post(['/api/vet/professors/verify', '/vet-hospital/api/professors/verify'], (req, res) => {
+  try {
+    const { professorId, status, visitFee, badges } = req.body;
+    if (!professorId || !status) {
+      return res.status(400).json({ success: false, error: 'professorId and status are required' });
+    }
+    const professors = readVetProfessors();
+    const idx = professors.findIndex((p) => p.id === professorId);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, error: 'استاد مورد نظر یافت نشد.' });
+    }
+    professors[idx].status = status;
+    if (visitFee) professors[idx].visitFee = Number(visitFee);
+    if (badges) professors[idx].badges = badges;
+    professors[idx].verifiedAt = new Date().toISOString();
+    writeVetProfessors(professors);
+    return res.json({ success: true, professor: professors[idx], message: `وضعیت استاد به «${status === 'approved' ? 'تایید شده و فعال' : status === 'rejected' ? 'رد شده' : status}» تغییر یافت.` });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/vet/professors/update
+app.post(['/api/vet/professors/update', '/vet-hospital/api/professors/update'], (req, res) => {
+  try {
+    const incoming = req.body;
+    if (!incoming || !incoming.id) {
+      return res.status(400).json({ success: false, error: 'شناسه استاد الزامی است.' });
+    }
+    const professors = readVetProfessors();
+    const idx = professors.findIndex((p) => p.id === incoming.id);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, error: 'استاد یافت نشد.' });
+    }
+    professors[idx] = {
+      ...professors[idx],
+      ...incoming,
+      visitFee: Number(incoming.visitFee) || professors[idx].visitFee,
+      onlineConsultFee: Number(incoming.onlineConsultFee) || professors[idx].onlineConsultFee,
+      updatedAt: new Date().toISOString()
+    };
+    writeVetProfessors(professors);
+    return res.json({ success: true, professor: professors[idx] });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/vet/appointments
+app.get(['/api/vet/appointments', '/vet-hospital/api/appointments'], (_req, res) => {
+  const appointments = readVetAppointments();
+  return res.json({ success: true, count: appointments.length, appointments });
+});
+
+// POST /api/vet/appointments/book
+app.post(['/api/vet/appointments/book', '/vet-hospital/api/appointments/book'], (req, res) => {
+  try {
+    const incoming = req.body;
+    if (!incoming || !incoming.clientName || !incoming.clientPhone || !incoming.professorId) {
+      return res.status(400).json({ success: false, error: 'مشخصات مراجع، بیمار و استاد انتخابی الزامی است.' });
+    }
+    const trackingCode = 'VET-' + (1403 + Math.floor(Math.random() * 2)) + '-' + Math.floor(1000 + Math.random() * 9000);
+    const txnId = 'ZIBAL-TXN-' + Math.floor(10000000 + Math.random() * 90000000);
+    
+    const newAppointment = {
+      id: trackingCode,
+      trackingCode,
+      clientName: incoming.clientName,
+      clientPhone: incoming.clientPhone,
+      clientNationalId: incoming.clientNationalId || '',
+      animalName: incoming.animalName || 'بدون نام',
+      animalType: incoming.animalType || 'حیوان خانگی',
+      animalBreed: incoming.animalBreed || 'نامشخص',
+      animalAge: incoming.animalAge || '',
+      animalGender: incoming.animalGender || '',
+      departmentId: incoming.departmentId || 'internal-small',
+      departmentName: incoming.departmentName || '',
+      professorId: incoming.professorId,
+      professorName: incoming.professorName || '',
+      visitType: incoming.visitType || 'in_person',
+      visitTypeName: incoming.visitType === 'online' ? 'مشاوره آنلاین تخصصی' : 'ویزیت حضوری در کلینیک بیمارستان',
+      appointmentDate: incoming.appointmentDate || new Date().toLocaleDateString('fa-IR'),
+      appointmentTime: incoming.appointmentTime || '۱۰:۰۰ صبح',
+      symptoms: incoming.symptoms || '',
+      aiTriageReport: incoming.aiTriageReport || '',
+      amountPaid: Number(incoming.amountPaid) || 350000,
+      paymentStatus: 'paid',
+      paymentMethod: 'درگاه پرداخت زیپال (Zibal)',
+      transactionId: txnId,
+      visitStatus: 'scheduled',
+      createdAt: new Date().toISOString()
+    };
+
+    const appointments = readVetAppointments();
+    appointments.unshift(newAppointment);
+    writeVetAppointments(appointments);
+
+    // Increment professor totalVisits count
+    const professors = readVetProfessors();
+    const pIdx = professors.findIndex((p) => p.id === incoming.professorId);
+    if (pIdx !== -1) {
+      professors[pIdx].totalVisits = (professors[pIdx].totalVisits || 0) + 1;
+      writeVetProfessors(professors);
+    }
+
+    return res.json({
+      success: true,
+      appointment: newAppointment,
+      trackingCode,
+      transactionId: txnId,
+      message: `نوبت شما با موفقیت در سیستم بیمارستان دانشکده دامپزشکی ثبت شد. کد پیگیری: ${trackingCode}`
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/vet/appointments/status
+app.post(['/api/vet/appointments/status', '/vet-hospital/api/appointments/status'], (req, res) => {
+  try {
+    const { appointmentId, visitStatus, prescription, clinicalNotes } = req.body;
+    if (!appointmentId || !visitStatus) {
+      return res.status(400).json({ success: false, error: 'شناسه نوبت و وضعیت ویزیت الزامی است.' });
+    }
+    const appointments = readVetAppointments();
+    const idx = appointments.findIndex((a) => a.id === appointmentId || a.trackingCode === appointmentId);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, error: 'نوبت یافت نشد.' });
+    }
+    appointments[idx].visitStatus = visitStatus;
+    if (prescription) appointments[idx].prescription = prescription;
+    if (clinicalNotes) appointments[idx].clinicalNotes = clinicalNotes;
+    appointments[idx].updatedAt = new Date().toISOString();
+    writeVetAppointments(appointments);
+    return res.json({ success: true, appointment: appointments[idx] });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/vet/ai-triage
+app.post(['/api/vet/ai-triage', '/vet-hospital/api/ai-triage'], (req, res) => {
+  try {
+    const triageResult = performAiVeterinaryTriage(req.body);
+    return res.json(triageResult);
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/vet/stats
+app.get(['/api/vet/stats', '/vet-hospital/api/stats'], (_req, res) => {
+  const departments = readVetDepartments();
+  const professors = readVetProfessors();
+  const appointments = readVetAppointments();
+  const totalRevenue = appointments
+    .filter((a) => a.paymentStatus === 'paid')
+    .reduce((sum, a) => sum + (Number(a.amountPaid) || 0), 0);
+
+  return res.json({
+    success: true,
+    stats: {
+      departmentsCount: departments.length,
+      totalProfessorsCount: professors.length,
+      approvedProfessorsCount: professors.filter((p) => p.status === 'approved').length,
+      pendingProfessorsCount: professors.filter((p) => p.status === 'pending').length,
+      totalAppointmentsCount: appointments.length,
+      completedVisitsCount: appointments.filter((a) => a.visitStatus === 'completed').length,
+      totalRevenue
+    }
+  });
+});
 
 // GET /api/orders & /jaheshkala/api/orders
 app.get(['/api/orders', '/jaheshkala/api/orders'], (_req, res) => {
@@ -2501,6 +2743,22 @@ app.get(['/amlak.html', '/amlak', '/jaheshkala/amlak.html', '/jaheshkala/amlak']
     }
   }
   return res.status(404).send('صفحه سامانه مدیریت املاک جهش یافت نشد.');
+});
+
+// Serve Veterinary Faculty Hospital static files & SPA entry
+const vetHospitalDir = path.join(__dirname, 'vet-hospital');
+app.use('/vet-hospital', express.static(vetHospitalDir));
+app.get(['/vet-hospital', '/vet-hospital/*'], (req, res, next) => {
+  if (path.extname(req.path)) {
+    return next();
+  }
+  const indexFile = path.join(vetHospitalDir, 'index.html');
+  if (fs.existsSync(indexFile)) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(indexFile);
+  }
+  next();
 });
 
 // Serve jaheshkala static files & SPA entry
