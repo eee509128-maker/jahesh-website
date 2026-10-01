@@ -412,6 +412,9 @@ let state = {
   currentUser: JSON.parse(localStorage.getItem("vet_user") || "null"),
 
   adminActiveTab: "professors",
+  adminUserFilter: "all",
+  adminProfFilter: "all",
+  adminSearchTerm: "",
   cloudUsers: [],
   bookingModalOpen: false,
   triageModalOpen: false,
@@ -1099,29 +1102,30 @@ window.openAdminModal = async function() {
   // دریافت مستقیم و فوق‌سریع از سرور داخلی (بدون نیاز به فیلترشکن - آنی)
   try {
     const [usersRes, profsRes, apptsRes] = await Promise.all([
-      fetch('/api/vet/users').catch(() => null),
-      fetch('/api/vet/professors').catch(() => null),
-      fetch('/api/vet/appointments').catch(() => null)
+      fetchUniversalApi('users', { cache: 'no-store' }).catch(() => null),
+      fetchUniversalApi('professors', { cache: 'no-store' }).catch(() => null),
+      fetchUniversalApi('appointments', { cache: 'no-store' }).catch(() => null)
     ]);
 
     if (usersRes && usersRes.ok) {
-      const uData = await usersRes.json();
-      if (uData && Array.isArray(uData.users) && uData.users.length > 0) {
+      const uData = await usersRes.json().catch(() => null);
+      if (uData && Array.isArray(uData.users)) {
         state.cloudUsers = uData.users;
         saveStoredUsers(uData.users);
       }
     }
     if (profsRes && profsRes.ok) {
-      const pData = await profsRes.json();
-      if (pData && Array.isArray(pData.professors) && pData.professors.length > 0) {
+      const pData = await profsRes.json().catch(() => null);
+      if (pData && Array.isArray(pData.professors)) {
         state.professors = pData.professors;
         saveStoredProfessors(pData.professors);
       }
     }
     if (apptsRes && apptsRes.ok) {
-      const aData = await apptsRes.json();
+      const aData = await apptsRes.json().catch(() => null);
       if (aData && Array.isArray(aData.appointments)) {
         state.appointments = aData.appointments;
+        try { localStorage.setItem("vet_appointments", JSON.stringify(aData.appointments)); } catch(e){}
       }
     }
     renderApp();
@@ -1138,37 +1142,53 @@ window.setAdminActiveTab = function(tab) {
   renderApp();
 };
 
+window.setAdminUserFilter = function(filter) {
+  state.adminUserFilter = filter;
+  renderApp();
+};
+
+window.setAdminProfFilter = function(filter) {
+  state.adminProfFilter = filter;
+  renderApp();
+};
+
+window.setAdminSearchTerm = function(term) {
+  state.adminSearchTerm = term;
+  renderApp();
+};
+
 window.refreshCloudData = async function() {
   try {
     const [usersRes, profsRes, apptsRes] = await Promise.all([
-      fetch('/api/vet/users').catch(() => null),
-      fetch('/api/vet/professors').catch(() => null),
-      fetch('/api/vet/appointments').catch(() => null)
+      fetchUniversalApi('users', { cache: 'no-store' }).catch(() => null),
+      fetchUniversalApi('professors', { cache: 'no-store' }).catch(() => null),
+      fetchUniversalApi('appointments', { cache: 'no-store' }).catch(() => null)
     ]);
 
     if (usersRes && usersRes.ok) {
-      const uData = await usersRes.json();
-      if (uData && Array.isArray(uData.users) && uData.users.length > 0) {
+      const uData = await usersRes.json().catch(() => null);
+      if (uData && Array.isArray(uData.users)) {
         state.cloudUsers = uData.users;
         saveStoredUsers(uData.users);
       }
     }
     if (profsRes && profsRes.ok) {
-      const pData = await profsRes.json();
-      if (pData && Array.isArray(pData.professors) && pData.professors.length > 0) {
+      const pData = await profsRes.json().catch(() => null);
+      if (pData && Array.isArray(pData.professors)) {
         state.professors = pData.professors;
         saveStoredProfessors(pData.professors);
       }
     }
     if (apptsRes && apptsRes.ok) {
-      const aData = await apptsRes.json();
+      const aData = await apptsRes.json().catch(() => null);
       if (aData && Array.isArray(aData.appointments)) {
         state.appointments = aData.appointments;
+        try { localStorage.setItem("vet_appointments", JSON.stringify(aData.appointments)); } catch(e){}
       }
     }
 
     renderApp();
-    alert("اطلاعات آنلاین سامانه بدون نیاز به فیلترشکن با موفقیت به‌روزرسانی شد.");
+    if (window.confetti) window.confetti({ particleCount: 60, spread: 70 });
   } catch (e) {
     alert("خطا در به‌روزرسانی: " + e.message);
   }
@@ -2214,12 +2234,102 @@ function renderAdminModal() {
   const tab = state.adminActiveTab || 'professors';
   const totalVisits = state.appointments.length;
   const totalRevenue = state.appointments.reduce((sum, a) => sum + (Number(a.amountPaid) || 0), 0);
-  const allUsersList = state.cloudUsers && state.cloudUsers.length > 0 ? state.cloudUsers : getStoredUsers();
+
+  // ادغام جامع تمام کاربران از کلود، حافظه محلی و اساتید ثبت‌نام شده
+  const rawUsers = state.cloudUsers && state.cloudUsers.length > 0 ? state.cloudUsers : getStoredUsers();
+  const userMap = new Map();
+  rawUsers.forEach(u => {
+    if (u && (u.username || u.id)) userMap.set(String(u.username || u.id).toLowerCase(), u);
+  });
+
+  // اطمینان از حضور تمام اساتید در لیست کاربران
+  (state.professors || []).forEach(p => {
+    if (p && (p.username || p.id)) {
+      const key = String(p.username || p.id).toLowerCase();
+      if (!userMap.has(key)) {
+        const isPhd = p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && p.academicRank.includes('PhD')) || (p.academicRank && p.academicRank.includes('دکتری'));
+        userMap.set(key, {
+          id: p.id,
+          username: p.username || p.id,
+          name: p.name,
+          fullName: p.name,
+          phone: p.phone || '',
+          email: p.email || '',
+          role: isPhd ? 'phd' : 'doctor',
+          academicRank: p.academicRank,
+          departmentId: p.departmentId,
+          departmentName: p.departmentName,
+          medicalCouncilNo: p.medicalCouncilNo || p.studentNo || '',
+          createdAt: p.registeredAt || '۱۴۰۵'
+        });
+      }
+    }
+  });
+
+  const allUsersList = Array.from(userMap.values());
   const pendingDoctorsCount = state.professors.filter(p => p.status !== 'approved' && !p.isApproved).length;
+
+  // فیلترهای اساتید
+  const profFilter = state.adminProfFilter || 'all';
+  const userFilter = state.adminUserFilter || 'all';
+  const searchTerm = (state.adminSearchTerm || '').trim().toLowerCase();
+
+  const totalProfsCount = state.professors.length;
+  const facultyProfsCount = state.professors.filter(p => !p.badges?.includes('دستیار تخصصی PhD') && (!p.academicRank || (!p.academicRank.includes('PhD') && !p.academicRank.includes('دکتری')))).length;
+  const phdProfsCount = state.professors.filter(p => p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && (p.academicRank.includes('PhD') || p.academicRank.includes('دکتری')))).length;
+
+  let filteredProfessors = state.professors.filter(p => {
+    const isPhd = p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && (p.academicRank.includes('PhD') || p.academicRank.includes('دکتری')));
+    const isApproved = p.status === 'approved' || p.isApproved;
+
+    if (profFilter === 'faculty' && isPhd) return false;
+    if (profFilter === 'phd' && !isPhd) return false;
+    if (profFilter === 'pending' && isApproved) return false;
+    if (profFilter === 'approved' && !isApproved) return false;
+
+    if (searchTerm) {
+      const matchName = (p.name || '').toLowerCase().includes(searchTerm);
+      const matchUser = (p.username || '').toLowerCase().includes(searchTerm);
+      const matchDept = (p.departmentName || '').toLowerCase().includes(searchTerm);
+      const matchRank = (p.academicRank || '').toLowerCase().includes(searchTerm);
+      const matchMed = (p.medicalCouncilNo || '').toLowerCase().includes(searchTerm);
+      const matchPhone = (p.phone || '').includes(searchTerm);
+      return matchName || matchUser || matchDept || matchRank || matchMed || matchPhone;
+    }
+    return true;
+  });
+
+  // فیلترهای کاربران
+  const totalDoctorsUsers = allUsersList.filter(u => u.role === 'doctor' || (u.academicRank && !u.academicRank.includes('PhD'))).length;
+  const totalPhdUsers = allUsersList.filter(u => u.role === 'phd' || (u.academicRank && (u.academicRank.includes('PhD') || u.academicRank.includes('دکتری')))).length;
+  const totalClientUsers = allUsersList.filter(u => !u.role || u.role === 'client' || u.role === 'user').length;
+  const totalAdminUsers = allUsersList.filter(u => u.role === 'admin' || u.isAdmin).length;
+
+  let filteredUsers = allUsersList.filter(u => {
+    const isDoctor = u.role === 'doctor' || (u.academicRank && !u.academicRank.includes('PhD') && !u.academicRank.includes('دکتری'));
+    const isPhd = u.role === 'phd' || (u.academicRank && (u.academicRank.includes('PhD') || u.academicRank.includes('دکتری')));
+    const isAdmin = u.role === 'admin' || u.isAdmin;
+    const isClient = !isDoctor && !isPhd && !isAdmin;
+
+    if (userFilter === 'doctor' && !isDoctor) return false;
+    if (userFilter === 'phd' && !isPhd) return false;
+    if (userFilter === 'client' && !isClient) return false;
+    if (userFilter === 'admin' && !isAdmin) return false;
+
+    if (searchTerm) {
+      const matchName = (u.name || u.fullName || '').toLowerCase().includes(searchTerm);
+      const matchUser = (u.username || '').toLowerCase().includes(searchTerm);
+      const matchPhone = (u.phone || '').includes(searchTerm);
+      const matchEmail = (u.email || '').toLowerCase().includes(searchTerm);
+      const matchDept = (u.departmentName || '').toLowerCase().includes(searchTerm);
+      return matchName || matchUser || matchPhone || matchEmail || matchDept;
+    }
+    return true;
+  });
 
   return `
     <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4">
-      <div class="bg-[#0f172a] border border-amber-500/50 w-full max-w-5xl rounded-3xl p-5 sm:p-7 shadow-2xl relative text-right max-h-[92vh] flex flex-col">
+      <div class="bg-[#0f172a] border border-amber-500/50 w-full max-w-6xl rounded-3xl p-5 sm:p-7 shadow-2xl relative text-right max-h-[94vh] flex flex-col">
         
         <!-- هدر پنل مدیریت با برچسب آنلاین ابری دقیق مانند جهش کالا -->
         <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4 shrink-0">
@@ -2232,17 +2342,17 @@ function renderAdminModal() {
                 <h3 class="text-base sm:text-lg font-black text-white">پنل مدیریت یکپارچه بیمارستان دامپزشکی</h3>
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-500/50 text-[10px] text-emerald-300 font-bold">
                   <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  متصل به ابر آنلاین فایربیس (جهانی)
+                  همگام‌سازی زنده و آنی (بدون فیلترشکن)
                 </span>
               </div>
-              <p class="text-xs text-amber-400 mt-0.5">مدیریت اعضای هیئت علمی، تایید فوری پزشکان، کاربران آنلاین و نوبت‌ها</p>
+              <p class="text-xs text-amber-400 mt-0.5">مدیریت اعضای هیئت علمی، دانشجویان دکتری (PhD)، مراجعین و نوبت‌ها</p>
             </div>
           </div>
           
           <div class="flex items-center gap-2">
-            <button onclick="refreshCloudData()" title="به‌روزرسانی داده‌ها از ابر" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs border border-slate-700 transition-all cursor-pointer">
+            <button onclick="refreshCloudData()" title="به‌روزرسانی داده‌ها" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs border border-slate-700 transition-all cursor-pointer">
               <span>🔄</span>
-              <span class="hidden sm:inline">بروزرسانی از ابر</span>
+              <span class="hidden sm:inline">بروزرسانی داده‌ها</span>
             </button>
             <button onclick="closeAdminModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all text-sm border border-slate-700 cursor-pointer">
               ✕
@@ -2257,12 +2367,12 @@ function renderAdminModal() {
             <div class="text-base sm:text-lg font-black text-emerald-400 font-mono">${state.professors.length} نفر</div>
           </div>
           <div class="p-3 rounded-2xl bg-slate-800/80 border border-slate-700">
-            <div class="text-[11px] text-slate-400 mb-0.5">در انتظار تایید مدیریت:</div>
-            <div class="text-base sm:text-lg font-black text-amber-400 font-mono">${pendingDoctorsCount} پزشک</div>
+            <div class="text-[11px] text-slate-400 mb-0.5">دانشجویان و دستیاران PhD:</div>
+            <div class="text-base sm:text-lg font-black text-cyan-400 font-mono">${phdProfsCount + totalPhdUsers} نفر</div>
           </div>
           <div class="p-3 rounded-2xl bg-slate-800/80 border border-slate-700">
-            <div class="text-[11px] text-slate-400 mb-0.5">کاربران ثبت‌نامی:</div>
-            <div class="text-base sm:text-lg font-black text-cyan-400 font-mono">${allUsersList.length} کاربر</div>
+            <div class="text-[11px] text-slate-400 mb-0.5">کل کاربران ثبت‌نامی:</div>
+            <div class="text-base sm:text-lg font-black text-amber-300 font-mono">${allUsersList.length} کاربر</div>
           </div>
           <div class="p-3 rounded-2xl bg-slate-800/80 border border-slate-700">
             <div class="text-[11px] text-slate-400 mb-0.5">مجموع نوبت‌های ویزیت:</div>
@@ -2270,14 +2380,14 @@ function renderAdminModal() {
           </div>
         </div>
 
-        <!-- تب‌های پنل دقیق مثل جهش‌کالا -->
-        <div class="flex rounded-2xl bg-slate-900/90 p-1.5 mb-4 border border-slate-800 gap-1.5 shrink-0 overflow-x-auto">
+        <!-- تب‌های اصلی پنل -->
+        <div class="flex rounded-2xl bg-slate-900/90 p-1.5 mb-3 border border-slate-800 gap-1.5 shrink-0 overflow-x-auto">
           <button onclick="setAdminActiveTab('professors')" class="flex-1 min-w-[140px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${tab === 'professors' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' : 'text-slate-400 hover:text-white'}">
             <span>🩺 اساتید و پزشکان (${state.professors.length})</span>
             ${pendingDoctorsCount > 0 ? `<span class="bg-amber-400 text-black text-[10px] font-black px-1.5 py-0.2 rounded-full animate-bounce">${pendingDoctorsCount}</span>` : ''}
           </button>
           <button onclick="setAdminActiveTab('users')" class="flex-1 min-w-[140px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${tab === 'users' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' : 'text-slate-400 hover:text-white'}">
-            <span>👥 کاربران آنلاین (${allUsersList.length})</span>
+            <span>👥 همه کاربران آنلاین (${allUsersList.length})</span>
           </button>
           <button onclick="setAdminActiveTab('appointments')" class="flex-1 min-w-[140px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${tab === 'appointments' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' : 'text-slate-400 hover:text-white'}">
             <span>📋 نوبت‌های ثبت‌شده (${totalVisits})</span>
@@ -2293,37 +2403,83 @@ function renderAdminModal() {
           <!-- ۱. تب اساتید و پزشکان -->
           ${tab === 'professors' ? `
             <div class="space-y-4">
-              <div class="flex items-center justify-between flex-wrap gap-2">
-                <div class="text-xs text-slate-300">
-                  اساتید ثبت‌نام شده (به محض تایید، بلافاصله برای تمامی مشتریان در سراسر جهان در صفحه اصلی و نوبت‌دهی نمایش داده می‌شوند):
+              
+              <!-- ردیف فیلتر و جستجو -->
+              <div class="flex items-center justify-between flex-wrap gap-3 bg-slate-900/70 p-3 rounded-2xl border border-slate-800">
+                
+                <!-- فیلترهای دسته‌بندی اساتید -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <button onclick="setAdminProfFilter('all')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${profFilter === 'all' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                    همه (${totalProfsCount})
+                  </button>
+                  <button onclick="setAdminProfFilter('faculty')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${profFilter === 'faculty' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                    🩺 هیئت علمی (${facultyProfsCount})
+                  </button>
+                  <button onclick="setAdminProfFilter('phd')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${profFilter === 'phd' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                    🎓 دانشجویان دکتری PhD (${phdProfsCount})
+                  </button>
+                  ${pendingDoctorsCount > 0 ? `
+                    <button onclick="setAdminProfFilter('pending')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${profFilter === 'pending' ? 'bg-amber-500 text-black font-black' : 'bg-amber-950/60 text-amber-300 border border-amber-500/40'}">
+                      ⏳ در انتظار تایید (${pendingDoctorsCount})
+                    </button>
+                  ` : ''}
                 </div>
-                <button onclick="openAuthModal('register')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-1.5">
-                  <span>+</span>
-                  <span>ثبت‌نام پزشک جدید</span>
-                </button>
+
+                <!-- باکس جستجو و دکمه افزودن -->
+                <div class="flex items-center gap-2 flex-1 min-w-[260px] justify-end">
+                  <input type="text" placeholder="جستجوی نام استاد، کد نظام، دپارتمان، تلفن..." value="${state.adminSearchTerm}" oninput="setAdminSearchTerm(this.value)" class="w-full max-w-xs bg-slate-800 border border-slate-700 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500" />
+                  <button onclick="openAuthModal('register')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-md cursor-pointer whitespace-nowrap flex items-center gap-1">
+                    <span>+</span>
+                    <span>ثبت پزشک/دانشجو</span>
+                  </button>
+                </div>
+
               </div>
 
+              <!-- لیست اساتید -->
               <div class="space-y-3">
-                ${state.professors.map(prof => {
+                ${filteredProfessors.length > 0 ? filteredProfessors.map(prof => {
+                  const isPhd = prof.badges?.includes('دستیار تخصصی PhD') || (prof.academicRank && (prof.academicRank.includes('PhD') || prof.academicRank.includes('دکتری')));
                   const isApproved = prof.status === 'approved' || prof.isApproved;
                   return `
                     <div class="p-4 rounded-2xl bg-slate-800/90 border ${isApproved ? 'border-emerald-500/40' : 'border-amber-500/70 bg-amber-950/20'} flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div class="flex items-start gap-3 min-w-0">
-                        <img src="${prof.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80'}" class="w-12 h-12 rounded-xl object-cover border border-slate-700 shrink-0" />
+                        <img src="${prof.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80'}" class="w-13 h-13 rounded-2xl object-cover border border-slate-700 shrink-0" />
                         <div class="min-w-0">
                           <div class="font-bold text-white text-xs flex items-center gap-2 flex-wrap">
-                            <span>${prof.name}</span>
-                            <span class="text-[10px] px-2 py-0.5 rounded-md font-bold ${isApproved ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500 text-black animate-pulse'}">
-                              ${isApproved ? '✓ تایید شده و فعال در سایت' : '⏳ در انتظار تایید مدیریت'}
+                            <span class="text-sm">${prof.name}</span>
+                            
+                            ${isPhd ? `
+                              <span class="text-[10px] px-2 py-0.5 rounded-md font-bold bg-cyan-950 text-cyan-300 border border-cyan-500/40">
+                                🎓 دانشجوی دکتری تخصصی (PhD)
+                              </span>
+                            ` : `
+                              <span class="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                                🩺 عضو هیئت علمی / استادیار
+                              </span>
+                            `}
+
+                            <span class="text-[10px] px-2 py-0.5 rounded-md font-bold ${isApproved ? 'bg-emerald-900/60 text-emerald-200 border border-emerald-500/30' : 'bg-amber-500 text-black animate-pulse'}">
+                              ${isApproved ? '✓ فعال و منتشر در سایت' : '⏳ در انتظار تایید مدیریت'}
                             </span>
                           </div>
-                          <div class="text-[11px] text-slate-300 mt-0.5">${prof.academicRank} - ${prof.departmentName || prof.departmentId}</div>
-                          <div class="text-[10px] text-slate-400 mt-0.5">
-                            🕒 ساعات حضور: <span class="text-white">${Array.isArray(prof.schedule) ? prof.schedule[0] : (prof.schedule || 'شنبه تا چهارشنبه')}</span> | 
-                            💵 تعرفه ویزیت: <span class="text-emerald-400 font-bold">${formatPrice(prof.visitFee)}</span> | 
-                            💻 آنلاین: <span class="text-emerald-400 font-bold">${formatPrice(prof.onlineConsultFee || 250000)}</span>
+
+                          <div class="text-[11px] text-slate-300 mt-1">
+                            <strong>${prof.academicRank || (isPhd ? 'دانشجوی PhD' : 'استادیار')}</strong> - ${prof.departmentName || prof.departmentId} ${prof.subSpecialty ? `(${prof.subSpecialty})` : ''}
                           </div>
-                          ${prof.username ? `<div class="text-[10px] text-slate-400 mt-0.5 font-mono">نام کاربری: ${prof.username} ${prof.medicalCouncilNo ? `| ن.د: ${prof.medicalCouncilNo}` : ''} ${prof.phone ? `| همراه: ${prof.phone}` : ''}</div>` : ''}
+
+                          <div class="text-[10px] text-slate-400 mt-1">
+                            🕒 ساعت حضور: <span class="text-white">${Array.isArray(prof.schedule) ? prof.schedule[0] : (prof.schedule || 'شنبه تا چهارشنبه')}</span> | 
+                            💵 تعرفه ویزیت حضوری: <span class="text-emerald-400 font-bold">${formatPrice(prof.visitFee)}</span> | 
+                            💻 ویزیت آنلاین: <span class="text-emerald-400 font-bold">${formatPrice(prof.onlineConsultFee || 250000)}</span>
+                          </div>
+
+                          <div class="text-[10px] text-slate-400 mt-1 font-mono flex items-center gap-3 flex-wrap">
+                            ${prof.username ? `<span>👤 نام کاربری: <strong class="text-white">${prof.username}</strong></span>` : ''}
+                            ${prof.medicalCouncilNo ? `<span>🆔 ن.د / ش.دانشجویی: <strong class="text-amber-300">${prof.medicalCouncilNo}</strong></span>` : ''}
+                            ${prof.phone ? `<span>📞 همراه: <strong class="text-slate-300">${prof.phone}</strong></span>` : ''}
+                            ${prof.email ? `<span>✉️ ایمیل: <strong class="text-slate-300">${prof.email}</strong></span>` : ''}
+                          </div>
                         </div>
                       </div>
 
@@ -2344,33 +2500,65 @@ function renderAdminModal() {
                       </div>
                     </div>
                   `;
-                }).join('')}
+                }).join('') : `
+                  <div class="text-center py-12 text-xs text-slate-400 bg-slate-800/30 rounded-2xl border border-slate-700">
+                    پزشک یا استادی با این فیلتر یا عبارت جستجو یافت نشد.
+                  </div>
+                `}
               </div>
             </div>
           ` : ''}
 
-          <!-- ۲. تب کاربران ثبت‌نامی آنلاین در سراسر جهان -->
+          <!-- ۲. تب همه کاربران ثبت‌نامی در سراسر جهان -->
           ${tab === 'users' ? `
             <div class="space-y-4">
-              <div class="text-xs text-slate-300">
-                لیست کاربرانی که از سراسر جهان در سامانه ثبت‌نام کرده‌اند (همگام با پایگاه داده ابری فایربیس):
+              
+              <!-- ردیف فیلتر و جستجوی کاربران -->
+              <div class="flex items-center justify-between flex-wrap gap-3 bg-slate-900/70 p-3 rounded-2xl border border-slate-800">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <button onclick="setAdminUserFilter('all')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${userFilter === 'all' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                    همه (${allUsersList.length})
+                  </button>
+                  <button onclick="setAdminUserFilter('doctor')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${userFilter === 'doctor' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                    🩺 اساتید و پزشکان (${totalDoctorsUsers})
+                  </button>
+                  <button onclick="setAdminUserFilter('phd')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${userFilter === 'phd' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                    🎓 دانشجویان PhD (${totalPhdUsers})
+                  </button>
+                  <button onclick="setAdminUserFilter('client')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${userFilter === 'client' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                    🐾 مراجعین (${totalClientUsers})
+                  </button>
+                  <button onclick="setAdminUserFilter('admin')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${userFilter === 'admin' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400 hover:text-white'}">
+                    👑 مدیران (${totalAdminUsers})
+                  </button>
+                </div>
+
+                <div class="flex-1 min-w-[240px] max-w-sm">
+                  <input type="text" placeholder="جستجوی نام، نام کاربری، شماره همراه یا ایمیل..." value="${state.adminSearchTerm}" oninput="setAdminSearchTerm(this.value)" class="w-full bg-slate-800 border border-slate-700 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500" />
+                </div>
               </div>
 
+              <!-- جدول کاربران -->
               <div class="overflow-x-auto rounded-2xl border border-slate-800">
                 <table class="w-full text-right text-xs">
                   <thead class="bg-slate-800/90 text-slate-300 border-b border-slate-700">
                     <tr>
                       <th class="p-3">نام و نام خانوادگی</th>
                       <th class="p-3">نام کاربری</th>
-                      <th class="p-3">شماره همراه</th>
-                      <th class="p-3">نقش کاربری</th>
+                      <th class="p-3">شماره همراه / ایمیل</th>
+                      <th class="p-3">نقش و مرتبه علمی</th>
+                      <th class="p-3">دپارتمان / نظام پزشکی</th>
                       <th class="p-3">تاریخ ثبت</th>
                       <th class="p-3 text-center">عملیات</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-800 bg-slate-900/50">
-                    ${allUsersList.map(u => {
+                    ${filteredUsers.length > 0 ? filteredUsers.map(u => {
                       const isMaster = (u.username || '').toLowerCase() === 'jahesh1395@gmail.com' || (u.email || '').toLowerCase() === 'jahesh1395@gmail.com' || u.id === 'usr-jahesh-master';
+                      const isDoc = u.role === 'doctor' || (u.academicRank && !u.academicRank.includes('PhD') && !u.academicRank.includes('دکتری'));
+                      const isPhd = u.role === 'phd' || (u.academicRank && (u.academicRank.includes('PhD') || u.academicRank.includes('دکتری')));
+                      const isAdmin = u.role === 'admin' || u.isAdmin;
+
                       return `
                         <tr class="hover:bg-slate-800/50 transition-colors">
                           <td class="p-3 font-bold text-white flex items-center gap-2">
@@ -2378,11 +2566,19 @@ function renderAdminModal() {
                             ${isMaster ? '<span class="text-[9px] bg-amber-500 text-black font-black px-1.5 py-0.5 rounded">مدیر ارشد</span>' : ''}
                           </td>
                           <td class="p-3 font-mono text-slate-300">${u.username || u.email || '—'}</td>
-                          <td class="p-3 font-mono text-slate-300">${u.phone || '—'}</td>
+                          <td class="p-3 font-mono text-slate-300">
+                            <div>${u.phone || '—'}</div>
+                            ${u.email ? `<div class="text-[10px] text-slate-500">${u.email}</div>` : ''}
+                          </td>
                           <td class="p-3">
-                            <span class="px-2 py-0.5 rounded text-[10px] ${u.role === 'admin' ? 'bg-amber-950 text-amber-300 border border-amber-500/40' : (u.role === 'doctor' || u.role === 'phd' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-400')}">
-                              ${u.role === 'admin' ? 'مدیریت کل' : (u.role === 'doctor' ? 'پزشک متخصص' : (u.role === 'phd' ? 'دستیار PhD' : 'مراجعه‌کننده'))}
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isAdmin ? 'bg-amber-950 text-amber-300 border border-amber-500/40' : (isDoc ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : (isPhd ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/40' : 'bg-slate-800 text-slate-400'))}">
+                              ${isAdmin ? '👑 مدیر ارشد' : (isDoc ? '🩺 عضو هیئت علمی / پزشک' : (isPhd ? '🎓 دانشجوی دکتری (PhD)' : '🐾 مراجعه‌کننده'))}
                             </span>
+                            ${u.academicRank ? `<div class="text-[10px] text-slate-400 mt-0.5">${u.academicRank}</div>` : ''}
+                          </td>
+                          <td class="p-3 text-[11px] text-slate-300">
+                            <div>${u.departmentName || u.departmentId || '—'}</div>
+                            ${u.medicalCouncilNo ? `<div class="text-[10px] text-amber-400/90 font-mono">نظام: ${u.medicalCouncilNo}</div>` : ''}
                           </td>
                           <td class="p-3 text-slate-400 text-[11px]">${u.createdAt || '۱۴۰۵'}</td>
                           <td class="p-3 text-center">
@@ -2394,7 +2590,11 @@ function renderAdminModal() {
                           </td>
                         </tr>
                       `;
-                    }).join('')}
+                    }).join('') : `
+                      <tr>
+                        <td colspan="7" class="text-center py-10 text-xs text-slate-400">کاربری با این مشخصات یافت نشد.</td>
+                      </tr>
+                    `}
                   </tbody>
                 </table>
               </div>
@@ -2760,13 +2960,13 @@ async function initApp() {
   // ۲. مدیریت اتصال ابری فایربیس (سرور داخلی جهش‌کالا وظیفه سینک زنده را بر عهده دارد، لذا نیازی به خواندن مستقیم کلاینت از فایربیس نیست)
   console.log("سامانه بیمارستان تخصصی با موفقیت از سرور داخلی بارگذاری گردید.");
 
-  // ۳. نظارت مداوم و پولینگ پنل مدیریت (دقیقاً مثل جهش‌کالا: هر ۴ ثانیه در صورت باز بودن پنل)
+  // ۳. نظارت مداوم و پولینگ پنل مدیریت (دقیقاً مثل جهش‌کالا: هر ۲ ثانیه در صورت باز بودن پنل)
   setInterval(() => {
     if (state.adminModalOpen) {
       Promise.all([
-        fetchUniversalApi('users').then(r => r && r.ok ? r.json() : null).catch(() => null),
-        fetchUniversalApi('professors').then(r => r && r.ok ? r.json() : null).catch(() => null),
-        fetchUniversalApi('appointments').then(r => r && r.ok ? r.json() : null).catch(() => null)
+        fetchUniversalApi('users', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null),
+        fetchUniversalApi('professors', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null),
+        fetchUniversalApi('appointments', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null)
       ]).then(([uData, pData, aData]) => {
         let changed = false;
         if (uData && Array.isArray(uData.users)) {
@@ -2798,7 +2998,7 @@ async function initApp() {
         if (changed) renderApp();
       }).catch(() => {});
     }
-  }, 4000);
+  }, 2000);
 }
 
 if (typeof document !== "undefined") {

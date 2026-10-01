@@ -1306,12 +1306,38 @@ app.get(['/api/vet/users', '/vet-hospital/api/users'], (_req, res) => {
   try {
     const vetUsers = readVetUsers();
     const universalUsers = readUsersFromDisk();
+    const professors = readVetProfessors();
     const mergedMap = new Map();
+
     universalUsers.forEach((u) => {
-      if (u && (u.id || u.username)) mergedMap.set(u.username || u.id, u);
+      if (u && (u.id || u.username)) mergedMap.set(String(u.username || u.id).toLowerCase(), u);
     });
     vetUsers.forEach((u) => {
-      if (u && (u.id || u.username)) mergedMap.set(u.username || u.id, u);
+      if (u && (u.id || u.username)) mergedMap.set(String(u.username || u.id).toLowerCase(), u);
+    });
+    professors.forEach((p) => {
+      if (p && (p.username || p.id)) {
+        const key = String(p.username || p.id).toLowerCase();
+        const existing = mergedMap.get(key) || {};
+        mergedMap.set(key, {
+          ...existing,
+          id: p.id || existing.id,
+          username: p.username || existing.username,
+          name: p.name || existing.name || existing.fullName,
+          fullName: p.name || existing.fullName || existing.name,
+          phone: p.phone || existing.phone,
+          email: p.email || existing.email,
+          role: p.badges?.includes('دستیار تخصصی PhD') || p.academicRank?.includes('PhD') || p.academicRank?.includes('دکتری') ? 'phd' : 'doctor',
+          academicRank: p.academicRank || existing.academicRank,
+          departmentId: p.departmentId || existing.departmentId,
+          departmentName: p.departmentName || existing.departmentName,
+          medicalCouncilNo: p.medicalCouncilNo || existing.medicalCouncilNo,
+          studentNo: p.studentNo || existing.studentNo,
+          avatar: p.avatar || existing.avatar,
+          createdAt: p.registeredAt || existing.createdAt || '۱۴۰۵',
+          updatedAt: p.updatedAt || existing.updatedAt || new Date().toISOString()
+        });
+      }
     });
     const users = Array.from(mergedMap.values());
     return res.json({ success: true, count: users.length, users });
@@ -1334,14 +1360,20 @@ app.post(['/api/vet/users/delete', '/vet-hospital/api/users/delete'], (req, res)
     vetUsers = vetUsers.filter((u) => u.id !== id && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
     writeVetUsers(vetUsers);
 
-    // 2. Remove from universal users
+    // 2. Remove from vet professors if matched
+    let professors = readVetProfessors();
+    professors = professors.filter((p) => p.id !== id && (!cleanU || (p.username || '').toLowerCase() !== cleanU));
+    writeVetProfessors(professors);
+
+    // 3. Remove from universal users
     let universal = readUsersFromDisk();
     universal = universal.filter((u) => u.id !== id && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
     writeUsersToDisk(universal);
 
-    // 3. Remove from Firestore cloud database
+    // 4. Remove from Firestore cloud database
     try {
       if (id) deleteDoc(doc(serverDb, 'users', id)).catch(() => {});
+      if (id) deleteDoc(doc(serverDb, 'professors', id)).catch(() => {});
     } catch (e) {}
 
     return res.json({ success: true, message: 'کاربر با موفقیت حذف گردید.' });
@@ -1358,15 +1390,67 @@ app.get(['/api/vet/departments', '/vet-hospital/api/departments'], (_req, res) =
 
 // GET /api/vet/professors
 app.get(['/api/vet/professors', '/vet-hospital/api/professors'], (req, res) => {
-  const { department, status, all } = req.query;
-  let professors = readVetProfessors();
-  if (status && status !== 'all') {
-    professors = professors.filter((p) => p.status === status);
+  try {
+    const { department, status, all } = req.query;
+    let professors = readVetProfessors();
+    const vetUsers = readVetUsers();
+
+    // Auto-synthesize and merge any doctor or phd users into professors
+    const profMap = new Map();
+    professors.forEach((p) => {
+      if (p && (p.id || p.username)) {
+        profMap.set(String(p.username || p.id).toLowerCase(), p);
+      }
+    });
+
+    vetUsers.forEach((u) => {
+      if (u && (u.role === 'doctor' || u.role === 'phd' || u.academicRank || u.medicalCouncilNo)) {
+        const key = String(u.username || u.id || '').toLowerCase();
+        if (key && !profMap.has(key)) {
+          const isPhd = u.role === 'phd' || (u.academicRank && u.academicRank.includes('PhD')) || (u.academicRank && u.academicRank.includes('دکتری'));
+          const synthesized = {
+            id: u.id ? (u.id.startsWith('prof-') ? u.id : 'prof-' + u.id) : ('prof-' + Date.now()),
+            username: u.username || u.email || u.phone || '',
+            password: u.password || '123456',
+            name: u.name || u.fullName || 'استاد / پزشک',
+            academicRank: u.academicRank || (isPhd ? 'دانشجوی دکتری تخصصی (PhD) / دستیار' : 'استادیار'),
+            departmentId: u.departmentId || 'surgery-anesthesia',
+            departmentName: u.departmentName || 'بخش جراحی، ارتوپدی و بیهوشی',
+            subSpecialty: u.subSpecialty || (isPhd ? 'پژوهشگر دکتری تخصصی' : 'متخصص بالینی'),
+            medicalCouncilNo: u.medicalCouncilNo || u.studentNo || '',
+            phone: u.phone || '',
+            email: u.email || '',
+            avatar: u.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
+            bio: u.bio || 'عضو کادر تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد.',
+            visitFee: Number(u.visitFee) || (isPhd ? 280000 : 380000),
+            onlineConsultFee: Number(u.onlineConsultFee) || 220000,
+            workDays: u.workDays || ['شنبه', 'دوشنبه', 'چهارشنبه'],
+            workHours: u.workHours || '۰۹:۰۰ الی ۱۳:۰۰',
+            schedule: u.schedule || ['شنبه، دوشنبه، چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰'],
+            status: u.status || 'approved',
+            isApproved: true,
+            rating: 5.0,
+            totalVisits: u.totalVisits || 0,
+            badges: u.badges || [isPhd ? 'دستیار تخصصی PhD' : 'عضو هیئت علمی'],
+            registeredAt: u.createdAt || new Date().toISOString(),
+            updatedAt: u.updatedAt || new Date().toISOString()
+          };
+          profMap.set(key, synthesized);
+        }
+      }
+    });
+
+    let result = Array.from(profMap.values());
+    if (status && status !== 'all') {
+      result = result.filter((p) => p.status === status);
+    }
+    if (department) {
+      result = result.filter((p) => p.departmentId === department);
+    }
+    return res.json({ success: true, count: result.length, professors: result });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
-  if (department) {
-    professors = professors.filter((p) => p.departmentId === department);
-  }
-  return res.json({ success: true, count: professors.length, professors });
 });
 
 // POST /api/vet/professors/register
