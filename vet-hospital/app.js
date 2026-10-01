@@ -258,8 +258,10 @@ async function fetchUniversalApi(pathOrAction, options = {}) {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-      if (res && res.ok) {
-        return res;
+      if (res) {
+        if (res.ok || (res.status >= 400 && res.status < 500)) {
+          return res;
+        }
       }
     } catch (e) {}
   }
