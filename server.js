@@ -1302,43 +1302,63 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet
 });
 
 // GET /api/vet/users
-app.get(['/api/vet/users', '/vet-hospital/api/users'], (_req, res) => {
+app.get(['/api/vet/users', '/vet-hospital/api/users', '/api/vet/hospital/users'], (_req, res) => {
   try {
     const vetUsers = readVetUsers();
-    const universalUsers = readUsersFromDisk();
     const professors = readVetProfessors();
     const mergedMap = new Map();
 
-    universalUsers.forEach((u) => {
-      if (u && (u.id || u.username)) mergedMap.set(String(u.username || u.id).toLowerCase(), u);
-    });
+    // 1. Hospital registered users
     vetUsers.forEach((u) => {
-      if (u && (u.id || u.username)) mergedMap.set(String(u.username || u.id).toLowerCase(), u);
+      if (u && (u.id || u.username || u.phone)) {
+        const key = String(u.username || u.phone || u.id).toLowerCase();
+        mergedMap.set(key, u);
+      }
     });
+
+    // 2. Hospital professors & doctors
     professors.forEach((p) => {
-      if (p && (p.username || p.id)) {
-        const key = String(p.username || p.id).toLowerCase();
+      if (p && (p.username || p.id || p.phone)) {
+        const key = String(p.username || p.phone || p.id).toLowerCase();
+        const isPhd = p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && (p.academicRank.includes('PhD') || p.academicRank.includes('دکتری')));
         const existing = mergedMap.get(key) || {};
         mergedMap.set(key, {
-          ...existing,
-          id: p.id || existing.id,
-          username: p.username || existing.username,
-          name: p.name || existing.name || existing.fullName,
-          fullName: p.name || existing.fullName || existing.name,
-          phone: p.phone || existing.phone,
-          email: p.email || existing.email,
-          role: p.badges?.includes('دستیار تخصصی PhD') || p.academicRank?.includes('PhD') || p.academicRank?.includes('دکتری') ? 'phd' : 'doctor',
-          academicRank: p.academicRank || existing.academicRank,
-          departmentId: p.departmentId || existing.departmentId,
-          departmentName: p.departmentName || existing.departmentName,
-          medicalCouncilNo: p.medicalCouncilNo || existing.medicalCouncilNo,
-          studentNo: p.studentNo || existing.studentNo,
-          avatar: p.avatar || existing.avatar,
+          id: p.id || existing.id || `user-${Date.now()}`,
+          username: p.username || existing.username || '',
+          name: p.name || existing.name || existing.fullName || 'استاد / پزشک',
+          fullName: p.name || existing.fullName || existing.name || 'استاد / پزشک',
+          phone: p.phone || existing.phone || '',
+          email: p.email || existing.email || '',
+          role: isPhd ? 'phd' : 'doctor',
+          academicRank: p.academicRank || existing.academicRank || (isPhd ? 'دانشجوی دکتری تخصصی (PhD) / دستیار' : 'استادیار'),
+          departmentId: p.departmentId || existing.departmentId || 'surgery-anesthesia',
+          departmentName: p.departmentName || existing.departmentName || 'بخش جراحی، ارتوپدی و بیهوشی',
+          subSpecialty: p.subSpecialty || existing.subSpecialty || '',
+          medicalCouncilNo: p.medicalCouncilNo || existing.medicalCouncilNo || '',
+          studentNo: p.studentNo || existing.studentNo || '',
+          avatar: p.avatar || existing.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
           createdAt: p.registeredAt || existing.createdAt || '۱۴۰۵',
           updatedAt: p.updatedAt || existing.updatedAt || new Date().toISOString()
         });
       }
     });
+
+    // 3. Ensure master admin is present
+    const adminKey = 'jahesh1395@gmail.com';
+    if (!mergedMap.has(adminKey)) {
+      mergedMap.set(adminKey, {
+        id: 'usr-vet-admin',
+        username: 'jahesh1395@gmail.com',
+        email: 'jahesh1395@gmail.com',
+        name: 'مهندس عرفان مقدم متقی (مدیر ارشد بیمارستان)',
+        fullName: 'مهندس عرفان مقدم متقی (مدیر ارشد بیمارستان)',
+        phone: '09152331974',
+        role: 'admin',
+        isAdmin: true,
+        createdAt: '۱۴۰۵/۶/۱'
+      });
+    }
+
     const users = Array.from(mergedMap.values());
     return res.json({ success: true, count: users.length, users });
   } catch (err) {

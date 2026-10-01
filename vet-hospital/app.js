@@ -168,19 +168,84 @@ const API_BASE = "/api/vet";
 // پایگاه اساتید واقعی ثبت‌شده در کلود (بدون داده‌های تستی)
 const INITIAL_PROFESSORS = [];
 
+const DEFAULT_INITIAL_PROFESSORS = [
+  {
+    id: "prof-1790851853973",
+    username: "adsadasd",
+    password: "sadasdasdas",
+    name: "شسیبسیبسیبس",
+    academicRank: "استادیار",
+    departmentId: "surgery-anesthesia",
+    departmentName: "بخش جراحی، ارتوپدی و بیهوشی",
+    subSpecialty: "asfasdfasd",
+    medicalCouncilNo: "133213",
+    phone: "312423423423",
+    email: "dasdadfwe@gmail.com",
+    avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
+    bio: "asdasd",
+    visitFee: 380000,
+    onlineConsultFee: 250000,
+    workDays: ["شنبه", "دوشنبه", "چهارشنبه"],
+    workHours: "۰۹:۰۰ الی ۱۳:۰۰",
+    schedule: ["شنبه، دوشنبه، چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰"],
+    status: "approved",
+    isApproved: true,
+    rating: 5,
+    totalVisits: 0,
+    badges: ["عضو هیئت علمی"],
+    registeredAt: "2026-10-01T10:50:53.973Z"
+  },
+  {
+    id: "prof-1790851005017",
+    username: "sdasdasd",
+    name: "بلیبلیب",
+    academicRank: "استادیار",
+    departmentId: "surgery-anesthesia",
+    departmentName: "بخش جراحی، ارتوپدی و بیهوشی",
+    subSpecialty: "جراح",
+    medicalCouncilNo: "12341",
+    phone: "4234234234",
+    email: "weqwdzd@gmail.com",
+    avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
+    status: "approved",
+    isApproved: true,
+    rating: 5,
+    badges: ["عضو هیئت علمی"],
+    registeredAt: "2026-10-01T10:36:45.017Z"
+  },
+  {
+    id: "prof-1790841158105",
+    username: "manije",
+    name: "moghaddammotagi",
+    academicRank: "استادیار",
+    departmentId: "surgery-anesthesia",
+    departmentName: "بخش جراحی، ارتوپدی و بیهوشی",
+    subSpecialty: "sfsf",
+    medicalCouncilNo: "133133",
+    phone: "1231231",
+    email: "erfanmoghaddammotagicrypto@gmail.com",
+    avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
+    status: "approved",
+    isApproved: true,
+    rating: 5,
+    badges: ["عضو هیئت علمی"],
+    registeredAt: "2026-10-01T07:52:38.105Z"
+  }
+];
+
 function getStoredProfessors() {
   try {
     const raw = localStorage.getItem("vet_professors");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         // فیلتر کردن و پاک‌سازی هرگونه اساتید تستی و ماک قدیمی (prof-1 تا prof-6)
         const realProfessors = parsed.filter(p => p && p.id && !p.id.match(/^prof-[1-6]$/));
-        return realProfessors;
+        if (realProfessors.length > 0) return realProfessors;
       }
     }
   } catch (e) {}
-  return [];
+  return [...DEFAULT_INITIAL_PROFESSORS];
 }
 
 function saveStoredProfessors(profs) {
@@ -221,7 +286,7 @@ function saveStoredUsers(users) {
   } catch (e) {}
 }
 
-// سامانه ارتباط مستقیم Universal API (دقیقاً مشابه جهش‌کالا - ۱۰۰٪ بدون فیلترشکن، سریع و بدون قطعی)
+// سامانه ارتباط مستقیم Universal API اختصاصی بیمارستان دامپزشکی (۱۰۰٪ مستقل، بدون فیلترشکن و آنی)
 async function fetchUniversalApi(pathOrAction, options = {}) {
   let endpointPath = String(pathOrAction || '').replace(/^\/+/, '');
   let queryPart = "";
@@ -243,10 +308,7 @@ async function fetchUniversalApi(pathOrAction, options = {}) {
   const candidateUrls = [
     `/api/vet/${endpointPath}${queryPart}`,
     `/vet-hospital/api/${endpointPath}${queryPart}`,
-    `/api/${endpointPath}${queryPart}`,
-    `/jaheshkala/api/${endpointPath}${queryPart}`,
-    `/jaheshkala/api.php${phpQuery}`,
-    `api.php${phpQuery}`
+    `/api/vet/hospital/${endpointPath}${queryPart}`
   ];
 
   let lastResponse = null;
@@ -262,7 +324,6 @@ async function fetchUniversalApi(pathOrAction, options = {}) {
 
       if (res) {
         lastResponse = res;
-        // Return immediately if success (2xx) or valid client-side JSON response (4xx)
         const contentType = res.headers.get('content-type') || '';
         if (res.ok || (res.status >= 400 && res.status < 500 && contentType.includes('application/json'))) {
           return res;
@@ -1099,7 +1160,7 @@ window.openAdminModal = async function() {
   state.adminModalOpen = true;
   renderApp();
 
-  // دریافت مستقیم و فوق‌سریع از سرور داخلی (بدون نیاز به فیلترشکن - آنی)
+  // دریافت مستقیم و فوق‌سریع از سرور داخلی بیمارستان (بدون نیاز به فیلترشکن - آنی)
   try {
     const [usersRes, profsRes, apptsRes] = await Promise.all([
       fetchUniversalApi('users', { cache: 'no-store' }).catch(() => null),
@@ -1109,23 +1170,26 @@ window.openAdminModal = async function() {
 
     if (usersRes && usersRes.ok) {
       const uData = await usersRes.json().catch(() => null);
-      if (uData && Array.isArray(uData.users)) {
-        state.cloudUsers = uData.users;
-        saveStoredUsers(uData.users);
+      const usersList = Array.isArray(uData) ? uData : (uData && Array.isArray(uData.users) ? uData.users : []);
+      if (usersList.length > 0) {
+        state.cloudUsers = usersList;
+        saveStoredUsers(usersList);
       }
     }
     if (profsRes && profsRes.ok) {
       const pData = await profsRes.json().catch(() => null);
-      if (pData && Array.isArray(pData.professors)) {
-        state.professors = pData.professors;
-        saveStoredProfessors(pData.professors);
+      const profsList = Array.isArray(pData) ? pData : (pData && Array.isArray(pData.professors) ? pData.professors : []);
+      if (profsList.length > 0) {
+        state.professors = profsList;
+        saveStoredProfessors(profsList);
       }
     }
     if (apptsRes && apptsRes.ok) {
       const aData = await apptsRes.json().catch(() => null);
-      if (aData && Array.isArray(aData.appointments)) {
-        state.appointments = aData.appointments;
-        try { localStorage.setItem("vet_appointments", JSON.stringify(aData.appointments)); } catch(e){}
+      const apptsList = Array.isArray(aData) ? aData : (aData && Array.isArray(aData.appointments) ? aData.appointments : []);
+      if (apptsList.length > 0) {
+        state.appointments = apptsList;
+        try { localStorage.setItem("vet_appointments", JSON.stringify(apptsList)); } catch(e){}
       }
     }
     renderApp();
@@ -1167,23 +1231,26 @@ window.refreshCloudData = async function() {
 
     if (usersRes && usersRes.ok) {
       const uData = await usersRes.json().catch(() => null);
-      if (uData && Array.isArray(uData.users)) {
-        state.cloudUsers = uData.users;
-        saveStoredUsers(uData.users);
+      const usersList = Array.isArray(uData) ? uData : (uData && Array.isArray(uData.users) ? uData.users : []);
+      if (usersList.length > 0) {
+        state.cloudUsers = usersList;
+        saveStoredUsers(usersList);
       }
     }
     if (profsRes && profsRes.ok) {
       const pData = await profsRes.json().catch(() => null);
-      if (pData && Array.isArray(pData.professors)) {
-        state.professors = pData.professors;
-        saveStoredProfessors(pData.professors);
+      const profsList = Array.isArray(pData) ? pData : (pData && Array.isArray(pData.professors) ? pData.professors : []);
+      if (profsList.length > 0) {
+        state.professors = profsList;
+        saveStoredProfessors(profsList);
       }
     }
     if (apptsRes && apptsRes.ok) {
       const aData = await apptsRes.json().catch(() => null);
-      if (aData && Array.isArray(aData.appointments)) {
-        state.appointments = aData.appointments;
-        try { localStorage.setItem("vet_appointments", JSON.stringify(aData.appointments)); } catch(e){}
+      const apptsList = Array.isArray(aData) ? aData : (aData && Array.isArray(aData.appointments) ? aData.appointments : []);
+      if (apptsList.length > 0) {
+        state.appointments = apptsList;
+        try { localStorage.setItem("vet_appointments", JSON.stringify(apptsList)); } catch(e){}
       }
     }
 
@@ -2228,7 +2295,7 @@ function renderAuthModal() {
   `;
 }
 
-// پنل مدیریت اختصاصی بیمارستان دقیق همانند جهش‌کالا برای مدیر ارشد سامانه (jahesh1395@gmail.com)
+// پنل مدیریت اختصاصی بیمارستان دانشکده دامپزشکی برای مدیر ارشد سامانه (jahesh1395@gmail.com)
 function renderAdminModal() {
   if (!state.adminModalOpen) return "";
   const tab = state.adminActiveTab || 'professors';
@@ -2239,46 +2306,92 @@ function renderAdminModal() {
   const rawUsers = state.cloudUsers && state.cloudUsers.length > 0 ? state.cloudUsers : getStoredUsers();
   const userMap = new Map();
   rawUsers.forEach(u => {
-    if (u && (u.username || u.id)) userMap.set(String(u.username || u.id).toLowerCase(), u);
+    if (u && (u.username || u.phone || u.id)) userMap.set(String(u.username || u.phone || u.id).toLowerCase(), u);
+  });
+
+  // ادغام اساتید و پزشکان از تمام منابع
+  const profMap = new Map();
+  (state.professors || []).forEach(p => {
+    if (p && (p.id || p.username || p.name)) profMap.set(String(p.username || p.id || p.name).toLowerCase(), p);
+  });
+  getStoredProfessors().forEach(p => {
+    if (p && (p.id || p.username || p.name)) {
+      const k = String(p.username || p.id || p.name).toLowerCase();
+      if (!profMap.has(k)) profMap.set(k, p);
+    }
   });
 
   // اطمینان از حضور تمام اساتید در لیست کاربران
-  (state.professors || []).forEach(p => {
-    if (p && (p.username || p.id)) {
-      const key = String(p.username || p.id).toLowerCase();
-      if (!userMap.has(key)) {
-        const isPhd = p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && p.academicRank.includes('PhD')) || (p.academicRank && p.academicRank.includes('دکتری'));
-        userMap.set(key, {
-          id: p.id,
-          username: p.username || p.id,
-          name: p.name,
-          fullName: p.name,
-          phone: p.phone || '',
-          email: p.email || '',
-          role: isPhd ? 'phd' : 'doctor',
-          academicRank: p.academicRank,
-          departmentId: p.departmentId,
-          departmentName: p.departmentName,
-          medicalCouncilNo: p.medicalCouncilNo || p.studentNo || '',
-          createdAt: p.registeredAt || '۱۴۰۵'
+  profMap.forEach((p, key) => {
+    if (!userMap.has(key)) {
+      const isPhd = p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && (p.academicRank.includes('PhD') || p.academicRank.includes('دکتری')));
+      userMap.set(key, {
+        id: p.id,
+        username: p.username || p.id,
+        name: p.name,
+        fullName: p.name,
+        phone: p.phone || '',
+        email: p.email || '',
+        role: isPhd ? 'phd' : 'doctor',
+        academicRank: p.academicRank,
+        departmentId: p.departmentId,
+        departmentName: p.departmentName,
+        medicalCouncilNo: p.medicalCouncilNo || p.studentNo || '',
+        createdAt: p.registeredAt || '۱۴۰۵'
+      });
+    }
+  });
+
+  // همچنین افزودن پزشکان و دانشجویان دکتری از لیست کاربران به اساتید
+  userMap.forEach(u => {
+    if (u && (u.role === 'doctor' || u.role === 'phd' || u.academicRank || u.medicalCouncilNo)) {
+      const k = String(u.username || u.phone || u.id || u.name || '').toLowerCase();
+      if (k && !profMap.has(k)) {
+        const isPhd = u.role === 'phd' || (u.academicRank && (u.academicRank.includes('PhD') || u.academicRank.includes('دکتری')));
+        profMap.set(k, {
+          id: u.id || `prof-${Date.now()}`,
+          username: u.username || u.phone || '',
+          name: u.name || u.fullName || 'استاد / پزشک',
+          academicRank: u.academicRank || (isPhd ? 'دانشجوی دکتری تخصصی (PhD) / دستیار' : 'استادیار'),
+          departmentId: u.departmentId || 'surgery-anesthesia',
+          departmentName: u.departmentName || 'بخش جراحی، ارتوپدی و بیهوشی',
+          subSpecialty: u.subSpecialty || (isPhd ? 'پژوهشگر دکتری تخصصی' : 'متخصص بالینی'),
+          medicalCouncilNo: u.medicalCouncilNo || u.studentNo || '',
+          phone: u.phone || '',
+          email: u.email || '',
+          avatar: u.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
+          bio: u.bio || 'عضو کادر تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد.',
+          visitFee: Number(u.visitFee) || (isPhd ? 280000 : 380000),
+          onlineConsultFee: Number(u.onlineConsultFee) || 220000,
+          workDays: u.workDays || ['شنبه', 'دوشنبه', 'چهارشنبه'],
+          workHours: u.workHours || '۰۹:۰۰ الی ۱۳:۰۰',
+          schedule: u.schedule || ['شنبه، دوشنبه، چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰'],
+          status: u.status || 'approved',
+          isApproved: true,
+          rating: 5.0,
+          totalVisits: u.totalVisits || 0,
+          badges: u.badges || [isPhd ? 'دستیار تخصصی PhD' : 'عضو هیئت علمی'],
+          registeredAt: u.createdAt || new Date().toISOString()
         });
       }
     }
   });
 
   const allUsersList = Array.from(userMap.values());
-  const pendingDoctorsCount = state.professors.filter(p => p.status !== 'approved' && !p.isApproved).length;
+  const allProfessorsList = Array.from(profMap.values());
+
+  const pendingDoctorsCount = allProfessorsList.filter(p => p.status !== 'approved' && !p.isApproved).length;
 
   // فیلترهای اساتید
   const profFilter = state.adminProfFilter || 'all';
   const userFilter = state.adminUserFilter || 'all';
   const searchTerm = (state.adminSearchTerm || '').trim().toLowerCase();
 
-  const totalProfsCount = state.professors.length;
-  const facultyProfsCount = state.professors.filter(p => !p.badges?.includes('دستیار تخصصی PhD') && (!p.academicRank || (!p.academicRank.includes('PhD') && !p.academicRank.includes('دکتری')))).length;
-  const phdProfsCount = state.professors.filter(p => p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && (p.academicRank.includes('PhD') || p.academicRank.includes('دکتری')))).length;
+  const totalProfsCount = allProfessorsList.length;
+  const facultyProfsCount = allProfessorsList.filter(p => !p.badges?.includes('دستیار تخصصی PhD') && (!p.academicRank || (!p.academicRank.includes('PhD') && !p.academicRank.includes('دکتری')))).length;
+  const phdProfsCount = allProfessorsList.filter(p => p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && (p.academicRank.includes('PhD') || p.academicRank.includes('دکتری')))).length;
 
-  let filteredProfessors = state.professors.filter(p => {
+  let filteredProfessors = allProfessorsList.filter(p => {
     const isPhd = p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && (p.academicRank.includes('PhD') || p.academicRank.includes('دکتری')));
     const isApproved = p.status === 'approved' || p.isApproved;
 
@@ -2300,7 +2413,7 @@ function renderAdminModal() {
   });
 
   // فیلترهای کاربران
-  const totalDoctorsUsers = allUsersList.filter(u => u.role === 'doctor' || (u.academicRank && !u.academicRank.includes('PhD'))).length;
+  const totalDoctorsUsers = allUsersList.filter(u => u.role === 'doctor' || (u.academicRank && !u.academicRank.includes('PhD') && !u.academicRank.includes('دکتری'))).length;
   const totalPhdUsers = allUsersList.filter(u => u.role === 'phd' || (u.academicRank && (u.academicRank.includes('PhD') || u.academicRank.includes('دکتری')))).length;
   const totalClientUsers = allUsersList.filter(u => !u.role || u.role === 'client' || u.role === 'user').length;
   const totalAdminUsers = allUsersList.filter(u => u.role === 'admin' || u.isAdmin).length;
@@ -2331,7 +2444,7 @@ function renderAdminModal() {
     <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4">
       <div class="bg-[#0f172a] border border-amber-500/50 w-full max-w-6xl rounded-3xl p-5 sm:p-7 shadow-2xl relative text-right max-h-[94vh] flex flex-col">
         
-        <!-- هدر پنل مدیریت با برچسب آنلاین ابری دقیق مانند جهش کالا -->
+        <!-- هدر پنل مدیریت اختصاصی بیمارستان -->
         <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4 shrink-0">
           <div class="flex items-center gap-3">
             <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500 flex items-center justify-center text-2xl text-amber-400">
@@ -2342,7 +2455,7 @@ function renderAdminModal() {
                 <h3 class="text-base sm:text-lg font-black text-white">پنل مدیریت یکپارچه بیمارستان دامپزشکی</h3>
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-500/50 text-[10px] text-emerald-300 font-bold">
                   <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  همگام‌سازی زنده و آنی (بدون فیلترشکن)
+                  همگام‌سازی زنده و اختصاصی بیمارستان
                 </span>
               </div>
               <p class="text-xs text-amber-400 mt-0.5">مدیریت اعضای هیئت علمی، دانشجویان دکتری (PhD)، مراجعین و نوبت‌ها</p>
@@ -2364,14 +2477,14 @@ function renderAdminModal() {
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 shrink-0">
           <div class="p-3 rounded-2xl bg-slate-800/80 border border-slate-700">
             <div class="text-[11px] text-slate-400 mb-0.5">اساتید و پزشکان:</div>
-            <div class="text-base sm:text-lg font-black text-emerald-400 font-mono">${state.professors.length} نفر</div>
+            <div class="text-base sm:text-lg font-black text-emerald-400 font-mono">${allProfessorsList.length} نفر</div>
           </div>
           <div class="p-3 rounded-2xl bg-slate-800/80 border border-slate-700">
             <div class="text-[11px] text-slate-400 mb-0.5">دانشجویان و دستیاران PhD:</div>
-            <div class="text-base sm:text-lg font-black text-cyan-400 font-mono">${phdProfsCount + totalPhdUsers} نفر</div>
+            <div class="text-base sm:text-lg font-black text-cyan-400 font-mono">${phdProfsCount} نفر</div>
           </div>
           <div class="p-3 rounded-2xl bg-slate-800/80 border border-slate-700">
-            <div class="text-[11px] text-slate-400 mb-0.5">کل کاربران ثبت‌نامی:</div>
+            <div class="text-[11px] text-slate-400 mb-0.5">کل کاربران ثبت‌نامی بیمارستان:</div>
             <div class="text-base sm:text-lg font-black text-amber-300 font-mono">${allUsersList.length} کاربر</div>
           </div>
           <div class="p-3 rounded-2xl bg-slate-800/80 border border-slate-700">
@@ -2383,11 +2496,11 @@ function renderAdminModal() {
         <!-- تب‌های اصلی پنل -->
         <div class="flex rounded-2xl bg-slate-900/90 p-1.5 mb-3 border border-slate-800 gap-1.5 shrink-0 overflow-x-auto">
           <button onclick="setAdminActiveTab('professors')" class="flex-1 min-w-[140px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${tab === 'professors' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' : 'text-slate-400 hover:text-white'}">
-            <span>🩺 اساتید و پزشکان (${state.professors.length})</span>
+            <span>🩺 اساتید و پزشکان (${allProfessorsList.length})</span>
             ${pendingDoctorsCount > 0 ? `<span class="bg-amber-400 text-black text-[10px] font-black px-1.5 py-0.2 rounded-full animate-bounce">${pendingDoctorsCount}</span>` : ''}
           </button>
           <button onclick="setAdminActiveTab('users')" class="flex-1 min-w-[140px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${tab === 'users' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' : 'text-slate-400 hover:text-white'}">
-            <span>👥 همه کاربران آنلاین (${allUsersList.length})</span>
+            <span>👥 کاربران بیمارستان (${allUsersList.length})</span>
           </button>
           <button onclick="setAdminActiveTab('appointments')" class="flex-1 min-w-[140px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${tab === 'appointments' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' : 'text-slate-400 hover:text-white'}">
             <span>📋 نوبت‌های ثبت‌شده (${totalVisits})</span>
