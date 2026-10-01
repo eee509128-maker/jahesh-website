@@ -1,5 +1,17 @@
 [
   {
+    "id": "user-1790838126525",
+    "username": "jaheshf1395@gmail.com",
+    "password": "123",
+    "name": "مینا حیدر",
+    "phone": "09123456789",
+    "email": "",
+    "role": "client",
+    "departmentId": "",
+    "departmentName": "",
+    "createdAt": "2026-10-01T07:02:06.525Z"
+  },
+  {
     "id": "admin-1",
     "username": "jahesh1395@gmail.com",
     "email": "jahesh1395@gmail.com",
