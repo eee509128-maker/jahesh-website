@@ -17,7 +17,8 @@ import {
   readDeletedVetUsers,
   addDeletedVetUserId,
   removeDeletedVetUserId,
-  performAiVeterinaryTriage
+  performAiVeterinaryTriage,
+  saveBase64ImageToVetUploads
 } from './api/vet-hospital.js';
 import { initializeApp, getApps } from 'firebase/app';
 import {
@@ -1154,6 +1155,9 @@ app.post(['/api/vet/auth/login', '/vet-hospital/api/auth/login'], (req, res) => 
 
 // POST /api/vet/auth/register
 app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet/register', '/vet-hospital/api/register', '/api/auth/register'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     const {
       username,
@@ -1162,6 +1166,7 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet
       fullName,
       phone,
       email,
+      avatar,
       role = 'client',
       academicRank,
       departmentId,
@@ -1187,6 +1192,17 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet
     const users = readVetUsers();
     const cleanU = cleanUsername.toLowerCase();
     const cleanE = (email || '').trim().toLowerCase();
+    const cleanPhone = (phone || '').trim();
+
+    // Clear from deleted tombstones
+    removeDeletedVetUserId(cleanUsername, cleanU, cleanE, cleanPhone);
+    removeDeletedVetProfessorId(cleanUsername, cleanU, cleanE, cleanPhone);
+
+    // Process and permanently save uploaded avatar to /uploads/vet
+    let finalAvatar = avatar || '';
+    if (finalAvatar && typeof finalAvatar === 'string' && finalAvatar.startsWith('data:image/')) {
+      finalAvatar = saveBase64ImageToVetUploads(finalAvatar, 'vet_prof_' + cleanU);
+    }
 
     // Find existing user by username
     const existingIdx = users.findIndex(
@@ -1200,8 +1216,9 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet
         ...users[existingIdx],
         name: cleanName,
         password: cleanPass,
-        phone: (phone || users[existingIdx].phone || '').trim(),
+        phone: cleanPhone || users[existingIdx].phone || '',
         email: cleanE || users[existingIdx].email || '',
+        avatar: finalAvatar || users[existingIdx].avatar || '',
         role: role || users[existingIdx].role || 'client',
         departmentId: departmentId || users[existingIdx].departmentId || '',
         departmentName: departmentName || users[existingIdx].departmentName || '',
@@ -1214,8 +1231,9 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet
         username: cleanUsername,
         password: cleanPass,
         name: cleanName,
-        phone: (phone || '').trim(),
+        phone: cleanPhone,
         email: cleanE,
+        avatar: finalAvatar,
         role: role,
         departmentId: departmentId || '',
         departmentName: departmentName || '',
@@ -1236,6 +1254,7 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet
         phone: newUser.phone,
         email: newUser.email,
         username: newUser.username,
+        avatar: newUser.avatar,
         role: role === 'doctor' || role === 'phd' ? 'doctor' : 'user',
         guild: 'بیمارستان دانشکده دامپزشکی',
         createdAt: new Date().toLocaleDateString('fa-IR'),
@@ -1273,6 +1292,8 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet
           (p.id === newUser.id)
       );
 
+      const chosenAvatar = finalAvatar || (existingPIdx >= 0 && professors[existingPIdx].avatar) || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80';
+
       newProfessor = {
         id: existingPIdx >= 0 ? professors[existingPIdx].id : ('prof-' + Date.now()),
         username: cleanUsername,
@@ -1283,9 +1304,9 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet
         departmentName: departmentName || 'بخش جراحی، ارتوپدی و بیهوشی',
         subSpecialty: subSpecialty || (role === 'phd' ? 'پژوهشگر دکتری تخصصی' : 'متخصص بالینی'),
         medicalCouncilNo: medNo,
-        phone: (phone || '').trim(),
+        phone: cleanPhone,
         email: cleanE,
-        avatar: (existingPIdx >= 0 && professors[existingPIdx].avatar) || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
+        avatar: chosenAvatar,
         bio: bio || 'عضو کادر تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد.',
         visitFee: Number(visitFee) || (role === 'phd' ? 280000 : 380000),
         onlineConsultFee: Number(onlineConsultFee) || 220000,
@@ -1325,6 +1346,9 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet
 
 // GET /api/vet/users
 app.get(['/api/vet/users', '/vet-hospital/api/users', '/api/vet/hospital/users'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     const deletedUserKeys = new Set(readDeletedVetUsers());
     const deletedProfKeys = new Set(readDeletedVetProfessors());
@@ -1541,6 +1565,9 @@ app.get(['/api/vet/departments', '/vet-hospital/api/departments'], (_req, res) =
 
 // GET /api/vet/professors
 app.get(['/api/vet/professors', '/vet-hospital/api/professors'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     const { department, status, all } = req.query;
     const deletedProfKeys = new Set(readDeletedVetProfessors());
@@ -1576,6 +1603,9 @@ app.get(['/api/vet/professors', '/vet-hospital/api/professors'], (req, res) => {
 
 // POST /api/vet/professors/update
 app.post(['/api/vet/professors/update', '/vet-hospital/api/professors/update'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     const incoming = req.body || {};
     const targetId = incoming.id || incoming.professorId;
@@ -1594,6 +1624,11 @@ app.post(['/api/vet/professors/update', '/vet-hospital/api/professors/update'], 
     const cleanWorkHours = incoming.workHours || '۰۹:۰۰ الی ۱۳:۰۰';
     const scheduleStr = `${cleanWorkDays.join('، ')} ${cleanWorkHours}`;
 
+    let profAvatar = incoming.avatar || (pIdx >= 0 && professors[pIdx].avatar) || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80';
+    if (profAvatar && typeof profAvatar === 'string' && profAvatar.startsWith('data:image/')) {
+      profAvatar = saveBase64ImageToVetUploads(profAvatar, 'vet_prof_' + (cleanU || targetId));
+    }
+
     const updateObj = {
       name: (incoming.name || '').trim(),
       academicRank: incoming.academicRank || 'استادیار',
@@ -1603,7 +1638,7 @@ app.post(['/api/vet/professors/update', '/vet-hospital/api/professors/update'], 
       medicalCouncilNo: incoming.medicalCouncilNo || '',
       phone: (incoming.phone || '').trim(),
       email: (incoming.email || '').trim().toLowerCase(),
-      avatar: incoming.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
+      avatar: profAvatar,
       bio: incoming.bio || 'عضو کادر تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد.',
       visitFee: Number(incoming.visitFee) || 380000,
       onlineConsultFee: Number(incoming.onlineConsultFee) || 250000,
@@ -1668,6 +1703,9 @@ app.post(['/api/vet/professors/update', '/vet-hospital/api/professors/update'], 
 
 // POST /api/vet/professors/register
 app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     const incoming = req.body;
     if (!incoming || !incoming.name || !incoming.departmentId) {
@@ -1690,6 +1728,11 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
     const cleanWorkHours = incoming.workHours || '۰۹:۰۰ الی ۱۳:۰۰';
     const scheduleStr = `${cleanWorkDays.join('، ')} ${cleanWorkHours}`;
 
+    let profAvatar = incoming.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80';
+    if (profAvatar && typeof profAvatar === 'string' && profAvatar.startsWith('data:image/')) {
+      profAvatar = saveBase64ImageToVetUploads(profAvatar, 'vet_prof_' + (cleanU || assignedId));
+    }
+
     const newProf = {
       id: assignedId,
       username: incoming.username || incoming.email || incoming.phone || '',
@@ -1703,7 +1746,7 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
       nationalId: incoming.nationalId || '',
       phone: incoming.phone || '',
       email: incoming.email || '',
-      avatar: incoming.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
+      avatar: profAvatar,
       bio: incoming.bio || 'متخصص و کادر علمی دانشکده دامپزشکی دانشگاه فردوسی مشهد.',
       visitFee: Number(incoming.visitFee) || 380000,
       onlineConsultFee: Number(incoming.onlineConsultFee) || 250000,
@@ -1711,6 +1754,7 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
       workHours: cleanWorkHours,
       schedule: [scheduleStr],
       status: incoming.status || 'approved', // Active in directory and appointments immediately
+      isApproved: true,
       rating: 5.0,
       totalVisits: 0,
       badges: incoming.badges || ['عضو هیئت علمی'],
@@ -1850,6 +1894,9 @@ app.post(['/api/vet/professors/update', '/vet-hospital/api/professors/update'], 
 
 // GET /api/vet/appointments
 app.get(['/api/vet/appointments', '/vet-hospital/api/appointments'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   const appointments = readVetAppointments();
   return res.json({ success: true, count: appointments.length, appointments });
 });

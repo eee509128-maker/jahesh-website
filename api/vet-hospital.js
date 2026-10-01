@@ -18,6 +18,32 @@ const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const DELETED_USERS_FILE = path.join(DATA_DIR, 'deleted_users.json');
 
 // Helpers for reading/writing deleted tombstones
+export function saveBase64ImageToVetUploads(dataUrl, prefix = 'vet_prof') {
+  if (!dataUrl || typeof dataUrl !== 'string') return dataUrl;
+  if (!dataUrl.startsWith('data:image/')) return dataUrl;
+  try {
+    const matches = dataUrl.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+    if (!matches) return dataUrl;
+    const type = matches[1].toLowerCase();
+    let ext = 'jpg';
+    if (type.includes('png')) ext = 'png';
+    else if (type.includes('webp')) ext = 'webp';
+    else if (type.includes('svg')) ext = 'svg';
+
+    const buffer = Buffer.from(matches[2], 'base64');
+    const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const targetDir = path.join(process.cwd(), 'uploads', 'vet');
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(targetDir, filename), buffer);
+    return `/uploads/vet/${filename}`;
+  } catch (err) {
+    console.warn('saveBase64ImageToVetUploads error:', err);
+    return dataUrl;
+  }
+}
+
 export function readDeletedVetProfessors() {
   if (fs.existsSync(DELETED_PROFESSORS_FILE)) {
     try {
@@ -124,6 +150,11 @@ export function writeVetUsers(list) {
       const uId = String(u.id || '').toLowerCase().trim();
       const uName = String(u.username || '').toLowerCase().trim();
       return (!uId || !deleted.has(uId)) && (!uName || !deleted.has(uName));
+    }).map((u) => {
+      if (u.avatar && typeof u.avatar === 'string' && u.avatar.startsWith('data:image/')) {
+        return { ...u, avatar: saveBase64ImageToVetUploads(u.avatar, 'vet_user_' + (u.id || Date.now())) };
+      }
+      return u;
     });
     fs.writeFileSync(USERS_FILE, JSON.stringify(cleaned, null, 2), 'utf8');
     return true;
@@ -174,6 +205,11 @@ export function writeVetProfessors(list) {
       const pId = String(p.id || '').toLowerCase().trim();
       const pName = String(p.username || '').toLowerCase().trim();
       return (!pId || !deleted.has(pId)) && (!pName || !deleted.has(pName));
+    }).map((p) => {
+      if (p.avatar && typeof p.avatar === 'string' && p.avatar.startsWith('data:image/')) {
+        return { ...p, avatar: saveBase64ImageToVetUploads(p.avatar, 'vet_prof_' + (p.id || Date.now())) };
+      }
+      return p;
     });
     fs.writeFileSync(PROFESSORS_FILE, JSON.stringify(cleaned, null, 2), 'utf8');
     return true;

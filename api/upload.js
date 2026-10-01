@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, url: image });
     }
 
-    // Determine target folder: products, banners, or tools
+    // Determine target folder: products, banners, tools, or vet
     const queryType = req.query?.type;
     const bodyType = req.body?.type;
     let folder = 'products';
@@ -32,6 +32,8 @@ export default async function handler(req, res) {
       folder = 'banners';
     } else if (queryType === 'tools' || bodyType === 'tools' || (req.url && req.url.includes('tool'))) {
       folder = 'tools';
+    } else if (queryType === 'vet' || bodyType === 'vet' || (req.url && req.url.includes('vet'))) {
+      folder = 'vet';
     }
 
     let ext = 'webp';
@@ -55,7 +57,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid image format' });
     }
 
-    const prefix = folder === 'banners' ? 'banner' : (folder === 'tools' ? 'tool' : 'prod');
+    const prefix = folder === 'banners' ? 'banner' : (folder === 'tools' ? 'tool' : (folder === 'vet' ? 'vet_prof' : 'prod'));
     const safeName = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
     const uploadsDir = path.join(process.cwd(), 'uploads', folder);
     if (!fs.existsSync(uploadsDir)) {

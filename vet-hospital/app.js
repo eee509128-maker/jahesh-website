@@ -236,22 +236,18 @@ async function fetchUniversalApi(pathOrAction, options = {}) {
     queryPart = "?" + rest.join("&");
   }
 
-  const queryParams = new URLSearchParams(queryPart.replace(/^\?/, ""));
-  queryParams.set("action", endpointPath);
-  const phpQuery = "?" + queryParams.toString();
-
   const candidateUrls = [
     `/api/vet/${endpointPath}${queryPart}`,
-    `/vet-hospital/api/${endpointPath}${queryPart}`,
-    `/api/vet/hospital/${endpointPath}${queryPart}`
+    `/vet-hospital/api/${endpointPath}${queryPart}`
   ];
 
   let lastResponse = null;
   for (const url of candidateUrls) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
       const res = await fetch(url, {
+        cache: 'no-store',
         ...options,
         signal: controller.signal
       });
@@ -260,7 +256,8 @@ async function fetchUniversalApi(pathOrAction, options = {}) {
       if (res) {
         lastResponse = res;
         const contentType = res.headers.get('content-type') || '';
-        if (res.ok || (res.status >= 400 && res.status < 500 && contentType.includes('application/json'))) {
+        // الزام دریافت JSON جهت جلوگیری از دریافت صفحات اشتباه HTML
+        if (contentType.includes('application/json') && (res.ok || (res.status >= 400 && res.status < 500))) {
           return res;
         }
       }
@@ -279,17 +276,17 @@ window.handleProfessorAvatarUpload = function(event) {
     return;
   }
 
-  if (file.size > 8 * 1024 * 1024) {
-    alert('حجم تصویر نباید بیشتر از ۸ مگابایت باشد.');
+  if (file.size > 10 * 1024 * 1024) {
+    alert('حجم تصویر نباید بیشتر از ۱۰ مگابایت باشد.');
     return;
   }
 
   const reader = new FileReader();
   reader.onload = function(e) {
     const img = new Image();
-    img.onload = function() {
+    img.onload = async function() {
       const canvas = document.createElement('canvas');
-      const maxDim = 450;
+      const maxDim = 500;
       let width = img.width;
       let height = img.height;
       if (width > height) {
@@ -310,6 +307,22 @@ window.handleProfessorAvatarUpload = function(event) {
       const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
       state.authForm.avatar = dataUrl;
       renderApp();
+
+      // آپلود در پس‌زمینه برای تبدیل سریع به فایل دائمی سرور
+      try {
+        const uploadRes = await fetch('/api/upload?type=vet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: dataUrl, type: 'vet' })
+        });
+        if (uploadRes && uploadRes.ok) {
+          const uData = await uploadRes.json().catch(() => null);
+          if (uData && uData.url) {
+            state.authForm.avatar = uData.url;
+            renderApp();
+          }
+        }
+      } catch (err) {}
     };
     img.src = e.target.result;
   };
@@ -477,7 +490,7 @@ let state = {
   adminUserFilter: "all",
   adminProfFilter: "all",
   adminSearchTerm: "",
-  cloudUsers: [],
+  cloudUsers: getStoredUsers(),
   bookingModalOpen: false,
   triageModalOpen: false,
   doctorModalOpen: false,
@@ -889,6 +902,7 @@ window.handleUnifiedAuthSubmit = async function(e) {
       state.adminModalOpen = true; // مستقیماً باز شدن پنل مدیریت برای ادمین
       alert("خوش آمدید مدیر کل گرامی! پنل مدیریت با موفقیت باز شد.");
       renderApp();
+      if (typeof openAdminModal === 'function') openAdminModal();
       if (window.confetti) window.confetti({ particleCount: 80, spread: 70 });
       return;
     }
@@ -1201,6 +1215,21 @@ window.openAdminModal = async function() {
         try { localStorage.setItem("vet_appointments", JSON.stringify(apptsList)); } catch(e){}
       }
     }
+
+    if (window.VetFirebase && typeof window.VetFirebase.getProfessors === 'function') {
+      window.VetFirebase.getProfessors().then((fbProfs) => {
+        if (Array.isArray(fbProfs) && fbProfs.length > 0) {
+          const currentMap = new Map();
+          (state.professors || []).forEach(p => { if (p && p.id) currentMap.set(p.id, p); });
+          fbProfs.forEach(p => { if (p && p.id) currentMap.set(p.id, { ...currentMap.get(p.id), ...p }); });
+          const merged = Array.from(currentMap.values());
+          state.professors = merged;
+          saveStoredProfessors(merged);
+          renderApp();
+        }
+      }).catch(() => {});
+    }
+
     renderApp();
   } catch (e) {}
 };
@@ -1261,6 +1290,20 @@ window.refreshCloudData = async function() {
         state.appointments = apptsList;
         try { localStorage.setItem("vet_appointments", JSON.stringify(apptsList)); } catch(e){}
       }
+    }
+
+    if (window.VetFirebase && typeof window.VetFirebase.getProfessors === 'function') {
+      try {
+        const fbProfs = await window.VetFirebase.getProfessors();
+        if (Array.isArray(fbProfs) && fbProfs.length > 0) {
+          const currentMap = new Map();
+          (state.professors || []).forEach(p => { if (p && p.id) currentMap.set(p.id, p); });
+          fbProfs.forEach(p => { if (p && p.id) currentMap.set(p.id, { ...currentMap.get(p.id), ...p }); });
+          const merged = Array.from(currentMap.values());
+          state.professors = merged;
+          saveStoredProfessors(merged);
+        }
+      } catch (fbE) {}
     }
 
     renderApp();
@@ -3449,6 +3492,9 @@ function renderApp() {
 }
 
 async function initApp() {
+  // ۱. بارگذاری اولیه از حافظه محلی برای نمایش فوری (بدون هیچ تاخیر)
+  state.professors = getStoredProfessors();
+  state.cloudUsers = getStoredUsers();
   try {
     renderApp();
   } catch (err) {
@@ -3457,13 +3503,58 @@ async function initApp() {
 
   await handlePaymentReturn();
 
-  // ۱. دریافت فوق‌سریع اطلاعات از سرور داخلی (بدون فیلترشکن - آنی <10ms)
+  // ۲. اتصال بلادرنگ ابری فایربیس (دقیقاً همانند جهش‌کالا - همگام‌سازی فوری برای تمام کاربران در سراسر جهان)
+  if (window.VetFirebase) {
+    try {
+      if (typeof window.VetFirebase.onProfessorsChange === 'function') {
+        window.VetFirebase.onProfessorsChange((profs) => {
+          if (Array.isArray(profs) && profs.length > 0) {
+            const currentMap = new Map();
+            (state.professors || []).forEach(p => { if (p && p.id) currentMap.set(p.id, p); });
+            profs.forEach(p => { if (p && p.id) currentMap.set(p.id, { ...currentMap.get(p.id), ...p }); });
+            const merged = Array.from(currentMap.values());
+            state.professors = merged;
+            saveStoredProfessors(merged);
+            renderApp();
+          }
+        });
+      }
+
+      if (typeof window.VetFirebase.onUsersChange === 'function') {
+        window.VetFirebase.onUsersChange((users) => {
+          if (Array.isArray(users) && users.length > 0) {
+            const currentMap = new Map();
+            (state.cloudUsers || []).forEach(u => { if (u && u.id) currentMap.set(u.id, u); });
+            users.forEach(u => { if (u && u.id) currentMap.set(u.id, { ...currentMap.get(u.id), ...u }); });
+            const merged = Array.from(currentMap.values());
+            state.cloudUsers = merged;
+            saveStoredUsers(merged);
+            renderApp();
+          }
+        });
+      }
+
+      if (typeof window.VetFirebase.onAppointmentsChange === 'function') {
+        window.VetFirebase.onAppointmentsChange((appts) => {
+          if (Array.isArray(appts)) {
+            state.appointments = appts;
+            try { localStorage.setItem("vet_appointments", JSON.stringify(appts)); } catch(e){}
+            renderApp();
+          }
+        });
+      }
+    } catch (fbErr) {
+      console.warn("VetFirebase real-time listener notice:", fbErr);
+    }
+  }
+
+  // ۳. دریافت فوق‌سریع اطلاعات از سرور داخلی بیمارستان (بدون فیلترشکن - آنی <10ms)
   try {
     const [depsRes, profsRes, apptsRes, usersRes] = await Promise.all([
-      fetchUniversalApi('departments').catch(() => null),
-      fetchUniversalApi('professors').catch(() => null),
-      fetchUniversalApi('appointments').catch(() => null),
-      fetchUniversalApi('users').catch(() => null)
+      fetchUniversalApi('departments', { cache: 'no-store' }).catch(() => null),
+      fetchUniversalApi('professors', { cache: 'no-store' }).catch(() => null),
+      fetchUniversalApi('appointments', { cache: 'no-store' }).catch(() => null),
+      fetchUniversalApi('users', { cache: 'no-store' }).catch(() => null)
     ]);
 
     if (depsRes && depsRes.ok) {
@@ -3472,25 +3563,28 @@ async function initApp() {
     }
     if (profsRes && profsRes.ok) {
       const p = await profsRes.json().catch(() => null);
-      if (p && Array.isArray(p.professors)) {
-        state.professors = p.professors;
-        saveStoredProfessors(p.professors);
+      const profList = Array.isArray(p) ? p : (p && Array.isArray(p.professors) ? p.professors : []);
+      if (profList.length > 0) {
+        state.professors = profList;
+        saveStoredProfessors(profList);
       }
     }
     if (apptsRes && apptsRes.ok) {
       const a = await apptsRes.json().catch(() => null);
-      if (a && Array.isArray(a.appointments)) {
-        state.appointments = a.appointments;
+      const apptList = Array.isArray(a) ? a : (a && Array.isArray(a.appointments) ? a.appointments : []);
+      if (apptList.length > 0) {
+        state.appointments = apptList;
         try {
-          localStorage.setItem("vet_appointments", JSON.stringify(a.appointments));
+          localStorage.setItem("vet_appointments", JSON.stringify(apptList));
         } catch (e) {}
       }
     }
     if (usersRes && usersRes.ok) {
       const u = await usersRes.json().catch(() => null);
-      if (u && Array.isArray(u.users)) {
-        state.cloudUsers = u.users;
-        saveStoredUsers(u.users);
+      const uList = Array.isArray(u) ? u : (u && Array.isArray(u.users) ? u.users : []);
+      if (uList.length > 0) {
+        state.cloudUsers = uList;
+        saveStoredUsers(uList);
       }
     }
     renderApp();
@@ -3498,10 +3592,7 @@ async function initApp() {
     console.warn("Init fetch notice:", e);
   }
 
-  // ۲. مدیریت اتصال ابری فایربیس (سرور داخلی جهش‌کالا وظیفه سینک زنده را بر عهده دارد، لذا نیازی به خواندن مستقیم کلاینت از فایربیس نیست)
-  console.log("سامانه بیمارستان تخصصی با موفقیت از سرور داخلی بارگذاری گردید.");
-
-  // ۳. نظارت مداوم و همگام‌سازی بلادرنگ کلیه اطلاعات در تمامی حساب‌ها، مرورگرها و کاربران سراسر جهان (هر ۲ ثانیه)
+  // ۴. نظارت مداوم و همگام‌سازی بلادرنگ کلیه اطلاعات در تمامی حساب‌ها، مرورگرها و کاربران سراسر جهان (هر ۲ ثانیه)
   setInterval(() => {
     Promise.all([
       fetchUniversalApi('users', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null),
@@ -3509,31 +3600,25 @@ async function initApp() {
       fetchUniversalApi('appointments', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null)
     ]).then(([uData, pData, aData]) => {
       let changed = false;
-      if (uData && Array.isArray(uData.users)) {
-        const uList = uData.users;
-        if (JSON.stringify(uList) !== JSON.stringify(state.cloudUsers)) {
-          state.cloudUsers = uList;
-          saveStoredUsers(uList);
-          changed = true;
-        }
+      const uList = Array.isArray(uData) ? uData : (uData && Array.isArray(uData.users) ? uData.users : null);
+      if (uList && JSON.stringify(uList) !== JSON.stringify(state.cloudUsers)) {
+        state.cloudUsers = uList;
+        saveStoredUsers(uList);
+        changed = true;
       }
-      if (pData && Array.isArray(pData.professors)) {
-        const pList = pData.professors;
-        if (JSON.stringify(pList) !== JSON.stringify(state.professors)) {
-          state.professors = pList;
-          saveStoredProfessors(pList);
-          changed = true;
-        }
+      const pList = Array.isArray(pData) ? pData : (pData && Array.isArray(pData.professors) ? pData.professors : null);
+      if (pList && JSON.stringify(pList) !== JSON.stringify(state.professors)) {
+        state.professors = pList;
+        saveStoredProfessors(pList);
+        changed = true;
       }
-      if (aData && Array.isArray(aData.appointments)) {
-        const aList = aData.appointments;
-        if (JSON.stringify(aList) !== JSON.stringify(state.appointments)) {
-          state.appointments = aList;
-          try {
-            localStorage.setItem("vet_appointments", JSON.stringify(aList));
-          } catch (e) {}
-          changed = true;
-        }
+      const aList = Array.isArray(aData) ? aData : (aData && Array.isArray(aData.appointments) ? aData.appointments : null);
+      if (aList && JSON.stringify(aList) !== JSON.stringify(state.appointments)) {
+        state.appointments = aList;
+        try {
+          localStorage.setItem("vet_appointments", JSON.stringify(aList));
+        } catch (e) {}
+        changed = true;
       }
       if (changed) renderApp();
     }).catch(() => {});
