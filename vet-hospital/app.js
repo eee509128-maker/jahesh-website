@@ -165,175 +165,22 @@ const INITIAL_DEPARTMENTS = [
 const ZIBAL_MERCHANT_CODE = "6a9db4410df8756c31ea5d00";
 const API_BASE = "/api/vet";
 
-const INITIAL_PROFESSORS = [
-  {
-    "id": "prof-1",
-    "username": "dr_mohammadi",
-    "password": "123",
-    "name": "دکتر علیرضا محمدی",
-    "academicRank": "استاد تمام (پروفسور)",
-    "departmentId": "surgery-anesthesia",
-    "departmentName": "بخش جراحی، ارتوپدی و بیهوشی",
-    "subSpecialty": "فوق‌تخصص جراحی ارتوپدی و ستون فقرات حیوانات",
-    "medicalCouncilNo": "۱۴۲۵۸",
-    "phone": "09151112233",
-    "email": "a.mohammadi@um.ac.ir",
-    "avatar": "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
-    "bio": "عضو هیئت علمی دانشکده دامپزشکی دانشگاه فردوسی مشهد با بیش از ۲۲ سال سابقه تدریس و جراحی‌های پیشرفته شکستگی، TPLO و آرتروسکوپی.",
-    "visitFee": 450000,
-    "onlineConsultFee": 320000,
-    "workDays": ["شنبه", "دوشنبه", "چهارشنبه"],
-    "workHours": "۰۹:۰۰ الی ۱۳:۰۰",
-    "schedule": ["شنبه، دوشنبه، چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰"],
-    "status": "approved",
-    "rating": 5.0,
-    "totalVisits": 142,
-    "badges": ["عضو هیئت علمی", "جراح نمونه سال"],
-    "registeredAt": "2026-01-10T10:00:00.000Z"
-  },
-  {
-    "id": "prof-2",
-    "username": "dr_rezaei",
-    "password": "123",
-    "name": "دکتر مریم رضایی",
-    "academicRank": "دانشیار",
-    "departmentId": "internal-small",
-    "departmentName": "بخش بیماری‌های درونی دام‌های کوچک و پرندگان زینتی",
-    "subSpecialty": "متخصص طب داخلی، غدد و بیماری‌های کلیوی سگ و گربه",
-    "medicalCouncilNo": "۱۸۷۹۰",
-    "phone": "09152223344",
-    "email": "m.rezaei@um.ac.ir",
-    "avatar": "https://images.unsplash.com/photo-1594824813639-4919532e3077?auto=format&fit=crop&w=600&q=80",
-    "bio": "عضو هیئت علمی گروه علوم درمانگاهی، پژوهشگر بیماری‌های دیابت و نارسایی حاد کلیه در حیوانات خانگی و پرندگان زینتی.",
-    "visitFee": 380000,
-    "onlineConsultFee": 280000,
-    "workDays": ["یکشنبه", "سه‌شنبه", "پنجشنبه"],
-    "workHours": "۱۰:۰۰ الی ۱۴:۰۰",
-    "schedule": ["یکشنبه، سه‌شنبه، پنجشنبه ۱۰:۰۰ الی ۱۴:۰۰"],
-    "status": "approved",
-    "rating": 4.9,
-    "totalVisits": 98,
-    "badges": ["عضو هیئت علمی", "پژوهشگر برتر"],
-    "registeredAt": "2026-01-12T11:30:00.000Z"
-  },
-  {
-    "id": "prof-3",
-    "username": "dr_hosseini",
-    "password": "123",
-    "name": "دکتر کامران حسینی",
-    "academicRank": "استاد تمام (پروفسور)",
-    "departmentId": "imaging-radiology",
-    "departmentName": "بخش تصویربرداری تشخیصی و سونوگرافی",
-    "subSpecialty": "فوق‌تخصص اکوکاردیوگرافی داپلر و سونوگرافی مداخله‌ای",
-    "medicalCouncilNo": "۱۱۲۰۴",
-    "phone": "09153334455",
-    "email": "k.hosseini@um.ac.ir",
-    "avatar": "https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=600&q=80",
-    "bio": "رئیس بخش تصویربرداری تشخیصی بیمارستان دامپزشکی، دارای مقالات متعدد بین‌المللی در زمینه اکوکاردیوگرافی و رادیولوژی دیجیتال.",
-    "visitFee": 420000,
-    "onlineConsultFee": 300000,
-    "workDays": ["شنبه", "سه‌شنبه", "چهارشنبه"],
-    "workHours": "۰۸:۳۰ الی ۱۲:۳۰",
-    "schedule": ["شنبه، سه‌شنبه، چهارشنبه ۰۸:۳۰ الی ۱۲:۳۰"],
-    "status": "approved",
-    "rating": 5.0,
-    "totalVisits": 185,
-    "badges": ["عضو هیئت علمی", "استاد تمام"],
-    "registeredAt": "2026-01-15T09:15:00.000Z"
-  },
-  {
-    "id": "prof-4",
-    "username": "dr_taghavi",
-    "password": "123",
-    "name": "دکتر فاطمه تقوی",
-    "academicRank": "استادیار",
-    "departmentId": "pathobiology",
-    "departmentName": "بخش پاتوبیولوژی و آزمایشگاه بالینی",
-    "subSpecialty": "متخصص کلینیکال پاتولوژی و سیتولوژی انکولوژی",
-    "medicalCouncilNo": "۲۲۴۵۱",
-    "phone": "09154445566",
-    "email": "f.taghavi@um.ac.ir",
-    "avatar": "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
-    "bio": "مسئول فنی آزمایشگاه پاتوبیولوژی و بیولوژی مولکولی، متخصص در تشخیص سیتولوژیک توده‌ها و بیومارکرهای توموری.",
-    "visitFee": 350000,
-    "onlineConsultFee": 250000,
-    "workDays": ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه"],
-    "workHours": "۰۸:۰۰ الی ۱۳:۰۰",
-    "schedule": ["شنبه تا چهارشنبه ۰۸:۰۰ الی ۱۳:۰۰"],
-    "status": "approved",
-    "rating": 4.8,
-    "totalVisits": 115,
-    "badges": ["عضو هیئت علمی", "مسئول فنی آزمایشگاه"],
-    "registeredAt": "2026-01-18T14:00:00.000Z"
-  },
-  {
-    "id": "prof-5",
-    "username": "dr_ebrahimi",
-    "password": "123",
-    "name": "دکتر حمیدرضا ابراهیمی",
-    "academicRank": "دانشیار",
-    "departmentId": "theriogenology",
-    "departmentName": "بخش مامایی و بیماری‌های تولید مثل دام",
-    "subSpecialty": "متخصص مامایی، ناباروری و انتقال جنین دام‌های مزرعه و حیوانات خانگی",
-    "medicalCouncilNo": "۱۶۵۳۰",
-    "phone": "09155556677",
-    "email": "h.ebrahimi@um.ac.ir",
-    "avatar": "https://images.unsplash.com/photo-1582750433449-648ed127bb54?auto=format&fit=crop&w=600&q=80",
-    "bio": "عضو هیئت علمی گروه مامایی و بیماری‌های تولیدمثل با سابقه ۱۵ ساله در مدیریت زایمان‌های پرخطر و درمان‌های ناباروری.",
-    "visitFee": 390000,
-    "onlineConsultFee": 270000,
-    "workDays": ["یکشنبه", "سه‌شنبه", "چهارشنبه"],
-    "workHours": "۰۹:۳۰ الی ۱۳:۳۰",
-    "schedule": ["یکشنبه، سه‌شنبه، چهارشنبه ۰۹:۳۰ الی ۱۳:۳۰"],
-    "status": "approved",
-    "rating": 4.9,
-    "totalVisits": 74,
-    "badges": ["عضو هیئت علمی"],
-    "registeredAt": "2026-01-20T10:45:00.000Z"
-  },
-  {
-    "id": "prof-6",
-    "username": "dr_karimi",
-    "password": "123",
-    "name": "دکتر سامان کریمی",
-    "academicRank": "استادیار",
-    "departmentId": "internal-large",
-    "departmentName": "بخش بیماری‌های درونی دام‌های بزرگ و نشخوارکنندگان",
-    "subSpecialty": "متخصص بیماری‌های درونی اسب، کولیک و طب گله",
-    "medicalCouncilNo": "۲۱۹۸۴",
-    "phone": "09156667788",
-    "email": "s.karimi@um.ac.ir",
-    "avatar": "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=600&q=80",
-    "bio": "متخصص درمان‌های اورژانسی اسب و پایش سلامت فارم‌های صنعتی، مسئول کلینیک سیار دامپزشکی دانشگاه فردوسی.",
-    "visitFee": 500000,
-    "onlineConsultFee": 350000,
-    "workDays": ["شنبه", "دوشنبه", "پنجشنبه"],
-    "workHours": "۰۸:۰۰ الی ۱۲:۰۰",
-    "schedule": ["شنبه، دوشنبه، پنجشنبه ۰۸:۰۰ الی ۱۲:۰۰"],
-    "status": "approved",
-    "rating": 5.0,
-    "totalVisits": 89,
-    "badges": ["عضو هیئت علمی", "مسئول کلینیک سیار"],
-    "registeredAt": "2026-01-22T08:30:00.000Z"
-  }
-];
+// پایگاه اساتید واقعی ثبت‌شده در کلود (بدون داده‌های تستی)
+const INITIAL_PROFESSORS = [];
 
 function getStoredProfessors() {
   try {
     const raw = localStorage.getItem("vet_professors");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const idMap = new Map();
-        parsed.forEach(p => idMap.set(p.id, p));
-        INITIAL_PROFESSORS.forEach(p => {
-          if (!idMap.has(p.id)) idMap.set(p.id, p);
-        });
-        return Array.from(idMap.values());
+      if (Array.isArray(parsed)) {
+        // فیلتر کردن و پاک‌سازی هرگونه اساتید تستی و ماک قدیمی (prof-1 تا prof-6)
+        const realProfessors = parsed.filter(p => p && p.id && !p.id.match(/^prof-[1-6]$/));
+        return realProfessors;
       }
     }
   } catch (e) {}
-  return [...INITIAL_PROFESSORS];
+  return [];
 }
 
 function saveStoredProfessors(profs) {
@@ -2895,59 +2742,8 @@ async function initApp() {
     console.warn("Init fetch notice:", e);
   }
 
-  // ۲. اتصال تکمیلی غیرمسدودکننده به ابر فایربیس (در پس‌زمینه بدون معطلی برای کاربران داخل کشور)
-  if (typeof window !== "undefined" && window.VetFirebase) {
-    setTimeout(async () => {
-      try {
-        const timeoutPromise = new Promise((_, r) => setTimeout(() => r("timeout"), 2500));
-        const [cloudProfs, cloudUsers, cloudAppts] = await Promise.race([
-          Promise.all([
-            window.VetFirebase.getProfessors(),
-            window.VetFirebase.getUsers(),
-            window.VetFirebase.getAppointments()
-          ]),
-          timeoutPromise
-        ]);
-
-        if (cloudProfs && cloudProfs.length > 0) {
-          state.professors = cloudProfs;
-          saveStoredProfessors(cloudProfs);
-        }
-        if (cloudUsers && cloudUsers.length > 0) {
-          state.cloudUsers = cloudUsers;
-        }
-        if (cloudAppts && cloudAppts.length > 0) {
-          state.appointments = cloudAppts;
-        }
-        renderApp();
-
-        // شنوندگان زنده (Real-time Snapshots) در صورت دسترسی
-        window.VetFirebase.onProfessorsChange((profs) => {
-          if (profs && profs.length > 0) {
-            state.professors = profs;
-            saveStoredProfessors(profs);
-            renderApp();
-          }
-        });
-
-        window.VetFirebase.onUsersChange((users) => {
-          if (users && users.length > 0) {
-            state.cloudUsers = users;
-            renderApp();
-          }
-        });
-
-        window.VetFirebase.onAppointmentsChange((appts) => {
-          if (appts && appts.length > 0) {
-            state.appointments = appts;
-            renderApp();
-          }
-        });
-      } catch (fbErr) {
-        // فایربیس در صورت فعال نبودن فیلترشکن بدون خطا نادیده گرفته می‌شود
-      }
-    }, 50);
-  }
+  // ۲. مدیریت اتصال ابری فایربیس (سرور داخلی جهش‌کالا وظیفه سینک زنده را بر عهده دارد، لذا نیازی به خواندن مستقیم کلاینت از فایربیس نیست)
+  console.log("سامانه بیمارستان تخصصی با موفقیت از سرور داخلی بارگذاری گردید.");
 
   // ۳. نظارت مداوم و پولینگ پنل مدیریت (دقیقاً مثل جهش‌کالا: هر ۴ ثانیه در صورت باز بودن پنل)
   setInterval(() => {

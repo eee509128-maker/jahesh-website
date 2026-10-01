@@ -13,6 +13,15 @@ import {
   writeVetUsers,
   performAiVeterinaryTriage
 } from './api/vet-hospital.js';
+import { initializeApp, getApps } from 'firebase/app';
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  deleteDoc,
+  collection,
+  onSnapshot
+} from 'firebase/firestore';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +29,51 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 const HOST = '0.0.0.0';
+
+// ==========================================
+// پایگاه ابری فایربیس در سرور (۱۰۰٪ مستقل از فیلترشکن - اتصال آنی به گوگل کلود)
+// ==========================================
+const firebaseConfig = {
+  projectId: 'tranquil-keyword-5ggh3',
+  appId: '1:39375983688:web:6405230219491a92a7f5a6',
+  apiKey: 'AIzaSyBoilrOWTMjbpG1IHvKDkRD9Dm20Pl7UW8',
+  authDomain: 'tranquil-keyword-5ggh3.firebaseapp.com'
+};
+
+const serverFirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig, 'vet-cloud-server');
+const serverDb = getFirestore(serverFirebaseApp, 'ai-studio-jaheshwebsite-13126c61-5143-4f84-b87e-dcc220de14bc');
+
+// شنود زنده و آنی دیتابیس ابری فایربیس بر روی سرور
+try {
+  onSnapshot(collection(serverDb, 'professors'), (snap) => {
+    const profs = [];
+    snap.docs.forEach((d) => profs.push({ ...d.data(), id: d.id }));
+    if (profs.length > 0) {
+      writeVetProfessors(profs);
+      console.log(`[Server Firestore] Real-time synced ${profs.length} professors`);
+    }
+  }, (err) => console.warn('[Server Firestore] professors listener notice:', err));
+
+  onSnapshot(collection(serverDb, 'users'), (snap) => {
+    const users = [];
+    snap.docs.forEach((d) => users.push({ ...d.data(), id: d.id }));
+    if (users.length > 0) {
+      writeVetUsers(users);
+      console.log(`[Server Firestore] Real-time synced ${users.length} users`);
+    }
+  }, (err) => console.warn('[Server Firestore] users listener notice:', err));
+
+  onSnapshot(collection(serverDb, 'vet_appointments'), (snap) => {
+    const appts = [];
+    snap.docs.forEach((d) => appts.push({ ...d.data(), id: d.id }));
+    if (appts.length > 0) {
+      writeVetAppointments(appts);
+      console.log(`[Server Firestore] Real-time synced ${appts.length} appointments`);
+    }
+  }, (err) => console.warn('[Server Firestore] appointments listener notice:', err));
+} catch (e) {
+  console.warn('[Server Firestore] listener init error:', e);
+}
 
 // Global CORS Middleware - Enables Cross-Origin API calls from Google AI Studio, Android, iOS, Windows and external apps
 app.use((req, res, next) => {
@@ -1130,7 +1184,12 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register'], (req, re
       console.warn('Sync to universal users error:', e);
     }
 
-    // If registered as a doctor or PhD, also register/sync in professors.json
+    // ذخیره مستقیم در پایگاه ابری فایربیس (اتصال ۲۴ ساعته سرور بدون نیاز به فیلترشکن)
+    try {
+      setDoc(doc(serverDb, 'users', newUser.id), newUser, { merge: true }).catch(() => {});
+    } catch (e) {}
+
+    // If registered as a doctor or PhD, also register/sync in professors.json & Firestore
     let newProfessor = null;
     if (role === 'doctor' || role === 'phd') {
       const professors = readVetProfessors();
@@ -1165,6 +1224,9 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register'], (req, re
       };
       professors.unshift(newProfessor);
       writeVetProfessors(professors);
+      try {
+        setDoc(doc(serverDb, 'professors', newProfessor.id), newProfessor, { merge: true }).catch(() => {});
+      } catch (e) {}
     }
 
     return res.json({
@@ -1215,6 +1277,11 @@ app.post(['/api/vet/users/delete', '/vet-hospital/api/users/delete'], (req, res)
     let universal = readUsersFromDisk();
     universal = universal.filter((u) => u.id !== id && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
     writeUsersToDisk(universal);
+
+    // 3. Remove from Firestore cloud database
+    try {
+      if (id) deleteDoc(doc(serverDb, 'users', id)).catch(() => {});
+    } catch (e) {}
 
     return res.json({ success: true, message: 'کاربر با موفقیت حذف گردید.' });
   } catch (err) {
@@ -1283,13 +1350,21 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
     };
 
     const existingIndex = professors.findIndex((p) => p.id === newProf.id || (incoming.medicalCouncilNo && p.medicalCouncilNo === incoming.medicalCouncilNo));
+    let finalProf = newProf;
     if (existingIndex >= 0) {
       professors[existingIndex] = { ...professors[existingIndex], ...newProf };
+      finalProf = professors[existingIndex];
     } else {
       professors.unshift(newProf);
     }
     writeVetProfessors(professors);
-    return res.json({ success: true, professor: newProf, message: 'ثبت‌نام استاد با موفقیت انجام شد و پروفایل تخصصی در سامانه فعال گردید.' });
+
+    // ذخیره در فایربیس از سمت سرور (اتصال آنی و بدون فیلترشکن)
+    try {
+      setDoc(doc(serverDb, 'professors', finalProf.id), finalProf, { merge: true }).catch(() => {});
+    } catch (e) {}
+
+    return res.json({ success: true, professor: finalProf, message: 'ثبت‌نام استاد با موفقیت انجام شد و پروفایل تخصصی در سامانه فعال گردید.' });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -1320,6 +1395,12 @@ app.post(['/api/vet/professors/verify', '/vet-hospital/api/professors/verify'], 
     if (badges) professors[idx].badges = badges;
     professors[idx].verifiedAt = new Date().toISOString();
     writeVetProfessors(professors);
+
+    // به‌روزرسانی در فایربیس از سمت سرور
+    try {
+      setDoc(doc(serverDb, 'professors', professors[idx].id), professors[idx], { merge: true }).catch(() => {});
+    } catch (e) {}
+
     return res.json({ success: true, professor: professors[idx], message: `وضعیت استاد با موفقیت به‌روزرسانی شد.` });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
@@ -1336,6 +1417,12 @@ app.post(['/api/vet/professors/delete', '/vet-hospital/api/professors/delete'], 
     let professors = readVetProfessors();
     professors = professors.filter((p) => p.id !== professorId);
     writeVetProfessors(professors);
+
+    // حذف از فایربیس از سمت سرور
+    try {
+      deleteDoc(doc(serverDb, 'professors', professorId)).catch(() => {});
+    } catch (e) {}
+
     return res.json({ success: true, remaining: professors.length, message: 'استاد با موفقیت حذف گردید.' });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
@@ -1362,6 +1449,12 @@ app.post(['/api/vet/professors/update', '/vet-hospital/api/professors/update'], 
       updatedAt: new Date().toISOString()
     };
     writeVetProfessors(professors);
+
+    // به‌روزرسانی در فایربیس از سمت سرور
+    try {
+      setDoc(doc(serverDb, 'professors', professors[idx].id), professors[idx], { merge: true }).catch(() => {});
+    } catch (e) {}
+
     return res.json({ success: true, professor: professors[idx] });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
@@ -1417,12 +1510,21 @@ app.post(['/api/vet/appointments/book', '/vet-hospital/api/appointments/book'], 
     appointments.unshift(newAppointment);
     writeVetAppointments(appointments);
 
+    // ذخیره در فایربیس از سمت سرور
+    try {
+      setDoc(doc(serverDb, 'vet_appointments', newAppointment.id), newAppointment, { merge: true }).catch(() => {});
+    } catch (e) {}
+
     // Increment professor totalVisits count
     const professors = readVetProfessors();
     const pIdx = professors.findIndex((p) => p.id === incoming.professorId);
     if (pIdx !== -1) {
       professors[pIdx].totalVisits = (professors[pIdx].totalVisits || 0) + 1;
       writeVetProfessors(professors);
+      // به‌روزرسانی کلود
+      try {
+        setDoc(doc(serverDb, 'professors', professors[pIdx].id), professors[pIdx], { merge: true }).catch(() => {});
+      } catch (e) {}
     }
 
     return res.json({
@@ -1454,6 +1556,12 @@ app.post(['/api/vet/appointments/status', '/vet-hospital/api/appointments/status
     if (clinicalNotes) appointments[idx].clinicalNotes = clinicalNotes;
     appointments[idx].updatedAt = new Date().toISOString();
     writeVetAppointments(appointments);
+
+    // به‌روزرسانی در فایربیس از سمت سرور
+    try {
+      setDoc(doc(serverDb, 'vet_appointments', appointments[idx].id), appointments[idx], { merge: true }).catch(() => {});
+    } catch (e) {}
+
     return res.json({ success: true, appointment: appointments[idx] });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
@@ -2152,6 +2260,21 @@ app.post(['/api/users/save', '/jaheshkala/api/users/save'], (req, res) => {
       current.unshift(user);
     }
     writeUsersToDisk(current);
+
+    // همگام‌سازی با پایگاه داده کاربران بیمارستان دامپزشکی و فایربیس
+    try {
+      const vetUsers = readVetUsers();
+      const vIdx = vetUsers.findIndex((u) => u.id === user.id || (user.username && u.username && u.username.toLowerCase() === user.username.toLowerCase()) || (user.phone && u.phone && u.phone === user.phone));
+      if (vIdx >= 0) {
+        vetUsers[vIdx] = { ...vetUsers[vIdx], ...user };
+        writeVetUsers(vetUsers);
+        // آپدیت در فایربیس سرور
+        setDoc(doc(serverDb, 'users', vetUsers[vIdx].id), vetUsers[vIdx], { merge: true }).catch(() => {});
+      }
+    } catch (ve) {
+      console.warn('Error syncing updated user to vet users:', ve);
+    }
+
     return res.json({ success: true, user, count: current.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
