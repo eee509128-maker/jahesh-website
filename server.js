@@ -1103,6 +1103,33 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register'], (req, re
     users.unshift(newUser);
     writeVetUsers(users);
 
+    // همگام‌سازی با پایگاه داده کل کاربران سرور جهش‌کالا (Universal Users)
+    try {
+      const allUniversal = readUsersFromDisk();
+      const uMatchIdx = allUniversal.findIndex(u => matchUser(u, newUser));
+      const universalUserObj = {
+        id: newUser.id,
+        fullName: newUser.name,
+        name: newUser.name,
+        phone: newUser.phone,
+        email: newUser.email,
+        username: newUser.username,
+        role: role === 'doctor' || role === 'phd' ? 'doctor' : 'user',
+        guild: 'بیمارستان دانشکده دامپزشکی',
+        createdAt: new Date().toLocaleDateString('fa-IR'),
+        timestamp: Date.now(),
+        password: newUser.password
+      };
+      if (uMatchIdx >= 0) {
+        allUniversal[uMatchIdx] = { ...allUniversal[uMatchIdx], ...universalUserObj };
+      } else {
+        allUniversal.unshift(universalUserObj);
+      }
+      writeUsersToDisk(allUniversal);
+    } catch (e) {
+      console.warn('Sync to universal users error:', e);
+    }
+
     // If registered as a doctor or PhD, also register/sync in professors.json
     let newProfessor = null;
     if (role === 'doctor' || role === 'phd') {
@@ -1148,6 +1175,50 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register'], (req, re
     });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// GET /api/vet/users
+app.get(['/api/vet/users', '/vet-hospital/api/users'], (_req, res) => {
+  try {
+    const vetUsers = readVetUsers();
+    const universalUsers = readUsersFromDisk();
+    const mergedMap = new Map();
+    universalUsers.forEach((u) => {
+      if (u && (u.id || u.username)) mergedMap.set(u.username || u.id, u);
+    });
+    vetUsers.forEach((u) => {
+      if (u && (u.id || u.username)) mergedMap.set(u.username || u.id, u);
+    });
+    const users = Array.from(mergedMap.values());
+    return res.json({ success: true, count: users.length, users });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/vet/users/delete
+app.post(['/api/vet/users/delete', '/vet-hospital/api/users/delete'], (req, res) => {
+  try {
+    const { id, username } = req.body || {};
+    if (!id && !username) {
+      return res.status(400).json({ success: false, error: 'User id or username is required' });
+    }
+    const cleanU = (username || '').toLowerCase();
+
+    // 1. Remove from vet users
+    let vetUsers = readVetUsers();
+    vetUsers = vetUsers.filter((u) => u.id !== id && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
+    writeVetUsers(vetUsers);
+
+    // 2. Remove from universal users
+    let universal = readUsersFromDisk();
+    universal = universal.filter((u) => u.id !== id && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
+    writeUsersToDisk(universal);
+
+    return res.json({ success: true, message: 'کاربر با موفقیت حذف گردید.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

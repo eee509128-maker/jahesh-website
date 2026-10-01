@@ -724,6 +724,101 @@ switch ($action) {
         break;
 
     // ==========================================
+    // PROFESSORS & VET HOSPITAL API
+    // ==========================================
+    case 'professors':
+    case 'get_professors':
+    case 'api/professors':
+    case 'professors/save':
+    case 'professors/verify':
+    case 'professors/delete':
+        $profsFile = $dataDir . '/professors.json';
+        $profs = readJsonFile($profsFile, []);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'DELETE' || $action === 'professors/delete' || isset($_GET['delete'])) {
+            $delId = isset($_GET['id']) ? (string)$_GET['id'] : (isset($inputData['id']) ? (string)$inputData['id'] : (isset($inputData['professorId']) ? (string)$inputData['professorId'] : ''));
+            if (!empty($delId)) {
+                $profs = array_values(array_filter($profs, function($p) use ($delId) {
+                    return isset($p['id']) && (string)$p['id'] !== $delId;
+                }));
+                writeJsonFile($profsFile, $profs);
+                echo json_encode(['success' => true, 'count' => count($profs), 'professors' => $profs]);
+                exit;
+            }
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if ($action === 'professors/verify' || isset($inputData['professorId'])) {
+                $targetId = (string)($inputData['professorId'] ?? $inputData['id'] ?? '');
+                $newStatus = (string)($inputData['status'] ?? 'approved');
+
+                foreach ($profs as $idx => $p) {
+                    if (isset($p['id']) && (string)$p['id'] === $targetId) {
+                        $profs[$idx]['status'] = $newStatus;
+                        $profs[$idx]['isApproved'] = ($newStatus === 'approved');
+                        $profs[$idx]['updatedAt'] = date('c');
+                        break;
+                    }
+                }
+                writeJsonFile($profsFile, $profs);
+                echo json_encode(['success' => true, 'status' => $newStatus, 'professors' => $profs]);
+                exit;
+            }
+
+            if (is_array($inputData) && !empty($inputData)) {
+                $targetId = isset($inputData['id']) ? (string)$inputData['id'] : ('prof-' . time());
+                $inputData['id'] = $targetId;
+                $inputData['updatedAt'] = date('c');
+
+                $foundIdx = -1;
+                foreach ($profs as $idx => $p) {
+                    if ((isset($p['id']) && (string)$p['id'] === $targetId) ||
+                        (isset($p['username'], $inputData['username']) && !empty($inputData['username']) && strtolower(trim($p['username'])) === strtolower(trim($inputData['username'])))) {
+                        $foundIdx = $idx;
+                        break;
+                    }
+                }
+
+                if ($foundIdx >= 0) {
+                    $profs[$foundIdx] = array_merge($profs[$foundIdx], $inputData);
+                } else {
+                    array_unshift($profs, $inputData);
+                }
+
+                writeJsonFile($profsFile, $profs);
+                echo json_encode(['success' => true, 'professor' => $inputData, 'count' => count($profs), 'professors' => $profs]);
+                exit;
+            }
+        }
+
+        echo json_encode(['success' => true, 'count' => count($profs), 'professors' => $profs]);
+        exit;
+        break;
+
+    case 'appointments':
+    case 'get_appointments':
+    case 'api/appointments':
+    case 'appointments/book':
+    case 'appointments/save':
+        $apptsFile = $dataDir . '/vet_appointments.json';
+        $appts = readJsonFile($apptsFile, []);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_array($inputData)) {
+            $targetId = isset($inputData['id']) ? (string)$inputData['id'] : ('appt-' . time());
+            $inputData['id'] = $targetId;
+            $inputData['createdAt'] = $inputData['createdAt'] ?? date('c');
+
+            array_unshift($appts, $inputData);
+            writeJsonFile($apptsFile, $appts);
+            echo json_encode(['success' => true, 'appointment' => $inputData, 'count' => count($appts), 'appointments' => $appts]);
+            exit;
+        }
+
+        echo json_encode(['success' => true, 'count' => count($appts), 'appointments' => $appts]);
+        exit;
+        break;
+
+    // ==========================================
     // APP AUTH & LICENSE API
     // ==========================================
     case 'app-auth':
