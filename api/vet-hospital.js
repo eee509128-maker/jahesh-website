@@ -13,8 +13,31 @@ if (!fs.existsSync(DATA_DIR)) {
 const DEPARTMENTS_FILE = path.join(DATA_DIR, 'departments.json');
 const PROFESSORS_FILE = path.join(DATA_DIR, 'professors.json');
 const APPOINTMENTS_FILE = path.join(DATA_DIR, 'appointments.json');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
 
 // Helpers for reading/writing JSON data
+export function readVetUsers() {
+  if (fs.existsSync(USERS_FILE)) {
+    try {
+      const raw = fs.readFileSync(USERS_FILE, 'utf8');
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn('Error reading users.json:', e);
+    }
+  }
+  return [];
+}
+
+export function writeVetUsers(list) {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    console.error('Error writing users.json:', e);
+    return false;
+  }
+}
+
 export function readVetDepartments() {
   if (fs.existsSync(DEPARTMENTS_FILE)) {
     try {

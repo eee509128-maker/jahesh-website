@@ -182,6 +182,7 @@ let state = {
   invoiceModalOpen: false,
   authModalOpen: false,
   myAppointmentsModalOpen: false,
+  adminModalOpen: false,
   mobileMenuOpen: false,
 
   triageForm: {
@@ -206,8 +207,8 @@ let state = {
     departmentId: "surgery-anesthesia",
     professorId: "",
     visitType: "in_person",
-    appointmentDate: "فردا - ساعت ۱۰:۰۰ صبح",
-    appointmentTime: "۱۰:۰۰ صبح",
+    appointmentDate: "شنبه آینده - ساعت ۰۹:۰۰ صبح",
+    appointmentTime: "۰۹:۰۰ صبح",
     symptoms: "",
     clientName: "",
     clientPhone: "",
@@ -218,8 +219,10 @@ let state = {
   authForm: {
     mode: "login", // "login" | "register"
     role: "client", // "client" | "doctor" | "phd"
-    phone: "",
+    username: "",
     password: "",
+    phone: "",
+    email: "",
     name: "",
     petName: "",
     medicalCouncilNo: "",
@@ -227,8 +230,11 @@ let state = {
     academicRank: "استادیار",
     departmentId: "surgery-anesthesia",
     subSpecialty: "",
+    workDays: ["شنبه", "دوشنبه", "چهارشنبه"],
+    workHours: "۰۹:۰۰ الی ۱۳:۰۰",
     visitFee: 380000,
-    onlineConsultFee: 250000
+    onlineConsultFee: 250000,
+    bio: ""
   },
 
   trackQuery: "",
@@ -522,31 +528,74 @@ async function handlePaymentReturn() {
   }
 }
 
-// ثبت‌نام یکپارچه بر اساس نقش (کاربر عادی، پزشک، دانشجوی PhD)
+// ثبت‌نام و ورود یکپارچه با نام کاربری و رمز عبور (دقیقاً مانند جهش‌کالا)
 window.handleUnifiedAuthSubmit = async function(e) {
   if (e && e.preventDefault) e.preventDefault();
   const f = state.authForm;
 
-  if (!f.phone) {
-    alert("شماره تلفن همراه الزامی است.");
-    return;
-  }
-
   if (f.mode === "login") {
-    const user = {
-      phone: f.phone,
-      name: f.name || "کاربر سامانه",
-      role: f.role
-    };
-    state.currentUser = user;
-    localStorage.setItem("vet_user", JSON.stringify(user));
-    state.authModalOpen = false;
-    alert("ورود با موفقیت انجام شد.");
-    renderApp();
-    return;
+    const identifier = (f.username || f.phone || f.email || "").trim();
+    if (!identifier) {
+      alert("لطفاً نام کاربری یا ایمیل خود را وارد فرمایید.");
+      return;
+    }
+    if (!f.password) {
+      alert("لطفاً رمز عبور خود را وارد فرمایید.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: identifier,
+          password: f.password
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        state.currentUser = data.user;
+        localStorage.setItem("vet_user", JSON.stringify(data.user));
+        state.authModalOpen = false;
+        alert(data.message || "ورود با موفقیت انجام شد.");
+        renderApp();
+        return;
+      } else {
+        alert(data.error || "نام کاربری یا رمز عبور اشتباه است.");
+        return;
+      }
+    } catch (err) {
+      // Fallback check for admin
+      if (identifier.toLowerCase() === "jahesh1395@gmail.com" && f.password === "Erfan3365!") {
+        const adminUser = {
+          id: "admin-1",
+          username: "jahesh1395@gmail.com",
+          name: "مهندس عرفان مقدم متقی (مدیر ارشد سامانه)",
+          role: "admin",
+          isAdmin: true
+        };
+        state.currentUser = adminUser;
+        localStorage.setItem("vet_user", JSON.stringify(adminUser));
+        state.authModalOpen = false;
+        alert("ورود موفقیت‌آمیز به عنوان مدیر ارشد بیمارستان.");
+        renderApp();
+        return;
+      }
+      alert("خطای ارتباط با سرور.");
+      return;
+    }
   }
 
-  // ثبت‌نام
+  // ثبت‌نام جدید
+  if (!f.username) {
+    alert("نام کاربری الزامی است.");
+    return;
+  }
+  if (!f.password) {
+    alert("تعیین رمز عبور الزامی است.");
+    return;
+  }
   if (!f.name) {
     alert("نام و نام خانوادگی الزامی است.");
     return;
@@ -554,50 +603,100 @@ window.handleUnifiedAuthSubmit = async function(e) {
 
   const dept = state.departments.find(d => d.id === f.departmentId);
   const deptName = dept ? dept.name : "دپارتمان تخصصی";
+  const academicTitle = f.role === "phd" ? "دانشجوی دکتری تخصصی (PhD) / دستیار" : (f.academicRank || "استادیار");
 
-  if (f.role === "doctor" || f.role === "phd") {
-    const academicTitle = f.role === "phd" ? "دانشجوی دکتری تخصصی (PhD) / دستیار" : (f.academicRank || "استادیار");
-    const payload = {
-      name: f.name.trim(),
-      academicRank: academicTitle,
-      departmentId: f.departmentId,
-      departmentName: deptName,
-      subSpecialty: f.subSpecialty || (f.role === "phd" ? "پژوهشگر دکتری تخصصی" : "متخصص بالینی"),
-      medicalCouncilNo: f.medicalCouncilNo || f.studentNo || "",
-      phone: f.phone,
-      visitFee: Number(f.visitFee) || (f.role === "phd" ? 280000 : 380000),
-      onlineConsultFee: Number(f.onlineConsultFee) || 200000,
-      schedule: ["شنبه تا چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰"],
-      status: "approved"
-    };
+  const registerPayload = {
+    username: f.username.trim(),
+    password: f.password.trim(),
+    name: f.name.trim(),
+    phone: (f.phone || "").trim(),
+    email: (f.email || "").trim(),
+    role: f.role,
+    academicRank: academicTitle,
+    departmentId: f.departmentId,
+    departmentName: deptName,
+    subSpecialty: f.subSpecialty || (f.role === "phd" ? "پژوهشگر دکتری تخصصی" : "متخصص بالینی"),
+    medicalCouncilNo: f.medicalCouncilNo || f.studentNo || "",
+    workDays: Array.isArray(f.workDays) && f.workDays.length > 0 ? f.workDays : ["شنبه", "دوشنبه", "چهارشنبه"],
+    workHours: f.workHours || "۰۹:۰۰ الی ۱۳:۰۰",
+    visitFee: Number(f.visitFee) || (f.role === "phd" ? 280000 : 380000),
+    onlineConsultFee: Number(f.onlineConsultFee) || 250000,
+    bio: f.bio || `عضو کادر تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد.`
+  };
 
-    try {
-      const res = await fetch("/api/vet/professors/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (data.success && data.professor) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(registerPayload)
+    });
+    const data = await res.json();
+    if (data.success && data.user) {
+      state.currentUser = data.user;
+      localStorage.setItem("vet_user", JSON.stringify(data.user));
+      if (data.professor) {
         state.professors.unshift(data.professor);
       }
-    } catch (err) {
-      console.warn("Register doc error:", err);
+      state.authModalOpen = false;
+      alert("عضویت شما با موفقیت ثبت گردید و پروفایل در سامانه فعال شد.");
+      renderApp();
+      if (window.confetti) window.confetti({ particleCount: 80, spread: 70 });
+      return;
+    } else {
+      alert(data.error || "خطا در ثبت‌نام.");
     }
+  } catch (err) {
+    console.warn("Register error:", err);
+    alert("خطای ارتباط در ثبت‌نام.");
   }
+};
 
-  const user = {
-    phone: f.phone,
-    name: f.name,
-    role: f.role,
-    departmentName: deptName
-  };
-  state.currentUser = user;
-  localStorage.setItem("vet_user", JSON.stringify(user));
-  state.authModalOpen = false;
-  alert("عضویت شما با موفقیت ثبت گردید و پروفایل شما فعال شد.");
+window.openAdminModal = function() {
+  state.adminModalOpen = true;
   renderApp();
-  if (window.confetti) window.confetti({ particleCount: 80, spread: 70 });
+};
+
+window.closeAdminModal = function() {
+  state.adminModalOpen = false;
+  renderApp();
+};
+
+window.adminApproveDoctor = async function(profId, newStatus = "approved") {
+  try {
+    const res = await fetch(`${API_BASE}/professors/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ professorId: profId, status: newStatus })
+    });
+    const data = await res.json();
+    if (data.success) {
+      const idx = state.professors.findIndex(p => p.id === profId);
+      if (idx >= 0) state.professors[idx].status = newStatus;
+      alert(`پزشک مورد نظر با موفقیت ${newStatus === 'approved' ? 'تایید و فعال' : 'رد'} شد و سریعاً برای همه به نمایش درآمد.`);
+      renderApp();
+    }
+  } catch (e) {
+    alert("خطا در تایید پزشک.");
+  }
+};
+
+window.adminDeleteDoctor = async function(profId) {
+  if (!confirm("آیا از حذف این استاد/پزشک از سامانه اطمینان دارید؟")) return;
+  try {
+    const res = await fetch(`${API_BASE}/professors/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ professorId: profId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.professors = state.professors.filter(p => p.id !== profId);
+      alert("استاد با موفقیت از سامانه حذف گردید.");
+      renderApp();
+    }
+  } catch (e) {
+    alert("خطا در حذف استاد.");
+  }
 };
 
 window.handleProfessorSearch = function(query) {
@@ -740,6 +839,8 @@ window.handleRunTriage = async function(e) {
 // رندر هدر خلوت، لوکس و تمیز
 function renderHeader() {
   const u = state.currentUser;
+  const isAdminUser = u && (u.isAdmin || u.role === 'admin' || (u.username && u.username.toLowerCase() === 'jahesh1395@gmail.com') || (u.email && u.email.toLowerCase() === 'jahesh1395@gmail.com'));
+
   return `
     <header class="bg-[#090d16] border-b border-slate-800/80 sticky top-0 z-40 backdrop-blur-md bg-opacity-95 shadow-lg">
       <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4 flex-nowrap">
@@ -769,14 +870,21 @@ function renderHeader() {
 
         <!-- دکمه‌های ورود و وب‌سایت اصلی جهش -->
         <div class="flex items-center gap-2 sm:gap-3 shrink-0 whitespace-nowrap">
+          ${isAdminUser ? `
+            <button onclick="openAdminModal()" class="flex items-center gap-1.5 text-xs font-black text-amber-300 bg-amber-950/80 hover:bg-amber-900 border border-amber-500/60 px-3.5 py-2 rounded-xl transition-all shadow-lg shadow-amber-900/30 shrink-0 cursor-pointer animate-pulse">
+              <span>⚙️</span>
+              <span>پنل مدیریت بیمارستان</span>
+            </button>
+          ` : ''}
+
           ${u ? `
             <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700/80 px-3 py-1.5 rounded-xl whitespace-nowrap shrink-0">
               <div class="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-xs font-black text-white shrink-0">
-                ${u.role === 'doctor' ? '👨‍⚕️' : u.role === 'phd' ? '🎓' : '🐾'}
+                ${isAdminUser ? '👑' : u.role === 'doctor' ? '👨‍⚕️' : u.role === 'phd' ? '🎓' : '🐾'}
               </div>
               <div class="text-right hidden sm:block">
                 <div class="text-xs font-bold text-white">${u.name}</div>
-                <div class="text-[10px] text-emerald-400">${u.role === 'doctor' ? 'استاد هیئت علمی' : u.role === 'phd' ? 'دانشجوی دکتری' : 'سرپرست بیمار'}</div>
+                <div class="text-[10px] text-emerald-400">${isAdminUser ? 'مدیر ارشد سامانه' : u.role === 'doctor' ? 'استاد هیئت علمی' : u.role === 'phd' ? 'دانشجوی دکتری' : 'سرپرست بیمار'}</div>
               </div>
               <button onclick="openMyAppointmentsModal()" title="نوبت‌ها" class="text-xs text-slate-300 hover:text-white p-1 hover:bg-slate-700 rounded-lg">📋</button>
               <button onclick="logoutUser()" title="خروج" class="text-xs text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-950/40 rounded-lg">✕</button>
@@ -813,7 +921,11 @@ function renderHeader() {
             <button onclick="setVetTab('professors')" class="p-2.5 rounded-xl bg-slate-800 text-right text-white">👨‍⚕️ اساتید هیئت علمی</button>
             <button onclick="setVetTab('triage')" class="p-2.5 rounded-xl bg-slate-800 text-right text-emerald-400">✨ تریاژ هوش مصنوعی</button>
             <button onclick="setVetTab('track')" class="p-2.5 rounded-xl bg-slate-800 text-right text-white">🔍 پیگیری نوبت</button>
-            <button onclick="openAuthModal('register')" class="p-2.5 rounded-xl bg-emerald-950 text-right text-emerald-300">👤 عضویت و ثبت‌نام</button>
+            ${isAdminUser ? `
+              <button onclick="openAdminModal()" class="p-2.5 rounded-xl bg-amber-950 text-right text-amber-300">⚙️ پنل مدیریت</button>
+            ` : `
+              <button onclick="openAuthModal('register')" class="p-2.5 rounded-xl bg-emerald-950 text-right text-emerald-300">👤 عضویت و ثبت‌نام</button>
+            `}
           </div>
           <a href="/" onclick="window.location.href='/'; return true;" class="block text-center text-xs text-slate-300 hover:text-white py-2.5 bg-slate-800 rounded-xl border border-slate-700">
             🌐 ورود به وب‌سایت اصلی جهش ←
@@ -1166,7 +1278,7 @@ function renderTrackSection() {
   `;
 }
 
-// مدال نوبت‌دهی هوشمند متصل به هوش مصنوعی
+// مدال نوبت‌دهی هوشمند متصل به هوش مصنوعی با هدر حرفه‌ای و زمان‌بندی و تعرفه اختصاصی اساتید
 function renderBookingModal() {
   if (!state.bookingModalOpen) return "";
   const currentStep = state.bookingStep;
@@ -1175,24 +1287,49 @@ function renderBookingModal() {
   const currentProf = state.professors.find(p => p.id === f.professorId);
   const profsInDept = state.professors.filter(p => p.departmentId === f.departmentId);
 
-  return `
-    <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar text-right">
-        
-        <button onclick="closeBookingModal()" class="absolute top-5 left-5 text-slate-400 hover:text-white text-lg">✕</button>
+  // Available days dynamically gathered from professors in this department
+  const availableScheduleOptions = [
+    { label: "شنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "شنبه", time: "۰۹:۰۰ الی ۱۳:۰۰" },
+    { label: "یکشنبه آینده - سانس صبح (۱۰:۰۰ الی ۱۴:۰۰)", day: "یکشنبه", time: "۱۰:۰۰ الی ۱۴:۰۰" },
+    { label: "دوشنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "دوشنبه", time: "۰۹:۰۰ الی ۱۳:۰۰" },
+    { label: "سه‌شنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "سه‌شنبه", time: "۰۹:۰۰ الی ۱۳:۰۰" },
+    { label: "چهارشنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "چهارشنبه", time: "۰۹:۰۰ الی ۱۳:۰۰" },
+    { label: "پنجشنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۲:۰۰)", day: "پنجشنبه", time: "۰۹:۰۰ الی ۱۲:۰۰" }
+  ];
 
-        <!-- نشان تریاژ و عنوان مدال با چیدمان دقیق و تراز -->
-        <div class="mb-6">
-          <div class="flex items-center justify-between mb-2">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-xs font-bold">
-              <span>✨ سامانه ویزیت دقیق درمانگاه با هوش مصنوعی</span>
-            </span>
-            <span class="text-xs text-slate-400">مرحله ${currentStep} از ۴</span>
+  return `
+    <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+      <div class="bg-slate-900 border border-slate-700/90 w-full max-w-2xl rounded-3xl p-5 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar text-right">
+        
+        <!-- هدر کاملاً تفکیک‌شده، مدرن و حرفه‌ای بدون تداخل دکمه ضربدر -->
+        <div class="border-b border-slate-800 pb-4 mb-6">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-xs font-bold">
+              <span>✨ سامانه ویزیت هوشمند بیمارستان دامپزشکی</span>
+            </div>
+            
+            <div class="flex items-center gap-2.5 shrink-0">
+              <span class="inline-flex items-center px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-black text-emerald-400">
+                مرحله ${currentStep} از ۴
+              </span>
+              <button onclick="closeBookingModal()" title="بستن" class="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all text-sm border border-slate-700 cursor-pointer">
+                ✕
+              </button>
+            </div>
           </div>
-          <h3 class="text-lg font-black text-white">
+
+          <!-- نوار پیشرفت خلاقانه ۴ مرحله‌ای -->
+          <div class="grid grid-cols-4 gap-1.5 pt-1">
+            <div class="h-1.5 rounded-full transition-all ${currentStep >= 1 ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-800'}"></div>
+            <div class="h-1.5 rounded-full transition-all ${currentStep >= 2 ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-800'}"></div>
+            <div class="h-1.5 rounded-full transition-all ${currentStep >= 3 ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-800'}"></div>
+            <div class="h-1.5 rounded-full transition-all ${currentStep >= 4 ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-800'}"></div>
+          </div>
+
+          <h3 class="text-base sm:text-lg font-black text-white mt-3">
             ${currentStep === 1 ? 'مرحله اول: مشخصات و شرح حال بالینی بیمار' : ''}
-            ${currentStep === 2 ? 'مرحله دوم: اساتید و متخصصین منتخب هوش مصنوعی' : ''}
-            ${currentStep === 3 ? 'مرحله سوم: زمان‌بندی و نوع ویزیت' : ''}
+            ${currentStep === 2 ? 'مرحله دوم: انتخاب زمان و روز ویزیت در دپارتمان' : ''}
+            ${currentStep === 3 ? 'مرحله سوم: انتخاب استاد معالج و مشاهده تعرفه اختصاصی' : ''}
             ${currentStep === 4 ? 'مرحله چهارم: مشخصات سرپرست و پیش‌فاکتور زیپال' : ''}
           </h3>
         </div>
@@ -1204,7 +1341,7 @@ function renderBookingModal() {
               <label class="block text-xs font-bold text-slate-300 mb-2">گونه بیمار را انتخاب فرمایید:</label>
               <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
                 ${['سگ', 'گربه', 'پرنده', 'اسب', 'دام بزرگ', 'حیوان خاص'].map(type => `
-                  <button type="button" onclick="selectBookingAnimalType('${type}')" class="p-3 rounded-xl border text-center transition-all ${f.animalType === type ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold' : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-slate-600'}">
+                  <button type="button" onclick="selectBookingAnimalType('${type}')" class="p-3 rounded-xl border text-center transition-all cursor-pointer ${f.animalType === type ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500' : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:border-slate-600'}">
                     <div class="text-xl mb-1">${type === 'سگ' ? '🐕' : type === 'گربه' ? '🐈' : type === 'پرنده' ? '🦜' : type === 'اسب' ? '🐎' : type === 'دام بزرگ' ? '🐄' : '🐇'}</div>
                     <div class="text-xs">${type}</div>
                   </button>
@@ -1227,110 +1364,132 @@ function renderBookingModal() {
               </div>
             </div>
 
-            <!-- کادر شرح حال جهت تحلیل هوش مصنوعی -->
             <div>
-              <label class="block text-xs font-bold text-slate-300 mb-1.5">شرح حال بالینی و علائم بیماری (بررسی و طبقه‌بندی هوشمند توسط هوش مصنوعی) *</label>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">شرح حال بالینی و علائم بیماری (ارزیابی هوشمند توسط هوش مصنوعی) *</label>
               <textarea required rows="3" placeholder="مثال: بیمار دچار لنگش شدید پای راست عقب شده و هنگام راه رفتن ناله می‌کند، از پله بالا نمی‌رود و بی‌حال است..." oninput="state.bookingForm.symptoms=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.symptoms}</textarea>
             </div>
 
             <div class="flex justify-end pt-3">
-              <button onclick="runBookingAiTriageAndProceed()" class="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs px-7 py-3.5 rounded-xl shadow-lg shadow-emerald-600/25 transition-all ${state.aiAnalyzingBooking ? 'opacity-70 pointer-events-none' : ''}">
-                ${state.aiAnalyzingBooking ? '✨ در حال تحلیل شرح حال با هوش مصنوعی...' : '✨ تحلیل شرح حال با هوش مصنوعی و معرفی اساتید ←'}
+              <button onclick="runBookingAiTriageAndProceed()" class="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs px-7 py-3.5 rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer ${state.aiAnalyzingBooking ? 'opacity-70 pointer-events-none' : ''}">
+                ${state.aiAnalyzingBooking ? '✨ در حال تحلیل شرح حال با هوش مصنوعی...' : '✨ تحلیل شرح حال با هوش مصنوعی و انتخاب زمان ویزیت ←'}
               </button>
             </div>
           </div>
         ` : ''}
 
-        <!-- مرحله دوم: اساتید پیشنهادی هوش مصنوعی بر اساس دپارتمان تشخیص داده شده -->
+        <!-- مرحله دوم: انتخاب زمان و روز ویزیت در دپارتمان تشخیص داده شده -->
         ${currentStep === 2 ? `
-          <div class="space-y-4">
-            <!-- بنر تشخیص هوش مصنوعی -->
-            <div class="p-3.5 rounded-2xl bg-emerald-950/70 border border-emerald-500/40 text-xs">
-              <div class="flex items-center justify-between mb-1">
-                <span class="font-bold text-emerald-300">✨ دپارتمان پیشنهادی هوش مصنوعی:</span>
-                <span class="font-black text-white bg-emerald-800/60 px-2.5 py-0.5 rounded-lg">${currentDept.name}</span>
+          <div class="space-y-5">
+            <div class="p-4 rounded-2xl bg-emerald-950/70 border border-emerald-500/40 text-xs">
+              <div class="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                <span class="font-bold text-emerald-300">✨ دپارتمان ارجاعی هوش مصنوعی:</span>
+                <span class="font-black text-white bg-emerald-800/80 px-3 py-1 rounded-lg">${currentDept.name}</span>
               </div>
-              <p class="text-[11px] text-slate-300 mt-1">بر اساس شرح حال بیمار، نوبت شما به این بخش ارجاع شده است. لطفاً پزشک معالج را انتخاب فرمایید:</p>
+              <p class="text-[11px] text-slate-300 leading-relaxed">
+                بر اساس علائم ثبت شده برای <strong class="text-white">${f.animalName}</strong>، سامانه هوشمند دپارتمان فوق را پیشنهاد داده است. لطفاً روز و ساعت مراجعه مد نظر خود را انتخاب فرمایید تا لیست اساتید حاضر در آن سانس برای شما نمایش یابد:
+              </p>
             </div>
 
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-bold text-slate-300">انتخاب استاد هیئت علمی / پزشک معالج:</label>
-              <select onchange="selectBookingDepartment(this.value)" class="bg-slate-800 border border-slate-700 text-slate-300 text-[11px] px-2 py-1 rounded-lg">
-                ${state.departments.map(d => `<option value="${d.id}" ${f.departmentId === d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
-              </select>
-            </div>
-
-            <!-- لیست اساتید دپارتمان با طراحی خوشگل -->
-            <div class="space-y-2.5 max-h-56 overflow-y-auto custom-scrollbar">
-              <div onclick="selectBookingProfessor('')" class="p-3.5 rounded-2xl border cursor-pointer transition-all ${!f.professorId ? 'bg-emerald-950/60 border-emerald-500 shadow-md ring-1 ring-emerald-500/50' : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'}">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-emerald-900/80 flex items-center justify-center text-lg text-white font-bold shrink-0">🏥</div>
-                    <div>
-                      <div class="font-bold text-white text-xs">پذیرش تخصصی دپارتمان و ویزیت توسط متخصص کشیک</div>
-                      <div class="text-[11px] text-emerald-400 mt-0.5">ویزیت توسط کادر هیئت علمی شیفت کلینیک</div>
-                    </div>
-                  </div>
-                  <div class="text-xs font-bold text-emerald-400">۳۵۰,۰۰۰ تومان</div>
-                </div>
-              </div>
-
-              ${profsInDept.map(prof => `
-                <div onclick="selectBookingProfessor('${prof.id}')" class="p-3.5 rounded-2xl border cursor-pointer transition-all ${f.professorId === prof.id ? 'bg-emerald-950/60 border-emerald-500 shadow-md ring-1 ring-emerald-500/50' : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'}">
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                      <img src="${prof.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80'}" class="w-10 h-10 rounded-xl object-cover border border-emerald-500/40 shrink-0" />
-                      <div>
-                        <div class="font-bold text-white text-xs">${prof.name}</div>
-                        <div class="text-[11px] text-emerald-400 mt-0.5">${prof.academicRank} - ${prof.subSpecialty || 'متخصص کلینیکال'}</div>
-                      </div>
-                    </div>
-                    <div class="text-xs font-bold text-emerald-400">${formatPrice(prof.visitFee)}</div>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-
-            <div class="flex items-center justify-between pt-4">
-              <button onclick="setBookingStep(1)" class="text-xs text-slate-400 hover:text-white">← بازگشت</button>
-              <button onclick="setBookingStep(3)" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all">
-                مرحله بعد: زمان‌بندی ویزیت ←
-              </button>
-            </div>
-          </div>
-        ` : ''}
-
-        <!-- مرحله سوم: زمان‌بندی و نوع ویزیت -->
-        ${currentStep === 3 ? `
-          <div class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-slate-300 mb-2">نوع ویزیت</label>
-                <div class="grid grid-cols-2 gap-2">
-                  <button type="button" onclick="selectBookingVisitType('in_person')" class="p-3 rounded-xl border text-xs font-bold transition-all ${f.visitType === 'in_person' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 border-slate-700 text-slate-300'}">
-                    🏥 حضوری در درمانگاه
-                  </button>
-                  <button type="button" onclick="selectBookingVisitType('online')" class="p-3 rounded-xl border text-xs font-bold transition-all ${f.visitType === 'online' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 border-slate-700 text-slate-300'}">
-                    💻 مشاوره آنلاین تصویری
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold text-slate-300 mb-2">انتخاب روز و سانس ویزیت</label>
-                <select onchange="selectBookingDate(this.value)" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl">
-                  <option value="فردا - ساعت ۱۰:۰۰ صبح">فردا - ساعت ۱۰:۰۰ صبح</option>
-                  <option value="فردا - ساعت ۱۱:۳۰ صبح">فردا - ساعت ۱۱:۳۰ صبح</option>
-                  <option value="پس‌فردا - ساعت ۱۶:۰۰ عصر">پس‌فردا - ساعت ۱۶:۰۰ عصر</option>
-                  <option value="شنبه آینده - ساعت ۰۹:۰۰ صبح">شنبه آینده - ساعت ۰۹:۰۰ صبح</option>
-                  <option value="دوشنبه آینده - ساعت ۱۰:۳۰ صبح">دوشنبه آینده - ساعت ۱۰:۳۰ صبح</option>
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-xs font-bold text-slate-300">تغییر دستی دپارتمان (در صورت تمایل):</label>
+                <select onchange="selectBookingDepartment(this.value)" class="bg-slate-800 border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-xl">
+                  ${state.departments.map(d => `<option value="${d.id}" ${f.departmentId === d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
                 </select>
               </div>
             </div>
 
-            <div class="flex items-center justify-between pt-4">
-              <button onclick="setBookingStep(2)" class="text-xs text-slate-400 hover:text-white">← بازگشت</button>
-              <button onclick="setBookingStep(4)" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-2.5">انتخاب روز و سانس ویزیت در درمانگاه:</label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                ${availableScheduleOptions.map((opt, idx) => `
+                  <div onclick="selectBookingDate('${opt.label}')" class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${f.appointmentDate === opt.label ? 'bg-emerald-950/70 border-emerald-500 shadow-md ring-1 ring-emerald-500' : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'}">
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-emerald-400 font-bold">📅</span>
+                      <div>
+                        <div class="text-xs font-bold text-white">${opt.day}</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">ساعت: ${opt.time}</div>
+                      </div>
+                    </div>
+                    <span class="text-[10px] px-2 py-0.5 rounded-md bg-slate-700/80 text-emerald-300">آماده پذیرش</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-slate-800">
+              <button onclick="setBookingStep(1)" class="text-xs text-slate-400 hover:text-white cursor-pointer">← بازگشت</button>
+              <button onclick="setBookingStep(3)" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all cursor-pointer">
+                مرحله بعد: مشاهده اساتید و تعرفه‌ها ←
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- مرحله سوم: انتخاب استاد و تعرفه اختصاصی هر پزشک -->
+        ${currentStep === 3 ? `
+          <div class="space-y-4">
+            <div class="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700 text-xs text-slate-300 flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <span class="text-slate-400">بخش انتخابی:</span>
+                <strong class="text-white mr-1">${currentDept.name}</strong>
+              </div>
+              <div>
+                <span class="text-slate-400">زمان حضور:</span>
+                <strong class="text-emerald-400 mr-1">${f.appointmentDate}</strong>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-2">انتخاب استاد هیئت علمی / پزشک معالج (با تعرفه اختصاصی هر استاد):</label>
+              
+              <div class="space-y-2.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                <!-- گزینه ویزیت عمومی کشیک -->
+                <div onclick="selectBookingProfessor('')" class="p-3.5 rounded-2xl border cursor-pointer transition-all ${!f.professorId ? 'bg-emerald-950/70 border-emerald-500 shadow-md ring-1 ring-emerald-500' : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'}">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div class="w-12 h-12 rounded-xl bg-emerald-900/80 flex items-center justify-center text-xl text-white font-bold shrink-0">🏥</div>
+                      <div class="min-w-0">
+                        <div class="font-bold text-white text-xs">پذیرش تخصصی دپارتمان و ویزیت توسط متخصص کشیک</div>
+                        <div class="text-[11px] text-emerald-400 mt-0.5">ویزیت توسط کادر هیئت علمی شیفت کلینیک</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">ساعات حضور: همه‌روزه صبح‌ها</div>
+                      </div>
+                    </div>
+                    <div class="text-left shrink-0">
+                      <div class="text-xs font-black text-emerald-400">۳۵۰,۰۰۰ تومان</div>
+                      <div class="text-[10px] text-slate-400">تعرفه پایه دپارتمان</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- لیست اساتید دپارتمان همراه با قیمت خاص و ساعت کاری هر کدام -->
+                ${profsInDept.map(prof => `
+                  <div onclick="selectBookingProfessor('${prof.id}')" class="p-3.5 rounded-2xl border cursor-pointer transition-all ${f.professorId === prof.id ? 'bg-emerald-950/70 border-emerald-500 shadow-md ring-1 ring-emerald-500' : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'}">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <img src="${prof.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80'}" class="w-12 h-12 rounded-xl object-cover border border-emerald-500/40 shrink-0" />
+                        <div class="min-w-0">
+                          <div class="font-bold text-white text-xs flex items-center gap-2">
+                            <span>${prof.name}</span>
+                            <span class="text-[10px] bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded-md font-normal">${prof.academicRank}</span>
+                          </div>
+                          <div class="text-[11px] text-slate-300 mt-0.5 truncate">${prof.subSpecialty || 'متخصص کلینیکال دپارتمان'}</div>
+                          <div class="text-[10px] text-slate-400 mt-0.5">🕒 ساعات حضور: ${Array.isArray(prof.schedule) ? prof.schedule[0] : (prof.schedule || 'شنبه تا چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰')}</div>
+                        </div>
+                      </div>
+                      <div class="text-left shrink-0">
+                        <div class="text-xs font-black text-emerald-400">${formatPrice(prof.visitFee)}</div>
+                        <div class="text-[10px] text-slate-400">تعرفه اختصاصی استاد</div>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-slate-800">
+              <button onclick="setBookingStep(2)" class="text-xs text-slate-400 hover:text-white cursor-pointer">← بازگشت</button>
+              <button onclick="setBookingStep(4)" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all cursor-pointer">
                 مرحله بعد: مشخصات سرپرست و پیش‌فاکتور ←
               </button>
             </div>
@@ -1340,6 +1499,18 @@ function renderBookingModal() {
         <!-- مرحله چهارم: مشخصات سرپرست و پیش‌فاکتور -->
         ${currentStep === 4 ? `
           <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-2">نوع ویزیت:</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" onclick="selectBookingVisitType('in_person')" class="p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${f.visitType === 'in_person' ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-600/20' : 'bg-slate-800 border-slate-700 text-slate-300'}">
+                  🏥 حضوری در درمانگاه
+                </button>
+                <button type="button" onclick="selectBookingVisitType('online')" class="p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${f.visitType === 'online' ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-600/20' : 'bg-slate-800 border-slate-700 text-slate-300'}">
+                  💻 مشاوره آنلاین تصویری
+                </button>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">نام و نام خانوادگی سرپرست *</label>
@@ -1351,28 +1522,32 @@ function renderBookingModal() {
               </div>
             </div>
 
-            <div class="bg-slate-800/70 border border-slate-700 p-4 rounded-2xl space-y-2 text-xs text-slate-300">
+            <div class="bg-slate-800/80 border border-slate-700 p-4 rounded-2xl space-y-2.5 text-xs text-slate-300">
               <div class="flex items-center justify-between border-b border-slate-700 pb-2">
                 <span>بیمار / گونه:</span>
                 <strong class="text-white">${f.animalName} (${f.animalType})</strong>
               </div>
               <div class="flex items-center justify-between border-b border-slate-700 pb-2">
-                <span>دپارتمان و پزشک معالج:</span>
-                <strong class="text-white">${currentProf?.name || 'متخصص کشیک دپارتمان'} - ${currentDept.name}</strong>
+                <span>دپارتمان تخصصی:</span>
+                <strong class="text-white">${currentDept.name}</strong>
+              </div>
+              <div class="flex items-center justify-between border-b border-slate-700 pb-2">
+                <span>استاد / پزشک معالج:</span>
+                <strong class="text-emerald-400">${currentProf?.name || 'متخصص کشیک دپارتمان'}</strong>
               </div>
               <div class="flex items-center justify-between border-b border-slate-700 pb-2">
                 <span>زمان مراجعه:</span>
-                <strong class="text-emerald-400">${f.appointmentDate}</strong>
+                <strong class="text-white">${f.appointmentDate}</strong>
               </div>
               <div class="flex items-center justify-between pt-1 text-sm font-black">
-                <span class="text-white">مبلغ قابل پرداخت:</span>
-                <span class="text-emerald-400">${formatPrice(f.visitType === 'online' ? (currentProf?.onlineConsultFee || 250000) : (currentProf?.visitFee || 380000))}</span>
+                <span class="text-white">مبلغ ویزیت اختصاصی:</span>
+                <span class="text-emerald-400">${formatPrice(f.visitType === 'online' ? (currentProf?.onlineConsultFee || 250000) : (currentProf?.visitFee || 350000))}</span>
               </div>
             </div>
 
-            <div class="flex items-center justify-between pt-4">
-              <button onclick="setBookingStep(3)" class="text-xs text-slate-400 hover:text-white">← بازگشت</button>
-              <button onclick="proceedToPayment()" class="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs px-7 py-3.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2">
+            <div class="flex items-center justify-between pt-4 border-t border-slate-800">
+              <button onclick="setBookingStep(3)" class="text-xs text-slate-400 hover:text-white cursor-pointer">← بازگشت</button>
+              <button onclick="proceedToPayment()" class="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs px-7 py-3.5 rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer">
                 <span>💳 ورود به درگاه پرداخت رسمی زیپال</span>
                 <span>←</span>
               </button>
@@ -1385,27 +1560,27 @@ function renderBookingModal() {
   `;
 }
 
-// مدال ورود و عضویت یکپارچه با ۳ نقش
+// مدال ورود و عضویت یکپارچه با نام کاربری، رمز عبور، ساعات کاری و تعرفه پزشکان
 function renderAuthModal() {
   if (!state.authModalOpen) return "";
   const f = state.authForm;
   return `
-    <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[90vh] overflow-y-auto custom-scrollbar">
-        <button onclick="closeAuthModal()" class="absolute top-5 left-5 text-slate-400 hover:text-white text-lg">✕</button>
+    <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+      <div class="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <button onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center absolute top-5 left-5 transition-all cursor-pointer border border-slate-700">✕</button>
 
-        <h3 class="text-lg font-black text-white mb-2">
-          ${f.mode === 'login' ? 'ورود به سامانه بیمارستان' : 'عضویت و ثبت‌نام در سامانه'}
+        <h3 class="text-lg font-black text-white mb-1">
+          ${f.mode === 'login' ? 'ورود به سامانه بیمارستان دانشکده دامپزشکی' : 'عضویت و ثبت‌نام در سامانه بیمارستان'}
         </h3>
-        <p class="text-xs text-slate-400 mb-6">سامانه جامع خدمات درمانی، مراجعین و اعضای هیئت علمی</p>
+        <p class="text-xs text-slate-400 mb-6">سامانه جامع خدمات درمانی، رزرو نوبت، مراجعین و اعضای هیئت علمی</p>
 
         <!-- تب‌های ورود / ثبت‌نام -->
-        <div class="flex rounded-xl bg-slate-800 p-1 mb-6">
-          <button type="button" onclick="state.authForm.mode='login'; renderApp();" class="flex-1 py-2 text-xs font-bold rounded-lg ${f.mode === 'login' ? 'bg-emerald-600 text-white' : 'text-slate-400'}">
-            ورود به حساب
+        <div class="flex rounded-xl bg-slate-800 p-1 mb-6 border border-slate-700">
+          <button type="button" onclick="state.authForm.mode='login'; renderApp();" class="flex-1 py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${f.mode === 'login' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}">
+            ورود با نام کاربری و رمز عبور
           </button>
-          <button type="button" onclick="state.authForm.mode='register'; renderApp();" class="flex-1 py-2 text-xs font-bold rounded-lg ${f.mode === 'register' ? 'bg-emerald-600 text-white' : 'text-slate-400'}">
-            ثبت‌نام جدید
+          <button type="button" onclick="state.authForm.mode='register'; renderApp();" class="flex-1 py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${f.mode === 'register' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}">
+            ثبت‌نام و عضویت جدید
           </button>
         </div>
 
@@ -1413,68 +1588,247 @@ function renderAuthModal() {
           ${f.mode === 'register' ? `
             <!-- انتخاب نقش کاربر در ثبت‌نام -->
             <div>
-              <label class="block text-xs font-bold text-slate-300 mb-2">نوع حساب و نقش شما در سامانه:</label>
+              <label class="block text-xs font-bold text-slate-300 mb-2">نوع حساب و نقش شما در سامانه بیمارستان:</label>
               <div class="grid grid-cols-3 gap-2">
-                <button type="button" onclick="state.authForm.role='client'; renderApp();" class="p-2.5 rounded-xl border text-center transition-all ${f.role === 'client' ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold' : 'bg-slate-800 border-slate-700 text-slate-400'}">
-                  <div class="text-base mb-0.5">🐾</div>
-                  <div class="text-[11px]">کاربر عادی</div>
+                <button type="button" onclick="state.authForm.role='client'; renderApp();" class="p-3 rounded-2xl border text-center transition-all cursor-pointer ${f.role === 'client' ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500' : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-600'}">
+                  <div class="text-lg mb-1">🐾</div>
+                  <div class="text-xs">کاربر عادی / سرپرست</div>
                 </button>
-                <button type="button" onclick="state.authForm.role='doctor'; renderApp();" class="p-2.5 rounded-xl border text-center transition-all ${f.role === 'doctor' ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold' : 'bg-slate-800 border-slate-700 text-slate-400'}">
-                  <div class="text-base mb-0.5">👨‍⚕️</div>
-                  <div class="text-[11px]">پزشک / استاد</div>
+                <button type="button" onclick="state.authForm.role='doctor'; renderApp();" class="p-3 rounded-2xl border text-center transition-all cursor-pointer ${f.role === 'doctor' ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500' : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-600'}">
+                  <div class="text-lg mb-1">👨‍⚕️</div>
+                  <div class="text-xs">استاد / پزشک متخصص</div>
                 </button>
-                <button type="button" onclick="state.authForm.role='phd'; renderApp();" class="p-2.5 rounded-xl border text-center transition-all ${f.role === 'phd' ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold' : 'bg-slate-800 border-slate-700 text-slate-400'}">
-                  <div class="text-base mb-0.5">🎓</div>
-                  <div class="text-[11px]">دانشجوی PhD</div>
+                <button type="button" onclick="state.authForm.role='phd'; renderApp();" class="p-3 rounded-2xl border text-center transition-all cursor-pointer ${f.role === 'phd' ? 'bg-emerald-600/30 border-emerald-500 text-white font-bold ring-1 ring-emerald-500' : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:border-slate-600'}">
+                  <div class="text-lg mb-1">🎓</div>
+                  <div class="text-xs">دانشجوی PhD / دستیار</div>
                 </button>
               </div>
             </div>
 
             <div>
               <label class="block text-xs font-bold text-slate-300 mb-1.5">نام و نام خانوادگی *</label>
-              <input required type="text" placeholder="مثال: دکتر سارا مهدوی" value="${f.name}" oninput="state.authForm.name=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+              <input required type="text" placeholder="مثال: دکتر علیرضا محمدی" value="${f.name || ''}" oninput="state.authForm.name=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">نام کاربری دلخواه (جهت ورود) *</label>
+                <input required type="text" placeholder="مثال: dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">رمز عبور *</label>
+                <input required type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره همراه *</label>
+                <input required type="tel" placeholder="0912xxxxxxx" value="${f.phone || ''}" oninput="state.authForm.phone=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">پست الکترونیک (ایمیل)</label>
+                <input type="email" placeholder="name@domain.com" value="${f.email || ''}" oninput="state.authForm.email=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+              </div>
             </div>
 
             ${f.role === 'doctor' || f.role === 'phd' ? `
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs font-bold text-slate-300 mb-1.5">${f.role === 'doctor' ? 'شماره نظام دامپزشکی *' : 'شماره دانشجویی / نظام *'}</label>
-                  <input required type="text" placeholder="18450" value="${f.medicalCouncilNo}" oninput="state.authForm.medicalCouncilNo=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-300 mb-1.5">دپارتمان تخصصی *</label>
-                  <select onchange="state.authForm.departmentId=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl">
-                    ${state.departments.map(d => `<option value="${d.id}" ${f.departmentId === d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
-                  </select>
-                </div>
-              </div>
+              <div class="p-4 rounded-2xl bg-slate-800/60 border border-slate-700 space-y-4">
+                <div class="text-xs font-black text-emerald-400">اطلاعات تخصصی، زمان‌بندی ویزیت و تعرفه پزشک</div>
 
-              ${f.role === 'doctor' ? `
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">${f.role === 'doctor' ? 'شماره نظام دامپزشکی *' : 'شماره دانشجویی / نظام *'}</label>
+                    <input required type="text" placeholder="18450" value="${f.medicalCouncilNo || ''}" oninput="state.authForm.medicalCouncilNo=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">دپارتمان تخصصی *</label>
+                    <select onchange="state.authForm.departmentId=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
+                      ${state.departments.map(d => `<option value="${d.id}" ${f.departmentId === d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">مرتبه علمی</label>
-                    <select onchange="state.authForm.academicRank=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl">
-                      ${['استاد تمام (پروفسور)', 'دانشیار', 'استادیار', 'رزیدنت ارشد تخصصی'].map(r => `<option value="${r}" ${f.academicRank === r ? 'selected' : ''}>${r}</option>`).join('')}
+                    <select onchange="state.authForm.academicRank=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
+                      ${['استاد تمام (پروفسور)', 'دانشیار', 'استادیار', 'رزیدنت ارشد تخصصی', 'دانشجوی دکتری تخصصی (PhD)'].map(r => `<option value="${r}" ${f.academicRank === r ? 'selected' : ''}>${r}</option>`).join('')}
                     </select>
                   </div>
                   <div>
-                    <label class="block text-xs font-bold text-slate-300 mb-1.5">حیطه فوق‌تخصصی</label>
-                    <input type="text" placeholder="جراحی ارتوپدی، سونوگرافی..." value="${f.subSpecialty}" oninput="state.authForm.subSpecialty=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">حیطه فوق‌تخصصی / فیلد کاری</label>
+                    <input type="text" placeholder="مثال: جراحی ارتوپدی و ستون فقرات" value="${f.subSpecialty || ''}" oninput="state.authForm.subSpecialty=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                 </div>
-              ` : ''}
+
+                <!-- ساعات کاری و روزهای حضور -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">روزهای حضور در کلینیک</label>
+                    <input type="text" placeholder="شنبه، یکشنبه، سه‌شنبه..." value="${Array.isArray(f.workDays) ? f.workDays.join('، ') : (f.workDays || 'شنبه، دوشنبه، چهارشنبه')}" oninput="state.authForm.workDays=this.value.split(/[،,]/).map(s=>s.trim()).filter(Boolean)" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">ساعات و شیفت ویزیت</label>
+                    <input type="text" placeholder="۰۹:۰۰ الی ۱۳:۰۰" value="${f.workHours || '۰۹:۰۰ الی ۱۳:۰۰'}" oninput="state.authForm.workHours=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                  </div>
+                </div>
+
+                <!-- تعرفه اختصاصی استاد -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">تعرفه ویزیت حضوری اختصاصی (تومان)</label>
+                    <input type="number" step="10000" placeholder="450000" value="${f.visitFee || 450000}" oninput="state.authForm.visitFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">تعرفه مشاوره آنلاین اختصاصی (تومان)</label>
+                    <input type="number" step="10000" placeholder="300000" value="${f.onlineConsultFee || 300000}" oninput="state.authForm.onlineConsultFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-300 mb-1.5">بیوگرافی و رزومه علمی</label>
+                  <textarea rows="2" placeholder="عضو هیئت علمی و پژوهشگر حوزه بالینی دامپزشکی..." oninput="state.authForm.bio=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.bio || ''}</textarea>
+                </div>
+              </div>
             ` : ''}
-          ` : ''}
+          ` : `
+            <!-- فرم ورود با نام کاربری / ایمیل و رمز عبور -->
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">نام کاربری یا ایمیل *</label>
+              <input required type="text" placeholder="مثال: jahesh1395@gmail.com یا dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+            </div>
 
-          <div>
-            <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره همراه *</label>
-            <input required type="tel" placeholder="0912xxxxxxx" value="${f.phone}" oninput="state.authForm.phone=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
-          </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">رمز عبور *</label>
+              <input required type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+            </div>
+          `}
 
-          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3.5 rounded-xl transition-all">
-            ${f.mode === 'login' ? 'ورود به سامانه' : 'تکمیل ثبت‌نام و فعال‌سازی حساب'}
+          <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs py-3.5 rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer">
+            ${f.mode === 'login' ? 'ورود به سامانه بیمارستان' : 'تکمیل ثبت‌نام و فعال‌سازی فوری حساب'}
           </button>
         </form>
+      </div>
+    </div>
+  `;
+}
+
+// پنل مدیریت اختصاصی بیمارستان برای مدیر ارشد سامانه (jahesh1395@gmail.com)
+function renderAdminModal() {
+  if (!state.adminModalOpen) return "";
+  const totalVisits = state.appointments.length;
+  const totalRevenue = state.appointments.reduce((sum, a) => sum + (Number(a.amountPaid) || 0), 0);
+
+  return `
+    <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+      <div class="bg-slate-900 border border-amber-500/50 w-full max-w-4xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[90vh] overflow-y-auto custom-scrollbar">
+        
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500 flex items-center justify-center text-2xl text-amber-400">
+              ⚙️
+            </div>
+            <div>
+              <h3 class="text-base sm:text-lg font-black text-white">پنل مدیریت جامع بیمارستان دانشکده دامپزشکی</h3>
+              <p class="text-xs text-amber-400">مدیریت اعضای هیئت علمی، تایید فوری اساتید و گزارش‌گیری نوبت‌ها</p>
+            </div>
+          </div>
+          
+          <button onclick="closeAdminModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all text-sm border border-slate-700 cursor-pointer">
+            ✕
+          </button>
+        </div>
+
+        <!-- آمارهای سریع سیستم -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div class="p-4 rounded-2xl bg-slate-800/80 border border-slate-700">
+            <div class="text-xs text-slate-400 mb-1">تعداد پزشکان و اساتید:</div>
+            <div class="text-xl font-black text-emerald-400 font-mono">${state.professors.length} نفر</div>
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-800/80 border border-slate-700">
+            <div class="text-xs text-slate-400 mb-1">تعداد نوبت‌های ثبت‌شده:</div>
+            <div class="text-xl font-black text-cyan-400 font-mono">${totalVisits} نوبت</div>
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-800/80 border border-slate-700">
+            <div class="text-xs text-slate-400 mb-1">مجموع گردش مالی زیپال:</div>
+            <div class="text-xl font-black text-amber-400 font-mono">${formatPrice(totalRevenue)}</div>
+          </div>
+        </div>
+
+        <!-- بخش مدیریت اساتید و تایید فوری -->
+        <div class="space-y-4 mb-8">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-black text-white flex items-center gap-2">
+              <span>👨‍⚕️</span>
+              <span>لیست اساتید و پزشکان (تایید، ویرایش تعرفه و انتشار فوری)</span>
+            </h4>
+            <button onclick="openAuthModal('register')" class="text-xs font-bold text-emerald-400 hover:underline cursor-pointer">
+              + افزودن پزشک جدید
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            ${state.professors.map(prof => `
+              <div class="p-4 rounded-2xl bg-slate-800/90 border ${prof.status === 'approved' ? 'border-emerald-500/40' : 'border-amber-500/60'} flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-start gap-3 min-w-0">
+                  <img src="${prof.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80'}" class="w-12 h-12 rounded-xl object-cover border border-slate-700 shrink-0" />
+                  <div class="min-w-0">
+                    <div class="font-bold text-white text-xs flex items-center gap-2">
+                      <span>${prof.name}</span>
+                      <span class="text-[10px] px-2 py-0.5 rounded-md ${prof.status === 'approved' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/30' : 'bg-amber-950 text-amber-300 border border-amber-500/40'}">
+                        ${prof.status === 'approved' ? '✓ تایید شده و فعال در سایت' : '⏳ در انتظار تایید'}
+                      </span>
+                    </div>
+                    <div class="text-[11px] text-slate-300 mt-0.5">${prof.academicRank} - ${prof.departmentName || prof.departmentId}</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">🕒 حضور: ${Array.isArray(prof.schedule) ? prof.schedule[0] : (prof.schedule || 'شنبه تا چهارشنبه')} | 💵 تعرفه: ${formatPrice(prof.visitFee)}</div>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                  ${prof.status !== 'approved' ? `
+                    <button onclick="adminApproveDoctor('${prof.id}', 'approved')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-md cursor-pointer transition-all">
+                      ✓ تایید و انتشار فوری
+                    </button>
+                  ` : `
+                    <button onclick="adminApproveDoctor('${prof.id}', 'pending')" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all">
+                      تعلیق موقت
+                    </button>
+                  `}
+                  <button onclick="adminDeleteDoctor('${prof.id}')" class="bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all">
+                    حذف
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- بخش نوبت‌های رزرو شده اخیر -->
+        <div>
+          <h4 class="text-sm font-black text-white mb-3 flex items-center gap-2">
+            <span>📋</span>
+            <span>آخرین نوبت‌های ثبت‌شده در سیستم بیمارستان</span>
+          </h4>
+          
+          <div class="space-y-2.5 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+            ${state.appointments.length > 0 ? state.appointments.slice(0, 10).map(a => `
+              <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between text-xs">
+                <div>
+                  <div class="font-bold text-white">${a.animalName} (${a.animalType}) | سرپرست: ${a.clientName} (${a.clientPhone || 'بدون شماره'})</div>
+                  <div class="text-slate-400 text-[11px] mt-0.5">${a.departmentName} - پزشک: ${a.professorName} | تاریخ: ${a.appointmentDate}</div>
+                </div>
+                <div class="text-left shrink-0">
+                  <div class="font-black text-emerald-400">${formatPrice(a.amountPaid)}</div>
+                  <div class="text-[10px] text-slate-400 font-mono">رهگیری: ${a.trackingCode}</div>
+                </div>
+              </div>
+            `).join('') : `
+              <div class="text-center py-6 text-xs text-slate-400 bg-slate-800/30 rounded-xl">هنوز نوبتی ثبت نشده است.</div>
+            `}
+          </div>
+        </div>
+
       </div>
     </div>
   `;
@@ -1619,23 +1973,40 @@ function renderFooter() {
   return `
     <footer class="bg-[#070a10] border-t border-slate-800/80 py-12 text-right">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-          <div class="md:col-span-2">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center p-1">
-                <img src="/vet-hospital/faculty-logo.svg" alt="دانشکده دامپزشکی" class="w-full h-full object-contain" />
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10">
+          
+          <!-- متن کامل و رسمی معرفی بیمارستان -->
+          <div class="lg:col-span-7 space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center p-1.5 shadow-lg shadow-emerald-500/20 shrink-0">
+                <img src="/vet-hospital/faculty-logo.svg" alt="دانشکده دامپزشکی دانشگاه فردوسی مشهد" class="w-full h-full object-contain" />
               </div>
               <div>
-                <h4 class="font-black text-white text-base">بیمارستان تخصصی دانشکده دامپزشکی</h4>
-                <p class="text-xs text-emerald-400">مرکز آموزشی و درمانی دانشگاه فردوسی مشهد</p>
+                <h4 class="font-black text-white text-base">بیمارستان و پلی‌کلینیک تخصصی دانشکده دامپزشکی</h4>
+                <p class="text-xs text-emerald-400 font-semibold">دانشگاه فردوسی مشهد (تاسیس ۱۳۷۱)</p>
               </div>
             </div>
-            <p class="text-xs text-slate-400 leading-relaxed max-w-md">
-              ارائه خدمات تشخیصی، آزمایشگاهی، جراحی و درمانی فوق تخصصی حیوانات با کادر اساتید برجسته هیئت علمی و سیستم نوبت‌دهی آنلاین با درگاه رسمی زیپال و شبکه شاپرک.
+            
+            <p class="text-xs text-slate-300 leading-relaxed text-justify">
+              بیمارستان و پلی کلینیک تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد، یکی از قطب های اصلی و مهم آموزشی-پژوهشی دامپزشکی در شمال شرق ایران به شمار می رود که همه ساله به پرورش و تربیت دامپزشکان جوان و آینده این مرز و بوم می پردازد. این مرکز به جهت پهناوری استان خراسان، فراوانی جمعیت های دامی و همجواری این استان با کشور های همسایه در سال ۱۳۷۱ تاسیس شده است و امروزه به عنوان بزرگترین و مجهزترین مرکز ارائه دهنده خدمات بالینی-تخصصی دامپزشکی در شرق ایران محسوب می شود که با حضور متخصصین و رزیدنت های دامپزشکی به همراه کارشناسان مجرب و متعهد و با استفاده از به روز ترین تکنیک ها و تجهیزات درمانی در حوزه های مختلفی چون بیماری های داخلی دام های بزرگ و کوچک، جراحی دامپزشکی، مامایی و بیماری های تولیدمثلی دام، کلینیکال پاتولوژی، رادیولوژی و سونوگرافی، بیماری های طیور و کالبدگشایی، به صاحبان دام ها و حیوانات خانگی خدمات درمانی و مشاوره ارائه می نماید.
             </p>
+
+            <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 space-y-2">
+              <div class="flex items-center gap-2 text-emerald-400 font-bold">
+                <span>🕒</span>
+                <span>ساعات پذیرش:</span>
+              </div>
+              <p class="text-slate-300 text-[11px] leading-relaxed">
+                بیمارستان دامپزشکی همه روزه به جز در روزهای جمعه و تعطیلات رسمی، صبح ها آماده پذیرش دام ها و حیوانات خانگی است.
+              </p>
+              <p class="text-slate-400 text-[11px] leading-relaxed">
+                جهت اخذ نوبت معاینه و یا تصویربرداری تشخیصی حیوانات خانگی برای بخش های داخلی دام کوچک و رادیولوژی و سونوگرافی می توانید از طریق این سامانه یا تارنمای رسمی بیمارستان، <a href="http://www.vetclinic.um.ac.ir" target="_blank" rel="noopener noreferrer" class="text-emerald-400 hover:underline">www.vetclinic.um.ac.ir</a> مراجعه فرمایید. هم چنین می توانید نتایج آزمایشگاهی و گواهی نامه های صادره از سوی بیمارستان را در این تارنما مشاهده نمایید.
+              </p>
+            </div>
           </div>
 
-          <div>
+          <!-- دسترسی سریع -->
+          <div class="lg:col-span-2 space-y-3">
             <h5 class="font-bold text-white text-xs mb-3">دسترسی سریع</h5>
             <ul class="space-y-2 text-xs text-slate-400">
               <li><button onclick="setVetTab('home')" class="hover:text-emerald-400">صفحه اصلی</button></li>
@@ -1643,21 +2014,40 @@ function renderFooter() {
               <li><button onclick="setVetTab('professors')" class="hover:text-emerald-400">اساتید هیئت علمی</button></li>
               <li><button onclick="setVetTab('triage')" class="hover:text-emerald-400">تریاژ هوش مصنوعی</button></li>
               <li><button onclick="setVetTab('track')" class="hover:text-emerald-400">پیگیری نوبت</button></li>
+              <li><a href="/" class="hover:text-emerald-400">وب‌سایت اصلی جهش</a></li>
             </ul>
           </div>
 
-          <div>
-            <h5 class="font-bold text-white text-xs mb-3">اطلاعات تماس</h5>
-            <p class="text-xs text-slate-400 leading-relaxed">
-              مشهد، میدان آزادی، پردیس دانشگاه، دانشکده دامپزشکی<br />
-              تلفن پذیرش: ۰۵۱-۳۸۸۰۴۰۰۰<br />
-              درگاه پرداخت: شبکه شاپرک زیپال
-            </p>
+          <!-- نشانی و تماس رسمی -->
+          <div class="lg:col-span-3 space-y-3 text-xs">
+            <h5 class="font-bold text-white text-xs mb-3">نشانی و اطلاعات تماس بیمارستان</h5>
+            <div class="space-y-2.5 text-slate-300">
+              <div class="flex items-start gap-2">
+                <span class="text-emerald-400 shrink-0 mt-0.5">📍</span>
+                <span><strong>نشانی:</strong> کیلومتر ۵ جاده آسیایی (بزرگراه پیامبر اعظم (ص)) روبه‌روی بیمارستان رضوی، کندرو بزرگراه پیامبر اعظم</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-emerald-400 shrink-0">📞</span>
+                <span><strong>تلفن پذیرش:</strong> <a href="tel:05138803765" class="text-emerald-400 font-bold hover:underline">۰۵۱-۳۸۸۰۳۷۶۵</a></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-emerald-400 shrink-0">📮</span>
+                <span><strong>کدپستی:</strong> ۹۱۷۷۹۴۸۹۷۴</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-emerald-400 shrink-0">✉️</span>
+                <span><strong>پست الکترونیک:</strong> <a href="mailto:vetclinic@um.ac.ir" class="text-emerald-400 hover:underline">vetclinic@um.ac.ir</a></span>
+              </div>
+              <div class="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                درگاه پرداخت آنلاین: شبکه رسمی شاپرک و زیپال
+              </div>
+            </div>
           </div>
+
         </div>
 
         <div class="border-t border-slate-800/80 pt-6 text-center text-xs text-slate-500">
-          تمامی حقوق متعلق به بیمارستان دانشکده دامپزشکی و جهش می‌باشد.
+          تمامی حقوق مادی و معنوی متعلق به بیمارستان تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد و انجمن علمی جهش می‌باشد.
         </div>
       </div>
     </footer>
@@ -1698,6 +2088,7 @@ function renderApp() {
       ${renderInvoiceModal()}
       ${renderAuthModal()}
       ${renderMyAppointmentsModal()}
+      ${renderAdminModal()}
     </div>
   `;
 }

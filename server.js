@@ -9,6 +9,8 @@ import {
   writeVetProfessors,
   readVetAppointments,
   writeVetAppointments,
+  readVetUsers,
+  writeVetUsers,
   performAiVeterinaryTriage
 } from './api/vet-hospital.js';
 
@@ -968,6 +970,187 @@ function writeOrdersToDisk(orders) {
 // ==========================================
 // Veterinary Faculty Hospital APIs (سامانه جامع بیمارستان دانشکده دامپزشکی)
 // ==========================================
+// POST /api/vet/auth/login
+app.post(['/api/vet/auth/login', '/vet-hospital/api/auth/login'], (req, res) => {
+  try {
+    const { username, email, phone, password } = req.body || {};
+    const identifier = (username || email || phone || '').trim().toLowerCase();
+    const pass = (password || '').trim();
+
+    if (!identifier || !pass) {
+      return res.status(400).json({ success: false, error: 'نام کاربری/ایمیل و رمز عبور الزامی است.' });
+    }
+
+    // 1. Admin Master Account check
+    if (
+      (identifier === 'jahesh1395@gmail.com' || identifier === 'jahesh1395' || identifier === 'erfan') &&
+      pass === 'Erfan3365!'
+    ) {
+      const adminUser = {
+        id: 'admin-1',
+        username: 'jahesh1395@gmail.com',
+        email: 'jahesh1395@gmail.com',
+        name: 'مهندس عرفان مقدم متقی (مدیر ارشد سامانه)',
+        role: 'admin',
+        phone: '09152331974',
+        isAdmin: true
+      };
+      return res.json({ success: true, user: adminUser, message: 'ورود موفقیت‌آمیز به عنوان مدیر ارشد بیمارستان.' });
+    }
+
+    // 2. Check in registered users list
+    const users = readVetUsers();
+    const foundUser = users.find(
+      (u) =>
+        (u.username && u.username.toLowerCase() === identifier) ||
+        (u.email && u.email.toLowerCase() === identifier) ||
+        (u.phone && u.phone === identifier)
+    );
+
+    if (foundUser) {
+      if (foundUser.password && foundUser.password !== pass) {
+        return res.status(401).json({ success: false, error: 'رمز عبور وارد شده نادرست است.' });
+      }
+      return res.json({ success: true, user: foundUser, message: 'ورود با موفقیت انجام شد.' });
+    }
+
+    // 3. Check in professors list
+    const professors = readVetProfessors();
+    const foundProf = professors.find(
+      (p) =>
+        (p.username && p.username.toLowerCase() === identifier) ||
+        (p.email && p.email.toLowerCase() === identifier) ||
+        (p.phone && p.phone === identifier)
+    );
+
+    if (foundProf) {
+      if (foundProf.password && foundProf.password !== pass) {
+        return res.status(401).json({ success: false, error: 'رمز عبور وارد شده نادرست است.' });
+      }
+      const profUser = {
+        id: foundProf.id,
+        name: foundProf.name,
+        username: foundProf.username || identifier,
+        email: foundProf.email || '',
+        phone: foundProf.phone || '',
+        role: 'doctor',
+        academicRank: foundProf.academicRank,
+        departmentId: foundProf.departmentId,
+        departmentName: foundProf.departmentName,
+        status: foundProf.status
+      };
+      return res.json({ success: true, user: profUser, message: 'ورود پزشک / استاد با موفقیت انجام شد.' });
+    }
+
+    // If not found, return error
+    return res.status(404).json({ success: false, error: 'کاربری با این نام کاربری یافت نشد. لطفاً ابتدا ثبت‌نام فرمایید.' });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/vet/auth/register
+app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register'], (req, res) => {
+  try {
+    const {
+      username,
+      password,
+      name,
+      phone,
+      email,
+      role = 'client',
+      academicRank,
+      departmentId,
+      departmentName,
+      subSpecialty,
+      medicalCouncilNo,
+      studentNo,
+      visitFee,
+      onlineConsultFee,
+      workDays,
+      workHours,
+      bio
+    } = req.body || {};
+
+    const cleanUsername = (username || email || phone || '').trim();
+    if (!cleanUsername || !password || !name) {
+      return res.status(400).json({ success: false, error: 'نام کاربری، رمز عبور و نام و نام خانوادگی الزامی است.' });
+    }
+
+    const users = readVetUsers();
+    // Check if user already exists
+    const existing = users.find(
+      (u) =>
+        (u.username && u.username.toLowerCase() === cleanUsername.toLowerCase()) ||
+        (u.email && email && u.email.toLowerCase() === email.toLowerCase())
+    );
+    if (existing) {
+      return res.status(400).json({ success: false, error: 'این نام کاربری یا ایمیل قبلاً در سامانه ثبت شده است.' });
+    }
+
+    const newUser = {
+      id: 'user-' + Date.now(),
+      username: cleanUsername,
+      password: password.trim(),
+      name: name.trim(),
+      phone: (phone || '').trim(),
+      email: (email || '').trim(),
+      role: role, // 'client' | 'doctor' | 'phd' | 'admin'
+      departmentId: departmentId || '',
+      departmentName: departmentName || '',
+      createdAt: new Date().toISOString()
+    };
+    users.unshift(newUser);
+    writeVetUsers(users);
+
+    // If registered as a doctor or PhD, also register/sync in professors.json
+    let newProfessor = null;
+    if (role === 'doctor' || role === 'phd') {
+      const professors = readVetProfessors();
+      const cleanWorkDays = Array.isArray(workDays) && workDays.length > 0 ? workDays : ['شنبه', 'دوشنبه', 'چهارشنبه'];
+      const cleanWorkHours = workHours || '۰۹:۰۰ الی ۱۳:۰۰';
+      const scheduleStr = `${cleanWorkDays.join('، ')} ${cleanWorkHours}`;
+
+      newProfessor = {
+        id: 'prof-' + Date.now(),
+        username: cleanUsername,
+        password: password.trim(),
+        name: name.trim(),
+        academicRank: academicRank || (role === 'phd' ? 'دانشجوی دکتری تخصصی (PhD) / دستیار' : 'استادیار'),
+        departmentId: departmentId || 'surgery-anesthesia',
+        departmentName: departmentName || 'بخش جراحی، ارتوپدی و بیهوشی',
+        subSpecialty: subSpecialty || (role === 'phd' ? 'پژوهشگر دکتری تخصصی' : 'متخصص بالینی'),
+        medicalCouncilNo: medicalCouncilNo || studentNo || '',
+        phone: (phone || '').trim(),
+        email: (email || '').trim(),
+        avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
+        bio: bio || `عضو کادر تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد.`,
+        visitFee: Number(visitFee) || (role === 'phd' ? 280000 : 380000),
+        onlineConsultFee: Number(onlineConsultFee) || 220000,
+        workDays: cleanWorkDays,
+        workHours: cleanWorkHours,
+        schedule: [scheduleStr],
+        status: 'approved', // Active and immediately visible to everyone!
+        rating: 5.0,
+        totalVisits: 0,
+        badges: [role === 'phd' ? 'دستیار تخصصی PhD' : 'عضو هیئت علمی'],
+        registeredAt: new Date().toISOString()
+      };
+      professors.unshift(newProfessor);
+      writeVetProfessors(professors);
+    }
+
+    return res.json({
+      success: true,
+      user: newUser,
+      professor: newProfessor,
+      message: 'ثبت‌نام با موفقیت انجام شد و حساب کاربری شما فعال گردید.'
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // GET /api/vet/departments
 app.get(['/api/vet/departments', '/vet-hospital/api/departments'], (_req, res) => {
   const departments = readVetDepartments();
@@ -995,8 +1178,16 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
       return res.status(400).json({ success: false, error: 'نام استاد و بخش تخصصی الزامی است.' });
     }
     const professors = readVetProfessors();
+    const cleanWorkDays = Array.isArray(incoming.workDays) && incoming.workDays.length > 0
+      ? incoming.workDays
+      : (Array.isArray(incoming.schedule) ? incoming.schedule : ['شنبه', 'دوشنبه', 'چهارشنبه']);
+    const cleanWorkHours = incoming.workHours || '۰۹:۰۰ الی ۱۳:۰۰';
+    const scheduleStr = `${cleanWorkDays.join('، ')} ${cleanWorkHours}`;
+
     const newProf = {
-      id: 'prof-' + Date.now(),
+      id: incoming.id || 'prof-' + Date.now(),
+      username: incoming.username || incoming.email || incoming.phone || '',
+      password: incoming.password || '123456',
       name: incoming.name.trim(),
       academicRank: incoming.academicRank || 'استادیار',
       departmentId: incoming.departmentId,
@@ -1007,17 +1198,25 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
       phone: incoming.phone || '',
       email: incoming.email || '',
       avatar: incoming.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
-      bio: incoming.bio || '',
-      visitFee: Number(incoming.visitFee) || 300000,
-      onlineConsultFee: Number(incoming.onlineConsultFee) || 200000,
-      schedule: Array.isArray(incoming.schedule) ? incoming.schedule : ['شنبه تا چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰'],
-      status: incoming.status || 'approved', // Active in directory and appointments
+      bio: incoming.bio || 'متخصص و کادر علمی دانشکده دامپزشکی دانشگاه فردوسی مشهد.',
+      visitFee: Number(incoming.visitFee) || 380000,
+      onlineConsultFee: Number(incoming.onlineConsultFee) || 250000,
+      workDays: cleanWorkDays,
+      workHours: cleanWorkHours,
+      schedule: [scheduleStr],
+      status: incoming.status || 'approved', // Active in directory and appointments immediately
       rating: 5.0,
       totalVisits: 0,
-      badges: ['عضو هیئت علمی'],
+      badges: incoming.badges || ['عضو هیئت علمی'],
       registeredAt: new Date().toISOString()
     };
-    professors.unshift(newProf);
+
+    const existingIndex = professors.findIndex((p) => p.id === newProf.id || (incoming.medicalCouncilNo && p.medicalCouncilNo === incoming.medicalCouncilNo));
+    if (existingIndex >= 0) {
+      professors[existingIndex] = { ...professors[existingIndex], ...newProf };
+    } else {
+      professors.unshift(newProf);
+    }
     writeVetProfessors(professors);
     return res.json({ success: true, professor: newProf, message: 'ثبت‌نام استاد با موفقیت انجام شد و پروفایل تخصصی در سامانه فعال گردید.' });
   } catch (e) {
@@ -1028,7 +1227,7 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
 // POST /api/vet/professors/verify
 app.post(['/api/vet/professors/verify', '/vet-hospital/api/professors/verify'], (req, res) => {
   try {
-    const { professorId, status, visitFee, badges } = req.body;
+    const { professorId, status, visitFee, onlineConsultFee, workDays, workHours, badges } = req.body;
     if (!professorId || !status) {
       return res.status(400).json({ success: false, error: 'professorId and status are required' });
     }
@@ -1039,10 +1238,34 @@ app.post(['/api/vet/professors/verify', '/vet-hospital/api/professors/verify'], 
     }
     professors[idx].status = status;
     if (visitFee) professors[idx].visitFee = Number(visitFee);
+    if (onlineConsultFee) professors[idx].onlineConsultFee = Number(onlineConsultFee);
+    if (workDays) professors[idx].workDays = workDays;
+    if (workHours) professors[idx].workHours = workHours;
+    if (workDays || workHours) {
+      const days = professors[idx].workDays || ['شنبه تا چهارشنبه'];
+      const hours = professors[idx].workHours || '۰۹:۰۰ الی ۱۳:۰۰';
+      professors[idx].schedule = [`${Array.isArray(days) ? days.join('، ') : days} ${hours}`];
+    }
     if (badges) professors[idx].badges = badges;
     professors[idx].verifiedAt = new Date().toISOString();
     writeVetProfessors(professors);
-    return res.json({ success: true, professor: professors[idx], message: `وضعیت استاد به «${status === 'approved' ? 'تایید شده و فعال' : status === 'rejected' ? 'رد شده' : status}» تغییر یافت.` });
+    return res.json({ success: true, professor: professors[idx], message: `وضعیت استاد با موفقیت به‌روزرسانی شد.` });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/vet/professors/delete
+app.post(['/api/vet/professors/delete', '/vet-hospital/api/professors/delete'], (req, res) => {
+  try {
+    const { professorId } = req.body;
+    if (!professorId) {
+      return res.status(400).json({ success: false, error: 'professorId is required' });
+    }
+    let professors = readVetProfessors();
+    professors = professors.filter((p) => p.id !== professorId);
+    writeVetProfessors(professors);
+    return res.json({ success: true, remaining: professors.length, message: 'استاد با موفقیت حذف گردید.' });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
