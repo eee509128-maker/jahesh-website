@@ -223,15 +223,15 @@ function saveStoredUsers(users) {
 
 // سامانه ارتباط مستقیم Universal API (دقیقاً مشابه جهش‌کالا - ۱۰۰٪ بدون فیلترشکن، سریع و بدون قطعی)
 async function fetchUniversalApi(pathOrAction, options = {}) {
-  let endpointPath = pathOrAction;
+  let endpointPath = String(pathOrAction || '').replace(/^\/+/, '');
   let queryPart = "";
 
-  if (pathOrAction.includes("?")) {
-    const [p, q] = pathOrAction.split("?");
+  if (endpointPath.includes("?")) {
+    const [p, q] = endpointPath.split("?");
     endpointPath = p;
     queryPart = "?" + q;
-  } else if (pathOrAction.includes("&")) {
-    const [p, ...rest] = pathOrAction.split("&");
+  } else if (endpointPath.includes("&")) {
+    const [p, ...rest] = endpointPath.split("&");
     endpointPath = p;
     queryPart = "?" + rest.join("&");
   }
@@ -242,30 +242,35 @@ async function fetchUniversalApi(pathOrAction, options = {}) {
 
   const candidateUrls = [
     `/api/vet/${endpointPath}${queryPart}`,
-    `/api/${endpointPath}${queryPart}`,
     `/vet-hospital/api/${endpointPath}${queryPart}`,
+    `/api/${endpointPath}${queryPart}`,
     `/jaheshkala/api/${endpointPath}${queryPart}`,
     `/jaheshkala/api.php${phpQuery}`,
     `api.php${phpQuery}`
   ];
 
+  let lastResponse = null;
   for (const url of candidateUrls) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       const res = await fetch(url, {
         ...options,
         signal: controller.signal
       });
       clearTimeout(timeoutId);
+
       if (res) {
-        if (res.ok || (res.status >= 400 && res.status < 500)) {
+        lastResponse = res;
+        // Return immediately if success (2xx) or valid client-side JSON response (4xx)
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok || (res.status >= 400 && res.status < 500 && contentType.includes('application/json'))) {
           return res;
         }
       }
     } catch (e) {}
   }
-  return null;
+  return lastResponse;
 }
 
 // ذخیره آنلاین کاربر (همزمان در سرور داخلی با سرعت بالا و بدون نیاز به فیلترشکن + کش محلی + سینک پس‌زمینه با فایربیس)
@@ -947,6 +952,7 @@ window.handleUnifiedAuthSubmit = async function(e) {
     username: cleanUsername,
     password: password.trim(),
     name: name.trim(),
+    fullName: name.trim(),
     phone: phone.trim(),
     email: email.trim(),
     role: role,
@@ -967,7 +973,7 @@ window.handleUnifiedAuthSubmit = async function(e) {
   let serverProf = null;
   let serverMessage = "";
 
-  // ۱. ارسال مستقیم و آنی به سرور داخلی (بدون فیلترشکن - آنی)
+  // ۱. ارسال مستقیم و آنی به سرور داخلی
   try {
     const res = await fetchUniversalApi("auth/register", {
       method: "POST",
@@ -980,19 +986,32 @@ window.handleUnifiedAuthSubmit = async function(e) {
       serverUser = data.user;
       serverProf = data.professor;
       serverMessage = data.message;
-    } else {
-      const errMsg = (data && data.error) || "خطایی در ثبت‌نام سمت سرور رخ داده است.";
-      alert(errMsg);
+    } else if (data && data.error && !data.success && res && res.status === 400 && data.error.includes('نام کاربری')) {
+      alert(data.error);
       return;
+    } else if (data && data.user) {
+      serverUser = data.user;
+      serverProf = data.professor;
+      serverMessage = data.message || "ثبت‌نام با موفقیت انجام شد.";
     }
   } catch (err) {
-    console.warn("Direct register notice:", err);
-    alert("بروز خطا در برقراری ارتباط با سرور ثبت‌نام. لطفا وضعیت اتصال خود را بررسی کنید.");
-    return;
+    console.warn("Direct register fallback mode:", err);
   }
 
-  // ۲. ساخت کاربر برای نشست جاری (در صورت در دسترس نبودن موقت شبکه، با کش محلی کار می‌کند)
-  const finalUser = serverUser;
+  // ۲. ساخت کاربر برای نشست جاری و ذخیره در حافظه محلی
+  const finalUser = serverUser || {
+    id: "user-" + Date.now(),
+    username: cleanUsername,
+    name: name.trim(),
+    fullName: name.trim(),
+    phone: phone.trim(),
+    email: email.trim(),
+    role: role,
+    departmentId: dept.id,
+    departmentName: deptName,
+    createdAt: new Date().toISOString()
+  };
+
   let finalProf = serverProf;
   if (!finalProf && (role === "doctor" || role === "phd")) {
     finalProf = {
@@ -2082,28 +2101,28 @@ function renderAuthModal() {
 
             <div>
               <label class="block text-xs font-bold text-slate-300 mb-1.5">نام و نام خانوادگی *</label>
-              <input required type="text" placeholder="مثال: دکتر علیرضا محمدی" value="${f.name || ''}" oninput="state.authForm.name=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+              <input required name="name" id="auth_name" type="text" placeholder="مثال: دکتر علیرضا محمدی" value="${f.name || ''}" oninput="state.authForm.name=this.value" onchange="state.authForm.name=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">نام کاربری دلخواه (جهت ورود) *</label>
-                <input required type="text" placeholder="مثال: dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+                <input required name="username" id="auth_username" type="text" placeholder="مثال: dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" onchange="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">رمز عبور *</label>
-                <input required type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+                <input required name="password" id="auth_password" type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" onchange="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
               </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره همراه *</label>
-                <input required type="tel" placeholder="0912xxxxxxx" value="${f.phone || ''}" oninput="state.authForm.phone=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
+                <input required name="phone" id="auth_phone" type="tel" placeholder="0912xxxxxxx" value="${f.phone || ''}" oninput="state.authForm.phone=this.value" onchange="state.authForm.phone=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">پست الکترونیک (ایمیل)</label>
-                <input type="email" placeholder="name@domain.com" value="${f.email || ''}" oninput="state.authForm.email=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+                <input name="email" id="auth_email" type="email" placeholder="name@domain.com" value="${f.email || ''}" oninput="state.authForm.email=this.value" onchange="state.authForm.email=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
               </div>
             </div>
 
@@ -2114,11 +2133,11 @@ function renderAuthModal() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">${f.role === 'doctor' ? 'شماره نظام دامپزشکی *' : 'شماره دانشجویی / نظام *'}</label>
-                    <input required type="text" placeholder="18450" value="${f.medicalCouncilNo || ''}" oninput="state.authForm.medicalCouncilNo=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
+                    <input required name="medicalCouncilNo" id="auth_med_no" type="text" placeholder="18450" value="${f.medicalCouncilNo || ''}" oninput="state.authForm.medicalCouncilNo=this.value" onchange="state.authForm.medicalCouncilNo=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">دپارتمان تخصصی *</label>
-                    <select onchange="state.authForm.departmentId=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
+                    <select name="departmentId" id="auth_dept_id" onchange="state.authForm.departmentId=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
                       ${state.departments.map(d => `<option value="${d.id}" ${f.departmentId === d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
                     </select>
                   </div>
@@ -2127,13 +2146,13 @@ function renderAuthModal() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">مرتبه علمی</label>
-                    <select onchange="state.authForm.academicRank=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
+                    <select name="academicRank" id="auth_academic_rank" onchange="state.authForm.academicRank=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
                       ${['استاد تمام (پروفسور)', 'دانشیار', 'استادیار', 'رزیدنت ارشد تخصصی', 'دانشجوی دکتری تخصصی (PhD)'].map(r => `<option value="${r}" ${f.academicRank === r ? 'selected' : ''}>${r}</option>`).join('')}
                     </select>
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">حیطه فوق‌تخصصی / فیلد کاری</label>
-                    <input type="text" placeholder="مثال: جراحی ارتوپدی و ستون فقرات" value="${f.subSpecialty || ''}" oninput="state.authForm.subSpecialty=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="subSpecialty" id="auth_sub_spec" type="text" placeholder="مثال: جراحی ارتوپدی و ستون فقرات" value="${f.subSpecialty || ''}" oninput="state.authForm.subSpecialty=this.value" onchange="state.authForm.subSpecialty=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                 </div>
 
@@ -2141,11 +2160,11 @@ function renderAuthModal() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">روزهای حضور در کلینیک</label>
-                    <input type="text" placeholder="شنبه، یکشنبه، سه‌شنبه..." value="${Array.isArray(f.workDays) ? f.workDays.join('، ') : (f.workDays || 'شنبه، دوشنبه، چهارشنبه')}" oninput="state.authForm.workDays=this.value.split(/[،,]/).map(s=>s.trim()).filter(Boolean)" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="workDays" id="auth_work_days" type="text" placeholder="شنبه، یکشنبه، سه‌شنبه..." value="${Array.isArray(f.workDays) ? f.workDays.join('، ') : (f.workDays || 'شنبه، دوشنبه، چهارشنبه')}" oninput="state.authForm.workDays=this.value.split(/[،,]/).map(s=>s.trim()).filter(Boolean)" onchange="state.authForm.workDays=this.value.split(/[،,]/).map(s=>s.trim()).filter(Boolean)" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">ساعات و شیفت ویزیت</label>
-                    <input type="text" placeholder="۰۹:۰۰ الی ۱۳:۰۰" value="${f.workHours || '۰۹:۰۰ الی ۱۳:۰۰'}" oninput="state.authForm.workHours=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="workHours" id="auth_work_hours" type="text" placeholder="۰۹:۰۰ الی ۱۳:۰۰" value="${f.workHours || '۰۹:۰۰ الی ۱۳:۰۰'}" oninput="state.authForm.workHours=this.value" onchange="state.authForm.workHours=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                 </div>
 
@@ -2153,17 +2172,17 @@ function renderAuthModal() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">تعرفه ویزیت حضوری اختصاصی (تومان)</label>
-                    <input type="number" step="10000" placeholder="450000" value="${f.visitFee || 450000}" oninput="state.authForm.visitFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="visitFee" id="auth_visit_fee" type="number" step="10000" placeholder="450000" value="${f.visitFee || 450000}" oninput="state.authForm.visitFee=Number(this.value)" onchange="state.authForm.visitFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">تعرفه مشاوره آنلاین اختصاصی (تومان)</label>
-                    <input type="number" step="10000" placeholder="300000" value="${f.onlineConsultFee || 300000}" oninput="state.authForm.onlineConsultFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="onlineConsultFee" id="auth_online_fee" type="number" step="10000" placeholder="300000" value="${f.onlineConsultFee || 300000}" oninput="state.authForm.onlineConsultFee=Number(this.value)" onchange="state.authForm.onlineConsultFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                 </div>
 
                 <div>
                   <label class="block text-xs font-bold text-slate-300 mb-1.5">بیوگرافی و رزومه علمی</label>
-                  <textarea rows="2" placeholder="عضو هیئت علمی و پژوهشگر حوزه بالینی دامپزشکی..." oninput="state.authForm.bio=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.bio || ''}</textarea>
+                  <textarea name="bio" id="auth_bio" rows="2" placeholder="عضو هیئت علمی و پژوهشگر حوزه بالینی دامپزشکی..." oninput="state.authForm.bio=this.value" onchange="state.authForm.bio=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.bio || ''}</textarea>
                 </div>
               </div>
             ` : ''}
@@ -2171,12 +2190,12 @@ function renderAuthModal() {
             <!-- فرم ورود با نام کاربری / ایمیل و رمز عبور -->
             <div>
               <label class="block text-xs font-bold text-slate-300 mb-1.5">نام کاربری یا ایمیل *</label>
-              <input required type="text" placeholder="مثال: jahesh1395@gmail.com یا dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+              <input required name="username" id="login_username" type="text" placeholder="مثال: jahesh1395@gmail.com یا dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" onchange="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
             </div>
 
             <div>
               <label class="block text-xs font-bold text-slate-300 mb-1.5">رمز عبور *</label>
-              <input required type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+              <input required name="password" id="login_password" type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" onchange="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
             </div>
           `}
 

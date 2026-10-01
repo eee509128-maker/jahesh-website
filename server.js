@@ -1131,12 +1131,13 @@ app.post(['/api/vet/auth/login', '/vet-hospital/api/auth/login'], (req, res) => 
 });
 
 // POST /api/vet/auth/register
-app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register'], (req, res) => {
+app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register', '/api/vet/register', '/vet-hospital/api/register', '/api/auth/register'], (req, res) => {
   try {
     const {
       username,
       password,
       name,
+      fullName,
       phone,
       email,
       role = 'client',
@@ -1154,34 +1155,52 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register'], (req, re
     } = req.body || {};
 
     const cleanUsername = (username || email || phone || '').trim();
-    if (!cleanUsername || !password || !name) {
+    const cleanName = (name || fullName || '').trim();
+    const cleanPass = (password || '').trim();
+
+    if (!cleanUsername || !cleanPass || !cleanName) {
       return res.status(400).json({ success: false, error: 'نام کاربری، رمز عبور و نام و نام خانوادگی الزامی است.' });
     }
 
     const users = readVetUsers();
-    // Check if user already exists
-    const existing = users.find(
-      (u) =>
-        (u.username && u.username.toLowerCase() === cleanUsername.toLowerCase()) ||
-        (u.email && email && u.email.toLowerCase() === email.toLowerCase())
-    );
-    if (existing) {
-      return res.status(400).json({ success: false, error: 'این نام کاربری یا ایمیل قبلاً در سامانه ثبت شده است.' });
-    }
+    const cleanU = cleanUsername.toLowerCase();
+    const cleanE = (email || '').trim().toLowerCase();
 
-    const newUser = {
-      id: 'user-' + Date.now(),
-      username: cleanUsername,
-      password: password.trim(),
-      name: name.trim(),
-      phone: (phone || '').trim(),
-      email: (email || '').trim(),
-      role: role, // 'client' | 'doctor' | 'phd' | 'admin'
-      departmentId: departmentId || '',
-      departmentName: departmentName || '',
-      createdAt: new Date().toISOString()
-    };
-    users.unshift(newUser);
+    // Find existing user by username
+    const existingIdx = users.findIndex(
+      (u) => (u.username && u.username.toLowerCase() === cleanU)
+    );
+
+    let newUser;
+    if (existingIdx >= 0) {
+      // Update existing user profile
+      users[existingIdx] = {
+        ...users[existingIdx],
+        name: cleanName,
+        password: cleanPass,
+        phone: (phone || users[existingIdx].phone || '').trim(),
+        email: cleanE || users[existingIdx].email || '',
+        role: role || users[existingIdx].role || 'client',
+        departmentId: departmentId || users[existingIdx].departmentId || '',
+        departmentName: departmentName || users[existingIdx].departmentName || '',
+        updatedAt: new Date().toISOString()
+      };
+      newUser = users[existingIdx];
+    } else {
+      newUser = {
+        id: 'user-' + Date.now(),
+        username: cleanUsername,
+        password: cleanPass,
+        name: cleanName,
+        phone: (phone || '').trim(),
+        email: cleanE,
+        role: role,
+        departmentId: departmentId || '',
+        departmentName: departmentName || '',
+        createdAt: new Date().toISOString()
+      };
+      users.unshift(newUser);
+    }
     writeVetUsers(users);
 
     // همگام‌سازی با پایگاه داده کل کاربران سرور جهش‌کالا (Universal Users)
@@ -1223,33 +1242,48 @@ app.post(['/api/vet/auth/register', '/vet-hospital/api/auth/register'], (req, re
       const cleanWorkDays = Array.isArray(workDays) && workDays.length > 0 ? workDays : ['شنبه', 'دوشنبه', 'چهارشنبه'];
       const cleanWorkHours = workHours || '۰۹:۰۰ الی ۱۳:۰۰';
       const scheduleStr = `${cleanWorkDays.join('، ')} ${cleanWorkHours}`;
+      const medNo = (medicalCouncilNo || studentNo || '').trim();
+
+      const existingPIdx = professors.findIndex(
+        (p) =>
+          (p.username && p.username.toLowerCase() === cleanU) ||
+          (medNo && p.medicalCouncilNo === medNo) ||
+          (p.id === newUser.id)
+      );
 
       newProfessor = {
-        id: 'prof-' + Date.now(),
+        id: existingPIdx >= 0 ? professors[existingPIdx].id : ('prof-' + Date.now()),
         username: cleanUsername,
-        password: password.trim(),
-        name: name.trim(),
+        password: cleanPass,
+        name: cleanName,
         academicRank: academicRank || (role === 'phd' ? 'دانشجوی دکتری تخصصی (PhD) / دستیار' : 'استادیار'),
         departmentId: departmentId || 'surgery-anesthesia',
         departmentName: departmentName || 'بخش جراحی، ارتوپدی و بیهوشی',
         subSpecialty: subSpecialty || (role === 'phd' ? 'پژوهشگر دکتری تخصصی' : 'متخصص بالینی'),
-        medicalCouncilNo: medicalCouncilNo || studentNo || '',
+        medicalCouncilNo: medNo,
         phone: (phone || '').trim(),
-        email: (email || '').trim(),
-        avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
-        bio: bio || `عضو کادر تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد.`,
+        email: cleanE,
+        avatar: (existingPIdx >= 0 && professors[existingPIdx].avatar) || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
+        bio: bio || 'عضو کادر تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد.',
         visitFee: Number(visitFee) || (role === 'phd' ? 280000 : 380000),
         onlineConsultFee: Number(onlineConsultFee) || 220000,
         workDays: cleanWorkDays,
         workHours: cleanWorkHours,
         schedule: [scheduleStr],
-        status: 'approved', // Active and immediately visible to everyone!
+        status: 'approved',
+        isApproved: true,
         rating: 5.0,
-        totalVisits: 0,
+        totalVisits: existingPIdx >= 0 ? (professors[existingPIdx].totalVisits || 0) : 0,
         badges: [role === 'phd' ? 'دستیار تخصصی PhD' : 'عضو هیئت علمی'],
-        registeredAt: new Date().toISOString()
+        registeredAt: existingPIdx >= 0 ? (professors[existingPIdx].registeredAt || new Date().toISOString()) : new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
-      professors.unshift(newProfessor);
+
+      if (existingPIdx >= 0) {
+        professors[existingPIdx] = { ...professors[existingPIdx], ...newProfessor };
+      } else {
+        professors.unshift(newProfessor);
+      }
       writeVetProfessors(professors);
       try {
         setDoc(doc(serverDb, 'professors', newProfessor.id), newProfessor, { merge: true }).catch(() => {});
