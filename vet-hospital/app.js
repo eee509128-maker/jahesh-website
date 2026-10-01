@@ -168,75 +168,10 @@ const API_BASE = "/api/vet";
 // پایگاه اساتید واقعی ثبت‌شده در کلود (بدون داده‌های تستی)
 const INITIAL_PROFESSORS = [];
 
-const DEFAULT_INITIAL_PROFESSORS = [
-  {
-    id: "prof-1790851853973",
-    username: "adsadasd",
-    password: "sadasdasdas",
-    name: "شسیبسیبسیبس",
-    academicRank: "استادیار",
-    departmentId: "surgery-anesthesia",
-    departmentName: "بخش جراحی، ارتوپدی و بیهوشی",
-    subSpecialty: "asfasdfasd",
-    medicalCouncilNo: "133213",
-    phone: "312423423423",
-    email: "dasdadfwe@gmail.com",
-    avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
-    bio: "asdasd",
-    visitFee: 380000,
-    onlineConsultFee: 250000,
-    workDays: ["شنبه", "دوشنبه", "چهارشنبه"],
-    workHours: "۰۹:۰۰ الی ۱۳:۰۰",
-    schedule: ["شنبه، دوشنبه، چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰"],
-    status: "approved",
-    isApproved: true,
-    rating: 5,
-    totalVisits: 0,
-    badges: ["عضو هیئت علمی"],
-    registeredAt: "2026-10-01T10:50:53.973Z"
-  },
-  {
-    id: "prof-1790851005017",
-    username: "sdasdasd",
-    name: "بلیبلیب",
-    academicRank: "استادیار",
-    departmentId: "surgery-anesthesia",
-    departmentName: "بخش جراحی، ارتوپدی و بیهوشی",
-    subSpecialty: "جراح",
-    medicalCouncilNo: "12341",
-    phone: "4234234234",
-    email: "weqwdzd@gmail.com",
-    avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
-    status: "approved",
-    isApproved: true,
-    rating: 5,
-    badges: ["عضو هیئت علمی"],
-    registeredAt: "2026-10-01T10:36:45.017Z"
-  },
-  {
-    id: "prof-1790841158105",
-    username: "manije",
-    name: "moghaddammotagi",
-    academicRank: "استادیار",
-    departmentId: "surgery-anesthesia",
-    departmentName: "بخش جراحی، ارتوپدی و بیهوشی",
-    subSpecialty: "sfsf",
-    medicalCouncilNo: "133133",
-    phone: "1231231",
-    email: "erfanmoghaddammotagicrypto@gmail.com",
-    avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
-    status: "approved",
-    isApproved: true,
-    rating: 5,
-    badges: ["عضو هیئت علمی"],
-    registeredAt: "2026-10-01T07:52:38.105Z"
-  }
-];
-
 function getStoredProfessors() {
   try {
     const raw = localStorage.getItem("vet_professors");
-    if (raw !== null) {
+    if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         // فیلتر کردن و پاک‌سازی هرگونه اساتید تستی و ماک قدیمی (prof-1 تا prof-6)
@@ -245,7 +180,7 @@ function getStoredProfessors() {
       }
     }
   } catch (e) {}
-  return [...DEFAULT_INITIAL_PROFESSORS];
+  return [];
 }
 
 function saveStoredProfessors(profs) {
@@ -551,6 +486,10 @@ let state = {
   authModalOpen: false,
   myAppointmentsModalOpen: false,
   adminModalOpen: false,
+  editDoctorModalOpen: false,
+  editingDoctor: null,
+  editUserModalOpen: false,
+  editingUser: null,
   mobileMenuOpen: false,
 
   triageForm: {
@@ -1346,6 +1285,236 @@ window.adminDeleteUser = async function(userId, username = "") {
   if (!confirm("آیا از حذف این کاربر از سامانه اطمینان دارید؟")) return;
   await deleteUserOnline(userId, username);
   alert("کاربر با موفقیت از پایگاه آنلاین حذف گردید.");
+};
+
+window.openEditDoctorModal = function(profId) {
+  const target = (state.professors || []).find(p => p.id === profId) || (state.cloudUsers || []).find(u => u.id === profId);
+  if (!target) {
+    alert("استاد یا پزشک مورد نظر یافت نشد.");
+    return;
+  }
+  state.editingDoctor = JSON.parse(JSON.stringify(target));
+  state.editDoctorModalOpen = true;
+  renderApp();
+};
+
+window.closeEditDoctorModal = function() {
+  state.editDoctorModalOpen = false;
+  state.editingDoctor = null;
+  renderApp();
+};
+
+window.handleEditDoctorAvatarUpload = function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  if (file.size > 5 * 1024 * 1024) {
+    alert("حجم تصویر نباید بیشتر از ۵ مگابایت باشد.");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const maxDim = 400;
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      if (state.editingDoctor) {
+        state.editingDoctor.avatar = dataUrl;
+        renderApp();
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+window.removeEditDoctorAvatar = function() {
+  if (state.editingDoctor) {
+    state.editingDoctor.avatar = '';
+    renderApp();
+  }
+};
+
+window.handleEditDoctorSubmit = async function(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const form = e.target;
+  const d = state.editingDoctor;
+  if (!d || !d.id) return;
+
+  const name = form.elements['name'] ? form.elements['name'].value.trim() : d.name;
+  const phone = form.elements['phone'] ? form.elements['phone'].value.trim() : d.phone;
+  const email = form.elements['email'] ? form.elements['email'].value.trim() : d.email;
+  const academicRank = form.elements['academicRank'] ? form.elements['academicRank'].value : d.academicRank;
+  const departmentId = form.elements['departmentId'] ? form.elements['departmentId'].value : d.departmentId;
+  const dept = state.departments.find(dep => dep.id === departmentId);
+  const departmentName = dept ? dept.name : (d.departmentName || 'بخش تخصصی');
+  const subSpecialty = form.elements['subSpecialty'] ? form.elements['subSpecialty'].value.trim() : d.subSpecialty;
+  const medicalCouncilNo = form.elements['medicalCouncilNo'] ? form.elements['medicalCouncilNo'].value.trim() : d.medicalCouncilNo;
+  const workDaysVal = form.elements['workDays'] ? form.elements['workDays'].value : '';
+  const cleanWorkDays = workDaysVal ? workDaysVal.split(/[،,]/).map(s=>s.trim()).filter(Boolean) : (Array.isArray(d.workDays) ? d.workDays : ['شنبه', 'دوشنبه', 'چهارشنبه']);
+  const workHours = form.elements['workHours'] ? form.elements['workHours'].value.trim() : (d.workHours || '۰۹:۰۰ الی ۱۳:۰۰');
+  const visitFee = form.elements['visitFee'] ? Number(form.elements['visitFee'].value) : (d.visitFee || 380000);
+  const onlineConsultFee = form.elements['onlineConsultFee'] ? Number(form.elements['onlineConsultFee'].value) : (d.onlineConsultFee || 250000);
+  const bio = form.elements['bio'] ? form.elements['bio'].value.trim() : d.bio;
+  const status = form.elements['status'] ? form.elements['status'].value : (d.status || 'approved');
+
+  const updatedProf = {
+    ...d,
+    name,
+    phone,
+    email,
+    academicRank,
+    departmentId,
+    departmentName,
+    subSpecialty,
+    medicalCouncilNo,
+    workDays: cleanWorkDays,
+    workHours,
+    schedule: [`${cleanWorkDays.join('، ')} ${workHours}`],
+    visitFee,
+    onlineConsultFee,
+    bio,
+    status,
+    isApproved: (status === 'approved'),
+    avatar: d.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
+    updatedAt: new Date().toISOString()
+  };
+
+  // ۱. به‌روزرسانی آنی در حافظه کلاینت
+  const pIdx = (state.professors || []).findIndex(p => p.id === d.id || (p.username && d.username && p.username.toLowerCase() === d.username.toLowerCase()));
+  if (pIdx >= 0) {
+    state.professors[pIdx] = updatedProf;
+  } else {
+    state.professors.unshift(updatedProf);
+  }
+  saveStoredProfessors(state.professors);
+
+  const uIdx = (state.cloudUsers || []).findIndex(u => u.id === d.id || (u.username && d.username && u.username.toLowerCase() === d.username.toLowerCase()));
+  if (uIdx >= 0) {
+    state.cloudUsers[uIdx] = { ...state.cloudUsers[uIdx], ...updatedProf, fullName: name };
+    saveStoredUsers(state.cloudUsers);
+  }
+
+  state.editDoctorModalOpen = false;
+  state.editingDoctor = null;
+  renderApp();
+  if (window.confetti) window.confetti({ particleCount: 70, spread: 60 });
+
+  // ۲. ارسال آنی به سرور داخلی
+  try {
+    await fetchUniversalApi('professors/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedProf)
+    });
+  } catch (e) {
+    console.warn("Save doctor error:", e);
+  }
+
+  // ۳. ارسال به فایربیس
+  if (window.VetFirebase) {
+    Promise.race([
+      window.VetFirebase.saveProfessor(updatedProf),
+      new Promise((_, reject) => setTimeout(() => reject('timeout'), 1500))
+    ]).catch(() => {});
+  }
+
+  alert("مشخصات استاد با موفقیت ویرایش و در تمامی بخش‌ها و پایگاه داده به‌روزرسانی شد.");
+};
+
+window.openEditUserModal = function(userId) {
+  const target = (state.cloudUsers || []).find(u => u.id === userId) || (state.professors || []).find(p => p.id === userId);
+  if (!target) {
+    alert("کاربر مورد نظر یافت نشد.");
+    return;
+  }
+  state.editingUser = JSON.parse(JSON.stringify(target));
+  state.editUserModalOpen = true;
+  renderApp();
+};
+
+window.closeEditUserModal = function() {
+  state.editUserModalOpen = false;
+  state.editingUser = null;
+  renderApp();
+};
+
+window.handleEditUserSubmit = async function(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const form = e.target;
+  const u = state.editingUser;
+  if (!u || !u.id) return;
+
+  const name = form.elements['name'] ? form.elements['name'].value.trim() : u.name;
+  const phone = form.elements['phone'] ? form.elements['phone'].value.trim() : u.phone;
+  const email = form.elements['email'] ? form.elements['email'].value.trim() : u.email;
+  const role = form.elements['role'] ? form.elements['role'].value : u.role;
+  const academicRank = form.elements['academicRank'] ? form.elements['academicRank'].value : u.academicRank;
+  const departmentId = form.elements['departmentId'] ? form.elements['departmentId'].value : u.departmentId;
+  const dept = state.departments.find(dep => dep.id === departmentId);
+  const departmentName = dept ? dept.name : (u.departmentName || '');
+  const medicalCouncilNo = form.elements['medicalCouncilNo'] ? form.elements['medicalCouncilNo'].value.trim() : u.medicalCouncilNo;
+
+  const updatedUser = {
+    ...u,
+    name,
+    fullName: name,
+    phone,
+    email,
+    role,
+    academicRank: role === 'doctor' || role === 'phd' ? (academicRank || 'استادیار') : '',
+    departmentId: role === 'doctor' || role === 'phd' ? departmentId : '',
+    departmentName: role === 'doctor' || role === 'phd' ? departmentName : '',
+    medicalCouncilNo: role === 'doctor' || role === 'phd' ? medicalCouncilNo : '',
+    updatedAt: new Date().toISOString()
+  };
+
+  const uIdx = (state.cloudUsers || []).findIndex(user => user.id === u.id);
+  if (uIdx >= 0) {
+    state.cloudUsers[uIdx] = updatedUser;
+  }
+  saveStoredUsers(state.cloudUsers);
+
+  if (role === 'doctor' || role === 'phd') {
+    const pIdx = (state.professors || []).findIndex(p => p.id === u.id || (p.username && u.username && p.username.toLowerCase() === u.username.toLowerCase()));
+    if (pIdx >= 0) {
+      state.professors[pIdx] = { ...state.professors[pIdx], ...updatedUser };
+      saveStoredProfessors(state.professors);
+    }
+  }
+
+  state.editUserModalOpen = false;
+  state.editingUser = null;
+  renderApp();
+
+  try {
+    await fetchUniversalApi('users/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedUser)
+    });
+  } catch (e) {}
+
+  alert("اطلاعات کاربر با موفقیت به‌روزرسانی شد.");
 };
 
 window.handleProfessorSearch = function(query) {
@@ -2408,85 +2577,9 @@ function renderAdminModal() {
   if (!state.adminModalOpen) return "";
   const tab = state.adminActiveTab || 'professors';
   const totalVisits = state.appointments.length;
-  const totalRevenue = state.appointments.reduce((sum, a) => sum + (Number(a.amountPaid) || 0), 0);
 
-  // ادغام جامع تمام کاربران از کلود، حافظه محلی و اساتید ثبت‌نام شده
-  const rawUsers = state.cloudUsers && state.cloudUsers.length > 0 ? state.cloudUsers : getStoredUsers();
-  const userMap = new Map();
-  rawUsers.forEach(u => {
-    if (u && (u.username || u.phone || u.id)) userMap.set(String(u.username || u.phone || u.id).toLowerCase(), u);
-  });
-
-  // ادغام اساتید و پزشکان از تمام منابع
-  const profMap = new Map();
-  (state.professors || []).forEach(p => {
-    if (p && (p.id || p.username || p.name)) profMap.set(String(p.username || p.id || p.name).toLowerCase(), p);
-  });
-  getStoredProfessors().forEach(p => {
-    if (p && (p.id || p.username || p.name)) {
-      const k = String(p.username || p.id || p.name).toLowerCase();
-      if (!profMap.has(k)) profMap.set(k, p);
-    }
-  });
-
-  // اطمینان از حضور تمام اساتید در لیست کاربران
-  profMap.forEach((p, key) => {
-    if (!userMap.has(key)) {
-      const isPhd = p.badges?.includes('دستیار تخصصی PhD') || (p.academicRank && (p.academicRank.includes('PhD') || p.academicRank.includes('دکتری')));
-      userMap.set(key, {
-        id: p.id,
-        username: p.username || p.id,
-        name: p.name,
-        fullName: p.name,
-        phone: p.phone || '',
-        email: p.email || '',
-        role: isPhd ? 'phd' : 'doctor',
-        academicRank: p.academicRank,
-        departmentId: p.departmentId,
-        departmentName: p.departmentName,
-        medicalCouncilNo: p.medicalCouncilNo || p.studentNo || '',
-        createdAt: p.registeredAt || '۱۴۰۵'
-      });
-    }
-  });
-
-  // همچنین افزودن پزشکان و دانشجویان دکتری از لیست کاربران به اساتید
-  userMap.forEach(u => {
-    if (u && (u.role === 'doctor' || u.role === 'phd' || u.academicRank || u.medicalCouncilNo)) {
-      const k = String(u.username || u.phone || u.id || u.name || '').toLowerCase();
-      if (k && !profMap.has(k)) {
-        const isPhd = u.role === 'phd' || (u.academicRank && (u.academicRank.includes('PhD') || u.academicRank.includes('دکتری')));
-        profMap.set(k, {
-          id: u.id || `prof-${Date.now()}`,
-          username: u.username || u.phone || '',
-          name: u.name || u.fullName || 'استاد / پزشک',
-          academicRank: u.academicRank || (isPhd ? 'دانشجوی دکتری تخصصی (PhD) / دستیار' : 'استادیار'),
-          departmentId: u.departmentId || 'surgery-anesthesia',
-          departmentName: u.departmentName || 'بخش جراحی، ارتوپدی و بیهوشی',
-          subSpecialty: u.subSpecialty || (isPhd ? 'پژوهشگر دکتری تخصصی' : 'متخصص بالینی'),
-          medicalCouncilNo: u.medicalCouncilNo || u.studentNo || '',
-          phone: u.phone || '',
-          email: u.email || '',
-          avatar: u.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
-          bio: u.bio || 'عضو کادر تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد.',
-          visitFee: Number(u.visitFee) || (isPhd ? 280000 : 380000),
-          onlineConsultFee: Number(u.onlineConsultFee) || 220000,
-          workDays: u.workDays || ['شنبه', 'دوشنبه', 'چهارشنبه'],
-          workHours: u.workHours || '۰۹:۰۰ الی ۱۳:۰۰',
-          schedule: u.schedule || ['شنبه، دوشنبه، چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰'],
-          status: u.status || 'approved',
-          isApproved: true,
-          rating: 5.0,
-          totalVisits: u.totalVisits || 0,
-          badges: u.badges || [isPhd ? 'دستیار تخصصی PhD' : 'عضو هیئت علمی'],
-          registeredAt: u.createdAt || new Date().toISOString()
-        });
-      }
-    }
-  });
-
-  const allUsersList = Array.from(userMap.values());
-  const allProfessorsList = Array.from(profMap.values());
+  const allProfessorsList = (state.professors && state.professors.length > 0) ? state.professors : getStoredProfessors();
+  const allUsersList = (state.cloudUsers && state.cloudUsers.length > 0) ? state.cloudUsers : getStoredUsers();
 
   const pendingDoctorsCount = allProfessorsList.filter(p => p.status !== 'approved' && !p.isApproved).length;
 
@@ -2665,10 +2758,10 @@ function renderAdminModal() {
                   return `
                     <div class="p-4 rounded-2xl bg-slate-800/90 border ${isApproved ? 'border-emerald-500/40' : 'border-amber-500/70 bg-amber-950/20'} flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div class="flex items-start gap-3 min-w-0">
-                        <img src="${prof.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80'}" class="w-13 h-13 rounded-2xl object-cover border border-slate-700 shrink-0" />
+                        <img src="${prof.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80'}" class="w-14 h-14 rounded-2xl object-cover border border-slate-700 shrink-0" />
                         <div class="min-w-0">
                           <div class="font-bold text-white text-xs flex items-center gap-2 flex-wrap">
-                            <span class="text-sm">${prof.name}</span>
+                            <span class="text-sm font-black">${prof.name}</span>
                             
                             ${isPhd ? `
                               <span class="text-[10px] px-2 py-0.5 rounded-md font-bold bg-cyan-950 text-cyan-300 border border-cyan-500/40">
@@ -2704,19 +2797,24 @@ function renderAdminModal() {
                         </div>
                       </div>
 
-                      <div class="flex items-center gap-2 shrink-0">
+                      <div class="flex items-center gap-2 shrink-0 flex-wrap">
                         ${!isApproved ? `
-                          <button onclick="adminApproveDoctor('${prof.id}', 'approved')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-4 py-2 rounded-xl shadow-lg shadow-emerald-900/40 cursor-pointer transition-all flex items-center gap-1.5">
+                          <button onclick="adminApproveDoctor('${prof.id}', 'approved')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-3.5 py-2 rounded-xl shadow-lg shadow-emerald-900/40 cursor-pointer transition-all flex items-center gap-1">
                             <span>✓</span>
-                            <span>تایید فوری و نمایش در سایت</span>
+                            <span>تایید فوری</span>
                           </button>
                         ` : `
                           <button onclick="adminApproveDoctor('${prof.id}', 'pending')" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all">
                             تعلیق موقت
                           </button>
                         `}
-                        <button onclick="adminDeleteDoctor('${prof.id}')" class="bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all">
-                          حذف
+                        <button onclick="openEditDoctorModal('${prof.id}')" class="bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-500/50 text-indigo-300 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer transition-all flex items-center gap-1">
+                          <span>✏️</span>
+                          <span>ویرایش</span>
+                        </button>
+                        <button onclick="adminDeleteDoctor('${prof.id}')" class="bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-all flex items-center gap-1">
+                          <span>🗑️</span>
+                          <span>حذف</span>
                         </button>
                       </div>
                     </div>
@@ -2775,7 +2873,7 @@ function renderAdminModal() {
                   </thead>
                   <tbody class="divide-y divide-slate-800 bg-slate-900/50">
                     ${filteredUsers.length > 0 ? filteredUsers.map(u => {
-                      const isMaster = (u.username || '').toLowerCase() === 'jahesh1395@gmail.com' || (u.email || '').toLowerCase() === 'jahesh1395@gmail.com' || u.id === 'usr-jahesh-master';
+                      const isMaster = (u.username || '').toLowerCase() === 'jahesh1395@gmail.com' || (u.email || '').toLowerCase() === 'jahesh1395@gmail.com' || u.id === 'usr-jahesh-master' || u.id === 'usr-vet-admin';
                       const isDoc = u.role === 'doctor' || (u.academicRank && !u.academicRank.includes('PhD') && !u.academicRank.includes('دکتری'));
                       const isPhd = u.role === 'phd' || (u.academicRank && (u.academicRank.includes('PhD') || u.academicRank.includes('دکتری')));
                       const isAdmin = u.role === 'admin' || u.isAdmin;
@@ -2802,7 +2900,10 @@ function renderAdminModal() {
                             ${u.medicalCouncilNo ? `<div class="text-[10px] text-amber-400/90 font-mono">نظام: ${u.medicalCouncilNo}</div>` : ''}
                           </td>
                           <td class="p-3 text-slate-400 text-[11px]">${u.createdAt || '۱۴۰۵'}</td>
-                          <td class="p-3 text-center">
+                          <td class="p-3 text-center whitespace-nowrap">
+                            <button onclick="openEditUserModal('${u.id}')" class="text-indigo-400 hover:text-indigo-300 text-xs px-2.5 py-1 rounded-lg bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-800/40 cursor-pointer ml-1">
+                              ویرایش
+                            </button>
                             ${!isMaster ? `
                               <button onclick="adminDeleteUser('${u.id}', '${u.username || ''}')" class="text-rose-400 hover:text-rose-300 text-xs px-2.5 py-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 cursor-pointer">
                                 حذف
@@ -2866,9 +2967,219 @@ function renderAdminModal() {
   `;
 }
 
+// مدال ویرایش اطلاعات و تعرفه اختصاصی استاد / پزشک
+function renderEditDoctorModal() {
+  if (!state.editDoctorModalOpen || !state.editingDoctor) return "";
+  const d = state.editingDoctor;
+  return `
+    <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+      <div class="bg-slate-900 border border-indigo-500/50 w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[92vh] overflow-y-auto custom-scrollbar">
+        <button onclick="closeEditDoctorModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center absolute top-5 left-5 transition-all cursor-pointer border border-slate-700">✕</button>
+
+        <div class="flex items-center gap-3 border-b border-slate-800 pb-4 mb-5">
+          <div class="w-10 h-10 rounded-xl bg-indigo-950 border border-indigo-500/50 flex items-center justify-center text-xl text-indigo-400">
+            ✏️
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-black text-white">ویرایش مشخصات، تعرفه و برنامه حضور استاد</h3>
+            <p class="text-xs text-indigo-400">تغییرات بلافاصله در کل سامانه و صفحه رزرو مراجعین اعمال می‌گردد.</p>
+          </div>
+        </div>
+
+        <form onsubmit="handleEditDoctorSubmit(event)" class="space-y-4">
+          
+          <!-- بخش عکس پرسنلی -->
+          <div class="p-4 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center gap-4 flex-wrap">
+            <div class="relative group shrink-0">
+              <img src="${d.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80'}" class="w-20 h-20 rounded-2xl object-cover border-2 border-emerald-500 shadow-md bg-slate-800" />
+              <button type="button" onclick="document.getElementById('edit_doctor_avatar_input').click()" class="absolute inset-0 bg-black/60 text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center text-[11px] font-bold cursor-pointer">
+                تغییر عکس
+              </button>
+            </div>
+            <div class="flex-1 min-w-[200px] space-y-2">
+              <input type="file" id="edit_doctor_avatar_input" accept="image/*" class="hidden" onchange="handleEditDoctorAvatarUpload(event)" />
+              <div class="flex items-center gap-2 flex-wrap">
+                <button type="button" onclick="document.getElementById('edit_doctor_avatar_input').click()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5">
+                  <span>📁</span>
+                  <span>انتخاب تصویر جدید</span>
+                </button>
+                ${d.avatar ? `
+                  <button type="button" onclick="removeEditDoctorAvatar()" class="bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer">
+                    حذف عکس
+                  </button>
+                ` : ''}
+              </div>
+              <p class="text-[11px] text-slate-400">عکس پرسنلی استاد در کارت معرفی و پروفایل رسمی نمایش داده می‌شود.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">نام و نام خانوادگی استاد *</label>
+              <input required name="name" type="text" value="${d.name || ''}" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">مرتبه علمی *</label>
+              <select name="academicRank" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500">
+                ${['استاد تمام (پروفسور)', 'دانشیار', 'استادیار', 'رزیدنت ارشد تخصصی', 'دانشجوی دکتری تخصصی (PhD)'].map(r => `<option value="${r}" ${(d.academicRank || '').includes(r) ? 'selected' : ''}>${r}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">دپارتمان تخصصی *</label>
+              <select name="departmentId" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500">
+                ${state.departments.map(dep => `<option value="${dep.id}" ${d.departmentId === dep.id ? 'selected' : ''}>${dep.name}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">فیلد فوق‌تخصصی / گرایش</label>
+              <input name="subSpecialty" type="text" value="${d.subSpecialty || ''}" placeholder="مثال: جراحی بافت نرم و ارتوپدی" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره نظام / دانشجویی</label>
+              <input name="medicalCouncilNo" type="text" value="${d.medicalCouncilNo || d.studentNo || ''}" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره همراه</label>
+              <input name="phone" type="tel" value="${d.phone || ''}" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">ایمیل</label>
+              <input name="email" type="email" value="${d.email || ''}" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">تعرفه ویزیت حضوری (تومان)</label>
+              <input name="visitFee" type="number" step="10000" value="${d.visitFee || 380000}" class="w-full bg-slate-800 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">تعرفه مشاوره آنلاین (تومان)</label>
+              <input name="onlineConsultFee" type="number" step="10000" value="${d.onlineConsultFee || 250000}" class="w-full bg-slate-800 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">روزهای حضور</label>
+              <input name="workDays" type="text" value="${Array.isArray(d.workDays) ? d.workDays.join('، ') : (d.workDays || 'شنبه، دوشنبه، چهارشنبه')}" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">ساعت شیفت حضور</label>
+              <input name="workHours" type="text" value="${d.workHours || '۰۹:۰۰ الی ۱۳:۰۰'}" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1.5">وضعیت انتشار و فعالیت در سایت</label>
+            <select name="status" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500">
+              <option value="approved" ${d.status === 'approved' || d.isApproved ? 'selected' : ''}>✓ فعال و تایید شده (نمایش در لیست اساتید و نوبت‌دهی)</option>
+              <option value="pending" ${d.status === 'pending' && !d.isApproved ? 'selected' : ''}>⏳ در انتظار تایید / تعلیق موقت</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1.5">بیوگرافی و سوابق علمی</label>
+            <textarea name="bio" rows="2" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl leading-relaxed focus:outline-none focus:border-indigo-500">${d.bio || ''}</textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+            <button type="button" onclick="closeEditDoctorModal()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer">
+              انصراف
+            </button>
+            <button type="submit" class="px-7 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black transition-all shadow-lg shadow-indigo-600/30 cursor-pointer">
+              ذخیره و اعمال تغییرات
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+// مدال ویرایش اطلاعات کاربر
+function renderEditUserModal() {
+  if (!state.editUserModalOpen || !state.editingUser) return "";
+  const u = state.editingUser;
+  return `
+    <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+      <div class="bg-slate-900 border border-indigo-500/50 w-full max-w-lg rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right">
+        <button onclick="closeEditUserModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center absolute top-5 left-5 transition-all cursor-pointer border border-slate-700">✕</button>
+
+        <h3 class="text-base sm:text-lg font-black text-white mb-1">ویرایش اطلاعات کاربر</h3>
+        <p class="text-xs text-slate-400 mb-5">نام کاربری: <span class="font-mono text-emerald-400">${u.username || u.phone || u.id}</span></p>
+
+        <form onsubmit="handleEditUserSubmit(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1.5">نام و نام خانوادگی *</label>
+            <input required name="name" type="text" value="${u.name || u.fullName || ''}" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره همراه</label>
+              <input name="phone" type="tel" value="${u.phone || ''}" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">پست الکترونیک (ایمیل)</label>
+              <input name="email" type="email" value="${u.email || ''}" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1.5">نقش در سامانه</label>
+            <select name="role" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500">
+              <option value="client" ${u.role === 'client' || (!u.role && !u.isAdmin) ? 'selected' : ''}>🐾 مراجعه‌کننده / سرپرست بیمار</option>
+              <option value="doctor" ${u.role === 'doctor' ? 'selected' : ''}>🩺 عضو هیئت علمی / پزشک متخصص</option>
+              <option value="phd" ${u.role === 'phd' ? 'selected' : ''}>🎓 دانشجوی دکتری تخصصی (PhD)</option>
+              <option value="admin" ${u.role === 'admin' || u.isAdmin ? 'selected' : ''}>👑 مدیر سامانه</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">مرتبه علمی (ویژه اساتید)</label>
+              <input name="academicRank" type="text" value="${u.academicRank || ''}" placeholder="استادیار / دانشیار" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره نظام دامپزشکی</label>
+              <input name="medicalCouncilNo" type="text" value="${u.medicalCouncilNo || ''}" placeholder="12345" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1.5">دپارتمان مربوطه</label>
+            <select name="departmentId" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-indigo-500">
+              <option value="">بدون دپارتمان</option>
+              ${state.departments.map(dep => `<option value="${dep.id}" ${u.departmentId === dep.id ? 'selected' : ''}>${dep.name}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+            <button type="button" onclick="closeEditUserModal()" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer">
+              انصراف
+            </button>
+            <button type="submit" class="px-7 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black transition-all shadow-lg shadow-indigo-600/30 cursor-pointer">
+              ذخیره کاربر
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
 function renderDoctorModal() {
   if (!state.doctorModalOpen || !state.activeDoctorDetails) return "";
   const prof = state.activeDoctorDetails;
+  const isMaster = state.currentUser && (state.currentUser.isAdmin || state.currentUser.role === 'admin' || state.currentUser.id === prof.id);
+
   return `
     <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div class="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right">
@@ -2891,9 +3202,16 @@ function renderDoctorModal() {
           </div>
         </div>
 
-        <button onclick="closeDoctorDetails(); openBookingModal('${prof.id}');" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3.5 rounded-xl transition-all text-center">
-          رزرو نوبت با این استاد
-        </button>
+        <div class="flex items-center gap-3">
+          ${isMaster ? `
+            <button onclick="closeDoctorDetails(); openEditDoctorModal('${prof.id}');" class="bg-indigo-950 hover:bg-indigo-900 border border-indigo-500/60 text-indigo-300 font-bold text-xs py-3.5 px-5 rounded-xl transition-all text-center cursor-pointer">
+              ✏️ ویرایش مشخصات
+            </button>
+          ` : ''}
+          <button onclick="closeDoctorDetails(); openBookingModal('${prof.id}');" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3.5 rounded-xl transition-all text-center cursor-pointer">
+            رزرو نوبت با این استاد
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -3124,6 +3442,8 @@ function renderApp() {
       ${renderAuthModal()}
       ${renderMyAppointmentsModal()}
       ${renderAdminModal()}
+      ${renderEditDoctorModal()}
+      ${renderEditUserModal()}
     </div>
   `;
 }
@@ -3181,44 +3501,42 @@ async function initApp() {
   // ۲. مدیریت اتصال ابری فایربیس (سرور داخلی جهش‌کالا وظیفه سینک زنده را بر عهده دارد، لذا نیازی به خواندن مستقیم کلاینت از فایربیس نیست)
   console.log("سامانه بیمارستان تخصصی با موفقیت از سرور داخلی بارگذاری گردید.");
 
-  // ۳. نظارت مداوم و پولینگ پنل مدیریت (دقیقاً مثل جهش‌کالا: هر ۲ ثانیه در صورت باز بودن پنل)
+  // ۳. نظارت مداوم و همگام‌سازی بلادرنگ کلیه اطلاعات در تمامی حساب‌ها، مرورگرها و کاربران سراسر جهان (هر ۲ ثانیه)
   setInterval(() => {
-    if (state.adminModalOpen) {
-      Promise.all([
-        fetchUniversalApi('users', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null),
-        fetchUniversalApi('professors', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null),
-        fetchUniversalApi('appointments', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null)
-      ]).then(([uData, pData, aData]) => {
-        let changed = false;
-        if (uData && Array.isArray(uData.users)) {
-          const currentLength = (state.cloudUsers || []).length;
-          if (uData.users.length !== currentLength || JSON.stringify(uData.users) !== JSON.stringify(state.cloudUsers)) {
-            state.cloudUsers = uData.users;
-            saveStoredUsers(uData.users);
-            changed = true;
-          }
+    Promise.all([
+      fetchUniversalApi('users', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null),
+      fetchUniversalApi('professors', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null),
+      fetchUniversalApi('appointments', { cache: 'no-store' }).then(r => r && r.ok ? r.json() : null).catch(() => null)
+    ]).then(([uData, pData, aData]) => {
+      let changed = false;
+      if (uData && Array.isArray(uData.users)) {
+        const uList = uData.users;
+        if (JSON.stringify(uList) !== JSON.stringify(state.cloudUsers)) {
+          state.cloudUsers = uList;
+          saveStoredUsers(uList);
+          changed = true;
         }
-        if (pData && Array.isArray(pData.professors)) {
-          const currentLength = (state.professors || []).length;
-          if (pData.professors.length !== currentLength || JSON.stringify(pData.professors) !== JSON.stringify(state.professors)) {
-            state.professors = pData.professors;
-            saveStoredProfessors(pData.professors);
-            changed = true;
-          }
+      }
+      if (pData && Array.isArray(pData.professors)) {
+        const pList = pData.professors;
+        if (JSON.stringify(pList) !== JSON.stringify(state.professors)) {
+          state.professors = pList;
+          saveStoredProfessors(pList);
+          changed = true;
         }
-        if (aData && Array.isArray(aData.appointments)) {
-          const currentLength = (state.appointments || []).length;
-          if (aData.appointments.length !== currentLength) {
-            state.appointments = aData.appointments;
-            try {
-              localStorage.setItem("vet_appointments", JSON.stringify(aData.appointments));
-            } catch (e) {}
-            changed = true;
-          }
+      }
+      if (aData && Array.isArray(aData.appointments)) {
+        const aList = aData.appointments;
+        if (JSON.stringify(aList) !== JSON.stringify(state.appointments)) {
+          state.appointments = aList;
+          try {
+            localStorage.setItem("vet_appointments", JSON.stringify(aList));
+          } catch (e) {}
+          changed = true;
         }
-        if (changed) renderApp();
-      }).catch(() => {});
-    }
+      }
+      if (changed) renderApp();
+    }).catch(() => {});
   }, 2000);
 }
 
