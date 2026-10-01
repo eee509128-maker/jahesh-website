@@ -226,6 +226,69 @@
       margin: 0 !important;
     }
 
+    /* Ensure top header & navigation menu always stay on top of all page layers */
+    header,
+    header.w-box,
+    header.cjqo3r0,
+    .c1a5jpyh,
+    [data-radix-menu-content],
+    [data-radix-popper-content-wrapper],
+    .w-dialog-overlay,
+    .w-dialog-content {
+      z-index: 999999 !important;
+    }
+
+    header {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      z-index: 999999 !important;
+    }
+
+    /* Layout Spacing: Section 2 (3 logos + AI Banner) & Footer */
+    section.cztu8ya {
+      margin-top: 36px !important;
+      margin-bottom: 40px !important;
+      position: relative !important;
+      z-index: 10 !important;
+    }
+
+    @media (max-width: 768px) {
+      section.cztu8ya {
+        margin-top: 24px !important;
+        margin-bottom: 24px !important;
+      }
+    }
+
+    .cjqyi6z {
+      margin-top: 28px !important;
+      margin-bottom: 48px !important;
+      position: relative !important;
+      z-index: 20 !important;
+    }
+
+    footer.w-box,
+    footer.c128r2zr {
+      margin-top: 60px !important;
+      margin-bottom: 0px !important;
+      padding-top: 40px !important;
+      padding-bottom: 40px !important;
+      position: relative !important;
+      z-index: 10 !important;
+      clear: both !important;
+    }
+
+    footer.w-box .c10vhufq,
+    footer.w-box .cnq7vy0,
+    footer.w-box .c10r58nh,
+    footer.w-box .czjxq8p,
+    footer.w-box .c10d16hw,
+    footer.w-box .c1jsg78k {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
     @media (max-width: 768px) {
       /* Base & Typography & Layout Adjustments for Mobile */
       *, *::before, *::after {
@@ -1405,7 +1468,8 @@
           </style>
         </div>
         <header
-          class="w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lxiyww c1qyy4dh ct02u4h c1z0l37u c1ml0hr7 c1fd0kk1 c11gzs80 c1sche0c c1l2989r cjqo3r0 c1cvcmzo c3xzas1 c1n6cdq4 c1a5jpyh c18j5d8w c1fysxfs">
+          class="w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lxiyww c1qyy4dh ct02u4h c1z0l37u c1ml0hr7 c1fd0kk1 c11gzs80 c1sche0c c1l2989r cjqo3r0 c1cvcmzo c3xzas1 c1n6cdq4 c1a5jpyh c18j5d8w c1fysxfs"
+          style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; z-index: 999999 !important;">
           <div
             class="w-box czr2pxy copqmak ct8c5y2 c10zkoym cignq8x cavd3zn c1tbut6b c1tzxl2z c16n19h8 cwqojdn c7klx50 c1qrxaqp cjkeggx c8pi8fa cow6lkx c1oxjrsz csud216 c1xiy5b1 cq7d8me c1ycnvnd">
             <div style="display:contents">
@@ -1486,7 +1550,7 @@
       </div>
     </div>
     <main class="w-box">
-      <section class="w-box ch3bbj5 c1mzb2kd c1dz3al c1cl2zap c8qdjaz c1uc2zh c1l8rbde cq8dnu3 cth1c7d">
+      <section class="w-box ch3bbj5 c1dz3al c1cl2zap c8qdjaz c1uc2zh c1l8rbde cq8dnu3 cth1c7d" style="position: relative; z-index: 30; padding-bottom: 24px !important;">
         <div
           class="w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lfjoq7 c1778y6x c1wt8a7g ceu66s9 c12ae6v5 c1fd0kk1 c11gzs80 c16h1mmi">
           <div class="w-box cry9bxc c1lfjoq7 ct8c5y2 c10zkoym c1qyy4dh c1wt8a7g"><a
@@ -1504,25 +1568,22 @@
             </h1>
             <h2
               class="w-heading cmy06ei cy1haag c32myit cwrra4i c12y6bqh c1mpwk4w c1cqu2xh c1qom380 c1357293 c9jnjeu cqpp1f9 cg4v2lj c1n926lt c1st924m c4omex0 c1dhz37v">
-              مرجع تخصصی طراحی سایت اختصاصی، فروشگاه آنلاین جهش کالا و بستر فعالیت‌های علمی و نوآوری.<br /></h2>
-            <div class="w-box c76ugon c1va7jp0 c18xibj9 ccn5ruk c5ehae6 cax3zcx c1le23sj c40yjke c1kzn7na c17q2jvf csugexd cciu1th co2lzyj cghs7z1 c18xchlu ckqzz7r" style="width: 250px; margin-top: 4px; margin-bottom: 0px;">
-              <a class="w-link c1b1clqm c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 c1yajs6b cdcs8wy c1m1praz c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx czr2pxy c1f4gqnf c6k8nt0 cy8zwmn cl60rel czukzo6 c1qvfg2v c1170qfo"
-                href="/abzar-jahesh">داشبورد تکنولوژی جهش</a>
-            </div>
-            <div class="w-box c76ugon c1va7jp0 c18xibj9 ccn5ruk c5ehae6 cax3zcx c1le23sj c40yjke c1kzn7na c17q2jvf csugexd cciu1th co2lzyj cghs7z1 c18xchlu ckqzz7r" style="width: 250px; margin-top: -6px; margin-bottom: 0px;">
-              <a href="/vet-hospital/" rel="external" data-vike-ignore="true" target="_self"
-                class="w-link c1b1clqm c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 c1yajs6b cdcs8wy c1m1praz c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx czr2pxy c1f4gqnf c6k8nt0 cy8zwmn cl60rel czukzo6 c1qvfg2v c1170qfo">
-                بیمارستان دانشکده دامپزشکی</a>
-            </div>
-            <div class="w-box c76ugon c1va7jp0 c18xibj9 ccn5ruk c5ehae6 cax3zcx c1le23sj c40yjke c1kzn7na c17q2jvf csugexd cciu1th co2lzyj cghs7z1 c18xchlu ckqzz7r" style="width: 250px; margin-top: -6px; margin-bottom: 0px;">
-              <a href="/jaheshkala/" rel="external" data-vike-ignore="true" target="_self"
-                class="w-link c1b1clqm c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 c1yajs6b cdcs8wy c1m1praz c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx czr2pxy c1f4gqnf c6k8nt0 cy8zwmn cl60rel czukzo6 c1qvfg2v c1170qfo" onclick="window.location.href='/jaheshkala/'; return true;">
-                جهش کالا</a>
+              انجمن علمی جهش، بستری برای رشد، یادگیری و فعالیت‌های علمی دانشجویان.<br /></h2>
+            <div style="display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; z-index: 50; gap: 6px;">
+              <div class="w-box c76ugon c1va7jp0 c18xibj9 ccn5ruk c5ehae6 cax3zcx c1le23sj c40yjke c1kzn7na c17q2jvf csugexd cciu1th co2lzyj cghs7z1 c18xchlu ckqzz7r" style="width: 260px; margin-top: 4px; margin-bottom: 0px; position: relative; z-index: 50;">
+                <a href="/abzar-jahesh" class="w-link c1umvwl9 c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx czr2pxy c3pidkv cy8zwmn cl60rel czukzo6" style="background-color: #000000 !important; color: #ffffff !important; font-size: 15.5px !important; font-weight: 700 !important; padding: 10px 16px !important;">داشبورد تکنولوژی جهش</a>
+              </div>
+              <div class="w-box c76ugon c1va7jp0 c18xibj9 ccn5ruk c5ehae6 cax3zcx c1le23sj c40yjke c1kzn7na c17q2jvf csugexd cciu1th co2lzyj cghs7z1 c18xchlu ckqzz7r" style="width: 260px; margin-top: 4px; margin-bottom: 0px; position: relative; z-index: 50;">
+                <a href="/vet-hospital/" class="w-link c1umvwl9 c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx czr2pxy c3pidkv cy8zwmn cl60rel czukzo6" style="background-color: #000000 !important; color: #ffffff !important; font-size: 15.5px !important; font-weight: 700 !important; padding: 10px 16px !important;">بیمارستان دانشکده دامپزشکی</a>
+              </div>
+              <div class="w-box c76ugon c1va7jp0 c18xibj9 ccn5ruk c5ehae6 cax3zcx c1le23sj c40yjke c1kzn7na c17q2jvf csugexd cciu1th co2lzyj cghs7z1 c18xchlu ckqzz7r" style="width: 260px; margin-top: 4px; margin-bottom: 0px; position: relative; z-index: 50; cursor: pointer;" onclick="window.location.href='/jaheshkala/';">
+                <a href="/jaheshkala/" class="w-link c1umvwl9 c13b531o c1my01bv c14z1eqr c1ktl1y1 cr8yqfm c1ufwdzl c5blvcv cml0h3f c135vpv5 csru8nn c1qyy4dh ct02u4h c1md20bl c1e892th c1qom380 c1mcu1jn c1d7r856 cd3iwfe c1yhcvvf cwc6hbl c11r52nx czr2pxy c3pidkv cy8zwmn cl60rel czukzo6" style="background-color: #000000 !important; color: #ffffff !important; font-size: 15.5px !important; font-weight: 700 !important; padding: 10px 16px !important;">جهش کالا</a>
+              </div>
             </div>
           </div>
         </div>
       </section>
-      <section class="w-box cna0hdz c1mzb2kd cztu8ya c1nfu27o cf9av01" style="margin-top: -162px !important; position: relative; z-index: 5;">
+      <section class="w-box cztu8ya c1nfu27o cf9av01" style="margin-top: 36px !important; padding-top: 0px !important; margin-bottom: 40px !important; position: relative; z-index: 10;">
         <div
           class="w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lfjoq7 c1778y6x c1wt8a7g c1s46o9r cdczzub c1fd0kk1 c11gzs80">
           <div
@@ -1547,7 +1608,7 @@
                 src="/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png" decoding="async"
                 loading="lazy" /></a>
           </div>
-          <div class="w-element cjqyi6z c6pxsvg">
+          <div class="w-element cjqyi6z c6pxsvg" style="margin-top: 28px !important; margin-bottom: 48px !important; position: relative; z-index: 20;">
             <div class="w-html-embed">
               <div
                 style="position:relative;border-radius:1rem;background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.1);padding:24px;overflow:hidden;direction: rtl;">
@@ -1734,7 +1795,7 @@
     </main>
     <div style="display:contents">
       <div style="display:contents">
-        <footer class="w-box c128r2zr cwmfdmi c1jsg78k c10d16hw c1oo3gam">
+        <footer class="w-box c128r2zr cwmfdmi c1jsg78k c10d16hw c1oo3gam" style="margin-top: 60px !important; margin-bottom: 0px !important; padding-top: 40px !important; padding-bottom: 40px !important; position: relative !important; z-index: 10; clear: both !important;">
           <div
             class="w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lfjoq7 c1778y6x c1wt8a7g c1s46o9r cdczzub c1fd0kk1 c11gzs80 c1y2xgno">
             <div class="w-box cry9bxc c18v2pa2 c174sw29 cmaksb1 c1i9o1yp c1oo3gam czjxq8p">
