@@ -308,7 +308,7 @@ async function saveProfessorOnline(prof) {
   saveStoredProfessors(localProfs);
 
   try {
-    fetch('/api/vet/professors/register', {
+    fetchUniversalApi('professors/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(prof)
@@ -333,7 +333,7 @@ async function approveDoctorOnline(profId, newStatus = "approved") {
     renderApp();
 
     try {
-      fetch('/api/vet/professors/verify', {
+      fetchUniversalApi('professors/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ professorId: profId, status: newStatus })
@@ -356,7 +356,7 @@ async function deleteProfessorOnline(profId) {
   renderApp();
 
   try {
-    fetch('/api/vet/professors/delete', {
+    fetchUniversalApi('professors/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ professorId: profId })
@@ -379,7 +379,7 @@ async function deleteUserOnline(userId, username = "") {
   renderApp();
 
   try {
-    fetch('/api/vet/users/delete', {
+    fetchUniversalApi('users/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: userId, username: username })
@@ -567,7 +567,7 @@ window.runBookingAiTriageAndProceed = async function() {
   renderApp();
 
   try {
-    const res = await fetch(`${API_BASE}/ai-triage`, {
+    const res = await fetchUniversalApi("ai-triage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -576,8 +576,8 @@ window.runBookingAiTriageAndProceed = async function() {
         symptoms: f.symptoms
       })
     });
-    const data = await res.json();
-    if (data.success && data.triageResult) {
+    const data = res ? await res.json().catch(() => null) : null;
+    if (data && data.success && data.triageResult) {
       state.aiTriageResult = data.triageResult;
       state.bookingForm.departmentId = data.triageResult.targetDepartmentId;
     }
@@ -662,7 +662,7 @@ window.proceedToPayment = async function() {
   showPaymentRedirectLoader("در حال انتقال امن به درگاه پرداخت اینترنتی زیپال (شاپرک)...");
 
   try {
-    const res = await fetch("/api/zibal-request", {
+    const res = await fetchUniversalApi("zibal-request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -676,12 +676,12 @@ window.proceedToPayment = async function() {
       })
     });
 
-    const data = await res.json();
-    if (data.success && data.paymentUrl) {
+    const data = res ? await res.json().catch(() => null) : null;
+    if (data && data.success && data.paymentUrl) {
       window.location.href = data.paymentUrl;
     } else {
       hidePaymentRedirectLoader();
-      alert("خطا در اتصال به درگاه زیپال: " + (data.message || "لطفاً دوباره تلاش فرمایید."));
+      alert("خطا در اتصال به درگاه زیپال: " + ((data && data.message) || "لطفاً دوباره تلاش فرمایید."));
     }
   } catch (err) {
     hidePaymentRedirectLoader();
@@ -703,7 +703,7 @@ async function handlePaymentReturn() {
   if (trackId && (status === "2" || successParam === "1" || status === "1")) {
     showPaymentRedirectLoader("در حال تایید پرداخت و صدور فاکتور رسمی بیمارستان...");
     try {
-      const vRes = await fetch("/api/zibal-verify", {
+      const vRes = await fetchUniversalApi("zibal-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -711,11 +711,11 @@ async function handlePaymentReturn() {
           merchant: ZIBAL_MERCHANT_CODE
         })
       });
-      const vData = await vRes.json();
+      const vData = vRes ? await vRes.json().catch(() => null) : null;
       hidePaymentRedirectLoader();
 
-      if (vData.success || status === "2") {
-        const refNumber = vData.refNumber || trackId;
+      if ((vData && vData.success) || status === "2") {
+        const refNumber = (vData && vData.refNumber) || trackId;
         const finalAppointment = {
           ...(pending || {}),
           id: pending?.id || "VET-" + trackId,
@@ -728,7 +728,7 @@ async function handlePaymentReturn() {
         };
 
         try {
-          await fetch("/api/vet/appointments/book", {
+          await fetchUniversalApi("appointments/book", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(finalAppointment)
@@ -819,15 +819,15 @@ window.handleUnifiedAuthSubmit = async function(e) {
 
     // ۲. ارسال درخواست ورود به سرور داخلی (بدون نیاز به فیلترشکن - سریع‌تر از ۱۰ میلی‌ثانیه)
     try {
-      const res = await fetch("/api/vet/auth/login", {
+      const res = await fetchUniversalApi("auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: identifier, password: pass })
       });
 
       if (res && res.ok) {
-        const data = await res.json();
-        if (data.success && data.user) {
+        const data = await res.json().catch(() => null);
+        if (data && data.success && data.user) {
           state.currentUser = data.user;
           localStorage.setItem("vet_user", JSON.stringify(data.user));
           state.authModalOpen = false;
@@ -838,7 +838,7 @@ window.handleUnifiedAuthSubmit = async function(e) {
           renderApp();
           if (window.confetti) window.confetti({ particleCount: 70, spread: 60 });
           return;
-        } else if (data.error) {
+        } else if (data && data.error) {
           alert(data.error);
           return;
         }
@@ -967,13 +967,13 @@ window.handleUnifiedAuthSubmit = async function(e) {
 
   // ۱. ارسال مستقیم و آنی به سرور داخلی (بدون فیلترشکن - آنی)
   try {
-    const res = await fetch("/api/vet/auth/register", {
+    const res = await fetchUniversalApi("auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(regPayload)
     });
 
-    const data = await res.json().catch(() => null);
+    const data = res ? await res.json().catch(() => null) : null;
     if (res && res.ok && data && data.success) {
       serverUser = data.user;
       serverProf = data.professor;
@@ -1287,7 +1287,7 @@ window.handleRunTriage = async function(e) {
   renderApp();
 
   try {
-    const res = await fetch(`${API_BASE}/ai-triage`, {
+    const res = await fetchUniversalApi("ai-triage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1297,8 +1297,10 @@ window.handleRunTriage = async function(e) {
         age: f.age
       })
     });
-    const data = await res.json();
-    state.triageForm.result = data.triageResult;
+    const data = res ? await res.json().catch(() => null) : null;
+    if (data && data.triageResult) {
+      state.triageForm.result = data.triageResult;
+    }
   } catch (err) {
     console.warn("Triage error:", err);
   }
@@ -2696,30 +2698,35 @@ async function initApp() {
   // ۱. دریافت فوق‌سریع اطلاعات از سرور داخلی (بدون فیلترشکن - آنی <10ms)
   try {
     const [depsRes, profsRes, apptsRes, usersRes] = await Promise.all([
-      fetch('/api/vet/departments').catch(() => null),
-      fetch('/api/vet/professors').catch(() => null),
-      fetch('/api/vet/appointments').catch(() => null),
-      fetch('/api/vet/users').catch(() => null)
+      fetchUniversalApi('departments').catch(() => null),
+      fetchUniversalApi('professors').catch(() => null),
+      fetchUniversalApi('appointments').catch(() => null),
+      fetchUniversalApi('users').catch(() => null)
     ]);
 
     if (depsRes && depsRes.ok) {
-      const d = await depsRes.json();
-      if (d.departments && d.departments.length) state.departments = d.departments;
+      const d = await depsRes.json().catch(() => null);
+      if (d && Array.isArray(d.departments)) state.departments = d.departments;
     }
     if (profsRes && profsRes.ok) {
-      const p = await profsRes.json();
-      if (p.professors && p.professors.length) {
+      const p = await profsRes.json().catch(() => null);
+      if (p && Array.isArray(p.professors)) {
         state.professors = p.professors;
         saveStoredProfessors(p.professors);
       }
     }
     if (apptsRes && apptsRes.ok) {
-      const a = await apptsRes.json();
-      if (a.appointments && a.appointments.length) state.appointments = a.appointments;
+      const a = await apptsRes.json().catch(() => null);
+      if (a && Array.isArray(a.appointments)) {
+        state.appointments = a.appointments;
+        try {
+          localStorage.setItem("vet_appointments", JSON.stringify(a.appointments));
+        } catch (e) {}
+      }
     }
     if (usersRes && usersRes.ok) {
-      const u = await usersRes.json();
-      if (u.users && u.users.length) {
+      const u = await usersRes.json().catch(() => null);
+      if (u && Array.isArray(u.users)) {
         state.cloudUsers = u.users;
         saveStoredUsers(u.users);
       }
@@ -2736,22 +2743,36 @@ async function initApp() {
   setInterval(() => {
     if (state.adminModalOpen) {
       Promise.all([
-        fetch('/api/vet/users').then(r => r && r.ok ? r.json() : null).catch(() => null),
-        fetch('/api/vet/professors').then(r => r && r.ok ? r.json() : null).catch(() => null),
-        fetch('/api/vet/appointments').then(r => r && r.ok ? r.json() : null).catch(() => null)
+        fetchUniversalApi('users').then(r => r && r.ok ? r.json() : null).catch(() => null),
+        fetchUniversalApi('professors').then(r => r && r.ok ? r.json() : null).catch(() => null),
+        fetchUniversalApi('appointments').then(r => r && r.ok ? r.json() : null).catch(() => null)
       ]).then(([uData, pData, aData]) => {
         let changed = false;
-        if (uData && Array.isArray(uData.users) && uData.users.length !== (state.cloudUsers || []).length) {
-          state.cloudUsers = uData.users;
-          changed = true;
+        if (uData && Array.isArray(uData.users)) {
+          const currentLength = (state.cloudUsers || []).length;
+          if (uData.users.length !== currentLength || JSON.stringify(uData.users) !== JSON.stringify(state.cloudUsers)) {
+            state.cloudUsers = uData.users;
+            saveStoredUsers(uData.users);
+            changed = true;
+          }
         }
-        if (pData && Array.isArray(pData.professors) && pData.professors.length !== state.professors.length) {
-          state.professors = pData.professors;
-          changed = true;
+        if (pData && Array.isArray(pData.professors)) {
+          const currentLength = (state.professors || []).length;
+          if (pData.professors.length !== currentLength || JSON.stringify(pData.professors) !== JSON.stringify(state.professors)) {
+            state.professors = pData.professors;
+            saveStoredProfessors(pData.professors);
+            changed = true;
+          }
         }
-        if (aData && Array.isArray(aData.appointments) && aData.appointments.length !== state.appointments.length) {
-          state.appointments = aData.appointments;
-          changed = true;
+        if (aData && Array.isArray(aData.appointments)) {
+          const currentLength = (state.appointments || []).length;
+          if (aData.appointments.length !== currentLength) {
+            state.appointments = aData.appointments;
+            try {
+              localStorage.setItem("vet_appointments", JSON.stringify(aData.appointments));
+            } catch (e) {}
+            changed = true;
+          }
         }
         if (changed) renderApp();
       }).catch(() => {});

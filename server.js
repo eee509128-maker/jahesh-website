@@ -46,29 +46,56 @@ const serverDb = getFirestore(serverFirebaseApp, 'ai-studio-jaheshwebsite-13126c
 // شنود زنده و آنی دیتابیس ابری فایربیس بر روی سرور
 try {
   onSnapshot(collection(serverDb, 'professors'), (snap) => {
-    const profs = [];
-    snap.docs.forEach((d) => profs.push({ ...d.data(), id: d.id }));
-    if (profs.length > 0) {
-      writeVetProfessors(profs);
-      console.log(`[Server Firestore] Real-time synced ${profs.length} professors`);
+    const firestoreProfs = [];
+    snap.docs.forEach((d) => firestoreProfs.push({ ...d.data(), id: d.id }));
+    if (firestoreProfs.length > 0) {
+      const localProfs = readVetProfessors();
+      const mergedMap = new Map();
+      localProfs.forEach((p) => {
+        if (p && p.id) mergedMap.set(p.id, p);
+      });
+      firestoreProfs.forEach((p) => {
+        if (p && p.id) mergedMap.set(p.id, p);
+      });
+      const mergedProfs = Array.from(mergedMap.values());
+      writeVetProfessors(mergedProfs);
+      console.log(`[Server Firestore] Real-time merged ${mergedProfs.length} professors`);
     }
   }, (err) => console.warn('[Server Firestore] professors listener notice:', err));
 
   onSnapshot(collection(serverDb, 'users'), (snap) => {
-    const users = [];
-    snap.docs.forEach((d) => users.push({ ...d.data(), id: d.id }));
-    if (users.length > 0) {
-      writeVetUsers(users);
-      console.log(`[Server Firestore] Real-time synced ${users.length} users`);
+    const firestoreUsers = [];
+    snap.docs.forEach((d) => firestoreUsers.push({ ...d.data(), id: d.id }));
+    if (firestoreUsers.length > 0) {
+      const localUsers = readVetUsers();
+      const mergedMap = new Map();
+      localUsers.forEach((u) => {
+        if (u && u.id) mergedMap.set(u.id, u);
+      });
+      firestoreUsers.forEach((u) => {
+        if (u && u.id) mergedMap.set(u.id, u);
+      });
+      const mergedUsers = Array.from(mergedMap.values());
+      writeVetUsers(mergedUsers);
+      console.log(`[Server Firestore] Real-time merged ${mergedUsers.length} users`);
     }
   }, (err) => console.warn('[Server Firestore] users listener notice:', err));
 
   onSnapshot(collection(serverDb, 'vet_appointments'), (snap) => {
-    const appts = [];
-    snap.docs.forEach((d) => appts.push({ ...d.data(), id: d.id }));
-    if (appts.length > 0) {
-      writeVetAppointments(appts);
-      console.log(`[Server Firestore] Real-time synced ${appts.length} appointments`);
+    const firestoreAppts = [];
+    snap.docs.forEach((d) => firestoreAppts.push({ ...d.data(), id: d.id }));
+    if (firestoreAppts.length > 0) {
+      const localAppts = readVetAppointments();
+      const mergedMap = new Map();
+      localAppts.forEach((a) => {
+        if (a && a.id) mergedMap.set(a.id, a);
+      });
+      firestoreAppts.forEach((a) => {
+        if (a && a.id) mergedMap.set(a.id, a);
+      });
+      const mergedAppts = Array.from(mergedMap.values());
+      writeVetAppointments(mergedAppts);
+      console.log(`[Server Firestore] Real-time merged ${mergedAppts.length} appointments`);
     }
   }, (err) => console.warn('[Server Firestore] appointments listener notice:', err));
 } catch (e) {
