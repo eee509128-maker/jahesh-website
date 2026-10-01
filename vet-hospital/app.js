@@ -973,37 +973,24 @@ window.handleUnifiedAuthSubmit = async function(e) {
       body: JSON.stringify(regPayload)
     });
 
-    if (res && res.ok) {
-      const data = await res.json();
-      if (data.success) {
-        serverUser = data.user;
-        serverProf = data.professor;
-        serverMessage = data.message;
-      } else if (data.error) {
-        alert(data.error);
-        return;
-      }
+    const data = await res.json().catch(() => null);
+    if (res && res.ok && data && data.success) {
+      serverUser = data.user;
+      serverProf = data.professor;
+      serverMessage = data.message;
+    } else {
+      const errMsg = (data && data.error) || "خطایی در ثبت‌نام سمت سرور رخ داده است.";
+      alert(errMsg);
+      return;
     }
   } catch (err) {
     console.warn("Direct register notice:", err);
+    alert("بروز خطا در برقراری ارتباط با سرور ثبت‌نام. لطفا وضعیت اتصال خود را بررسی کنید.");
+    return;
   }
 
   // ۲. ساخت کاربر برای نشست جاری (در صورت در دسترس نبودن موقت شبکه، با کش محلی کار می‌کند)
-  const finalUser = serverUser || {
-    id: "user-" + Date.now(),
-    username: cleanUsername,
-    password: password.trim(),
-    name: name.trim(),
-    fullName: name.trim(),
-    phone: phone.trim(),
-    email: email.trim(),
-    role: role,
-    departmentId: dept.id,
-    departmentName: deptName,
-    createdAt: new Date().toLocaleDateString('fa-IR'),
-    timestamp: Date.now()
-  };
-
+  const finalUser = serverUser;
   let finalProf = serverProf;
   if (!finalProf && (role === "doctor" || role === "phd")) {
     finalProf = {
