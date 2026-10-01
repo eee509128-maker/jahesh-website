@@ -36,5 +36,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+    match /professors/{profId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /vet_appointments/{appId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }

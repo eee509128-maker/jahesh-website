@@ -103,6 +103,54 @@
         "status": { "type": "string" }
       },
       "required": ["username", "licenseKey"]
+    },
+    "Professor": {
+      "title": "Professor",
+      "description": "Veterinary hospital faculty professors and doctors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "name": { "type": "string" },
+        "specialty": { "type": "string" },
+        "department": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "medicalCouncilNo": { "type": "string" },
+        "avatar": { "type": "string" },
+        "bio": { "type": "string" },
+        "visitPrice": { "type": "number" },
+        "onlinePrice": { "type": "number" },
+        "isApproved": { "type": "boolean" },
+        "rating": { "type": "number" },
+        "availableDays": { "type": "string" },
+        "workingHours": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "VetAppointment": {
+      "title": "VetAppointment",
+      "description": "Veterinary clinic appointment bookings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trackingCode": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "departmentName": { "type": "string" },
+        "patientName": { "type": "string" },
+        "patientPhone": { "type": "string" },
+        "petName": { "type": "string" },
+        "petSpecies": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "status": { "type": "string" },
+        "fee": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "patientPhone"]
     }
   },
   "firestore": {
@@ -133,6 +181,14 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "Store user accounts"
+    },
+    "/professors/{profId}": {
+      "schema": "Professor",
+      "description": "Store veterinary professors and doctors"
+    },
+    "/vet_appointments/{appId}": {
+      "schema": "VetAppointment",
+      "description": "Store veterinary appointments"
     }
   }
 }
