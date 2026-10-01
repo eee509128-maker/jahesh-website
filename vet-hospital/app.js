@@ -236,12 +236,12 @@ const DEFAULT_INITIAL_PROFESSORS = [
 function getStoredProfessors() {
   try {
     const raw = localStorage.getItem("vet_professors");
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         // فیلتر کردن و پاک‌سازی هرگونه اساتید تستی و ماک قدیمی (prof-1 تا prof-6)
         const realProfessors = parsed.filter(p => p && p.id && !p.id.match(/^prof-[1-6]$/));
-        if (realProfessors.length > 0) return realProfessors;
+        return realProfessors;
       }
     }
   } catch (e) {}
@@ -334,6 +334,58 @@ async function fetchUniversalApi(pathOrAction, options = {}) {
   return lastResponse;
 }
 
+// آپلود عکس اختصاصی استاد و پزشک در فرم ثبت‌نام
+window.handleProfessorAvatarUpload = function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    alert('لطفاً یک فایل تصویری معتبر انتخاب فرمایید (JPG, PNG, WEBP).');
+    return;
+  }
+
+  if (file.size > 8 * 1024 * 1024) {
+    alert('حجم تصویر نباید بیشتر از ۸ مگابایت باشد.');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const maxDim = 450;
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      state.authForm.avatar = dataUrl;
+      renderApp();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+window.removeProfessorAvatar = function() {
+  state.authForm.avatar = '';
+  renderApp();
+};
+
 // ذخیره آنلاین کاربر (همزمان در سرور داخلی با سرعت بالا و بدون نیاز به فیلترشکن + کش محلی + سینک پس‌زمینه با فایربیس)
 async function saveUserOnline(user) {
   const localUsers = getStoredUsers();
@@ -417,18 +469,26 @@ async function approveDoctorOnline(profId, newStatus = "approved") {
   }
 }
 
-// حذف آنلاین پزشک
+// حذف قطعی و آنلاین پزشک در تمام پایگاه‌ها
 async function deleteProfessorOnline(profId) {
-  state.professors = state.professors.filter(p => p.id !== profId);
+  const targetProf = (state.professors || []).find(p => p.id === profId);
+  const cleanU = targetProf?.username || '';
+  
+  state.professors = (state.professors || []).filter(p => p.id !== profId);
   saveStoredProfessors(state.professors);
+
+  state.cloudUsers = (state.cloudUsers || []).filter(u => u.id !== profId && (!cleanU || u.username !== cleanU));
+  const localUsers = getStoredUsers().filter(u => u.id !== profId && (!cleanU || u.username !== cleanU));
+  saveStoredUsers(localUsers);
+
   renderApp();
 
   try {
-    fetchUniversalApi('professors/delete', {
+    await fetchUniversalApi('professors/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ professorId: profId })
-    }).catch(() => {});
+      body: JSON.stringify({ professorId: profId, id: profId, username: cleanU })
+    });
   } catch (e) {}
 
   if (window.VetFirebase) {
@@ -439,19 +499,25 @@ async function deleteProfessorOnline(profId) {
   }
 }
 
-// حذف آنلاین کاربر
+// حذف قطعی و آنلاین کاربر در تمام پایگاه‌ها
 async function deleteUserOnline(userId, username = "") {
-  state.cloudUsers = (state.cloudUsers || []).filter(u => u.id !== userId && (!username || u.username !== username));
-  const localUsers = getStoredUsers().filter(u => u.id !== userId && (!username || u.username !== username));
+  const cleanU = (username || '').toLowerCase().trim();
+  
+  state.cloudUsers = (state.cloudUsers || []).filter(u => u.id !== userId && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
+  const localUsers = getStoredUsers().filter(u => u.id !== userId && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
   saveStoredUsers(localUsers);
+
+  state.professors = (state.professors || []).filter(p => p.id !== userId && (!cleanU || (p.username || '').toLowerCase() !== cleanU));
+  saveStoredProfessors(state.professors);
+
   renderApp();
 
   try {
-    fetchUniversalApi('users/delete', {
+    await fetchUniversalApi('users/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: userId, username: username })
-    }).catch(() => {});
+      body: JSON.stringify({ id: userId, username: cleanU })
+    });
   } catch (e) {}
 
   if (window.VetFirebase) {
@@ -1012,6 +1078,8 @@ window.handleUnifiedAuthSubmit = async function(e) {
   const cleanWorkHours = f.workHours || "۰۹:۰۰ الی ۱۳:۰۰";
   const scheduleStr = `${cleanWorkDays.join("، ")} ${cleanWorkHours}`;
 
+  const chosenAvatar = f.avatar || (role === 'doctor' || role === 'phd' ? 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80' : '');
+
   const regPayload = {
     username: cleanUsername,
     password: password.trim(),
@@ -1026,6 +1094,7 @@ window.handleUnifiedAuthSubmit = async function(e) {
     subSpecialty: getVal("subSpecialty") || f.subSpecialty || (role === "phd" ? "پژوهشگر دکتری تخصصی" : "متخصص بالینی"),
     medicalCouncilNo: getVal("medicalCouncilNo") || f.medicalCouncilNo || "",
     studentNo: getVal("medicalCouncilNo") || f.medicalCouncilNo || "",
+    avatar: chosenAvatar,
     visitFee: Number(f.visitFee) || (role === "phd" ? 280000 : 380000),
     onlineConsultFee: Number(f.onlineConsultFee) || 220000,
     workDays: cleanWorkDays,
@@ -1070,6 +1139,7 @@ window.handleUnifiedAuthSubmit = async function(e) {
     fullName: name.trim(),
     phone: phone.trim(),
     email: email.trim(),
+    avatar: chosenAvatar,
     role: role,
     departmentId: dept.id,
     departmentName: deptName,
@@ -1090,7 +1160,7 @@ window.handleUnifiedAuthSubmit = async function(e) {
       medicalCouncilNo: regPayload.medicalCouncilNo,
       phone: phone.trim(),
       email: email.trim(),
-      avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
+      avatar: chosenAvatar,
       bio: regPayload.bio,
       visitFee: regPayload.visitFee,
       onlineConsultFee: regPayload.onlineConsultFee,
@@ -2214,6 +2284,44 @@ function renderAuthModal() {
             </div>
 
             ${f.role === 'doctor' || f.role === 'phd' ? `
+              <!-- بخش اختصاصی آپلود عکس پرسنلی / تصویر پروفایل استاد یا پزشک -->
+              <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-800/90 to-slate-900 border border-emerald-500/40 space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="text-base">📸</span>
+                    <label class="text-xs font-black text-emerald-400">تصویر پرسنلی / عکس پروفایل استاد</label>
+                  </div>
+                  <span class="text-[10px] text-emerald-300 font-bold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">ویژه اساتید و پزشکان</span>
+                </div>
+                
+                <div class="flex items-center gap-4 flex-wrap">
+                  <div class="relative group shrink-0">
+                    <img src="${f.avatar || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80'}" class="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-500 shadow-md bg-slate-800" id="prof_avatar_preview" />
+                    <button type="button" onclick="document.getElementById('prof_avatar_file_input').click()" class="absolute inset-0 bg-black/60 text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center text-[11px] font-bold cursor-pointer">
+                      تغییر عکس
+                    </button>
+                  </div>
+                  
+                  <div class="flex-1 min-w-[200px] space-y-2">
+                    <input type="file" id="prof_avatar_file_input" accept="image/*" class="hidden" onchange="handleProfessorAvatarUpload(event)" />
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <button type="button" onclick="document.getElementById('prof_avatar_file_input').click()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-md shadow-emerald-900/40 flex items-center gap-1.5 cursor-pointer">
+                        <span>📁</span>
+                        <span>${f.avatar ? 'تغییر و انتخاب عکس جدید' : 'بارگذاری عکس پرسنلی استاد'}</span>
+                      </button>
+                      ${f.avatar ? `
+                        <button type="button" onclick="removeProfessorAvatar()" class="bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-rose-300 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer">
+                          حذف عکس
+                        </button>
+                      ` : ''}
+                    </div>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                      تصویر انتخابی مستقیماً در کارت معرفی استاد، بخش دپارتمان و فرم رزرو نوبت به مراجعین نمایش داده می‌شود.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div class="p-4 rounded-2xl bg-slate-800/60 border border-slate-700 space-y-4">
                 <div class="text-xs font-black text-emerald-400">اطلاعات تخصصی، زمان‌بندی ویزیت و تعرفه پزشک</div>
 

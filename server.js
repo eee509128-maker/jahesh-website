@@ -7,10 +7,16 @@ import {
   readVetDepartments,
   readVetProfessors,
   writeVetProfessors,
+  readDeletedVetProfessors,
+  addDeletedVetProfessorId,
+  removeDeletedVetProfessorId,
   readVetAppointments,
   writeVetAppointments,
   readVetUsers,
   writeVetUsers,
+  readDeletedVetUsers,
+  addDeletedVetUserId,
+  removeDeletedVetUserId,
   performAiVeterinaryTriage
 } from './api/vet-hospital.js';
 import { initializeApp, getApps } from 'firebase/app';
@@ -47,15 +53,23 @@ const serverDb = getFirestore(serverFirebaseApp, 'ai-studio-jaheshwebsite-13126c
 try {
   onSnapshot(collection(serverDb, 'professors'), (snap) => {
     const firestoreProfs = [];
-    snap.docs.forEach((d) => firestoreProfs.push({ ...d.data(), id: d.id }));
+    const deletedKeys = new Set(readDeletedVetProfessors());
+    snap.docs.forEach((d) => {
+      const data = d.data();
+      const pId = String(d.id || '').toLowerCase();
+      const pUname = String(data.username || '').toLowerCase();
+      if (!deletedKeys.has(pId) && !deletedKeys.has(pUname)) {
+        firestoreProfs.push({ ...data, id: d.id });
+      }
+    });
     if (firestoreProfs.length > 0) {
       const localProfs = readVetProfessors();
       const mergedMap = new Map();
       localProfs.forEach((p) => {
-        if (p && p.id) mergedMap.set(p.id, p);
+        if (p && p.id && !deletedKeys.has(String(p.id).toLowerCase())) mergedMap.set(p.id, p);
       });
       firestoreProfs.forEach((p) => {
-        if (p && p.id) mergedMap.set(p.id, p);
+        if (p && p.id && !deletedKeys.has(String(p.id).toLowerCase())) mergedMap.set(p.id, p);
       });
       const mergedProfs = Array.from(mergedMap.values());
       writeVetProfessors(mergedProfs);
@@ -65,15 +79,23 @@ try {
 
   onSnapshot(collection(serverDb, 'users'), (snap) => {
     const firestoreUsers = [];
-    snap.docs.forEach((d) => firestoreUsers.push({ ...d.data(), id: d.id }));
+    const deletedKeys = new Set(readDeletedVetUsers());
+    snap.docs.forEach((d) => {
+      const data = d.data();
+      const uId = String(d.id || '').toLowerCase();
+      const uUname = String(data.username || '').toLowerCase();
+      if (!deletedKeys.has(uId) && !deletedKeys.has(uUname)) {
+        firestoreUsers.push({ ...data, id: d.id });
+      }
+    });
     if (firestoreUsers.length > 0) {
       const localUsers = readVetUsers();
       const mergedMap = new Map();
       localUsers.forEach((u) => {
-        if (u && u.id) mergedMap.set(u.id, u);
+        if (u && u.id && !deletedKeys.has(String(u.id).toLowerCase())) mergedMap.set(u.id, u);
       });
       firestoreUsers.forEach((u) => {
-        if (u && u.id) mergedMap.set(u.id, u);
+        if (u && u.id && !deletedKeys.has(String(u.id).toLowerCase())) mergedMap.set(u.id, u);
       });
       const mergedUsers = Array.from(mergedMap.values());
       writeVetUsers(mergedUsers);
@@ -1373,24 +1395,28 @@ app.post(['/api/vet/users/delete', '/vet-hospital/api/users/delete'], (req, res)
     if (!id && !username) {
       return res.status(400).json({ success: false, error: 'User id or username is required' });
     }
-    const cleanU = (username || '').toLowerCase();
+    const cleanU = (username || '').toLowerCase().trim();
 
-    // 1. Remove from vet users
-    let vetUsers = readVetUsers();
-    vetUsers = vetUsers.filter((u) => u.id !== id && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
+    // 1. Blacklist in tombstones
+    const users = readVetUsers();
+    const targetUser = users.find(u => u.id === id || (cleanU && u.username && u.username.toLowerCase() === cleanU));
+    const cleanIds = [id, cleanU, targetUser?.username, targetUser?.email, targetUser?.phone].filter(Boolean);
+    addDeletedVetUserId(...cleanIds);
+    addDeletedVetProfessorId(...cleanIds);
+
+    // 2. Remove from vet users
+    let vetUsers = users.filter((u) => u.id !== id && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
     writeVetUsers(vetUsers);
 
-    // 2. Remove from vet professors if matched
-    let professors = readVetProfessors();
-    professors = professors.filter((p) => p.id !== id && (!cleanU || (p.username || '').toLowerCase() !== cleanU));
+    // 3. Remove from vet professors if matched
+    let professors = readVetProfessors().filter((p) => p.id !== id && (!cleanU || (p.username || '').toLowerCase() !== cleanU));
     writeVetProfessors(professors);
 
-    // 3. Remove from universal users
-    let universal = readUsersFromDisk();
-    universal = universal.filter((u) => u.id !== id && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
+    // 4. Remove from universal users
+    let universal = readUsersFromDisk().filter((u) => u.id !== id && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
     writeUsersToDisk(universal);
 
-    // 4. Remove from Firestore cloud database
+    // 5. Remove from Firestore cloud database
     try {
       if (id) deleteDoc(doc(serverDb, 'users', id)).catch(() => {});
       if (id) deleteDoc(doc(serverDb, 'professors', id)).catch(() => {});
@@ -1412,8 +1438,22 @@ app.get(['/api/vet/departments', '/vet-hospital/api/departments'], (_req, res) =
 app.get(['/api/vet/professors', '/vet-hospital/api/professors'], (req, res) => {
   try {
     const { department, status, all } = req.query;
-    let professors = readVetProfessors();
-    const vetUsers = readVetUsers();
+    const deletedProfKeys = new Set(readDeletedVetProfessors());
+    const deletedUserKeys = new Set(readDeletedVetUsers());
+
+    let professors = readVetProfessors().filter(p => {
+      if (!p) return false;
+      const pid = String(p.id || '').toLowerCase();
+      const puname = String(p.username || '').toLowerCase();
+      return !deletedProfKeys.has(pid) && !deletedProfKeys.has(puname);
+    });
+
+    const vetUsers = readVetUsers().filter(u => {
+      if (!u) return false;
+      const uid = String(u.id || '').toLowerCase();
+      const uname = String(u.username || '').toLowerCase();
+      return !deletedUserKeys.has(uid) && !deletedUserKeys.has(uname) && !deletedProfKeys.has(uid) && !deletedProfKeys.has(uname);
+    });
 
     // Auto-synthesize and merge any doctor or phd users into professors
     const profMap = new Map();
@@ -1426,7 +1466,7 @@ app.get(['/api/vet/professors', '/vet-hospital/api/professors'], (req, res) => {
     vetUsers.forEach((u) => {
       if (u && (u.role === 'doctor' || u.role === 'phd' || u.academicRank || u.medicalCouncilNo)) {
         const key = String(u.username || u.id || '').toLowerCase();
-        if (key && !profMap.has(key)) {
+        if (key && !profMap.has(key) && !deletedProfKeys.has(key) && !deletedUserKeys.has(key)) {
           const isPhd = u.role === 'phd' || (u.academicRank && u.academicRank.includes('PhD')) || (u.academicRank && u.academicRank.includes('دکتری'));
           const synthesized = {
             id: u.id ? (u.id.startsWith('prof-') ? u.id : 'prof-' + u.id) : ('prof-' + Date.now()),
@@ -1480,6 +1520,16 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
     if (!incoming || !incoming.name || !incoming.departmentId) {
       return res.status(400).json({ success: false, error: 'نام استاد و بخش تخصصی الزامی است.' });
     }
+
+    const cleanU = (incoming.username || incoming.email || incoming.phone || '').trim().toLowerCase();
+    const cleanE = (incoming.email || '').trim().toLowerCase();
+    const cleanPhone = (incoming.phone || '').trim();
+    const assignedId = incoming.id || 'prof-' + Date.now();
+
+    // Clear from deleted tombstones if being registered/re-registered
+    removeDeletedVetProfessorId(assignedId, cleanU, cleanE, cleanPhone);
+    removeDeletedVetUserId(assignedId, cleanU, cleanE, cleanPhone);
+
     const professors = readVetProfessors();
     const cleanWorkDays = Array.isArray(incoming.workDays) && incoming.workDays.length > 0
       ? incoming.workDays
@@ -1488,7 +1538,7 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
     const scheduleStr = `${cleanWorkDays.join('، ')} ${cleanWorkHours}`;
 
     const newProf = {
-      id: incoming.id || 'prof-' + Date.now(),
+      id: assignedId,
       username: incoming.username || incoming.email || incoming.phone || '',
       password: incoming.password || '123456',
       name: incoming.name.trim(),
@@ -1575,17 +1625,36 @@ app.post(['/api/vet/professors/verify', '/vet-hospital/api/professors/verify'], 
 // POST /api/vet/professors/delete
 app.post(['/api/vet/professors/delete', '/vet-hospital/api/professors/delete'], (req, res) => {
   try {
-    const { professorId } = req.body;
-    if (!professorId) {
+    const { professorId, id, username } = req.body || {};
+    const targetId = professorId || id;
+    if (!targetId && !username) {
       return res.status(400).json({ success: false, error: 'professorId is required' });
     }
-    let professors = readVetProfessors();
-    professors = professors.filter((p) => p.id !== professorId);
+    const cleanU = (username || '').toLowerCase().trim();
+
+    // 1. Blacklist in tombstones
+    const profs = readVetProfessors();
+    const targetProf = profs.find(p => p.id === targetId || (cleanU && p.username && p.username.toLowerCase() === cleanU));
+    const cleanIds = [targetId, cleanU, targetProf?.username, targetProf?.email, targetProf?.phone].filter(Boolean);
+    addDeletedVetProfessorId(...cleanIds);
+    addDeletedVetUserId(...cleanIds);
+
+    // 2. Remove from professors
+    let professors = profs.filter((p) => p.id !== targetId && (!cleanU || (p.username || '').toLowerCase() !== cleanU));
     writeVetProfessors(professors);
 
-    // حذف از فایربیس از سمت سرور
+    // 3. Remove from vet users
+    let vetUsers = readVetUsers().filter((u) => u.id !== targetId && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
+    writeVetUsers(vetUsers);
+
+    // 4. Remove from universal users
+    let universal = readUsersFromDisk().filter((u) => u.id !== targetId && (!cleanU || (u.username || '').toLowerCase() !== cleanU));
+    writeUsersToDisk(universal);
+
+    // 5. Delete from Firestore cloud database
     try {
-      deleteDoc(doc(serverDb, 'professors', professorId)).catch(() => {});
+      if (targetId) deleteDoc(doc(serverDb, 'professors', targetId)).catch(() => {});
+      if (targetId) deleteDoc(doc(serverDb, 'users', targetId)).catch(() => {});
     } catch (e) {}
 
     return res.json({ success: true, remaining: professors.length, message: 'استاد با موفقیت حذف گردید.' });

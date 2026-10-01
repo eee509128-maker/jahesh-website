@@ -12,15 +12,103 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const DEPARTMENTS_FILE = path.join(DATA_DIR, 'departments.json');
 const PROFESSORS_FILE = path.join(DATA_DIR, 'professors.json');
+const DELETED_PROFESSORS_FILE = path.join(DATA_DIR, 'deleted_professors.json');
 const APPOINTMENTS_FILE = path.join(DATA_DIR, 'appointments.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const DELETED_USERS_FILE = path.join(DATA_DIR, 'deleted_users.json');
+
+// Helpers for reading/writing deleted tombstones
+export function readDeletedVetProfessors() {
+  if (fs.existsSync(DELETED_PROFESSORS_FILE)) {
+    try {
+      const raw = fs.readFileSync(DELETED_PROFESSORS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((x) => String(x).toLowerCase().trim()).filter(Boolean);
+    } catch (e) {
+      console.warn('Error reading deleted_professors.json:', e);
+    }
+  }
+  return [];
+}
+
+export function addDeletedVetProfessorId(...ids) {
+  try {
+    const current = readDeletedVetProfessors();
+    const cleanNew = ids.flat().filter(Boolean).map((x) => String(x).toLowerCase().trim());
+    const merged = Array.from(new Set([...current, ...cleanNew]));
+    fs.writeFileSync(DELETED_PROFESSORS_FILE, JSON.stringify(merged, null, 2), 'utf8');
+    return merged;
+  } catch (e) {
+    console.error('Error writing deleted_professors.json:', e);
+    return [];
+  }
+}
+
+export function removeDeletedVetProfessorId(...ids) {
+  try {
+    const current = readDeletedVetProfessors();
+    const toRemove = new Set(ids.flat().filter(Boolean).map((x) => String(x).toLowerCase().trim()));
+    const filtered = current.filter((id) => !toRemove.has(id));
+    fs.writeFileSync(DELETED_PROFESSORS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+    return filtered;
+  } catch (e) {
+    return [];
+  }
+}
+
+export function readDeletedVetUsers() {
+  if (fs.existsSync(DELETED_USERS_FILE)) {
+    try {
+      const raw = fs.readFileSync(DELETED_USERS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((x) => String(x).toLowerCase().trim()).filter(Boolean);
+    } catch (e) {
+      console.warn('Error reading deleted_users.json:', e);
+    }
+  }
+  return [];
+}
+
+export function addDeletedVetUserId(...ids) {
+  try {
+    const current = readDeletedVetUsers();
+    const cleanNew = ids.flat().filter(Boolean).map((x) => String(x).toLowerCase().trim());
+    const merged = Array.from(new Set([...current, ...cleanNew]));
+    fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify(merged, null, 2), 'utf8');
+    return merged;
+  } catch (e) {
+    console.error('Error writing deleted_users.json:', e);
+    return [];
+  }
+}
+
+export function removeDeletedVetUserId(...ids) {
+  try {
+    const current = readDeletedVetUsers();
+    const toRemove = new Set(ids.flat().filter(Boolean).map((x) => String(x).toLowerCase().trim()));
+    const filtered = current.filter((id) => !toRemove.has(id));
+    fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+    return filtered;
+  } catch (e) {
+    return [];
+  }
+}
 
 // Helpers for reading/writing JSON data
 export function readVetUsers() {
   if (fs.existsSync(USERS_FILE)) {
     try {
       const raw = fs.readFileSync(USERS_FILE, 'utf8');
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const deleted = new Set(readDeletedVetUsers());
+        return parsed.filter((u) => {
+          if (!u) return false;
+          const uId = String(u.id || '').toLowerCase().trim();
+          const uName = String(u.username || '').toLowerCase().trim();
+          return (!uId || !deleted.has(uId)) && (!uName || !deleted.has(uName));
+        });
+      }
     } catch (e) {
       console.warn('Error reading users.json:', e);
     }
@@ -30,7 +118,14 @@ export function readVetUsers() {
 
 export function writeVetUsers(list) {
   try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    const deleted = new Set(readDeletedVetUsers());
+    const cleaned = (Array.isArray(list) ? list : []).filter((u) => {
+      if (!u) return false;
+      const uId = String(u.id || '').toLowerCase().trim();
+      const uName = String(u.username || '').toLowerCase().trim();
+      return (!uId || !deleted.has(uId)) && (!uName || !deleted.has(uName));
+    });
+    fs.writeFileSync(USERS_FILE, JSON.stringify(cleaned, null, 2), 'utf8');
     return true;
   } catch (e) {
     console.error('Error writing users.json:', e);
@@ -54,7 +149,16 @@ export function readVetProfessors() {
   if (fs.existsSync(PROFESSORS_FILE)) {
     try {
       const raw = fs.readFileSync(PROFESSORS_FILE, 'utf8');
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const deleted = new Set(readDeletedVetProfessors());
+        return parsed.filter((p) => {
+          if (!p) return false;
+          const pId = String(p.id || '').toLowerCase().trim();
+          const pName = String(p.username || '').toLowerCase().trim();
+          return (!pId || !deleted.has(pId)) && (!pName || !deleted.has(pName));
+        });
+      }
     } catch (e) {
       console.warn('Error reading professors.json:', e);
     }
@@ -64,7 +168,14 @@ export function readVetProfessors() {
 
 export function writeVetProfessors(list) {
   try {
-    fs.writeFileSync(PROFESSORS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    const deleted = new Set(readDeletedVetProfessors());
+    const cleaned = (Array.isArray(list) ? list : []).filter((p) => {
+      if (!p) return false;
+      const pId = String(p.id || '').toLowerCase().trim();
+      const pName = String(p.username || '').toLowerCase().trim();
+      return (!pId || !deleted.has(pId)) && (!pName || !deleted.has(pName));
+    });
+    fs.writeFileSync(PROFESSORS_FILE, JSON.stringify(cleaned, null, 2), 'utf8');
     return true;
   } catch (e) {
     console.error('Error writing professors.json:', e);
