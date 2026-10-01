@@ -1011,15 +1011,15 @@ app.post(['/api/vet/professors/register', '/vet-hospital/api/professors/register
       visitFee: Number(incoming.visitFee) || 300000,
       onlineConsultFee: Number(incoming.onlineConsultFee) || 200000,
       schedule: Array.isArray(incoming.schedule) ? incoming.schedule : ['شنبه تا چهارشنبه ۰۹:۰۰ الی ۱۳:۰۰'],
-      status: 'pending', // Awaiting Management Approval
+      status: incoming.status || 'approved', // Active in directory and appointments
       rating: 5.0,
       totalVisits: 0,
-      badges: ['عضو جدید هیئت علمی'],
+      badges: ['عضو هیئت علمی'],
       registeredAt: new Date().toISOString()
     };
     professors.unshift(newProf);
     writeVetProfessors(professors);
-    return res.json({ success: true, professor: newProf, message: 'ثبت‌نام استاد با موفقیت انجام شد و پس از بررسی تیم مدیریت بیمارستان تایید خواهد شد.' });
+    return res.json({ success: true, professor: newProf, message: 'ثبت‌نام استاد با موفقیت انجام شد و پروفایل تخصصی در سامانه فعال گردید.' });
   } catch (e) {
     return res.status(500).json({ success: false, error: e.message });
   }
@@ -2425,6 +2425,29 @@ app.post('/api/zibal-request', async (req, res) => {
         }
       }
 
+      // Auto-save pending vet hospital appointment
+      if (req.body?.appointmentData) {
+        try {
+          const currentAppts = readVetAppointments();
+          const pAppt = { ...req.body.appointmentData };
+          pAppt.trackingCode = String(data.trackId);
+          pAppt.zibalTrackId = String(data.trackId);
+          pAppt.paymentStatus = 'pending';
+          pAppt.visitStatus = 'scheduled';
+          pAppt.createdAt = pAppt.createdAt || new Date().toISOString();
+          const aIdx = currentAppts.findIndex((a) => a.id === pAppt.id || a.trackingCode === pAppt.trackingCode);
+          if (aIdx >= 0) {
+            currentAppts[aIdx] = { ...currentAppts[aIdx], ...pAppt };
+          } else {
+            currentAppts.unshift(pAppt);
+          }
+          writeVetAppointments(currentAppts);
+          console.log(`[Vet Hospital] Auto-saved pending appointment ${pAppt.id} with trackId ${data.trackId}`);
+        } catch (vetSaveErr) {
+          console.warn('[Vet Hospital] Could not auto-save pending appointment:', vetSaveErr);
+        }
+      }
+
       return res.json({
         success: true,
         result: data.result,
@@ -2525,6 +2548,34 @@ app.post('/api/zibal-verify', async (req, res) => {
         }
       } catch (diskErr) {
         console.warn('[Zibal Verify] Could not auto-update order on disk:', diskErr);
+      }
+
+      // Auto-update vet appointment on disk immediately upon successful verification!
+      try {
+        const currentAppts = readVetAppointments();
+        const aIdx = currentAppts.findIndex(
+          (a) =>
+            (a.trackingCode && String(a.trackingCode) === String(trackId)) ||
+            (a.zibalTrackId && String(a.zibalTrackId) === String(trackId)) ||
+            (a.id && String(a.id) === String(trackId))
+        );
+        if (aIdx >= 0) {
+          currentAppts[aIdx] = {
+            ...currentAppts[aIdx],
+            paymentStatus: 'paid',
+            status: 'confirmed',
+            trackingCode: String(trackId),
+            paymentRefId: refNum,
+            zibalTrackId: String(trackId),
+            zibalRefNumber: refNum,
+            paidAt: data.paidAt || new Date().toISOString(),
+            paymentMethod: 'درگاه پرداخت شاپرک و زیپال (موفق)'
+          };
+          writeVetAppointments(currentAppts);
+          console.log(`[Zibal Verify] Updated vet appointment ${currentAppts[aIdx].id} on disk to confirmed!`);
+        }
+      } catch (apptErr) {
+        console.warn('[Zibal Verify] Could not auto-update vet appointment on disk:', apptErr);
       }
 
       return res.json({
