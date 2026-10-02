@@ -14,6 +14,7 @@ import {
   Smartphone,
   Info,
   X,
+  Download,
 } from 'lucide-react';
 import { AppSubscriptionLicense } from '../types';
 import { checkLicenseStatus } from '../lib/appLicenseService';
@@ -105,6 +106,44 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
               لایسنس نرم‌افزار «<strong className="text-amber-300">{license.appName || license.productTitle}</strong>» با موفقیت فعال شد. شما می‌توانید با مشخصات زیر وارد اپلیکیشن شوید:
             </p>
           </div>
+
+          {/* بخش اختصاصی دانلود مستقیم و نصب فایل اپلیکیشن */}
+          {(license.downloadUrl || (license as any).appDownloadUrl) && (
+            <div className="bg-gradient-to-r from-emerald-950/90 via-teal-950/80 to-purple-950/90 border-2 border-emerald-400 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3.5 text-right shadow-xl shadow-emerald-950/40 animate-in fade-in">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30 shrink-0">
+                  <Download className="w-6 h-6 animate-bounce" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-black bg-emerald-400 text-slate-950 px-2 py-0.5 rounded-full shadow-sm">
+                      فایل نصبی آماده دانلود
+                    </span>
+                    <span className="text-[10px] text-emerald-300 font-bold">
+                      APK اندروید / نرم‌افزار
+                    </span>
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-black text-white mt-0.5">
+                    دریافت و نصب برنامه {license.appName || license.productTitle}
+                  </h4>
+                  <p className="text-[11px] text-emerald-200/80 mt-0.5">
+                    اپلیکیشن را روی گوشی یا کامپیوتر نصب کرده و با نام کاربری و رمز عبور زیر وارد شوید.
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={license.downloadUrl || (license as any).appDownloadUrl}
+                download
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-500/25 active:scale-95 transition-all text-xs whitespace-nowrap cursor-pointer no-underline shrink-0"
+              >
+                <Download className="w-4 h-4" />
+                <span>دانلود مستقیم فایل نصبی اپلیکیشن</span>
+              </a>
+            </div>
+          )}
 
           {/* Credentials Card (Golden VIP Card) */}
           <div className="relative rounded-2xl bg-gradient-to-br from-[#231647] via-[#1a0f38] to-[#12092a] border border-amber-400/60 p-4 shadow-xl space-y-3.5">
@@ -250,6 +289,20 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
           </button>
 
           <div className="flex items-center gap-2 w-full sm:w-auto flex-1 sm:flex-none">
+            {(license.downloadUrl || (license as any).appDownloadUrl) && (
+              <a
+                href={license.downloadUrl || (license as any).appDownloadUrl}
+                download
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer no-underline whitespace-nowrap"
+                title="دانلود فایل نصبی اپلیکیشن"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>دانلود اپلیکیشن</span>
+              </a>
+            )}
+
             {onViewOrders && (
               <button
                 type="button"

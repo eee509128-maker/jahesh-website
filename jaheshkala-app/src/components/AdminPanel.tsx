@@ -915,6 +915,69 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [testAuthResult, setTestAuthResult] = useState<any | null>(null);
   const [isTestingAuth, setIsTestingAuth] = useState(false);
 
+  // App Direct Download URL & Installer Package State (لینک دانلود مستقیم اپلیکیشن و فایل نصبی APK / EXE)
+  const [newDownloadUrl, setNewDownloadUrl] = useState('');
+  const [newAppVersion, setNewAppVersion] = useState('');
+  const [newAppFileSize, setNewAppFileSize] = useState('');
+  const [isUploadingAppFile, setIsUploadingAppFile] = useState(false);
+  const [appUploadProgressText, setAppUploadProgressText] = useState<string | null>(null);
+  const appFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleUploadAppFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 120 * 1024 * 1024) {
+      alert('حجم فایل انتخابی بیش از ۱۲۰ مگابایت است. لطفاً فایل کم‌حجم‌تر انتخاب کنید یا آن را در هاست دانلود / گوگل درایو آپلود کرده و لینک مستقیم آن را در کادر قرار دهید.');
+      return;
+    }
+
+    setIsUploadingAppFile(true);
+    setAppUploadProgressText(`در حال آماده‌سازی و خواندن فایل ${file.name}...`);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = reader.result as string;
+          setAppUploadProgressText(`در حال ارسال و ذخیره‌سازی فایل نصبی روی سرور جهش (${(file.size / (1024 * 1024)).toFixed(1)} MB)...`);
+
+          const res = await fetch('/api/upload-app-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileData: base64Data,
+              fileName: file.name,
+            }),
+          });
+
+          const data = await res.json();
+          if (data.success && data.url) {
+            setNewDownloadUrl(data.url);
+            if (data.fileSize) {
+              setNewAppFileSize(data.fileSize);
+            }
+            setFormSuccess(`فایل نصبی «${file.name}» با موفقیت در مسیر ${data.url} روی سرور ذخیره شد و لینک دانلود درج گردید!`);
+            setTimeout(() => setFormSuccess(''), 6000);
+          } else {
+            alert(data.error || 'خطا در آپلود فایل اپلیکیشن');
+          }
+        } catch (err: any) {
+          alert('خطا در ارتباط با سرور: ' + (err.message || ''));
+        } finally {
+          setIsUploadingAppFile(false);
+          setAppUploadProgressText(null);
+          if (appFileInputRef.current) appFileInputRef.current.value = '';
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setIsUploadingAppFile(false);
+      setAppUploadProgressText(null);
+      alert('خطا در بارگذاری فایل: ' + (err.message || ''));
+    }
+  };
+
   const handleTestAppAuth = async () => {
     setIsTestingAuth(true);
     setTestAuthResult(null);
@@ -1247,6 +1310,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setSelectedOfficialGuild(JAHESH_OFFICIAL_25_GUILDS[0] || 'طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات');
     setCustomGuildInput('');
     setNewPainPointSolved('');
+    setNewDownloadUrl('');
+    setNewAppVersion('');
+    setNewAppFileSize('');
     setNewProductCouponCode('');
     setNewProductCouponPercent('');
     setNewDisplayOrder('');
@@ -1309,6 +1375,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setAiAppCustomPromptNote(prod.aiAppCustomPromptNote || '');
     setCopiedPromptFeedback(null);
     setTestAuthResult(null);
+
+    // App Download & Installer File Info
+    setNewDownloadUrl(prod.downloadUrl || prod.appDownloadUrl || '');
+    setNewAppVersion(prod.appVersion || '');
+    setNewAppFileSize(prod.appFileSize || '');
 
     // Guild & Innovation Settings
     const currentGuild = prod.guild || (prod as any).targetGuild || '';
@@ -1466,6 +1537,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       aiAppPlatform: isAiAppProduct ? aiAppPlatform : undefined,
       aiAppDefaultDays: isAiAppProduct ? Math.max(1, aiAppDefaultDays || 7) : undefined,
       aiAppCustomPromptNote: isAiAppProduct ? aiAppCustomPromptNote.trim() : undefined,
+      downloadUrl: newDownloadUrl.trim() || undefined,
+      appDownloadUrl: newDownloadUrl.trim() || undefined,
+      appVersion: newAppVersion.trim() || undefined,
+      appFileSize: newAppFileSize.trim() || undefined,
       displayOrder: typeof newDisplayOrder === 'number' && newDisplayOrder > 0 ? newDisplayOrder : (existingProduct?.displayOrder || existingProduct?.displayRank || undefined),
       displayRank: typeof newDisplayOrder === 'number' && newDisplayOrder > 0 ? newDisplayOrder : (existingProduct?.displayRank || existingProduct?.displayOrder || undefined),
       updatedAt: new Date().toISOString(),
@@ -3713,6 +3788,151 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* 6.045 لینک مستقیم دانلود اپلیکیشن و فایل نصبی (APK اندروید / ویندوز) */}
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-[#0c1a2e] via-[#101b3b] to-[#0b1329] border-2 border-cyan-400/70 rounded-2xl space-y-4 shadow-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cyan-500/30 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-cyan-400/20 border border-cyan-400/50 flex items-center justify-center text-cyan-300 shadow-md">
+                        <Download className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-cyan-300 flex items-center gap-2">
+                          <span>لینک دانلود مستقیم و فایل نصبی اپلیکیشن (APK اندروید / ویندوز)</span>
+                          {newDownloadUrl && (
+                            <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+                              لینک فعال است
+                            </span>
+                          )}
+                        </h4>
+                        <p className="text-[11px] text-slate-300 mt-0.5">
+                          برای محصولاتی که نرم‌افزار، اپلیکیشن اندروید (مانند جهش شنتیا) یا فایل دانلودی دارند؛ دکمه دانلود خودکار در صفحه محصول و بخش لایسنس خریدار ظاهر می‌شود.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3.5">
+                    {/* Input & Direct Upload Button */}
+                    <div>
+                      <label className="text-xs font-bold text-cyan-200 block mb-1.5">
+                        لینک مستقیم دانلود اپلیکیشن (یا آپلود فایل):
+                      </label>
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <input
+                          type="text"
+                          value={newDownloadUrl}
+                          onChange={(e) => setNewDownloadUrl(e.target.value)}
+                          placeholder="مثلاً: /uploads/apps/shantia.apk یا https://.../app.apk"
+                          className="flex-1 bg-[#070e1c] border border-cyan-700/60 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 font-mono text-left dir-ltr"
+                        />
+
+                        {/* Hidden File Input for Direct App Upload */}
+                        <input
+                          type="file"
+                          ref={appFileInputRef}
+                          accept=".apk,.exe,.zip,.rar,.tar,.gz,.bin"
+                          onChange={handleUploadAppFile}
+                          className="hidden"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => appFileInputRef.current?.click()}
+                          disabled={isUploadingAppFile}
+                          className="flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs shadow-md transition-all cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-50"
+                        >
+                          {isUploadingAppFile ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Upload className="w-4 h-4" />
+                          )}
+                          <span>آپلود مستقیم فایل APK / نصبی</span>
+                        </button>
+
+                        {newDownloadUrl && (
+                          <a
+                            href={newDownloadUrl}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-1.5 bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition-colors shrink-0 whitespace-nowrap cursor-pointer"
+                            title="تست مستقیم لینک دانلود"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>تست دانلود</span>
+                          </a>
+                        )}
+                      </div>
+
+                      {appUploadProgressText && (
+                        <div className="mt-2 text-[11px] text-cyan-300 bg-cyan-950/60 border border-cyan-500/40 rounded-xl p-2 flex items-center gap-2 animate-pulse">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-cyan-400 shrink-0" />
+                          <span>{appUploadProgressText}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Version & File Size Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                          نسخه نرم‌افزار / اپلیکیشن (اختیاری):
+                        </label>
+                        <input
+                          type="text"
+                          value={newAppVersion}
+                          onChange={(e) => setNewAppVersion(e.target.value)}
+                          placeholder="مثلاً: 1.0.0 یا آخرین نسخه"
+                          className="w-full bg-[#070e1c] border border-cyan-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 font-mono text-left dir-ltr"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                          حجم تقریبی فایل نصبی (اختیاری):
+                        </label>
+                        <input
+                          type="text"
+                          value={newAppFileSize}
+                          onChange={(e) => setNewAppFileSize(e.target.value)}
+                          placeholder="مثلاً: 18.5 مگابایت"
+                          className="w-full bg-[#070e1c] border border-cyan-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quick Guide Card: راهنمای کجا و چگونه گذاشتن فایل اپلیکیشن */}
+                    <div className="rounded-xl bg-[#060a17] border border-cyan-600/40 p-3.5 text-xs text-slate-300 space-y-2">
+                      <div className="flex items-center gap-2 text-cyan-300 font-bold">
+                        <HelpCircle className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <span>راهنمای ویژه مدیر: چگونه فایل اپلیکیشن را قرار دهم تا لینک دانلود بگیرم؟</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1 text-[11px] leading-relaxed">
+                        <div className="bg-cyan-950/40 border border-cyan-700/30 rounded-lg p-2.5 space-y-1">
+                          <span className="font-bold text-amber-300 block">۱. آپلود مستقیم (آسان‌ترین):</span>
+                          <p className="text-slate-300">
+                            روی دکمه آبی‌رنگ «آپلود مستقیم فایل APK» بالا بزنید و فایل را انتخاب کنید. فایل خودکار روی هاست سرور جهش در پوشه <span className="font-mono text-cyan-300">/uploads/apps/</span> آپلود شده و لینک مستقیم آن تولید می‌شود.
+                          </p>
+                        </div>
+
+                        <div className="bg-cyan-950/40 border border-cyan-700/30 rounded-lg p-2.5 space-y-1">
+                          <span className="font-bold text-emerald-300 block">۲. قرار دادن در پوشه سرور:</span>
+                          <p className="text-slate-300">
+                            اگر از File Manager یا FTP استفاده می‌کنید، فایل APK خود را در پوشه <span className="font-mono text-emerald-300">uploads/apps/</span> هاست کپی کنید و در کادر بالا آدرس <span className="font-mono text-cyan-300">/uploads/apps/name.apk</span> را بنویسید.
+                          </p>
+                        </div>
+
+                        <div className="bg-cyan-950/40 border border-cyan-700/30 rounded-lg p-2.5 space-y-1">
+                          <span className="font-bold text-purple-300 block">۳. لینک خارجی (گوگل درایو/تلگرام):</span>
+                          <p className="text-slate-300">
+                            می‌توانید فایل نصبی را در Google Drive (با دسترسی Anyone with link)، پیکوفایل یا تلگرام قرار داده و لینک مستقیم دانلود آن را در کادر بالا پیست فرمایید.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

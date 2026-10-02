@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, ExternalLink
+  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, ExternalLink, Download
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
@@ -137,6 +137,10 @@ export function sanitizeProduct(p: any): Product | null {
     targetGuilds: Array.isArray(p.targetGuilds) ? p.targetGuilds : (p.guild ? [p.guild] : undefined),
     painPointSolved: p.painPointSolved || undefined,
     viewsCount: typeof p.viewsCount === 'number' ? p.viewsCount : undefined,
+    downloadUrl: typeof p.downloadUrl === 'string' && p.downloadUrl.trim() ? p.downloadUrl.trim() : (typeof p.appDownloadUrl === 'string' && p.appDownloadUrl.trim() ? p.appDownloadUrl.trim() : undefined),
+    appDownloadUrl: typeof p.downloadUrl === 'string' && p.downloadUrl.trim() ? p.downloadUrl.trim() : (typeof p.appDownloadUrl === 'string' && p.appDownloadUrl.trim() ? p.appDownloadUrl.trim() : undefined),
+    appVersion: typeof p.appVersion === 'string' && p.appVersion.trim() ? p.appVersion.trim() : undefined,
+    appFileSize: typeof p.appFileSize === 'string' && p.appFileSize.trim() ? p.appFileSize.trim() : undefined,
     updatedAt: p.updatedAt || new Date().toISOString(),
   };
 }
@@ -1892,6 +1896,19 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {(completedOrderReceipt.order.appLicense.downloadUrl || completedOrderReceipt.order.items?.find((i) => i.product?.downloadUrl)?.product?.downloadUrl) && (
+                  <a
+                    href={completedOrderReceipt.order.appLicense.downloadUrl || completedOrderReceipt.order.items?.find((i) => i.product?.downloadUrl)?.product?.downloadUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer no-underline"
+                  >
+                    <Download className="w-4 h-4 animate-bounce" />
+                    <span>دانلود مستقیم فایل نصبی اپلیکیشن ({completedOrderReceipt.order.appLicense.appName || completedOrderReceipt.order.appLicense.productTitle})</span>
+                  </a>
+                )}
 
                 <button
                   type="button"

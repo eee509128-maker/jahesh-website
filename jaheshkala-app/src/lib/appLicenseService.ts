@@ -145,6 +145,7 @@ export function generateAppLicense(
     expiresAt: expiresAt.toISOString(),
     status: 'active',
     apiEndpoint: 'https://jaheshit.ir/api/app-auth',
+    downloadUrl: resolvedProduct.downloadUrl || (resolvedProduct as any)?.appDownloadUrl || undefined,
   };
 
   saveAppLicenseLocally(license);

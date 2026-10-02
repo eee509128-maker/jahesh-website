@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X, Sparkles, CheckCircle2, Globe, ShieldCheck,
   ShoppingBag, Gift, Truck, RotateCcw, Headphones, Star, Ticket, Images, Zap, CreditCard, Check,
-  ChevronDown, ChevronUp, Info, ListChecks, Package
+  ChevronDown, ChevronUp, Info, ListChecks, Package, Download
 } from 'lucide-react';
 import { Product, User, SubscriptionPlan } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
@@ -562,6 +562,48 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               </div>
 
+              {/* بخش اختصاصی دانلود مستقیم اپلیکیشن و فایل نصبی (APK / ویندوز) */}
+              {(product.downloadUrl || (product as any).appDownloadUrl) && (
+                <div className="bg-gradient-to-r from-emerald-950/70 via-teal-950/60 to-purple-950/70 border-2 border-emerald-400/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-right shadow-2xl shadow-emerald-950/40">
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30 shrink-0">
+                      <Download className="w-6 h-6 animate-bounce" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-sm text-emerald-300">
+                          دانلود مستقیم اپلیکیشن و فایل نصبی (APK)
+                        </span>
+                        {product.appVersion && (
+                          <span className="text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+                            نسخه {product.appVersion}
+                          </span>
+                        )}
+                        {product.appFileSize && (
+                          <span className="text-[10px] text-slate-300 bg-white/10 px-2 py-0.5 rounded-full">
+                            {product.appFileSize}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        فایل نصبی آماده نصب بر روی تلفن همراه یا سیستم؛ با کلیک روی دکمه زیر، فایل بلافاصله دانلود شده و می‌توانید آن را نصب نمایید.
+                      </p>
+                    </div>
+                  </div>
+
+                  <a
+                    href={product.downloadUrl || (product as any).appDownloadUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black px-5 py-3 rounded-xl shadow-xl shadow-emerald-500/30 active:scale-95 transition-all text-xs whitespace-nowrap cursor-pointer no-underline shrink-0"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>دانلود فایل نصبی اپلیکیشن</span>
+                  </a>
+                </div>
+              )}
+
               {/* اعلان صدور خودکار نام کاربری و رمز پس از خرید */}
               {isAmlakOrSub && (
                 <div className="bg-gradient-to-r from-amber-500/10 via-purple-900/30 to-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 flex items-center gap-3 text-right">
@@ -611,6 +653,20 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            {(product.downloadUrl || (product as any).appDownloadUrl) && (
+              <a
+                href={product.downloadUrl || (product as any).appDownloadUrl}
+                download
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-10 sm:h-11 flex items-center justify-center gap-1.5 sm:gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black px-3.5 sm:px-4 rounded-xl shadow-md shadow-emerald-500/20 active:scale-95 transition-all text-xs cursor-pointer whitespace-nowrap no-underline shrink-0"
+                title="دانلود مستقیم فایل نصبی برنامه"
+              >
+                <Download className="w-4 h-4 animate-bounce" />
+                <span>دانلود اپلیکیشن</span>
+              </a>
+            )}
+
             <button
               onClick={onClose}
               className="h-10 sm:h-11 px-3 sm:px-4 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border border-slate-200 dark:border-purple-800 transition-colors shrink-0 text-center cursor-pointer shadow-xs whitespace-nowrap active:scale-95"

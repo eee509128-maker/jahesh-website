@@ -55,6 +55,10 @@ export interface Product {
   viewsCount?: number; // تعداد کل بازدیدها و دیده‌شدن‌های محصول توسط مشتریان
   displayOrder?: number; // اولویت و ترتیب رتبه‌بندی نمایش محصول (عدد ۱ یعنی اولین محصول)
   displayRank?: number; // رتبه نمایش محصول
+  downloadUrl?: string; // لینک مستقیم دانلود فایل نصبی اپلیکیشن (APK اندروید یا نرم‌افزار ویندوز)
+  appDownloadUrl?: string; // آلیاس لینک دانلود برنامه
+  appVersion?: string; // نسخه اپلیکیشن (مثلاً: v1.0.0)
+  appFileSize?: string; // حجم فایل نصبی (مثلاً: 25 مگابایت)
   updatedAt?: string; // ISO date timestamp for conflict resolution and persistent updates
 }
 
@@ -168,6 +172,7 @@ export interface AmlakSubscriptionLicense {
   startDate: string;
   expiresAt: string;
   status: 'active' | 'expired';
+  downloadUrl?: string;
 }
 
 export interface AppSubscriptionLicense {
@@ -186,6 +191,7 @@ export interface AppSubscriptionLicense {
   expiresAt: string;
   status: 'active' | 'expired';
   apiEndpoint?: string;
+  downloadUrl?: string;
 }
 
 export interface Order {

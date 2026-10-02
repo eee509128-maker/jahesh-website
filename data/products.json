@@ -243,7 +243,11 @@
     "guild": "طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات",
     "aiAppCustomPromptNote": "",
     "displayOrder": 4,
-    "displayRank": 4
+    "displayRank": 4,
+    "downloadUrl": "/uploads/apps/shantia.apk",
+    "appDownloadUrl": "/uploads/apps/shantia.apk",
+    "appVersion": "1.0.0",
+    "appFileSize": "18.5 مگابایت"
   },
   {
     "rating": 5,

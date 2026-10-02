@@ -20,6 +20,7 @@ import {
   Copy,
   Key,
   ShieldCheck,
+  Download,
 } from 'lucide-react';
 import { Order, User, Product } from '../types';
 import { fetchOrdersFromDb, parseOrderTimestamp } from '../lib/dbService';
@@ -717,6 +718,22 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                             </button>
                           </div>
                         </div>
+
+                        {/* دکمه اختصاصی دانلود فایل نصبی اپلیکیشن در سفارشات خریدار */}
+                        {(license.downloadUrl || order.items?.find((i) => i.product?.downloadUrl || (i.product as any)?.appDownloadUrl)?.product?.downloadUrl) && (
+                          <div className="pt-1">
+                            <a
+                              href={license.downloadUrl || order.items?.find((i) => i.product?.downloadUrl || (i.product as any)?.appDownloadUrl)?.product?.downloadUrl}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer no-underline"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>دانلود مستقیم فایل نصبی اپلیکیشن ({license.appName || license.productTitle})</span>
+                            </a>
+                          </div>
+                        )}
 
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1 text-xs">
                           <span className="text-[11px] text-slate-300">

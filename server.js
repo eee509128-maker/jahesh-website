@@ -150,12 +150,28 @@ const PRODUCTS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'products');
 if (!fs.existsSync(PRODUCTS_UPLOADS_DIR)) {
   fs.mkdirSync(PRODUCTS_UPLOADS_DIR, { recursive: true });
 }
+const APPS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'apps');
+if (!fs.existsSync(APPS_UPLOADS_DIR)) {
+  fs.mkdirSync(APPS_UPLOADS_DIR, { recursive: true });
+}
+const DIST_APPS_UPLOADS_DIR = path.join(__dirname, 'jaheshkala', 'uploads', 'apps');
+if (!fs.existsSync(DIST_APPS_UPLOADS_DIR)) {
+  fs.mkdirSync(DIST_APPS_UPLOADS_DIR, { recursive: true });
+}
 const JAHESH_IMAGES_DIR = path.join(__dirname, 'jaheshkala', 'images');
 if (!fs.existsSync(JAHESH_IMAGES_DIR)) {
   fs.mkdirSync(JAHESH_IMAGES_DIR, { recursive: true });
 }
-app.use('/uploads', express.static(UPLOADS_DIR));
-app.use('/jaheshkala/uploads', express.static(UPLOADS_DIR));
+const staticUploadsOptions = {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.apk')) {
+      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+      res.setHeader('Content-Disposition', 'attachment; filename="' + path.basename(filePath) + '"');
+    }
+  }
+};
+app.use('/uploads', express.static(UPLOADS_DIR, staticUploadsOptions));
+app.use('/jaheshkala/uploads', express.static(UPLOADS_DIR, staticUploadsOptions));
 app.use('/jaheshkala/images', express.static(JAHESH_IMAGES_DIR));
 app.use('/images', express.static(JAHESH_IMAGES_DIR));
 
@@ -786,6 +802,70 @@ app.post(['/api/upload-product-image', '/api/upload', '/jaheshkala/api/upload-pr
   } catch (err) {
     console.error('Error in /api/upload-product-image:', err);
     return res.status(500).json({ error: err.message || 'خطا در ذخیره‌سازی تصویر محصول' });
+  }
+});
+
+// Endpoint to upload App installer package (APK / EXE / ZIP) directly to server
+app.post(['/api/upload-app-file', '/api/upload-app', '/jaheshkala/api/upload-app-file', '/jaheshkala/api/upload-app'], (req, res) => {
+  try {
+    const { fileData, fileName, base64 } = req.body || {};
+    const rawData = fileData || base64;
+    if (!rawData || typeof rawData !== 'string') {
+      return res.status(400).json({ error: 'داده فایل اپلیکیشن الزامی است.' });
+    }
+
+    let ext = 'apk';
+    if (fileName && typeof fileName === 'string') {
+      const matchExt = fileName.match(/\.([a-zA-Z0-9]+)$/);
+      if (matchExt) ext = matchExt[1].toLowerCase();
+    }
+
+    let buffer;
+    if (rawData.startsWith('data:')) {
+      const parts = rawData.split(',');
+      buffer = Buffer.from(parts[1] || '', 'base64');
+    } else {
+      buffer = Buffer.from(rawData, 'base64');
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'محتوای فایل ارسالی نامعتبر یا خالی است.' });
+    }
+
+    const cleanBaseName = fileName
+      ? path.basename(fileName, path.extname(fileName)).replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 35)
+      : 'jahesh_app';
+    const safeName = `${cleanBaseName}_${Date.now()}.${ext}`;
+
+    if (!fs.existsSync(APPS_UPLOADS_DIR)) {
+      fs.mkdirSync(APPS_UPLOADS_DIR, { recursive: true });
+    }
+    const filePath = path.join(APPS_UPLOADS_DIR, safeName);
+    fs.writeFileSync(filePath, buffer);
+
+    // Also mirror to jaheshkala dist directory
+    try {
+      if (!fs.existsSync(DIST_APPS_UPLOADS_DIR)) {
+        fs.mkdirSync(DIST_APPS_UPLOADS_DIR, { recursive: true });
+      }
+      fs.writeFileSync(path.join(DIST_APPS_UPLOADS_DIR, safeName), buffer);
+    } catch {}
+
+    const publicUrl = `/uploads/apps/${safeName}`;
+    const sizeMb = (buffer.length / (1024 * 1024)).toFixed(1);
+    const sizeText = Number(sizeMb) > 0 ? `${sizeMb} مگابایت` : `${Math.round(buffer.length / 1024)} کیلوبایت`;
+    console.log(`[Upload App] App file saved to ${publicUrl} (${sizeText})`);
+
+    return res.json({
+      success: true,
+      url: publicUrl,
+      fileName: safeName,
+      fileSize: sizeText,
+      sizeBytes: buffer.length,
+    });
+  } catch (err) {
+    console.error('Error in /api/upload-app-file:', err);
+    return res.status(500).json({ error: err.message || 'خطا در ذخیره‌سازی فایل اپلیکیشن' });
   }
 });
 

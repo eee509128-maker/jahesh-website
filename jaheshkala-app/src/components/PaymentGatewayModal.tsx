@@ -17,6 +17,7 @@ import {
 import { CartItem, User, Order } from '../types';
 import { requestZibalPayment, savePendingOrder } from '../lib/zibalService';
 import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
+import { hasAiAppInItems, generateAppLicense } from '../lib/appLicenseService';
 
 interface PaymentGatewayModalProps {
   isOpen: boolean;
@@ -140,6 +141,9 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
 
       if (hasAmlakInItems(safeCartItems)) {
         adminOrder.amlakLicense = generateAmlakLicense(adminOrder, currentUser);
+      }
+      if (hasAiAppInItems(safeCartItems)) {
+        adminOrder.appLicense = generateAppLicense(adminOrder, currentUser);
       }
 
       if (onPaymentSuccess) {
