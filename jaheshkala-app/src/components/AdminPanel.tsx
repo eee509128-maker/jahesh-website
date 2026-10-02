@@ -915,66 +915,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [testAuthResult, setTestAuthResult] = useState<any | null>(null);
   const [isTestingAuth, setIsTestingAuth] = useState(false);
 
-  // App Download & Installation File State (لینک دانلود مستقیم اپ جهش شنتیا، APK، EXE، ZIP و نرم‌افزارها)
-  const [newDownloadUrl, setNewDownloadUrl] = useState('');
-  const [newDownloadButtonText, setNewDownloadButtonText] = useState('');
-  const [newAppVersion, setNewAppVersion] = useState('');
-  const [newAppSize, setNewAppSize] = useState('');
-  const [isUploadingAppFile, setIsUploadingAppFile] = useState(false);
-  const [appUploadSuccess, setAppUploadSuccess] = useState<string | null>(null);
-  const [appUploadError, setAppUploadError] = useState<string | null>(null);
-  const [showDownloadGuide, setShowDownloadGuide] = useState(false);
-
-  const handleUploadAppFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingAppFile(true);
-    setAppUploadSuccess(null);
-    setAppUploadError(null);
-
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64Data = reader.result as string;
-          const res = await fetch('/api/upload-app-file', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              file: base64Data,
-              filename: file.name,
-            }),
-          });
-
-          const data = await res.json();
-          if (data.success && data.url) {
-            setNewDownloadUrl(data.url);
-            if (data.sizeText) setNewAppSize(data.sizeText);
-            if (!newDownloadButtonText.trim()) {
-              setNewDownloadButtonText(`دانلود مستقیم ${file.name.endsWith('.apk') ? 'اپلیکیشن اندروید' : 'فایل نصبی نرم‌افزار'}`);
-            }
-            setAppUploadSuccess(`فایل «${file.name}» (${data.sizeText || ''}) با موفقیت در سرور ذخیره شد و لینک آن تنظیم گردید!`);
-          } else {
-            setAppUploadError(data.error || 'خطا در آپلود فایل در سرور');
-          }
-        } catch (postErr: any) {
-          setAppUploadError(postErr.message || 'خطا در ارتباط با سرور آپلود');
-        } finally {
-          setIsUploadingAppFile(false);
-        }
-      };
-      reader.onerror = () => {
-        setAppUploadError('خطا در خواندن فایل از حافظه دستگاه');
-        setIsUploadingAppFile(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (err: any) {
-      setAppUploadError(err.message || 'خطای پردازش فایل');
-      setIsUploadingAppFile(false);
-    }
-  };
-
   const handleTestAppAuth = async () => {
     setIsTestingAuth(true);
     setTestAuthResult(null);
@@ -1310,12 +1250,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewProductCouponCode('');
     setNewProductCouponPercent('');
     setNewDisplayOrder('');
-    setNewDownloadUrl('');
-    setNewDownloadButtonText('');
-    setNewAppVersion('');
-    setNewAppSize('');
-    setAppUploadSuccess(null);
-    setAppUploadError(null);
     setFormSuccess('');
     setActiveTab('new-product');
   };
@@ -1375,14 +1309,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setAiAppCustomPromptNote(prod.aiAppCustomPromptNote || '');
     setCopiedPromptFeedback(null);
     setTestAuthResult(null);
-
-    // App Download & Installation File fields (جهش شنتیا و سایر اپ‌ها)
-    setNewDownloadUrl(prod.downloadUrl || '');
-    setNewDownloadButtonText(prod.downloadButtonText || '');
-    setNewAppVersion(prod.appVersion || '');
-    setNewAppSize(prod.appSize || '');
-    setAppUploadSuccess(null);
-    setAppUploadError(null);
 
     // Guild & Innovation Settings
     const currentGuild = prod.guild || (prod as any).targetGuild || '';
@@ -1540,10 +1466,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       aiAppPlatform: isAiAppProduct ? aiAppPlatform : undefined,
       aiAppDefaultDays: isAiAppProduct ? Math.max(1, aiAppDefaultDays || 7) : undefined,
       aiAppCustomPromptNote: isAiAppProduct ? aiAppCustomPromptNote.trim() : undefined,
-      downloadUrl: newDownloadUrl.trim() || undefined,
-      downloadButtonText: newDownloadButtonText.trim() || undefined,
-      appVersion: newAppVersion.trim() || undefined,
-      appSize: newAppSize.trim() || undefined,
       displayOrder: typeof newDisplayOrder === 'number' && newDisplayOrder > 0 ? newDisplayOrder : (existingProduct?.displayOrder || existingProduct?.displayRank || undefined),
       displayRank: typeof newDisplayOrder === 'number' && newDisplayOrder > 0 ? newDisplayOrder : (existingProduct?.displayRank || existingProduct?.displayOrder || undefined),
       updatedAt: new Date().toISOString(),
@@ -3789,243 +3711,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                           )}
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 6.04 Dedicated App Download & File Management Module (دانلود اپلیکیشن جهش شنتیا، APK، EXE و نرم‌افزارها) */}
-                <div className="p-4 sm:p-5 bg-gradient-to-r from-[#0c1e28] via-[#0f2d2e] to-[#081820] border-2 border-emerald-500/70 rounded-2xl space-y-4 shadow-2xl">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-500/30 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/60 flex items-center justify-center text-emerald-300 shadow-inner shrink-0">
-                        <Download className="w-5 h-5 animate-bounce" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-xs sm:text-sm font-black text-emerald-200">
-                            لینک دانلود مستقیم و فایل نصبی اپلیکیشن (APK / EXE / ZIP)
-                          </h4>
-                          <span className="text-[10px] bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 font-black px-2 py-0.5 rounded-full shadow-sm">
-                            ویژه اپ جهش شنتیا و نرم‌افزارها
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-300 mt-0.5">
-                          نمایش دکمه دانلود مستقیم در صفحه معرفی کالا و همچنین در بخش لایسنس و صدور اشتراک پس از خرید
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowDownloadGuide(!showDownloadGuide)}
-                      className="flex items-center gap-1.5 text-xs font-bold text-amber-300 hover:text-amber-200 bg-black/40 px-3 py-1.5 rounded-xl border border-amber-400/40 hover:border-amber-400 transition-all cursor-pointer self-start sm:self-auto shrink-0"
-                    >
-                      <HelpCircle className="w-3.5 h-3.5" />
-                      <span>{showDownloadGuide ? 'بستن راهنمای آپلود' : 'راهنما: اپ را کجا بگذارم؟'}</span>
-                    </button>
-                  </div>
-
-                  {/* Step-by-Step Comprehensive Guide on Where and How to Upload Apps */}
-                  {showDownloadGuide && (
-                    <div className="bg-[#06141a]/95 border border-amber-400/60 rounded-2xl p-4 space-y-3.5 text-xs text-slate-200 animate-in fade-in shadow-inner">
-                      <div className="flex items-center justify-between border-b border-amber-500/30 pb-2">
-                        <div className="flex items-center gap-2 font-black text-amber-300">
-                          <Sparkles className="w-4 h-4 text-amber-400" />
-                          <span>آموزش جامع: کجا و چطور فایلم را آپلود کنم تا لینک دانلود مستقیم بگیرم؟</span>
-                        </div>
-                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-md">
-                          ۵ روش ساده و کاربردی
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] leading-relaxed">
-                        {/* Method 1 */}
-                        <div className="bg-black/40 border border-emerald-500/40 p-3 rounded-xl space-y-1.5">
-                          <div className="flex items-center gap-1.5 font-bold text-emerald-300">
-                            <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-[10px]">۱</span>
-                            <span>روش اول: آپلود مستقیم در همین پنل (سریع‌ترین روش)</span>
-                          </div>
-                          <p className="text-slate-300">
-                            کافیست روی دکمه‌ی سبزرنگ <strong>«انتخاب و آپلود فایل نصبی از کامپیوتر/گوشی»</strong> در زیر کلیک کنید. فایل APK یا ZIP شما مستقیم روی سرور آپلود شده و لینک اختصاصی آن به صورت خودکار در کادر قرار می‌گیرد.
-                          </p>
-                        </div>
-
-                        {/* Method 2 */}
-                        <div className="bg-black/40 border border-purple-500/40 p-3 rounded-xl space-y-1.5">
-                          <div className="flex items-center gap-1.5 font-bold text-purple-300">
-                            <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center text-[10px]">۲</span>
-                            <span>روش دوم: گوگل درایو (Google Drive Direct Link)</span>
-                          </div>
-                          <p className="text-slate-300">
-                            فایل را در درایو آپلود کنید، روی آن راست‌کلیک کرده و Share را بزنید و دسترسی را روی <em>Anyone with the link</em> بگذارید. شناسه فایل (ID) را کپی کرده و به فرمت زیر در کادر قرار دهید:
-                            <code className="block bg-[#020b0e] p-1.5 mt-1 rounded text-[10px] text-amber-300 font-mono select-all dir-ltr text-left">
-                              https://drive.google.com/uc?export=download&id=شناسه_فایل
-                            </code>
-                          </p>
-                        </div>
-
-                        {/* Method 3 */}
-                        <div className="bg-black/40 border border-blue-500/40 p-3 rounded-xl space-y-1.5">
-                          <div className="flex items-center gap-1.5 font-bold text-blue-300">
-                            <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-300 flex items-center justify-center text-[10px]">۳</span>
-                            <span>روش سوم: دراپ‌باکس (Dropbox)</span>
-                          </div>
-                          <p className="text-slate-300">
-                            فایل را در Dropbox آپلود کرده و لینک اشتراک آن را بگیرید. در انتهای لینک عبارت <code className="text-amber-300 font-mono">?dl=0</code> را به <code className="text-emerald-300 font-mono">?dl=1</code> تغییر دهید تا به لینک دانلود مستقیم و خودکار تبدیل شود.
-                          </p>
-                        </div>
-
-                        {/* Method 4 */}
-                        <div className="bg-black/40 border border-cyan-500/40 p-3 rounded-xl space-y-1.5">
-                          <div className="flex items-center gap-1.5 font-bold text-cyan-300">
-                            <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center text-[10px]">۴</span>
-                            <span>روش چهارم: گیت‌هاب (GitHub Releases) یا هاست دانلود</span>
-                          </div>
-                          <p className="text-slate-300">
-                            می‌توانید در ریپازیتوری گیت‌هاب خود یک Release بسازید و فایل APK را الصاق نمایید؛ گیت‌هاب لینک دانلود مستقیم دائمی و پرسرعت به شما می‌دهد. همچنین از هاست‌های دانلود مانند MediaFire یا سرور شخصی نیز می‌توانید استفاده کنید.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Input Fields & Direct Upload Section */}
-                  <div className="space-y-3.5">
-                    {/* Row 1: Direct URL Input with Action Buttons */}
-                    <div>
-                      <label className="text-xs font-bold text-emerald-200 block mb-1">
-                        آدرس اینترنتی / لینک مستقیم دانلود فایل (APK / EXE / ZIP / RAR):
-                      </label>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <div className="relative flex-1">
-                          <input
-                            type="url"
-                            dir="ltr"
-                            value={newDownloadUrl}
-                            onChange={(e) => setNewDownloadUrl(e.target.value)}
-                            placeholder="https://... یا /uploads/apps/app.apk"
-                            className="w-full bg-[#051116] border border-emerald-600/70 rounded-xl px-3 py-2.5 text-xs text-emerald-300 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-400 placeholder:text-slate-600 placeholder:font-sans"
-                          />
-                          {newDownloadUrl && (
-                            <button
-                              type="button"
-                              onClick={() => setNewDownloadUrl('')}
-                              className="absolute right-2 top-2.5 text-slate-400 hover:text-rose-400 p-1 rounded-md"
-                              title="پاک کردن لینک"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Test URL button */}
-                        {newDownloadUrl && (
-                          <a
-                            href={newDownloadUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-3.5 py-2 rounded-xl bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/60 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-colors"
-                            title="تست باز شدن لینک دانلود در تب جدید"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            <span>تست لینک</span>
-                          </a>
-                        )}
-
-                        {/* Direct File Upload Trigger */}
-                        <label className={`px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shrink-0 cursor-pointer shadow-md transition-all active:scale-95 ${
-                          isUploadingAppFile ? 'opacity-70 cursor-not-allowed' : ''
-                        }`}>
-                          <Upload className="w-4 h-4" />
-                          <span>{isUploadingAppFile ? 'در حال آپلود فایل...' : 'انتخاب و آپلود فایل نصبی'}</span>
-                          <input
-                            type="file"
-                            accept=".apk,.exe,.zip,.rar,.msi,.tar,.gz,.dmg"
-                            onChange={handleUploadAppFile}
-                            disabled={isUploadingAppFile}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-                    </div>
-
-                    {/* Upload Status Feedback */}
-                    {appUploadSuccess && (
-                      <div className="bg-emerald-950/80 border border-emerald-400/80 text-emerald-200 text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-2 animate-in fade-in">
-                        <Check className="w-4 h-4 text-emerald-300 shrink-0" />
-                        <span>{appUploadSuccess}</span>
-                      </div>
-                    )}
-
-                    {appUploadError && (
-                      <div className="bg-rose-950/80 border border-rose-400/80 text-rose-200 text-xs px-3.5 py-2.5 rounded-xl flex items-center gap-2 animate-in fade-in">
-                        <AlertCircle className="w-4 h-4 text-rose-300 shrink-0" />
-                        <span>{appUploadError}</span>
-                      </div>
-                    )}
-
-                    {/* Row 2: Button Text, Version, File Size */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                          متن روی دکمه دانلود (دلخواه):
-                        </label>
-                        <input
-                          type="text"
-                          value={newDownloadButtonText}
-                          onChange={(e) => setNewDownloadButtonText(e.target.value)}
-                          placeholder="مثلاً: دانلود اپلیکیشن جهش شنتیا (اندروید)"
-                          className="w-full bg-[#051116] border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                          نسخه نرم‌افزار / اپلیکیشن:
-                        </label>
-                        <input
-                          type="text"
-                          value={newAppVersion}
-                          onChange={(e) => setNewAppVersion(e.target.value)}
-                          placeholder="مثلاً: ۱.۰.۰ یا نگارش ۲.۴"
-                          className="w-full bg-[#051116] border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 font-mono"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                          حجم فایل نصبی:
-                        </label>
-                        <input
-                          type="text"
-                          value={newAppSize}
-                          onChange={(e) => setNewAppSize(e.target.value)}
-                          placeholder="مثلاً: ۱۸.۵ مگابایت"
-                          className="w-full bg-[#051116] border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Live Preview Box when URL is set */}
-                    {newDownloadUrl && (
-                      <div className="p-3 bg-emerald-950/30 border border-emerald-500/40 rounded-xl flex items-center justify-between gap-3 text-xs">
-                        <div className="flex items-center gap-2 text-emerald-200">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span>
-                            دکمه دانلود برای این محصول با عنوان <strong>«{newDownloadButtonText || 'دانلود اپلیکیشن'}»</strong> در صفحه کالا و صفحه لایسنس فعال خواهد بود.
-                          </span>
-                        </div>
-                        <a
-                          href={newDownloadUrl}
-                          download
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 bg-emerald-500 text-slate-950 font-black rounded-lg text-xs shrink-0 flex items-center gap-1 shadow-sm"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>پیش‌نمایش دانلود</span>
-                        </a>
                       </div>
                     )}
                   </div>

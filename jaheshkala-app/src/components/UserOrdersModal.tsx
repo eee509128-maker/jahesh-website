@@ -20,7 +20,6 @@ import {
   Copy,
   Key,
   ShieldCheck,
-  Download,
 } from 'lucide-react';
 import { Order, User, Product } from '../types';
 import { fetchOrdersFromDb, parseOrderTimestamp } from '../lib/dbService';
@@ -724,32 +723,17 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                             مدت اشتراک: <strong>{license.days} روز</strong> • تاریخ انقضا: <strong className="text-amber-300">{formattedExpiryFa}</strong>
                           </span>
 
-                          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-                            {license.downloadUrl && (
-                              <a
-                                href={license.downloadUrl}
-                                download
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                                <span>{license.downloadButtonText || 'دانلود اپلیکیشن'}</span>
-                              </a>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const creds = `نرم‌افزار: ${license.appName || license.productTitle}\nنام کاربری: ${license.username}\nرمز عبور: ${license.password}\nکلید لایسنس: ${license.licenseKey}\nانقضا: ${formattedExpiryFa}`;
-                                handleCopyText(creds, `ai-key-${order.id}`);
-                              }}
-                              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                            >
-                              <Copy className="w-3.5 h-3.5" />
-                              <span>{isKeyCopied ? 'همه مشخصات کپی شد!' : 'کپی کامل اطلاعات ورود به نرم‌افزار'}</span>
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const creds = `نرم‌افزار: ${license.appName || license.productTitle}\nنام کاربری: ${license.username}\nرمز عبور: ${license.password}\nکلید لایسنس: ${license.licenseKey}\nانقضا: ${formattedExpiryFa}`;
+                              handleCopyText(creds, `ai-key-${order.id}`);
+                            }}
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>{isKeyCopied ? 'همه مشخصات کپی شد!' : 'کپی کامل اطلاعات ورود به نرم‌افزار'}</span>
+                          </button>
                         </div>
                       </div>
                     );
