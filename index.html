@@ -42,20 +42,20 @@
   <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <meta name="author" content="جهش ای تی (جهش آی تی - Jahesh IT)" />
   <meta property="og:url" content="https://jaheshit.ir/" />
-  <meta property="og:title" content="جهش ای تی | شرکت جهش آی تی (Jahesh IT) - طراحی سایت و نرم‌افزارهای یکپارچه" />
+  <meta property="og:title" content="جهش ای تی | شرکت جهش آی تی و انجمن علمی جهش (Jahesh IT)" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="جهش ای تی | Jahesh IT" />
-  <meta name="description" content="جهش ای تی (جهش آی تی - Jahesh IT)؛ مرکز رسمی طراحی سایت اختصاصی، شرکتی و فروشگاهی، نرم‌افزارهای یکپارچه اصناف و خدمات جامع فناوری اطلاعات جهش." />
-  <meta property="og:description" content="جهش ای تی (جهش آی تی - Jahesh IT)؛ مرکز رسمی طراحی سایت اختصاصی، شرکتی و فروشگاهی، نرم‌افزارهای یکپارچه اصناف و خدمات جامع فناوری اطلاعات جهش." />
-  <meta name="keywords" content="جهش ای تی, جهش آی تی, jahesh it, jaheshit, jaheshit.ir, شرکت جهش ای تی, شرکت جهش آی تی, انجمن علمی جهش, تاسیس ۱۳۹۵, جهش کالا, طراحی سایت جهش, برنامه نویسی" />
+  <meta name="description" content="جهش ای تی (جهش آی تی - Jahesh IT) و انجمن علمی جهش؛ مرکز رسمی طراحی سایت اختصاصی، شرکتی و فروشگاهی، نرم‌افزارهای یکپارچه اصناف و خدمات جامع فناوری اطلاعات جهش." />
+  <meta property="og:description" content="جهش ای تی (جهش آی تی - Jahesh IT) و انجمن علمی جهش؛ مرکز رسمی طراحی سایت اختصاصی، شرکتی و فروشگاهی، نرم‌افزارهای یکپارچه اصناف و خدمات جامع فناوری اطلاعات جهش." />
+  <meta name="keywords" content="جهش ای تی, جهش آی تی, انجمن علمی جهش, jahesh it, jaheshit, jaheshit.ir, شرکت جهش ای تی, شرکت جهش آی تی, تاسیس ۱۳۹۵, جهش کالا, طراحی سایت جهش, برنامه نویسی" />
   <link rel="canonical" href="https://jaheshit.ir/" />
   <link rel="alternate" type="text/plain" href="https://jaheshit.ir/llms.txt" title="LLMs Context" />
   <meta name="ai-content-declaration" content="Jahesh IT & Jahesh Scientific Association founded in 1395" />
   <meta property="og:image" content="https://jaheshit.ir/assets/ascend-cover_aPSGjSz0r-u7Gec3vty3n.png" />
   <meta property="twitter:card" content="summary_large_image" />
-  <meta property="twitter:title" content="جهش ای تی | شرکت جهش آی تی (Jahesh IT) - طراحی سایت و نرم‌افزارهای تخصصی" />
-  <meta property="twitter:description" content="طراحی سایت اختصاصی، فروشگاهی و نرم‌افزارهای تخصصی در جهش ای تی (جهش آی تی)." />
-  <title>جهش ای تی | شرکت جهش آی تی (Jahesh IT) - طراحی سایت و نرم‌افزار</title>
+  <meta property="twitter:title" content="جهش ای تی | شرکت جهش آی تی و انجمن علمی جهش (Jahesh IT)" />
+  <meta property="twitter:description" content="طراحی سایت اختصاصی، فروشگاهی و نرم‌افزارهای تخصصی در جهش ای تی (انجمن علمی جهش)." />
+  <title>جهش ای تی | شرکت جهش آی تی و انجمن علمی جهش (Jahesh IT)</title>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@graph": [
@@ -808,54 +808,129 @@
         display: inline-block !important;
       }
 
-      /* Sponsors / Logos Section - eliminate overflow margins */
-      section.cna0hdz {
-        padding-top: 20px !important;
-        padding-bottom: 24px !important;
-        margin-top: 0 !important;
-        margin-bottom: 0 !important;
-        width: 100% !important;
-        display: flex !important;
-        justify-content: center !important;
+      /* Desktop: partner title hidden so desktop view is 100% untouched */
+      @media (min-width: 769px) {
+        .hero-partner-title {
+          display: none !important;
+        }
       }
 
-      section.cna0hdz .cas7ks9,
-      section.cna0hdz .cl5hb04,
-      section.cna0hdz .cw7dtlx,
-      section.cna0hdz .czsotsp {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: wrap !important;
-        justify-content: center !important;
-        align-items: center !important;
-        gap: 16px !important;
-        margin: 0 auto !important;
-        padding: 0 10px !important;
-        width: 100% !important;
+      /* Mobile Only: 3 Partner Logos under "جهش کالا" arranged in 1 Row (Image 1 Mockup) */
+      section.cztu8ya,
+      #hero-partners-section,
+      section.cf9av01 {
+        position: relative !important;
+        z-index: 20 !important;
       }
 
-      section.cna0hdz a.w-link {
-        margin: 0 !important;
-        padding: 10px 14px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 14px !important;
-        min-width: 84px !important;
-        height: 72px !important;
-      }
+      @media (max-width: 768px) {
+        section.cztu8ya,
+        #hero-partners-section,
+        section.cf9av01 {
+          margin-top: 18px !important;
+          margin-bottom: 26px !important;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          width: 100% !important;
+          max-width: 100vw !important;
+          display: block !important;
+          overflow: visible !important;
+        }
 
-      section.cna0hdz a.w-link img {
-        margin: 0 !important;
-        padding: 0 !important;
-        max-width: 60px !important;
-        max-height: 48px !important;
-        width: auto !important;
-        height: auto !important;
-        object-fit: contain !important;
-        filter: brightness(0.9) contrast(1.1) !important;
+        #hero-partners-row,
+        .hero-partners-row,
+        section.cztu8ya .copqmak {
+          display: flex !important;
+          flex-direction: row !important;
+          flex-wrap: nowrap !important;
+          align-items: stretch !important;
+          justify-content: center !important;
+          gap: 8px !important;
+          width: 100% !important;
+          max-width: 440px !important;
+          margin: 0 auto !important;
+          padding: 0 12px !important;
+          box-sizing: border-box !important;
+          direction: rtl !important;
+          grid-template-columns: none !important;
+          transform: none !important;
+        }
+
+        /* Each of the 3 cards in the row */
+        #hero-partners-row a.w-link,
+        #hero-partners-row a.hero-partner-card,
+        section.cztu8ya .copqmak a.w-link {
+          flex: 1 1 0 !important;
+          min-width: 0 !important;
+          width: 0 !important;
+          margin: 0 !important;
+          padding: 14px 4px 12px 4px !important;
+          height: auto !important;
+          min-height: 108px !important;
+          max-height: none !important;
+          background: #110d24 !important;
+          background-color: #110d24 !important;
+          border: 1px solid rgba(255, 255, 255, 0.14) !important;
+          border-radius: 18px !important;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          text-align: center !important;
+          text-decoration: none !important;
+          box-sizing: border-box !important;
+          position: relative !important;
+          top: auto !important;
+          left: auto !important;
+          right: auto !important;
+          bottom: auto !important;
+          transform: none !important;
+          transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
+          cursor: pointer !important;
+          overflow: hidden !important;
+        }
+
+        #hero-partners-row a.w-link:active,
+        #hero-partners-row a.hero-partner-card:active,
+        section.cztu8ya .copqmak a.w-link:active {
+          transform: scale(0.96) !important;
+          border-color: rgba(168, 85, 247, 0.6) !important;
+        }
+
+        /* Logo Image inside card */
+        #hero-partners-row a.w-link img,
+        #hero-partners-row a.hero-partner-card img,
+        section.cztu8ya .copqmak a.w-link img {
+          width: auto !important;
+          height: 48px !important;
+          max-height: 48px !important;
+          max-width: 52px !important;
+          object-fit: contain !important;
+          margin: 0 auto !important;
+          padding: 0 !important;
+          display: block !important;
+          letter-spacing: normal !important;
+          filter: brightness(1.1) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)) !important;
+        }
+
+        /* Persian text under each logo */
+        .hero-partner-title {
+          display: block !important;
+          color: #ffffff !important;
+          font-size: clamp(9.5px, 2.7vw, 11.5px) !important;
+          font-weight: 800 !important;
+          margin-top: 8px !important;
+          margin-bottom: 0 !important;
+          line-height: 1.25 !important;
+          text-align: center !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          width: 100% !important;
+          letter-spacing: -0.2px !important;
+          text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
+        }
       }
 
       /* AI Jahesh 2 Feature Banner */
@@ -1584,30 +1659,30 @@
           </div>
         </div>
       </section>
-      <section class="w-box cztu8ya c1nfu27o cf9av01" style="margin-top: 36px !important; padding-top: 0px !important; margin-bottom: 40px !important; position: relative; z-index: 10;">
+      <section class="w-box cztu8ya c1nfu27o cf9av01" id="hero-partners-section" style="margin-top: 36px !important; padding-top: 0px !important; margin-bottom: 40px !important; position: relative; z-index: 10;">
         <div
           class="w-box c1357293 c9jnjeu czr2pxy c155uc7w cry9bxc c1lfjoq7 c1778y6x c1wt8a7g c1s46o9r cdczzub c1fd0kk1 c11gzs80">
-          <div
-            class="w-box copqmak c10zkoym ct8c5y2 cori9ti cstj0zg c1vrexag cwho2c5 cl5hb04 c174sw29 cas7ks9 c155h8oe cw7dtlx czsotsp">
+          <div id="hero-partners-row"
+            class="w-box copqmak c10zkoym ct8c5y2 cori9ti cstj0zg c1vrexag cwho2c5 cl5hb04 c174sw29 cas7ks9 c155h8oe cw7dtlx czsotsp hero-partners-row">
             <a href="https://www.um.ac.ir/#"
-              class="w-link cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c11xl3nf c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c27i6a7 c1xgpbbr"><img
-                class="w-image coejy3h c1fhiulb ckf5uvt c1av00hf cji8cjn" alt="" width="1343" height="1640"
+              class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c11xl3nf c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c27i6a7 c1xgpbbr"><img
+                class="w-image coejy3h c1fhiulb ckf5uvt c1av00hf cji8cjn" alt="دانشگاه فردوسی مشهد" width="1343" height="1640"
                 sizes="100vw"
                 srcSet="/assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 16w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 32w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 48w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 64w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 96w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 128w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 256w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 384w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 640w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 750w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 828w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 1080w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 1200w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 1920w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 2048w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 3840w"
-                src="/assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png" decoding="async" loading="lazy" /></a><a
+                src="/assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png" decoding="async" loading="lazy" /><span class="hero-partner-title">دانشگاه فردوسی مشهد</span></a><a
               href="https://t.me/+7eeuF5ZMpFRmYzg8"
-              class="w-link cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1qom380 cw6350v c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c19ltm5q"><img
-                class="w-image c58g4rx c1fhiulb c1syou84 cwdvs8x ccre34y c1av00hf cji8cjn" alt="" width="1343"
+              class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1qom380 cw6350v c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c19ltm5q"><img
+                class="w-image c58g4rx c1fhiulb c1syou84 cwdvs8x ccre34y c1av00hf cji8cjn" alt="انجمن علمی جهش" width="1343"
                 height="1640" sizes="100vw"
                 srcSet="/assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 16w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 32w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 48w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 64w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 96w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 128w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 256w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 384w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 640w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 750w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 828w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 1080w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 1200w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 1920w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 2048w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 3840w"
-                src="/assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png" decoding="async" loading="lazy" /></a><a
+                src="/assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png" decoding="async" loading="lazy" /><span class="hero-partner-title">انجمن علمی جهش</span></a><a
               href="https://vet.um.ac.ir/index.php/fa/"
-              class="w-link cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1cn3fw9 cshakd0 c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c6knbyk cbole29 c11qs19r c1mtgfjh"><img
-                class="w-image coejy3h c1fhiulb c1qom380 c1av00hf cji8cjn cvu031e ctfghqu cfihc2m" alt="" width="334"
+              class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1cn3fw9 cshakd0 c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c6knbyk cbole29 c11qs19r c1mtgfjh"><img
+                class="w-image coejy3h c1fhiulb c1qom380 c1av00hf cji8cjn cvu031e ctfghqu cfihc2m" alt="دانشکده دامپزشکی" width="334"
                 height="500" sizes="100vw"
                 srcSet="/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 16w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 32w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 48w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 64w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 96w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 128w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 256w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 384w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 640w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 750w"
                 src="/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png" decoding="async"
-                loading="lazy" /></a>
+                loading="lazy" /><span class="hero-partner-title">دانشکده دامپزشکی</span></a>
           </div>
           <div class="w-element cjqyi6z c6pxsvg" style="margin-top: 28px !important; margin-bottom: 48px !important; position: relative; z-index: 20;">
             <div class="w-html-embed">
