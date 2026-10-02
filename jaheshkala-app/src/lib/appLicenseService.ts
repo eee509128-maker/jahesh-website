@@ -2,6 +2,7 @@ import { CartItem, Order, User, Product, AppSubscriptionLicense } from '../types
 import { safeSetLocalStorage } from './dbService';
 import { db } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { getSafeDownloadUrl } from './downloadUtils';
 
 const STORAGE_KEY = 'jahesh_app_licenses';
 
@@ -128,6 +129,7 @@ export function generateAppLicense(
 
   const licenseId = `lic_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const seed = `${exactUsername}_${resolvedProduct.id || 'app'}_${order.id || ''}`;
+  const downloadUrl = getSafeDownloadUrl(resolvedProduct.downloadUrl);
 
   const license: AppSubscriptionLicense = {
     id: licenseId,
@@ -145,6 +147,7 @@ export function generateAppLicense(
     expiresAt: expiresAt.toISOString(),
     status: 'active',
     apiEndpoint: 'https://jaheshit.ir/api/app-auth',
+    ...(downloadUrl ? { downloadUrl } : {}),
   };
 
   saveAppLicenseLocally(license);
