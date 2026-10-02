@@ -1009,7 +1009,8 @@ export default function App() {
     };
 
     const orderId = 'JAHESH-ADM-' + Math.floor(10000 + Math.random() * 90000).toString();
-    const isAmlakOrSub = Boolean(product.isSubscription || product.id === 'pkg-amlak-jahesh' || product.category === 'اشتراک نرم‌افزار');
+    const isAmlak = isAmlakProduct({ product, quantity });
+    const isSub = Boolean(product.isSubscription || product.category === 'اشتراک نرم‌افزار' || isAmlak);
     
     const newAdminOrder: Order = {
       id: orderId,
@@ -1025,7 +1026,7 @@ export default function App() {
         {
           product: { ...product },
           quantity,
-          subscriptionDays: isAmlakOrSub ? 365 : undefined,
+          subscriptionDays: isSub ? 365 : undefined,
           requestedDomain: product.domainIncluded ? 'دامنه اختصاصی مدیریت' : undefined,
           clientNotes: 'سفارش مستقیم و رایگان پنل مدیریت',
         },
@@ -1045,11 +1046,11 @@ export default function App() {
       }),
     };
 
-    if (isAmlakOrSub) {
+    if (isAmlak) {
       newAdminOrder.amlakLicense = generateAmlakLicense(newAdminOrder, adminUser);
     }
 
-    if (product.isAiAppProduct || hasAiAppInItems(newAdminOrder.items)) {
+    if (isAiAppProduct(product) || hasAiAppInItems(newAdminOrder.items)) {
       const generatedAppLic = generateAppLicense(newAdminOrder, adminUser);
       newAdminOrder.appLicense = generatedAppLic;
       registerAppLicenseOnServer(generatedAppLic).catch(() => {});

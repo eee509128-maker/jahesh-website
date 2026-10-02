@@ -7,18 +7,32 @@ const STORAGE_KEY = 'jahesh_amlak_licenses';
 
 /**
  * Checks if a cart or order contains the Jahesh Real Estate Management SaaS package
+ * Strictly matches Real Estate Management products only (NOT generic subscriptions or other apps like Shantia).
  */
 export function isAmlakProduct(item?: CartItem | null): boolean {
   if (!item || !item.product) return false;
   const prod = item.product;
-  return (
-    prod.id === 'pkg-amlak-jahesh' ||
-    Boolean(prod.isSubscription) ||
-    Boolean(prod.title && prod.title.includes('املاک'))
-  );
+  const id = String(prod.id || '').toLowerCase().trim();
+  const title = String(prod.title || '').trim();
+
+  if (id === 'pkg-amlak-jahesh' || id === 'amlak-jahesh') {
+    return true;
+  }
+
+  // Must explicitly mention real estate / amlak management and NOT be other apps
+  if (
+    title.includes('مدیریت املاک') ||
+    title.includes('سامانه مدیریت املاک') ||
+    title.includes('مشاورین املاک') ||
+    (title.includes('املاک') && !title.includes('شنتیا') && !title.includes('اپلیکیشن'))
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
-export function hasAmlakInItems(items: CartItem[]): boolean {
+export function hasAmlakInItems(items?: CartItem[] | null): boolean {
   if (!Array.isArray(items)) return false;
   return items.some(isAmlakProduct);
 }

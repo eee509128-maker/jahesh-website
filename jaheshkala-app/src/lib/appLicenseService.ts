@@ -6,12 +6,33 @@ import { doc, setDoc } from 'firebase/firestore';
 const STORAGE_KEY = 'jahesh_app_licenses';
 
 /**
- * Checks if a product or cart item has AI App / Software Subscription capability
- * and MUST have the 'isAiAppProduct' explicitly set to true.
+ * Checks if a product or cart item has AI App / Software Subscription capability (e.g. Shantia app).
+ * Real Estate Management is handled separately by the dedicated Amlak license service.
  */
 export function isAiAppProduct(prod?: Product | null): boolean {
   if (!prod) return false;
-  return Boolean(prod.isAiAppProduct || prod.isSubscription || prod.id === 'pkg-amlak-jahesh');
+  const id = String(prod.id || '').toLowerCase().trim();
+  const title = String(prod.title || '').trim();
+
+  // Real estate has its own dedicated portal/service, not generic app auth
+  if (
+    id === 'pkg-amlak-jahesh' ||
+    id === 'amlak-jahesh' ||
+    title.includes('مدیریت املاک') ||
+    title.includes('سامانه مدیریت املاک') ||
+    title.includes('مشاورین املاک')
+  ) {
+    return false;
+  }
+
+  return Boolean(
+    prod.isAiAppProduct ||
+    prod.downloadUrl ||
+    (prod as any).appDownloadUrl ||
+    prod.isSubscription ||
+    title.includes('اپلیکیشن') ||
+    title.includes('شنتیا')
+  );
 }
 
 export function isAiAppItem(item?: CartItem | null): boolean {
