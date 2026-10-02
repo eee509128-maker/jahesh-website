@@ -247,12 +247,183 @@
       z-index: 999999 !important;
     }
 
-    /* Layout Spacing: Section 2 (3 logos + AI Banner) & Footer */
-    section.cztu8ya {
+    /* Header Logo (Desktop & Mobile) */
+    header a[aria-label="Home"],
+    header a[aria-label="Home"].w-link {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 42px !important;
+      height: 42px !important;
+      min-width: 42px !important;
+      max-width: 42px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      text-decoration: none !important;
+    }
+
+    header a[aria-label="Home"] img,
+    header a[aria-label="Home"] .w-image,
+    header .coe1sx2,
+    header .cybwsdi {
+      width: 40px !important;
+      height: 40px !important;
+      max-width: 40px !important;
+      max-height: 40px !important;
+      object-fit: contain !important;
+      display: block !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    /* Partner Logos Section - Global Styles */
+    section.cztu8ya,
+    #hero-partners-section,
+    section.cf9av01 {
+      width: 100% !important;
+      max-width: 100% !important;
       margin-top: 36px !important;
-      margin-bottom: 40px !important;
+      margin-bottom: 36px !important;
+      padding: 0 16px !important;
+      display: flex !important;
+      justify-content: center !important;
+      align-items: center !important;
       position: relative !important;
-      z-index: 10 !important;
+      z-index: 20 !important;
+      box-sizing: border-box !important;
+    }
+
+    #hero-partners-row,
+    .hero-partners-row,
+    section.cztu8ya .copqmak {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: stretch !important;
+      justify-content: center !important;
+      gap: 20px !important;
+      width: 100% !important;
+      max-width: 960px !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      box-sizing: border-box !important;
+      transform: none !important;
+      grid-template-columns: none !important;
+    }
+
+    #hero-partners-row a.w-link,
+    #hero-partners-row a.hero-partner-card,
+    .hero-partners-row a.hero-partner-card,
+    section.cztu8ya .copqmak a.w-link {
+      flex: 1 1 0 !important;
+      min-width: 0 !important;
+      max-width: 290px !important;
+      width: 100% !important;
+      height: 250px !important;
+      min-height: 230px !important;
+      max-height: 270px !important;
+      margin: 0 !important;
+      padding: 24px 20px !important;
+      background: radial-gradient(ellipse at 50% 30%, rgba(45, 20, 80, 0.7) 0%, rgba(14, 7, 28, 0.95) 100%) !important;
+      background-color: #0e071c !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      border-radius: 22px !important;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+      text-decoration: none !important;
+      box-sizing: border-box !important;
+      position: relative !important;
+      top: auto !important;
+      left: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      transform: none !important;
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease !important;
+      cursor: pointer !important;
+      overflow: hidden !important;
+    }
+
+    #hero-partners-row a.w-link:hover,
+    #hero-partners-row a.hero-partner-card:hover,
+    .hero-partners-row a.hero-partner-card:hover,
+    section.cztu8ya .copqmak a.w-link:hover {
+      transform: translateY(-5px) !important;
+      border-color: rgba(168, 85, 247, 0.6) !important;
+      box-shadow: 0 14px 36px rgba(139, 92, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    }
+
+    #hero-partners-row a.w-link:active,
+    #hero-partners-row a.hero-partner-card:active,
+    .hero-partners-row a.hero-partner-card:active,
+    section.cztu8ya .copqmak a.w-link:active {
+      transform: translateY(-1px) scale(0.98) !important;
+    }
+
+    #hero-partners-row a.w-link img,
+    #hero-partners-row a.hero-partner-card img,
+    .hero-partners-row a.hero-partner-card img,
+    section.cztu8ya .copqmak a.w-link img {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 190px !important;
+      max-height: 190px !important;
+      object-fit: contain !important;
+      margin: auto !important;
+      padding: 0 !important;
+      display: block !important;
+      filter: brightness(1.08) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5)) !important;
+      transition: transform 0.25s ease !important;
+    }
+
+    #hero-partners-row a.hero-partner-card:hover img {
+      transform: scale(1.04) !important;
+    }
+
+    /* Optical Centering for Ferdowsi University Logo */
+    #hero-partners-row a[href*="um.ac.ir"] img,
+    .hero-partners-row a[href*="um.ac.ir"] img,
+    section.cztu8ya a[href*="um.ac.ir"] img {
+      transform: translateX(-6px) !important;
+    }
+
+    #hero-partners-row a[href*="um.ac.ir"]:hover img,
+    .hero-partners-row a[href*="um.ac.ir"]:hover img,
+    section.cztu8ya a[href*="um.ac.ir"]:hover img {
+      transform: translateX(-6px) scale(1.04) !important;
+    }
+
+    /* Completely hide any non-image elements inside partner cards */
+    #hero-partners-row a > *:not(img),
+    #hero-partners-row span,
+    #hero-partners-row .hero-partner-title,
+    .hero-partner-title {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      font-size: 0 !important;
+      line-height: 0 !important;
+      height: 0 !important;
+      width: 0 !important;
+      position: absolute !important;
+      left: -9999px !important;
+      pointer-events: none !important;
+    }
+
+    #hero-partners-row a,
+    #hero-partners-row a:link,
+    #hero-partners-row a:visited {
+      color: #ffffff !important;
+      text-decoration: none !important;
     }
 
     @media (max-width: 768px) {
@@ -808,128 +979,176 @@
         display: inline-block !important;
       }
 
-      /* Desktop: partner title hidden so desktop view is 100% untouched */
-      @media (min-width: 769px) {
-        .hero-partner-title {
-          display: none !important;
-        }
-      }
-
-      /* Mobile Only: 3 Partner Logos under "جهش کالا" arranged in 1 Row (Image 1 Mockup) */
+      /* ========================================================
+         Partner Logos Section - 3 Cards Side-by-Side (Matching Image 1)
+         ======================================================== */
       section.cztu8ya,
       #hero-partners-section,
       section.cf9av01 {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-top: 36px !important;
+        margin-bottom: 36px !important;
+        padding: 0 16px !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
         position: relative !important;
         z-index: 20 !important;
+        box-sizing: border-box !important;
       }
 
+      #hero-partners-row,
+      .hero-partners-row,
+      section.cztu8ya .copqmak {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+        justify-content: center !important;
+        gap: 20px !important;
+        width: 100% !important;
+        max-width: 960px !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        transform: none !important;
+        grid-template-columns: none !important;
+      }
+
+      /* 3 Individual Cards Side by Side */
+      #hero-partners-row a.w-link,
+      #hero-partners-row a.hero-partner-card,
+      .hero-partners-row a.hero-partner-card,
+      section.cztu8ya .copqmak a.w-link {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        max-width: 290px !important;
+        width: 100% !important;
+        height: 250px !important;
+        min-height: 230px !important;
+        max-height: 270px !important;
+        margin: 0 !important;
+        padding: 24px 20px !important;
+        background: radial-gradient(ellipse at 50% 30%, rgba(45, 20, 80, 0.7) 0%, rgba(14, 7, 28, 0.95) 100%) !important;
+        background-color: #0e071c !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 22px !important;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        text-decoration: none !important;
+        box-sizing: border-box !important;
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        transform: none !important;
+        transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease !important;
+        cursor: pointer !important;
+        overflow: hidden !important;
+      }
+
+      #hero-partners-row a.w-link:hover,
+      #hero-partners-row a.hero-partner-card:hover,
+      .hero-partners-row a.hero-partner-card:hover,
+      section.cztu8ya .copqmak a.w-link:hover {
+        transform: translateY(-5px) !important;
+        border-color: rgba(168, 85, 247, 0.6) !important;
+        box-shadow: 0 14px 36px rgba(139, 92, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+      }
+
+      #hero-partners-row a.w-link:active,
+      #hero-partners-row a.hero-partner-card:active,
+      .hero-partners-row a.hero-partner-card:active,
+      section.cztu8ya .copqmak a.w-link:active {
+        transform: translateY(-1px) scale(0.98) !important;
+      }
+
+      /* Logo Images inside cards */
+      #hero-partners-row a.w-link img,
+      #hero-partners-row a.hero-partner-card img,
+      .hero-partners-row a.hero-partner-card img,
+      section.cztu8ya .copqmak a.w-link img {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 190px !important;
+        max-height: 190px !important;
+        object-fit: contain !important;
+        margin: auto !important;
+        padding: 0 !important;
+        display: block !important;
+        filter: brightness(1.08) drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5)) !important;
+        transition: transform 0.25s ease !important;
+      }
+
+      #hero-partners-row a.hero-partner-card:hover img {
+        transform: scale(1.04) !important;
+      }
+
+      /* Optical Centering for Ferdowsi University Logo */
+      #hero-partners-row a[href*="um.ac.ir"] img,
+      .hero-partners-row a[href*="um.ac.ir"] img,
+      section.cztu8ya a[href*="um.ac.ir"] img {
+        transform: translateX(-6px) !important;
+      }
+
+      #hero-partners-row a[href*="um.ac.ir"]:hover img,
+      .hero-partners-row a[href*="um.ac.ir"]:hover img,
+      section.cztu8ya a[href*="um.ac.ir"]:hover img {
+        transform: translateX(-6px) scale(1.04) !important;
+      }
+
+      /* Hide extra plain text since calligraphy is inside the PNG logos */
+      .hero-partner-title {
+        display: none !important;
+      }
+
+      /* Responsive Mobile adjustments */
       @media (max-width: 768px) {
         section.cztu8ya,
         #hero-partners-section,
         section.cf9av01 {
           margin-top: 18px !important;
-          margin-bottom: 26px !important;
-          padding-top: 0 !important;
-          padding-bottom: 0 !important;
-          width: 100% !important;
-          max-width: 100vw !important;
-          display: block !important;
-          overflow: visible !important;
+          margin-bottom: 24px !important;
+          padding: 0 8px !important;
         }
 
         #hero-partners-row,
         .hero-partners-row,
         section.cztu8ya .copqmak {
-          display: flex !important;
-          flex-direction: row !important;
-          flex-wrap: nowrap !important;
-          align-items: stretch !important;
-          justify-content: center !important;
           gap: 8px !important;
-          width: 100% !important;
-          max-width: 440px !important;
-          margin: 0 auto !important;
-          padding: 0 12px !important;
-          box-sizing: border-box !important;
-          direction: rtl !important;
-          grid-template-columns: none !important;
-          transform: none !important;
+          max-width: 100% !important;
+          padding: 0 4px !important;
         }
 
-        /* Each of the 3 cards in the row */
         #hero-partners-row a.w-link,
         #hero-partners-row a.hero-partner-card,
+        .hero-partners-row a.hero-partner-card,
         section.cztu8ya .copqmak a.w-link {
-          flex: 1 1 0 !important;
-          min-width: 0 !important;
-          width: 0 !important;
-          margin: 0 !important;
-          padding: 14px 4px 12px 4px !important;
           height: auto !important;
-          min-height: 108px !important;
-          max-height: none !important;
-          background: #110d24 !important;
-          background-color: #110d24 !important;
-          border: 1px solid rgba(255, 255, 255, 0.14) !important;
-          border-radius: 18px !important;
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
-          display: flex !important;
-          flex-direction: column !important;
-          align-items: center !important;
-          justify-content: center !important;
-          text-align: center !important;
-          text-decoration: none !important;
-          box-sizing: border-box !important;
-          position: relative !important;
-          top: auto !important;
-          left: auto !important;
-          right: auto !important;
-          bottom: auto !important;
-          transform: none !important;
-          transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
-          cursor: pointer !important;
-          overflow: hidden !important;
+          min-height: 110px !important;
+          max-height: 135px !important;
+          border-radius: 16px !important;
+          padding: 12px 6px !important;
         }
 
-        #hero-partners-row a.w-link:active,
-        #hero-partners-row a.hero-partner-card:active,
-        section.cztu8ya .copqmak a.w-link:active {
-          transform: scale(0.96) !important;
-          border-color: rgba(168, 85, 247, 0.6) !important;
-        }
-
-        /* Logo Image inside card */
         #hero-partners-row a.w-link img,
         #hero-partners-row a.hero-partner-card img,
+        .hero-partners-row a.hero-partner-card img,
         section.cztu8ya .copqmak a.w-link img {
-          width: auto !important;
-          height: 48px !important;
-          max-height: 48px !important;
-          max-width: 52px !important;
-          object-fit: contain !important;
-          margin: 0 auto !important;
-          padding: 0 !important;
-          display: block !important;
-          letter-spacing: normal !important;
-          filter: brightness(1.1) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)) !important;
+          max-width: 82px !important;
+          max-height: 82px !important;
         }
 
-        /* Persian text under each logo */
-        .hero-partner-title {
-          display: block !important;
-          color: #ffffff !important;
-          font-size: clamp(9.5px, 2.7vw, 11.5px) !important;
-          font-weight: 800 !important;
-          margin-top: 8px !important;
-          margin-bottom: 0 !important;
-          line-height: 1.25 !important;
-          text-align: center !important;
-          white-space: nowrap !important;
-          overflow: hidden !important;
-          text-overflow: ellipsis !important;
-          width: 100% !important;
-          letter-spacing: -0.2px !important;
-          text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
+        #hero-partners-row a[href*="um.ac.ir"] img,
+        .hero-partners-row a[href*="um.ac.ir"] img,
+        section.cztu8ya a[href*="um.ac.ir"] img {
+          transform: translateX(-3px) !important;
         }
       }
 
@@ -1669,20 +1888,20 @@
                 class="w-image coejy3h c1fhiulb ckf5uvt c1av00hf cji8cjn" alt="دانشگاه فردوسی مشهد" width="1343" height="1640"
                 sizes="100vw"
                 srcSet="/assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 16w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 32w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 48w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 64w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 96w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 128w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 256w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 384w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 640w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 750w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 828w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 1080w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 1200w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 1920w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 2048w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 3840w"
-                src="/assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png" decoding="async" loading="lazy" /><span class="hero-partner-title">دانشگاه فردوسی مشهد</span></a><a
+                src="/assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png" decoding="async" loading="lazy" /></a><a
               href="https://t.me/+7eeuF5ZMpFRmYzg8"
               class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1qom380 cw6350v c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c19ltm5q"><img
                 class="w-image c58g4rx c1fhiulb c1syou84 cwdvs8x ccre34y c1av00hf cji8cjn" alt="انجمن علمی جهش" width="1343"
                 height="1640" sizes="100vw"
                 srcSet="/assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 16w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 32w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 48w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 64w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 96w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 128w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 256w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 384w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 640w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 750w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 828w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 1080w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 1200w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 1920w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 2048w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 3840w"
-                src="/assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png" decoding="async" loading="lazy" /><span class="hero-partner-title">انجمن علمی جهش</span></a><a
+                src="/assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png" decoding="async" loading="lazy" /></a><a
               href="https://vet.um.ac.ir/index.php/fa/"
               class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1cn3fw9 cshakd0 c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c6knbyk cbole29 c11qs19r c1mtgfjh"><img
                 class="w-image coejy3h c1fhiulb c1qom380 c1av00hf cji8cjn cvu031e ctfghqu cfihc2m" alt="دانشکده دامپزشکی" width="334"
                 height="500" sizes="100vw"
                 srcSet="/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 16w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 32w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 48w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 64w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 96w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 128w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 256w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 384w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 640w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 750w"
                 src="/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png" decoding="async"
-                loading="lazy" /><span class="hero-partner-title">دانشکده دامپزشکی</span></a>
+                loading="lazy" /></a>
           </div>
           <div class="w-element cjqyi6z c6pxsvg" style="margin-top: 28px !important; margin-bottom: 48px !important; position: relative; z-index: 20;">
             <div class="w-html-embed">
