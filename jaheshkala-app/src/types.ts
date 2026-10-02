@@ -49,6 +49,7 @@ export interface Product {
   aiAppPlatform?: 'windows' | 'android' | 'cross-platform' | 'all'; // پلتفرم هدف
   aiAppDefaultDays?: number; // مدت پیش‌فرض لایسنس به روز (مثلاً 7، 30، 365)
   aiAppCustomPromptNote?: string; // نکات و قابلیت‌های اختصاصی برای درج در پرامپت هوش مصنوعی
+  downloadUrl?: string; // لینک عمومی دانلود فایل نصب اپلیکیشن (APK، EXE و ...)
   guild?: string; // صنف مرتبط با این خدمت یا کالا (مثلاً: املاک و مستغلات، طراحی سایت، رستوران...)
   targetGuilds?: string[]; // صنف‌های مرتبط
   painPointSolved?: string; // چالش و معضل اصلی صنف که این محصول حل می‌کند
@@ -186,6 +187,7 @@ export interface AppSubscriptionLicense {
   expiresAt: string;
   status: 'active' | 'expired';
   apiEndpoint?: string;
+  downloadUrl?: string; // لینک دانلود اپ مرتبط با محصول خریداری‌شده
 }
 
 export interface Order {

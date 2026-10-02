@@ -12,11 +12,13 @@ import {
   ExternalLink,
   Laptop,
   Smartphone,
+  Download,
   Info,
   X,
 } from 'lucide-react';
 import { AppSubscriptionLicense } from '../types';
 import { checkLicenseStatus } from '../lib/appLicenseService';
+import { getSafeDownloadUrl } from '../lib/downloadUtils';
 
 interface AppLicenseModalProps {
   isOpen: boolean;
@@ -37,6 +39,7 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
   if (!isOpen || !license) return null;
 
   const { isExpired, daysRemaining, formattedExpiryFa } = checkLicenseStatus(license);
+  const downloadUrl = getSafeDownloadUrl(license.downloadUrl);
 
   const handleCopy = (text: string, fieldName: string) => {
     try {
@@ -105,6 +108,19 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
               لایسنس نرم‌افزار «<strong className="text-amber-300">{license.appName || license.productTitle}</strong>» با موفقیت فعال شد. شما می‌توانید با مشخصات زیر وارد اپلیکیشن شوید:
             </p>
           </div>
+
+          {downloadUrl && (
+            <a
+              href={downloadUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full rounded-2xl border border-emerald-400/60 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 px-4 py-3 text-slate-950 font-black text-sm shadow-lg shadow-emerald-950/40 transition-all flex items-center justify-center gap-2 no-underline active:scale-[0.99]"
+            >
+              <Download className="w-5 h-5" />
+              <span>دانلود اپلیکیشن {license.appName || license.productTitle}</span>
+            </a>
+          )}
 
           {/* Credentials Card (Golden VIP Card) */}
           <div className="relative rounded-2xl bg-gradient-to-br from-[#231647] via-[#1a0f38] to-[#12092a] border border-amber-400/60 p-4 shadow-xl space-y-3.5">

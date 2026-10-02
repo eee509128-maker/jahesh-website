@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, ExternalLink
+  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, ExternalLink, Download
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
@@ -40,6 +40,7 @@ import {
 import { hasAmlakInItems, generateAmlakLicense } from './lib/amlakLicenseService';
 import { hasAiAppInItems, generateAppLicense, registerAppLicenseOnServer, checkLicenseStatus } from './lib/appLicenseService';
 import { AppSubscriptionLicense } from './types';
+import { getSafeDownloadUrl } from './lib/downloadUtils';
 import { AppLicenseModal } from './components/AppLicenseModal';
 import { isProductMatchingCategoryOrGuild, isProductMatchingSearchQuery } from './lib/guildMatcher';
 import { testConnection } from './lib/firebase';
@@ -133,6 +134,7 @@ export function sanitizeProduct(p: any): Product | null {
     aiAppPlatform: p.aiAppPlatform || 'all',
     aiAppDefaultDays: typeof p.aiAppDefaultDays === 'number' ? p.aiAppDefaultDays : 7,
     aiAppCustomPromptNote: p.aiAppCustomPromptNote || undefined,
+    downloadUrl: getSafeDownloadUrl(p.downloadUrl),
     guild: p.guild || undefined,
     targetGuilds: Array.isArray(p.targetGuilds) ? p.targetGuilds : (p.guild ? [p.guild] : undefined),
     painPointSolved: p.painPointSolved || undefined,
@@ -1892,6 +1894,19 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {getSafeDownloadUrl(completedOrderReceipt.order.appLicense.downloadUrl) && (
+                  <a
+                    href={getSafeDownloadUrl(completedOrderReceipt.order.appLicense.downloadUrl)}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer no-underline"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>دانلود اپلیکیشن {completedOrderReceipt.order.appLicense.appName || completedOrderReceipt.order.appLicense.productTitle}</span>
+                  </a>
+                )}
 
                 <button
                   type="button"

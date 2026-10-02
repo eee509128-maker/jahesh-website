@@ -18,6 +18,7 @@ import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { renderFormattedBannerTitle } from '../lib/bannerUtils';
 import { JAHESH_OFFICIAL_25_GUILDS } from '../data/guildProducts';
 import { buildAiAppPrompt } from '../lib/appLicenseService';
+import { getSafeDownloadUrl } from '../lib/downloadUtils';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -909,6 +910,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [aiAppPlatform, setAiAppPlatform] = useState<'windows' | 'android' | 'cross-platform' | 'all'>('all');
   const [aiAppDefaultDays, setAiAppDefaultDays] = useState(7);
   const [aiAppCustomPromptNote, setAiAppCustomPromptNote] = useState('');
+  const [appDownloadUrl, setAppDownloadUrl] = useState('');
   const [copiedPromptFeedback, setCopiedPromptFeedback] = useState<string | null>(null);
   const [testAuthUsername, setTestAuthUsername] = useState('jahesh');
   const [testAuthPassword, setTestAuthPassword] = useState('jahesh1395');
@@ -1241,6 +1243,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setAiAppPlatform('all');
     setAiAppDefaultDays(7);
     setAiAppCustomPromptNote('');
+    setAppDownloadUrl('');
     setCopiedPromptFeedback(null);
     setTestAuthResult(null);
     setSelectedGuildMode('25guilds');
@@ -1307,6 +1310,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setAiAppPlatform(prod.aiAppPlatform || 'all');
     setAiAppDefaultDays(prod.aiAppDefaultDays || (prod.isSubscription ? 30 : 7));
     setAiAppCustomPromptNote(prod.aiAppCustomPromptNote || '');
+    setAppDownloadUrl(prod.downloadUrl || '');
     setCopiedPromptFeedback(null);
     setTestAuthResult(null);
 
@@ -1373,6 +1377,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newPrice.trim()) return;
+
+    const safeDownloadUrl = getSafeDownloadUrl(appDownloadUrl);
+    if (appDownloadUrl.trim() && !safeDownloadUrl) {
+      alert('لطفاً لینک دانلود معتبر با http:// یا https:// وارد کنید، یا مسیر فایل را از ابتدای / بنویسید.');
+      return;
+    }
 
     const finalCategory = isCustomCategory
       ? (customCategoryName.trim() || 'عمومی')
@@ -1462,6 +1472,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           }))
         : undefined,
       isAiAppProduct: Boolean(isAiAppProduct),
+      downloadUrl: safeDownloadUrl || '',
       aiAppName: isAiAppProduct ? (aiAppName.trim() || newTitle.trim()) : undefined,
       aiAppPlatform: isAiAppProduct ? aiAppPlatform : undefined,
       aiAppDefaultDays: isAiAppProduct ? Math.max(1, aiAppDefaultDays || 7) : undefined,
@@ -3511,6 +3522,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         />
                         <span>فعال‌سازی اپلیکیشن و صدور لایسنس اشتراک</span>
                       </label>
+                    </div>
+
+                    <div className="mt-4 rounded-xl bg-emerald-950/30 border border-emerald-500/35 p-3.5 space-y-2">
+                      <label className="text-[11px] font-bold text-emerald-200 block">
+                        لینک دانلود اپلیکیشن (اختیاری):
+                      </label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        inputMode="url"
+                        value={appDownloadUrl}
+                        onChange={(e) => setAppDownloadUrl(e.target.value)}
+                        placeholder="https://your-domain.com/downloads/jahesh-app.apk"
+                        className="w-full bg-[#0d071b] border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                      <p className="text-[10px] leading-relaxed text-slate-300">
+                        با ثبت لینک، دکمه «دانلود اپلیکیشن» در جزئیات محصول نمایش داده می‌شود؛ برای نمایش آن کنار لایسنس پس از خرید، گزینه «فعال‌سازی اپلیکیشن و صدور لایسنس اشتراک» را هم روشن کنید. توجه: لینک صفحه محصول عمومی است و همه بازدیدکنندگان می‌توانند فایل را دانلود کنند؛ لینک مستقیم فایل را وارد کنید.
+                      </p>
                     </div>
 
                     {isAiAppProduct && (
