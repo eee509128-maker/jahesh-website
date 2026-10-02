@@ -137,10 +137,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '150mb' }));
+app.use(express.urlencoded({ extended: true, limit: '150mb' }));
 
-// Static uploads directory for banners and user-uploaded media
+// Static uploads directory for banners, products, apps, and user-uploaded media
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const BANNERS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'banners');
 if (!fs.existsSync(BANNERS_UPLOADS_DIR)) {
@@ -149,6 +149,10 @@ if (!fs.existsSync(BANNERS_UPLOADS_DIR)) {
 const PRODUCTS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'products');
 if (!fs.existsSync(PRODUCTS_UPLOADS_DIR)) {
   fs.mkdirSync(PRODUCTS_UPLOADS_DIR, { recursive: true });
+}
+const APPS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'apps');
+if (!fs.existsSync(APPS_UPLOADS_DIR)) {
+  fs.mkdirSync(APPS_UPLOADS_DIR, { recursive: true });
 }
 const JAHESH_IMAGES_DIR = path.join(__dirname, 'jaheshkala', 'images');
 if (!fs.existsSync(JAHESH_IMAGES_DIR)) {
@@ -786,6 +790,73 @@ app.post(['/api/upload-product-image', '/api/upload', '/jaheshkala/api/upload-pr
   } catch (err) {
     console.error('Error in /api/upload-product-image:', err);
     return res.status(500).json({ error: err.message || 'خطا در ذخیره‌سازی تصویر محصول' });
+  }
+});
+
+// Endpoint to upload Application files (APK, EXE, ZIP, etc.) directly to server
+app.post(['/api/upload-app-file', '/jaheshkala/api/upload-app-file', '/api/upload-apk', '/jaheshkala/api/upload-apk'], (req, res) => {
+  try {
+    const { file, filename, base64 } = req.body || {};
+    const filePayload = file || base64;
+    if (!filePayload || typeof filePayload !== 'string') {
+      return res.status(400).json({ error: 'داده فایل الزامی است.' });
+    }
+
+    let buffer;
+    let originalExt = 'apk';
+    if (filename && filename.includes('.')) {
+      originalExt = filename.split('.').pop().toLowerCase();
+    }
+
+    if (filePayload.startsWith('data:')) {
+      const parts = filePayload.split(',');
+      buffer = Buffer.from(parts[1] || '', 'base64');
+    } else {
+      buffer = Buffer.from(filePayload, 'base64');
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'فایل آپلود شده خالی یا نامعتبر است.' });
+    }
+
+    // Format human-readable file size
+    const sizeInMb = buffer.length / (1024 * 1024);
+    const sizeText = sizeInMb >= 1 ? `${sizeInMb.toFixed(1)} مگابایت` : `${(buffer.length / 1024).toFixed(0)} کیلوبایت`;
+
+    // Clean safe filename
+    let cleanOriginal = 'app';
+    if (filename) {
+      cleanOriginal = filename.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
+    }
+    const safeName = `${cleanOriginal}_${Date.now()}.${originalExt}`;
+
+    if (!fs.existsSync(APPS_UPLOADS_DIR)) {
+      fs.mkdirSync(APPS_UPLOADS_DIR, { recursive: true });
+    }
+    const filePath = path.join(APPS_UPLOADS_DIR, safeName);
+    fs.writeFileSync(filePath, buffer);
+
+    // Mirror to jaheshkala dist if present
+    const distAppsUploads = path.join(__dirname, 'jaheshkala', 'uploads', 'apps');
+    try {
+      if (!fs.existsSync(distAppsUploads)) {
+        fs.mkdirSync(distAppsUploads, { recursive: true });
+      }
+      fs.writeFileSync(path.join(distAppsUploads, safeName), buffer);
+    } catch {}
+
+    const publicUrl = `/uploads/apps/${safeName}`;
+    console.log(`[Upload App] File saved: ${publicUrl} (${sizeText})`);
+    return res.json({
+      success: true,
+      url: publicUrl,
+      filename: safeName,
+      sizeText: sizeText,
+      sizeBytes: buffer.length
+    });
+  } catch (err) {
+    console.error('Error in /api/upload-app-file:', err);
+    return res.status(500).json({ error: err.message || 'خطا در ذخیره‌سازی فایل اپلیکیشن' });
   }
 });
 

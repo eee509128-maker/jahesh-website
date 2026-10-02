@@ -203,7 +203,11 @@
     "price": 250000,
     "image": "/uploads/products/prod-1790538341809.webp",
     "gallery": [],
-    "updatedAt": "2026-09-28T17:31:46.568Z"
+    "updatedAt": "2026-09-28T17:31:46.568Z",
+    "downloadUrl": "/uploads/apps/jahesh_shantia.apk",
+    "downloadButtonText": "دانلود مستقیم اپلیکیشن جهش شنتیا (اندروید)",
+    "appVersion": "1.0.0",
+    "appSize": "18.5 MB"
   },
   {
     "rating": 5,

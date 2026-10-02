@@ -238,6 +238,10 @@ export const USER_RESTORED_PRODUCTS: Product[] = [
       "طراحی مدرن Material Design 3 با پشتیبانی کامل از دارک‌مود و راست‌چین (RTL)"
     ],
     "isSubscription": true,
+    "downloadUrl": "/uploads/apps/jahesh_shantia.apk",
+    "downloadButtonText": "دانلود مستقیم اپلیکیشن جهش شنتیا (اندروید)",
+    "appVersion": "1.0.0",
+    "appSize": "18.5 MB",
     "targetGuilds": [
       "طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات"
     ],

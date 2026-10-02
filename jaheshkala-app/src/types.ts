@@ -49,6 +49,10 @@ export interface Product {
   aiAppPlatform?: 'windows' | 'android' | 'cross-platform' | 'all'; // پلتفرم هدف
   aiAppDefaultDays?: number; // مدت پیش‌فرض لایسنس به روز (مثلاً 7، 30، 365)
   aiAppCustomPromptNote?: string; // نکات و قابلیت‌های اختصاصی برای درج در پرامپت هوش مصنوعی
+  downloadUrl?: string; // لینک دانلود مستقیم فایل نصبی اپلیکیشن یا نرم‌افزار (APK / EXE / ZIP)
+  downloadButtonText?: string; // عنوان دکمه دانلود (مثلاً: دانلود مستقیم اپلیکیشن اندروید)
+  appVersion?: string; // نسخه اپلیکیشن (مثلاً: 1.0.0 یا نگارش ۲.۴)
+  appSize?: string; // حجم فایل نصبی (مثلاً: 18.5 MB)
   guild?: string; // صنف مرتبط با این خدمت یا کالا (مثلاً: املاک و مستغلات، طراحی سایت، رستوران...)
   targetGuilds?: string[]; // صنف‌های مرتبط
   painPointSolved?: string; // چالش و معضل اصلی صنف که این محصول حل می‌کند
@@ -186,6 +190,10 @@ export interface AppSubscriptionLicense {
   expiresAt: string;
   status: 'active' | 'expired';
   apiEndpoint?: string;
+  downloadUrl?: string; // لینک مستقیم دانلود نرم‌افزار / اپلیکیشن
+  downloadButtonText?: string; // متن دکمه دانلود
+  appVersion?: string; // نسخه نرم‌افزار
+  appSize?: string; // حجم فایل
 }
 
 export interface Order {

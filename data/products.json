@@ -243,7 +243,11 @@
     "guild": "طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات",
     "aiAppCustomPromptNote": "",
     "displayOrder": 4,
-    "displayRank": 4
+    "displayRank": 4,
+    "downloadUrl": "/uploads/apps/jahesh_shantia.apk",
+    "downloadButtonText": "دانلود مستقیم اپلیکیشن جهش شنتیا (اندروید)",
+    "appVersion": "1.0.0",
+    "appSize": "18.5 MB"
   },
   {
     "rating": 5,

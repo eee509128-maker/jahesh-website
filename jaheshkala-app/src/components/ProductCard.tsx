@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Star, Check, ShoppingBag, Eye, Truck, ShieldCheck, Ticket, Images, Zap, Package } from 'lucide-react';
+import { Sparkles, Star, Check, ShoppingBag, Eye, Truck, ShieldCheck, Ticket, Images, Zap, Package, Download } from 'lucide-react';
 import { Product } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
 
@@ -59,6 +59,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <span className="text-[9px] sm:text-[11px] font-black px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 flex items-center gap-0.5 sm:gap-1 shadow-md">
               <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
               <span>{product.badge}</span>
+            </span>
+          )}
+          {product.downloadUrl && (
+            <span className="text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-600/90 text-white backdrop-blur-sm border border-emerald-400/40 flex items-center gap-1 shadow-md">
+              <Download className="w-2.5 h-2.5 text-emerald-300 animate-bounce" />
+              <span>دارای اپلیکیشن</span>
             </span>
           )}
           {distinctGallery.length > 0 && (

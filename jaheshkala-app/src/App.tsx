@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import {
-  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, ExternalLink
+  Sparkles, CheckCircle2, Filter, X, ChevronLeft, ChevronRight, ExternalLink, Download
 } from 'lucide-react';
 import { Product, CartItem, Order, User, OrderStatus, Coupon, BannerSlide, SubscriptionPlan } from './types';
 import { supabase } from './lib/supabase';
@@ -1892,6 +1892,19 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {completedOrderReceipt.order.appLicense.downloadUrl && (
+                  <a
+                    href={completedOrderReceipt.order.appLicense.downloadUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>{completedOrderReceipt.order.appLicense.downloadButtonText || 'دانلود مستقیم فایل نصبی اپلیکیشن'}</span>
+                  </a>
+                )}
 
                 <button
                   type="button"

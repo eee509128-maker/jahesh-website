@@ -14,6 +14,7 @@ import {
   Smartphone,
   Info,
   X,
+  Download,
 } from 'lucide-react';
 import { AppSubscriptionLicense } from '../types';
 import { checkLicenseStatus } from '../lib/appLicenseService';
@@ -208,6 +209,45 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Download Application File Section */}
+          {license.downloadUrl && (
+            <div className="bg-gradient-to-r from-emerald-500/20 via-teal-900/40 to-emerald-500/20 border-2 border-emerald-500/70 rounded-2xl p-4 shadow-lg shadow-emerald-500/15 space-y-3">
+              <div className="flex items-center justify-between gap-2 border-b border-emerald-500/30 pb-2">
+                <div className="flex items-center gap-2 text-xs font-black text-emerald-300">
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  <span>دانلود فایل نصبی اپلیکیشن</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-300">
+                  {license.appVersion && (
+                    <span className="bg-purple-900/70 text-purple-200 border border-purple-700/50 px-2 py-0.5 rounded-md">
+                      نسخه {license.appVersion}
+                    </span>
+                  )}
+                  {license.appSize && (
+                    <span className="bg-emerald-950/70 text-emerald-300 border border-emerald-700/50 px-2 py-0.5 rounded-md">
+                      حجم: {license.appSize}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-200 leading-relaxed">
+                برای نصب برنامه روی گوشی یا کامپیوتر خود، فایل نصبی را دانلود کنید و سپس با مشخصات کاربری فوق وارد نرم‌افزار شوید:
+              </p>
+
+              <a
+                href={license.downloadUrl}
+                download
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 hover:from-emerald-300 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-500/30 active:scale-95 transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>{license.downloadButtonText || 'دانلود مستقیم اپلیکیشن (نصب روی گوشی)'}</span>
+              </a>
+            </div>
+          )}
 
           {/* 3 Step Instruction Guide */}
           <div className="bg-[#100722] border border-purple-900/60 rounded-2xl p-3.5 space-y-2 text-xs text-slate-300">
