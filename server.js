@@ -3691,15 +3691,19 @@ app.get(['/frwshgah', '/frwshgah/*'], (req, res) => {
   res.redirect(301, '/jaheshkala');
 });
 
-// Redirect AI routes to Jahesh 2 (https://jahesh-2.vercel.app/)
+// Redirect /hwsh-msnway to Jahesh 2 AI
+app.get(['/hwsh-msnway', '/hwsh-msnway/*'], (req, res) => {
+  res.redirect(301, 'https://jahesh-2.vercel.app/');
+});
+
+// Redirect legacy AI paths to Homepage / (for users searching جهش ای تی)
 app.get([
-  '/hwsh-msnway', '/hwsh-msnway/*',
   '/ai', '/ai/*',
   '/ai-v13', '/ai-v13/*',
   '/pages/ai-v13', '/pages/ai-v13/*',
   '/chat', '/chat/*'
 ], (req, res) => {
-  res.redirect(301, 'https://jahesh-2.vercel.app/');
+  res.redirect(301, '/');
 });
 
 // Serve static assets and html files
