@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   X, Sparkles, CheckCircle2, Globe, ShieldCheck,
   ShoppingBag, Gift, Truck, RotateCcw, Headphones, Star, Ticket, Images, Zap, CreditCard, Check,
-  ChevronDown, ChevronUp, Info, ListChecks, Package
+  ChevronDown, ChevronUp, Info, ListChecks, Package, Download
 } from 'lucide-react';
 import { Product, User, SubscriptionPlan } from '../types';
 import { getFallbackProductImage } from '../lib/imageUtils';
+import { getSafeDownloadUrl } from '../lib/downloadUtils';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -65,6 +66,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!product) return null;
 
+  const downloadUrl = getSafeDownloadUrl(product.downloadUrl);
   const allImages = [product.image, ...(product.gallery || [])].filter(
     (url, idx, arr) => url && typeof url === 'string' && url.trim() !== '' && arr.indexOf(url) === idx
   );
@@ -409,6 +411,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-line bg-purple-950/20 p-4 rounded-2xl border border-purple-900/30">
                   {product.fullDescription}
                 </p>
+
+                {downloadUrl && (
+                  <div className="mt-3 rounded-2xl border border-emerald-500/40 bg-gradient-to-r from-emerald-950/70 via-teal-950/50 to-purple-950/50 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5 text-right">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0">
+                        <Download className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="block text-xs font-black text-emerald-200">نسخه نصب اپلیکیشن آماده دانلود است</span>
+                        <span className="block mt-1 text-[10px] leading-relaxed text-slate-300">
+                          {product.isAiAppProduct
+                            ? 'لینک دانلود برای همه بازدیدکنندگان در دسترس است؛ اطلاعات ورود و لایسنس پس از خرید در سفارش شما نمایش داده می‌شود.'
+                            : 'لینک دانلود این فایل برای همه بازدیدکنندگان عمومی است.'}
+                        </span>
+                      </div>
+                    </div>
+                    <a
+                      href={downloadUrl}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-emerald-950/40 transition-all active:scale-95 no-underline"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>دانلود اپلیکیشن</span>
+                    </a>
+                  </div>
+                )}
               </div>
 
               {/* Custom Multi-Tier Plans Selection (if product has custom plans) */}

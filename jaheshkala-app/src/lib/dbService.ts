@@ -5,6 +5,7 @@ import { Product, Order, User, Coupon, BannerSlide, DashboardTool } from '../typ
 import { INITIAL_PRODUCTS, INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { RESTORED_ZIBAL_ORDERS } from '../data/restoredOrders';
 import { areSameUser, normalizePhone, normalizeUsername, mergeUserRecords, isMasterAdminUser } from './userUtils';
+import { getSafeDownloadUrl } from './downloadUtils';
 
 
 // Safe wrapper for safeSetLocalStorage to handle QuotaExceededError without ever losing or corrupting images
@@ -344,6 +345,7 @@ export function cleanProductItem(p: any): Product | null {
     aiAppPlatform: p.aiAppPlatform || 'all',
     aiAppDefaultDays: typeof p.aiAppDefaultDays === 'number' ? p.aiAppDefaultDays : 7,
     aiAppCustomPromptNote: p.aiAppCustomPromptNote || undefined,
+    downloadUrl: getSafeDownloadUrl(p.downloadUrl),
     guild: p.guild || undefined,
     targetGuilds: Array.isArray(p.targetGuilds) ? p.targetGuilds : (p.guild ? [p.guild] : undefined),
     painPointSolved: p.painPointSolved || undefined,

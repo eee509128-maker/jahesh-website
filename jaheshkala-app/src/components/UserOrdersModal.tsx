@@ -17,6 +17,7 @@ import {
   Package,
   Sparkles,
   ExternalLink,
+  Download,
   Copy,
   Key,
   ShieldCheck,
@@ -25,6 +26,7 @@ import { Order, User, Product } from '../types';
 import { fetchOrdersFromDb, parseOrderTimestamp } from '../lib/dbService';
 import { hasAmlakInItems, generateAmlakLicense } from '../lib/amlakLicenseService';
 import { hasAiAppInItems, generateAppLicense, checkLicenseStatus } from '../lib/appLicenseService';
+import { getSafeDownloadUrl } from '../lib/downloadUtils';
 
 interface UserOrdersModalProps {
   isOpen: boolean;
@@ -657,6 +659,12 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                     const isPassCopied = copiedField === `ai-pass-${order.id}`;
                     const isKeyCopied = copiedField === `ai-key-${order.id}`;
                     const { isExpired, daysRemaining, formattedExpiryFa } = checkLicenseStatus(license);
+                    const itemDownloadUrl = order.items?.find((item) => item.product?.downloadUrl)?.product.downloadUrl;
+                    const currentProductDownloadUrl = products.find((product) => product.id === license.productId)?.downloadUrl;
+                    const downloadUrl =
+                      getSafeDownloadUrl(license.downloadUrl) ||
+                      getSafeDownloadUrl(itemDownloadUrl) ||
+                      getSafeDownloadUrl(currentProductDownloadUrl);
 
                     return (
                       <div className="bg-gradient-to-br from-indigo-950/30 via-[#180f35] to-purple-950/40 border border-amber-400/70 rounded-2xl p-4 text-right space-y-3 shadow-md my-2 text-slate-100">
@@ -722,6 +730,19 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                           <span className="text-[11px] text-slate-300">
                             مدت اشتراک: <strong>{license.days} روز</strong> • تاریخ انقضا: <strong className="text-amber-300">{formattedExpiryFa}</strong>
                           </span>
+
+                          {downloadUrl && (
+                            <a
+                              href={downloadUrl}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer no-underline"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>دانلود اپلیکیشن</span>
+                            </a>
+                          )}
 
                           <button
                             type="button"
