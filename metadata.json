@@ -1,0 +1,8 @@
+{
+  "name": "جهش آی تی (Jahesh IT)",
+  "description": "مرکز تخصصی طراحی سایت اختصاصی، خدمات هوش مصنوعی، فروشگاه آنلاین جهش کالا و انجمن علمی جهش.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

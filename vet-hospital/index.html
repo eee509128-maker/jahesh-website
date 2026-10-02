@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>بیمارستان تخصصی دانشکده دامپزشکی | سامانه جامع نوبت‌دهی، تریاژ هوشمند هوش مصنوعی و اساتید هیئت علمی</title>
+  <meta name="description" content="سامانه جامع بیمارستان دانشکده دامپزشکی؛ تریاژ هوشمند بیماری‌های دام، پرندگان و حیوانات خانگی با هوش مصنوعی، نوبت‌دهی آنلاین اساتید هیئت علمی، آزمایشگاه پاتوبیولوژی و پرداخت زیپال." />
+  
+  <!-- Favicon & Brand Icons -->
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  
+  <!-- Tailwind CSS & Lucide Icons (Local high-reliability assets) -->
+  <script src="/vet-hospital/tailwind.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+            },
+            vet: {
+              navy: '#0f172a',
+              card: '#1e293b',
+              purple: '#7c3aed',
+              cyan: '#06b6d4',
+              emerald: '#10b981',
+              amber: '#f59e0b',
+            }
+          },
+          fontFamily: {
+            vazir: ['Vazirmatn', 'Tahoma', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons & Confetti (Served locally for zero CDN blocking) -->
+  <script src="/vet-hospital/lucide.min.js"></script>
+  <script src="/vet-hospital/confetti.min.js"></script>
+
+  <style>
+    * {
+      font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, Tahoma, sans-serif !important;
+      box-sizing: border-box;
+      letter-spacing: 0 !important;
+      word-spacing: normal !important;
+    }
+    html, body {
+      direction: rtl;
+      text-align: right;
+      overflow-x: hidden !important;
+      width: 100% !important;
+      max-width: 100vw !important;
+      margin: 0;
+      padding: 0;
+    }
+    #vet-app {
+      overflow-x: hidden !important;
+      width: 100% !important;
+      max-width: 100vw !important;
+      min-width: 0 !important;
+    }
+    header {
+      width: 100% !important;
+      max-width: 100vw !important;
+      box-sizing: border-box !important;
+    }
+    header, header * {
+      letter-spacing: 0 !important;
+    }
+    @media (min-width: 1024px) {
+      header nav button,
+      header nav a,
+      header nav span {
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+      }
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(16, 185, 129, 0.4);
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(16, 185, 129, 0.7);
+    }
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+    .animate-pulse-glow {
+      animation: pulse-glow 3s infinite ease-in-out;
+    }
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+      #printable-invoice, #printable-invoice * {
+        visibility: visible !important;
+      }
+      #printable-invoice {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        box-shadow: none !important;
+        border: 2px solid #0f172a !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col selection:bg-purple-600 selection:text-white antialiased">
+  
+  <!-- Root Container Managed by Vanilla React Engine -->
+  <div id="vet-app" class="flex-1 flex flex-col"></div>
+
+  <!-- Firebase Cloud Integration (Global Online Sync) -->
+  <script src="/vet-hospital/firebase-vet.bundle.js"></script>
+
+  <!-- Main Application Script -->
+  <script src="/vet-hospital/app.js?v=5.1"></script>
+</body>
+</html>

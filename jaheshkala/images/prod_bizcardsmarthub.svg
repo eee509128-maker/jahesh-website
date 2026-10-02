@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420" viewBox="0 0 600 420">
+    <defs>
+      <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#2e1065"/>
+        <stop offset="50%" stop-color="#15082e"/>
+        <stop offset="100%" stop-color="#110526"/>
+      </linearGradient>
+      <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.8"/>
+        <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.8"/>
+      </linearGradient>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.6"/>
+      </filter>
+    </defs>
+    
+    <!-- Background Frame -->
+    <rect width="600" height="420" rx="24" fill="url(#bgGrad)"/>
+    
+    <!-- Grid pattern & tech lines -->
+    <g opacity="0.08" stroke="#ffffff" stroke-width="1">
+      <line x1="60" y1="0" x2="60" y2="420"/>
+      <line x1="180" y1="0" x2="180" y2="420"/>
+      <line x1="300" y1="0" x2="300" y2="420"/>
+      <line x1="420" y1="0" x2="420" y2="420"/>
+      <line x1="540" y1="0" x2="540" y2="420"/>
+      <line x1="0" y1="80" x2="600" y2="80"/>
+      <line x1="0" y1="180" x2="600" y2="180"/>
+      <line x1="0" y1="280" x2="600" y2="280"/>
+      <line x1="0" y1="360" x2="600" y2="360"/>
+    </g>
+    
+    <!-- Glowing Center Aura -->
+    <circle cx="300" cy="150" r="90" fill="#7c3aed" fill-opacity="0.18" filter="url(#shadow)"/>
+    
+    <!-- Product Icon Illustration Slot -->
+    <g id="icon-layer" transform="translate(0, 0)">
+      <rect x="240" y="130" width="120" height="75" rx="10" fill="#7c3aed" fill-opacity="0.3" stroke="#a78bfa" stroke-width="3"/>
+       <circle cx="270" cy="155" r="10" fill="#fbbf24"/>
+       <line x1="290" y1="150" x2="340" y2="150" stroke="#e9d5ff" stroke-width="3"/>
+       <line x1="290" y1="165" x2="325" y2="165" stroke="#e9d5ff" stroke-width="2"/>
+       <path d="M335 180 Q345 170 335 160" stroke="#38bdf8" stroke-width="3" fill="none"/>
+    </g>
+    
+    <!-- Brand / System Pill -->
+    <rect x="200" y="32" width="200" height="32" rx="16" fill="#1e103f" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="300" y="53" fill="#fef08a" font-family="'Vazirmatn', sans-serif" font-size="13" font-weight="900" text-anchor="middle" direction="rtl">⚡ سامانه نوآورانه جهش</text>
+    
+    <!-- Badge Tag Left -->
+    <rect x="36" y="32" width="130" height="28" rx="14" fill="#f59e0b"/>
+    <text x="101" y="51" fill="#0f051d" font-family="'Vazirmatn', sans-serif" font-size="12" font-weight="900" text-anchor="middle" direction="rtl">💼 کارت هوشمند NFC</text>
+
+    <!-- Main Title and Guild info banner -->
+    <rect x="24" y="240" width="552" height="156" rx="20" fill="#0e0622" fill-opacity="0.92" stroke="#4c1d95" stroke-width="1.5" filter="url(#shadow)"/>
+    
+    <!-- Guild Category Chip -->
+    <rect x="420" y="258" width="136" height="26" rx="13" fill="#3b0764" stroke="#a855f7" stroke-width="1"/>
+    <text x="488" y="276" fill="#e9d5ff" font-family="'Vazirmatn', sans-serif" font-size="11" font-weight="bold" text-anchor="middle" direction="rtl">💼 کسب‌وکارهای آزاد</text>
+    
+    <!-- Product Title -->
+    <text x="556" y="324" fill="#ffffff" font-family="'Vazirmatn', sans-serif" font-size="20" font-weight="900" text-anchor="end" direction="rtl">کارت ویزیت فلزی هوشمند NFC و مینی‌سا</text>
+    
+    <!-- Bottom Highlights -->
+    <circle cx="546" cy="362" r="4" fill="#10b981"/>
+    <text x="532" y="367" fill="#6ee7b7" font-family="'Vazirmatn', sans-serif" font-size="12" font-weight="bold" text-anchor="end" direction="rtl">تضمین کیفیت و اصالت ایده جهش</text>
+    
+    <circle cx="340" cy="362" r="4" fill="#f59e0b"/>
+    <text x="326" y="367" fill="#fde68a" font-family="'Vazirmatn', sans-serif" font-size="12" font-weight="bold" text-anchor="end" direction="rtl">پشتیبانی ۲۴ ساعته اختصاصی</text>
+    
+    <!-- Tech Logo Stamp -->
+    <text x="48" y="372" fill="#7c3aed" font-family="'Vazirmatn', sans-serif" font-size="14" font-weight="900" text-anchor="start">JAHESH TECH</text>
+  </svg>

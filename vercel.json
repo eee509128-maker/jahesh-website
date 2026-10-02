@@ -1,0 +1,140 @@
+{
+  "outputDirectory": ".",
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/frwshgah",
+      "destination": "/jaheshkala",
+      "permanent": true
+    },
+    {
+      "source": "/frwshgah/:match*",
+      "destination": "/jaheshkala",
+      "permanent": true
+    },
+    {
+      "source": "/hwsh-msnway",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/hwsh-msnway/:match*",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/ai",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/ai/:match*",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/chat",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/chat/:match*",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/ai-v13",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/ai-v13/:match*",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/pages/ai-v13",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/pages/ai-v13/:match*",
+      "destination": "/",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/47887509.txt",
+      "destination": "/assets/47887509.txt"
+    },
+    {
+      "source": "/api/zibal-request",
+      "destination": "/api/zibal?action=request"
+    },
+    {
+      "source": "/api/zibal-verify",
+      "destination": "/api/zibal?action=verify"
+    },
+    {
+      "source": "/api/products/save",
+      "destination": "/api/products"
+    },
+    {
+      "source": "/api/products-save",
+      "destination": "/api/products"
+    },
+    {
+      "source": "/api/orders/save",
+      "destination": "/api/orders"
+    },
+    {
+      "source": "/api/orders-save",
+      "destination": "/api/orders"
+    },
+    {
+      "source": "/api/chats/save",
+      "destination": "/api/chats"
+    },
+    {
+      "source": "/api/upload-banner",
+      "destination": "/api/upload?type=banners"
+    },
+    {
+      "source": "/api/upload-product-image",
+      "destination": "/api/upload?type=products"
+    },
+    {
+      "source": "/api/upload-tool-image",
+      "destination": "/api/upload?type=tools"
+    },
+    {
+      "source": "/images/:path*",
+      "destination": "/jaheshkala/images/:path*"
+    },
+    {
+      "source": "/jaheshkala/images/:path*",
+      "destination": "/jaheshkala/images/:path*"
+    },
+    {
+      "source": "/jaheshkala/assets/:path*",
+      "destination": "/jaheshkala/assets/:path*"
+    },
+    {
+      "source": "/jaheshkala/uploads/:path*",
+      "destination": "/jaheshkala/uploads/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "/uploads/:path*"
+    },
+    {
+      "source": "/jaheshkala",
+      "destination": "/jaheshkala/index.html"
+    },
+    {
+      "source": "/jaheshkala/:match*",
+      "destination": "/jaheshkala/index.html"
+    }
+  ]
+}
