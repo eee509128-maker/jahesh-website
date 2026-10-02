@@ -63,18 +63,33 @@
     html, body {
       direction: rtl;
       text-align: right;
+      overflow-x: hidden !important;
+      width: 100% !important;
+      max-width: 100vw !important;
+      margin: 0;
+      padding: 0;
+    }
+    #vet-app {
+      overflow-x: hidden !important;
+      width: 100% !important;
+      max-width: 100vw !important;
+      min-width: 0 !important;
+    }
+    header {
+      width: 100% !important;
+      max-width: 100vw !important;
+      box-sizing: border-box !important;
     }
     header, header * {
       letter-spacing: 0 !important;
     }
-    header nav button,
-    header nav a,
-    header nav span,
-    header button,
-    header h1,
-    header p {
-      white-space: nowrap !important;
-      word-break: keep-all !important;
+    @media (min-width: 1024px) {
+      header nav button,
+      header nav a,
+      header nav span {
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+      }
     }
     .custom-scrollbar::-webkit-scrollbar {
       width: 6px;
@@ -130,6 +145,6 @@
   <script src="/vet-hospital/firebase-vet.bundle.js"></script>
 
   <!-- Main Application Script -->
-  <script src="/vet-hospital/app.js?v=5.0"></script>
+  <script src="/vet-hospital/app.js?v=5.1"></script>
 </body>
 </html>

@@ -1705,17 +1705,20 @@ function renderHeader() {
   const isAdminUser = u && (u.isAdmin || u.role === 'admin' || (u.username && u.username.toLowerCase() === 'jahesh1395@gmail.com') || (u.email && u.email.toLowerCase() === 'jahesh1395@gmail.com'));
 
   return `
-    <header class="bg-[#090d16] border-b border-slate-800/80 sticky top-0 z-40 backdrop-blur-md bg-opacity-95 shadow-lg">
-      <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4 flex-nowrap">
+    <header class="bg-[#090d16] border-b border-slate-800/80 sticky top-0 z-40 backdrop-blur-md bg-opacity-95 shadow-lg w-full max-w-full overflow-hidden">
+      <div class="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4 flex-nowrap w-full">
         
         <!-- لوگوی دانشکده دامپزشکی اصلی و عنوان -->
-        <div class="flex items-center gap-3 cursor-pointer shrink-0" onclick="setVetTab('home')">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-700 to-indigo-900 flex items-center justify-center p-1.5 shadow-lg shadow-emerald-500/20 border border-emerald-500/30 shrink-0">
+        <div class="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0 min-w-0" onclick="setVetTab('home')">
+          <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-700 to-indigo-900 flex items-center justify-center p-1 sm:p-1.5 shadow-lg shadow-emerald-500/20 border border-emerald-500/30 shrink-0">
             <img src="/vet-hospital/faculty-logo.svg" alt="دانشکده دامپزشکی" class="w-full h-full object-contain filter drop-shadow" />
           </div>
-          <div class="shrink-0">
-            <h1 class="text-sm sm:text-base font-black text-white leading-tight whitespace-nowrap">بیمارستان تخصصی دانشکده دامپزشکی</h1>
-            <p class="text-[11px] text-emerald-400 font-semibold whitespace-nowrap hidden sm:block">مرکز درمانی، تحقیقاتی و بالینی دانشگاه</p>
+          <div class="shrink-0 min-w-0">
+            <h1 class="text-xs sm:text-base font-black text-white leading-tight">
+              <span class="sm:hidden">بیمارستان دامپزشکی</span>
+              <span class="hidden sm:inline">بیمارستان تخصصی دانشکده دامپزشکی</span>
+            </h1>
+            <p class="text-[10px] sm:text-[11px] text-emerald-400 font-semibold whitespace-nowrap hidden md:block">مرکز درمانی، تحقیقاتی و بالینی دانشگاه</p>
           </div>
         </div>
 
@@ -1732,20 +1735,21 @@ function renderHeader() {
         </nav>
 
         <!-- دکمه‌های ورود و وب‌سایت اصلی جهش -->
-        <div class="flex items-center gap-2 sm:gap-3 shrink-0 whitespace-nowrap">
+        <div class="flex items-center gap-1.5 sm:gap-3 shrink-0 whitespace-nowrap">
           ${isAdminUser ? `
-            <button onclick="openAdminModal()" class="flex items-center gap-1.5 text-xs font-black text-amber-300 bg-amber-950/80 hover:bg-amber-900 border border-amber-500/60 px-3.5 py-2 rounded-xl transition-all shadow-lg shadow-amber-900/30 shrink-0 cursor-pointer animate-pulse">
+            <button onclick="openAdminModal()" class="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-black text-amber-300 bg-amber-950/80 hover:bg-amber-900 border border-amber-500/60 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all shadow-md sm:shadow-lg shadow-amber-900/30 shrink-0 cursor-pointer animate-pulse">
               <span>⚙️</span>
-              <span>پنل مدیریت بیمارستان</span>
+              <span class="hidden md:inline">پنل مدیریت بیمارستان</span>
+              <span class="md:hidden">مدیریت</span>
             </button>
           ` : ''}
 
           ${u ? `
-            <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700/80 px-3 py-1.5 rounded-xl whitespace-nowrap shrink-0">
-              <div class="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-xs font-black text-white shrink-0">
+            <div class="flex items-center gap-1 sm:gap-2 bg-slate-800/80 border border-slate-700/80 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl whitespace-nowrap shrink-0">
+              <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-xs font-black text-white shrink-0">
                 ${isAdminUser ? '👑' : u.role === 'doctor' ? '👨‍⚕️' : u.role === 'phd' ? '🎓' : '🐾'}
               </div>
-              <div class="text-right hidden sm:block">
+              <div class="text-right hidden md:block">
                 <div class="text-xs font-bold text-white">${u.name}</div>
                 <div class="text-[10px] text-emerald-400">${isAdminUser ? 'مدیر ارشد سامانه' : u.role === 'doctor' ? 'استاد هیئت علمی' : u.role === 'phd' ? 'دانشجوی دکتری' : 'سرپرست بیمار'}</div>
               </div>
@@ -1753,15 +1757,17 @@ function renderHeader() {
               <button onclick="logoutUser()" title="خروج" class="text-xs text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-950/40 rounded-lg">✕</button>
             </div>
           ` : `
-            <button onclick="openAuthModal('login')" class="flex items-center gap-1.5 text-xs font-bold text-slate-200 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 px-3.5 py-2.5 rounded-xl transition-all shrink-0">
+            <button onclick="openAuthModal('login')" class="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-bold text-slate-200 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 px-2 sm:px-3.5 py-1.5 sm:py-2.5 rounded-xl transition-all shrink-0">
               <span>👤</span>
-              <span>ورود / عضویت</span>
+              <span class="hidden sm:inline">ورود / عضویت</span>
+              <span class="sm:hidden">ورود</span>
             </button>
           `}
 
-          <button onclick="openBookingModal()" class="flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/25 transition-all shrink-0">
+          <button onclick="openBookingModal()" class="flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-2.5 sm:px-4 py-1.5 sm:py-2.5 rounded-xl shadow-md sm:shadow-lg shadow-emerald-600/25 transition-all shrink-0">
             <span>⚡</span>
-            <span>نوبت‌دهی آنلاین</span>
+            <span class="hidden sm:inline">نوبت‌دهی آنلاین</span>
+            <span class="sm:hidden">نوبت‌دهی</span>
           </button>
 
           <a href="/" onclick="window.location.href='/'; return true;" class="hidden xl:flex items-center gap-1 text-xs font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/80 px-3 py-2.5 rounded-xl transition-all shrink-0">
@@ -1770,7 +1776,7 @@ function renderHeader() {
             <span>←</span>
           </a>
 
-          <button onclick="toggleMobileMenu()" class="lg:hidden p-2 text-slate-300 hover:text-white bg-slate-800 rounded-xl shrink-0">
+          <button onclick="toggleMobileMenu()" aria-label="منوی سایت" class="lg:hidden p-1.5 sm:p-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl shrink-0 flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9">
             ☰
           </button>
         </div>
