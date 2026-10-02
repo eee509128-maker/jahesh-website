@@ -55,7 +55,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Digikala-style Top Badges */}
         <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 flex flex-col gap-1 items-start z-10">
-          {(product.downloadUrl || (product as any).appDownloadUrl) && (
+          {(product.downloadUrl || (product as any).appDownloadUrl || (product.id === 'prod-1790538341809' || product.title?.includes('شنتیا'))) && (
             <span className="text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 flex items-center gap-1 shadow-md">
               <Download className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
               <span>دانلود اپلیکیشن</span>

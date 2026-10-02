@@ -37,6 +37,8 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
 
   if (!isOpen || !license) return null;
 
+  const effectiveLicenseDownloadUrl = license.downloadUrl || (license as any).appDownloadUrl || (license.productId === 'prod-1790538341809' || license.productTitle?.includes('شنتیا') || license.appName?.includes('شنتیا') ? '/uploads/apps/shantia.apk' : undefined);
+
   const { isExpired, daysRemaining, formattedExpiryFa } = checkLicenseStatus(license);
 
   const handleCopy = (text: string, fieldName: string) => {
@@ -108,7 +110,7 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
           </div>
 
           {/* بخش اختصاصی دانلود مستقیم و نصب فایل اپلیکیشن */}
-          {(license.downloadUrl || (license as any).appDownloadUrl) && (
+          {effectiveLicenseDownloadUrl && (
             <div className="bg-gradient-to-r from-emerald-950/90 via-teal-950/80 to-purple-950/90 border-2 border-emerald-400 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3.5 text-right shadow-xl shadow-emerald-950/40 animate-in fade-in">
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30 shrink-0">
@@ -133,7 +135,7 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
               </div>
 
               <a
-                href={license.downloadUrl || (license as any).appDownloadUrl}
+                href={effectiveLicenseDownloadUrl}
                 download
                 target="_blank"
                 rel="noopener noreferrer"
@@ -289,9 +291,9 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
           </button>
 
           <div className="flex items-center gap-2 w-full sm:w-auto flex-1 sm:flex-none">
-            {(license.downloadUrl || (license as any).appDownloadUrl) && (
+            {effectiveLicenseDownloadUrl && (
               <a
-                href={license.downloadUrl || (license as any).appDownloadUrl}
+                href={effectiveLicenseDownloadUrl}
                 download
                 target="_blank"
                 rel="noopener noreferrer"

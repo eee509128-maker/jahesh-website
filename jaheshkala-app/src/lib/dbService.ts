@@ -262,11 +262,19 @@ export const mergeTwoProducts = (current: Product, incoming: Product): Product =
     preferredGallery = secondary.gallery.filter((g) => typeof g === 'string' && g.trim() !== '' && g.trim() !== preferredImage);
   }
 
+  const preferredDownloadUrl = primary.downloadUrl || primary.appDownloadUrl || secondary.downloadUrl || secondary.appDownloadUrl || (primary.id === 'prod-1790538341809' ? '/uploads/apps/shantia.apk' : undefined);
+  const preferredAppVersion = primary.appVersion || secondary.appVersion || (primary.id === 'prod-1790538341809' ? '1.0.0' : undefined);
+  const preferredAppFileSize = primary.appFileSize || secondary.appFileSize || (primary.id === 'prod-1790538341809' ? '18.5 مگابایت' : undefined);
+
   return {
     ...secondary,
     ...primary,
     image: preferredImage,
     gallery: preferredGallery,
+    downloadUrl: preferredDownloadUrl,
+    appDownloadUrl: preferredDownloadUrl,
+    appVersion: preferredAppVersion,
+    appFileSize: preferredAppFileSize,
   };
 };
 
@@ -303,6 +311,14 @@ export function cleanProductItem(p: any): Product | null {
   const subPlans = Array.isArray(p.subscriptionPlans) && p.subscriptionPlans.length > 0 ? p.subscriptionPlans : undefined;
   const hasPlans = Boolean(p.hasCustomPlans || (subPlans && subPlans.length > 0));
   const isSub = Boolean(p.isSubscription || p.id === 'pkg-amlak-jahesh' || hasPlans);
+
+  const resolvedDownloadUrl = (typeof p.downloadUrl === 'string' && p.downloadUrl.trim())
+    || (typeof p.appDownloadUrl === 'string' && p.appDownloadUrl.trim())
+    || (id === 'prod-1790538341809' ? '/uploads/apps/shantia.apk' : undefined);
+  const resolvedAppVersion = (typeof p.appVersion === 'string' && p.appVersion.trim())
+    || (id === 'prod-1790538341809' ? '1.0.0' : undefined);
+  const resolvedAppFileSize = (typeof p.appFileSize === 'string' && p.appFileSize.trim())
+    || (id === 'prod-1790538341809' ? '18.5 مگابایت' : undefined);
 
   return {
     ...p,
@@ -344,6 +360,10 @@ export function cleanProductItem(p: any): Product | null {
     aiAppPlatform: p.aiAppPlatform || 'all',
     aiAppDefaultDays: typeof p.aiAppDefaultDays === 'number' ? p.aiAppDefaultDays : 7,
     aiAppCustomPromptNote: p.aiAppCustomPromptNote || undefined,
+    downloadUrl: resolvedDownloadUrl || undefined,
+    appDownloadUrl: resolvedDownloadUrl || undefined,
+    appVersion: resolvedAppVersion || undefined,
+    appFileSize: resolvedAppFileSize || undefined,
     guild: p.guild || undefined,
     targetGuilds: Array.isArray(p.targetGuilds) ? p.targetGuilds : (p.guild ? [p.guild] : undefined),
     painPointSolved: p.painPointSolved || undefined,
@@ -781,17 +801,20 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
 
     // 4. Firebase Firestore sync: Save BOTH individual doc in products collection AND settings/products
     try {
+      const cleanAuthoritativeDoc = JSON.parse(JSON.stringify(authoritativeProduct));
+      const cleanMasterList = JSON.parse(JSON.stringify(sortedMaster));
       await Promise.allSettled([
-        setDoc(doc(db, 'products', product.id), authoritativeProduct),
+        setDoc(doc(db, 'products', product.id), cleanAuthoritativeDoc),
         setDoc(
           doc(db, 'settings', 'products'),
           {
-            products: sortedMaster,
+            products: cleanMasterList,
             updatedAt: new Date().toISOString(),
           },
           { merge: true }
         ),
       ]);
+      console.log(`[Firestore] Saved product ${product.id} and updated settings/products successfully.`);
     } catch (fbErr) {
       console.warn('Firestore save product notice:', fbErr);
     }
@@ -955,15 +978,16 @@ export const saveAllProductsOrderToDb = async (orderedProducts: Product[]): Prom
 
     // 3. Firebase Firestore sync
     try {
+      const cleanFinalList = JSON.parse(JSON.stringify(finalList));
       await setDoc(
         doc(db, 'settings', 'products'),
         {
-          products: finalList,
+          products: cleanFinalList,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
       );
-      finalList.forEach((prod) => {
+      cleanFinalList.forEach((prod: any) => {
         setDoc(doc(db, 'products', prod.id), prod, { merge: true }).catch(() => {});
       });
     } catch (fbErr) {

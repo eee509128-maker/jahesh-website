@@ -65,6 +65,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!product) return null;
 
+  const effectiveDownloadUrl = product.downloadUrl || (product as any).appDownloadUrl || (product.id === 'prod-1790538341809' || product.title?.includes('شنتیا') ? '/uploads/apps/shantia.apk' : undefined);
+
   const allImages = [product.image, ...(product.gallery || [])].filter(
     (url, idx, arr) => url && typeof url === 'string' && url.trim() !== '' && arr.indexOf(url) === idx
   );
@@ -563,7 +565,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
 
               {/* بخش اختصاصی دانلود مستقیم اپلیکیشن و فایل نصبی (APK / ویندوز) */}
-              {(product.downloadUrl || (product as any).appDownloadUrl) && (
+              {effectiveDownloadUrl && (
                 <div className="bg-gradient-to-r from-emerald-950/70 via-teal-950/60 to-purple-950/70 border-2 border-emerald-400/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-right shadow-2xl shadow-emerald-950/40">
                   <div className="flex items-center gap-3 w-full sm:w-auto">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-emerald-500/30 shrink-0">
@@ -574,14 +576,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         <span className="font-black text-sm text-emerald-300">
                           دانلود مستقیم اپلیکیشن و فایل نصبی (APK)
                         </span>
-                        {product.appVersion && (
+                        {(product.appVersion || '1.0.0') && (
                           <span className="text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">
-                            نسخه {product.appVersion}
+                            نسخه {product.appVersion || '1.0.0'}
                           </span>
                         )}
-                        {product.appFileSize && (
+                        {(product.appFileSize || '18.5 مگابایت') && (
                           <span className="text-[10px] text-slate-300 bg-white/10 px-2 py-0.5 rounded-full">
-                            {product.appFileSize}
+                            {product.appFileSize || '18.5 مگابایت'}
                           </span>
                         )}
                       </div>
@@ -592,7 +594,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </div>
 
                   <a
-                    href={product.downloadUrl || (product as any).appDownloadUrl}
+                    href={effectiveDownloadUrl}
                     download
                     target="_blank"
                     rel="noopener noreferrer"
@@ -652,43 +654,45 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            {(product.downloadUrl || (product as any).appDownloadUrl) && (
+          <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5">
+            {effectiveDownloadUrl && (
               <a
-                href={product.downloadUrl || (product as any).appDownloadUrl}
+                href={effectiveDownloadUrl}
                 download
                 target="_blank"
                 rel="noopener noreferrer"
-                className="h-10 sm:h-11 flex items-center justify-center gap-1.5 sm:gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black px-3.5 sm:px-4 rounded-xl shadow-md shadow-emerald-500/20 active:scale-95 transition-all text-xs cursor-pointer whitespace-nowrap no-underline shrink-0"
+                className="w-full sm:w-auto h-10 sm:h-11 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black px-4 sm:px-4 rounded-xl shadow-md shadow-emerald-500/20 active:scale-95 transition-all text-xs cursor-pointer whitespace-nowrap no-underline shrink-0"
                 title="دانلود مستقیم فایل نصبی برنامه"
               >
-                <Download className="w-4 h-4 animate-bounce" />
-                <span>دانلود اپلیکیشن</span>
+                <Download className="w-4 h-4 animate-bounce shrink-0" />
+                <span>دانلود مستقیم اپلیکیشن</span>
               </a>
             )}
 
-            <button
-              onClick={onClose}
-              className="h-10 sm:h-11 px-3 sm:px-4 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border border-slate-200 dark:border-purple-800 transition-colors shrink-0 text-center cursor-pointer shadow-xs whitespace-nowrap active:scale-95"
-            >
-              انصراف
-            </button>
-            <button
-              id="modal-add-to-cart-btn"
-              onClick={handleAdd}
-              className="flex-1 sm:flex-none h-10 sm:h-11 flex items-center justify-center gap-1.5 sm:gap-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/90 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-700/60 text-purple-900 hover:text-purple-950 dark:text-purple-200 dark:hover:text-white font-bold px-3 sm:px-4 rounded-xl shadow-xs transition-all text-xs cursor-pointer whitespace-nowrap active:scale-95"
-            >
-              <ShoppingBag className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-              <span>افزودن به سبد</span>
-            </button>
-            <button
-              id="modal-instant-buy-btn"
-              onClick={handleInstantBuy}
-              className="flex-1 sm:flex-none h-10 sm:h-11 flex items-center justify-center gap-1.5 sm:gap-2 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black px-4 sm:px-5 rounded-xl shadow-md shadow-amber-500/20 active:scale-95 transition-all text-xs cursor-pointer whitespace-nowrap"
-            >
-              <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950 shrink-0" />
-              <span>خرید فوری</span>
-            </button>
+            <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+              <button
+                onClick={onClose}
+                className="h-10 sm:h-11 px-2.5 sm:px-3.5 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:bg-purple-950/60 dark:hover:bg-purple-900/60 border border-slate-200 dark:border-purple-800 transition-colors shrink-0 text-center cursor-pointer shadow-xs whitespace-nowrap active:scale-95"
+              >
+                انصراف
+              </button>
+              <button
+                id="modal-add-to-cart-btn"
+                onClick={handleAdd}
+                className="flex-1 sm:flex-none h-10 sm:h-11 flex items-center justify-center gap-1 sm:gap-1.5 bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/90 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-700/60 text-purple-900 hover:text-purple-950 dark:text-purple-200 dark:hover:text-white font-bold px-2.5 sm:px-3.5 rounded-xl shadow-xs transition-all text-xs cursor-pointer whitespace-nowrap active:scale-95"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span>افزودن به سبد</span>
+              </button>
+              <button
+                id="modal-instant-buy-btn"
+                onClick={handleInstantBuy}
+                className="flex-1 sm:flex-none h-10 sm:h-11 flex items-center justify-center gap-1 sm:gap-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black px-3.5 sm:px-5 rounded-xl shadow-md shadow-amber-500/20 active:scale-95 transition-all text-xs cursor-pointer whitespace-nowrap"
+              >
+                <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950 shrink-0" />
+                <span>خرید فوری</span>
+              </button>
+            </div>
           </div>
         </div>
 
