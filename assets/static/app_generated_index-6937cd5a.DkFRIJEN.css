@@ -18,18 +18,204 @@ header {
 }
 
 /* Layout Spacing: Section 2 (3 logos + AI Banner) & Footer */
-section.cztu8ya {
-  margin-top: 36px !important;
-  margin-bottom: 40px !important;
+section.cztu8ya,
+.jahesh-official-logos-section {
   position: relative !important;
-  z-index: 10 !important;
+  z-index: 20 !important;
+  width: 100% !important;
+  clear: both !important;
+  margin-top: 52px !important;
+  margin-bottom: 40px !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.jahesh-logos-container {
+  max-width: 820px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  padding: 0 16px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+.official-logos-badge-wrapper {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  margin-bottom: 20px !important;
+  width: 100% !important;
+  opacity: 0.9 !important;
+}
+
+.official-logos-divider {
+  display: block !important;
+  height: 1px !important;
+  width: 48px !important;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.4), transparent) !important;
+}
+
+.official-logos-badge-title {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #c4b5fd !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+  direction: rtl !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6) !important;
+}
+
+.official-logos-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 16px !important;
+  width: 100% !important;
+  max-width: 660px !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+  direction: rtl !important;
+}
+
+.official-logo-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  padding: 16px 12px 14px 12px !important;
+  height: 125px !important;
+  box-sizing: border-box !important;
+  text-decoration: none !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+}
+
+.official-logo-card:hover {
+  transform: translateY(-4px) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(168, 85, 247, 0.5) !important;
+  box-shadow: 0 16px 35px -5px rgba(139, 92, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.official-logo-img {
+  height: 52px !important;
+  max-height: 52px !important;
+  max-width: 85% !important;
+  width: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+  margin: 0 auto !important;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) !important;
+  transition: transform 0.25s ease !important;
+}
+
+.official-logo-card:hover .official-logo-img {
+  transform: scale(1.06) !important;
+}
+
+.official-logo-text {
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  line-height: 1.3 !important;
+  direction: rtl !important;
+  margin: 0 !important;
 }
 
 @media all and (max-width: 768px) {
-  section.cztu8ya {
-    margin-top: 24px !important;
-    margin-bottom: 24px !important;
+  section.cztu8ya,
+  .jahesh-official-logos-section {
+    margin-top: 40px !important;
+    margin-bottom: 28px !important;
   }
+
+  .jahesh-logos-container {
+    padding: 0 10px !important;
+  }
+
+  .official-logos-badge-wrapper {
+    margin-bottom: 14px !important;
+    gap: 10px !important;
+  }
+
+  .official-logos-badge-title {
+    font-size: 11.5px !important;
+  }
+
+  .official-logos-divider {
+    width: 28px !important;
+  }
+
+  .official-logos-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .official-logo-card {
+    height: 104px !important;
+    padding: 10px 4px 8px 4px !important;
+    border-radius: 16px !important;
+    gap: 6px !important;
+  }
+
+  .official-logo-img {
+    height: 42px !important;
+    max-height: 42px !important;
+    max-width: 90% !important;
+  }
+
+  .official-logo-text {
+    font-size: 9.5px !important;
+    font-weight: 600 !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+  }
+}
+
+/* Neutralize legacy classes with negative margins */
+.c1xgpbbr,
+.c27i6a7,
+.c19ltm5q,
+.c6knbyk,
+.cw6350v,
+.cshakd0,
+.c11xl3nf,
+.c1nfu27o,
+.cf9av01,
+.cbole29,
+.c1mtgfjh {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
 }
 
 .cjqyi6z {
