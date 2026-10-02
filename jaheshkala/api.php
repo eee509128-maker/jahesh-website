@@ -1089,20 +1089,31 @@ switch ($action) {
             exit;
         }
 
-        // GET /api/app-auth - List all licenses
-        $enriched = [];
-        $now = time();
-        foreach ($licenses as $lic) {
-            $exp = isset($lic['expiresAt']) ? strtotime($lic['expiresAt']) : 0;
-            $diff = $exp - $now;
-            $isExp = $exp > 0 && $diff <= 0;
-            $days = $isExp ? 0 : ceil(max(0, $diff) / 86400);
-            $lic['isExpired'] = $isExp;
-            $lic['daysRemaining'] = $days;
-            $lic['status'] = $isExp ? 'expired' : 'active';
-            $enriched[] = $lic;
+        // GET /api/app-auth - Protected status
+        $adminSecret = $_SERVER['HTTP_X_ADMIN_SECRET'] ?? ($_GET['adminSecret'] ?? '');
+        if ($adminSecret === 'jahesh-admin-secret-2026' || $adminSecret === 'jahesh1395') {
+            $enriched = [];
+            $now = time();
+            foreach ($licenses as $lic) {
+                $exp = isset($lic['expiresAt']) ? strtotime($lic['expiresAt']) : 0;
+                $diff = $exp - $now;
+                $isExp = $exp > 0 && $diff <= 0;
+                $days = $isExp ? 0 : ceil(max(0, $diff) / 86400);
+                $lic['isExpired'] = $isExp;
+                $lic['daysRemaining'] = $days;
+                $lic['status'] = $isExp ? 'expired' : 'active';
+                $enriched[] = $lic;
+            }
+            echo json_encode(['success' => true, 'count' => count($enriched), 'licenses' => $enriched]);
+            exit;
         }
-        echo json_encode(['success' => true, 'count' => count($enriched), 'licenses' => $enriched]);
+
+        echo json_encode([
+            'status' => 'active',
+            'service' => 'سامانه احراز هویت لایسنس جهش',
+            'version' => '2.4.0',
+            'message' => 'دسترسی مستقیم غیرفعال است. جهت احراز هویت، اطلاعات کاربری را از طریق درخواست POST ارسال فرمایید.',
+        ]);
         exit;
         break;
 

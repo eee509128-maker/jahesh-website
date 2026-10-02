@@ -199,7 +199,15 @@
   {
     "id": "prod-1790538341809",
     "title": "اپلیکیشن هوشمند جهش شنتیا",
-    "downloadUrl": "/uploads/apps/shantia.apk"
+    "category": "کالای دیجیتال",
+    "price": 250000,
+    "image": "/uploads/products/prod-1790538341809.webp",
+    "gallery": [],
+    "updatedAt": "2026-09-28T17:31:46.568Z",
+    "downloadUrl": "/uploads/apps/shantia.apk",
+    "appDownloadUrl": "/uploads/apps/shantia.apk",
+    "appVersion": "1.0.0",
+    "appFileSize": "18.5 مگابایت"
   },
   {
     "rating": 5,

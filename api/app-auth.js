@@ -259,8 +259,17 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const list = await readAllLicenses();
-    return res.status(200).json({ success: true, count: list.length, licenses: list });
+    const adminKey = req.headers['x-admin-secret'] || req.query.adminSecret;
+    if (adminKey && adminKey === (process.env.ADMIN_SECRET || 'jahesh-admin-secret-2026')) {
+      const list = await readAllLicenses();
+      return res.status(200).json({ success: true, count: list.length, licenses: list });
+    }
+    return res.status(200).json({
+      status: 'active',
+      service: 'سامانه احراز هویت لایسنس جهش',
+      version: '2.4.0',
+      message: 'دسترسی مستقیم غیرفعال است. جهت احراز هویت، اطلاعات کاربری را از طریق درخواست POST ارسال فرمایید.',
+    });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });

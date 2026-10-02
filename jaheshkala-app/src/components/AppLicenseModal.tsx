@@ -56,8 +56,7 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
 نام کاربری: ${license.username}
 رمز عبور: ${license.password}
 کلید لایسنس: ${license.licenseKey}
-مدت اشتراک: ${license.days} روز (اعتبار تا: ${formattedExpiryFa})
-سامانه ورود: https://jaheshit.ir/api/app-auth`;
+مدت اشتراک: ${license.days} روز (اعتبار تا: ${formattedExpiryFa})`;
     handleCopy(allText, 'all');
   };
 
