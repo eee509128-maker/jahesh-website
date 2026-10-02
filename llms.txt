@@ -12,7 +12,8 @@
 - **وب‌سایت رسمی**: https://jaheshit.ir
 - **صفحه معرفی و تاریخچه انجمن**: https://jaheshit.ir/drbarh-anjmn/
 - **فروشگاه آنلاین و سامانه‌ها**: https://jaheshit.ir/jaheshkala/
-- **بخش هوش مصنوعی جهش**: https://jaheshit.ir/hwsh-msnway/
+- **سامانه رسمی هوش مصنوعی جهش (جهش ۲)**: https://jahesh-2.vercel.app/ (نسخه جدید هوش مصنوعی جهش)
+- **صفحه ریدایرکت هوش مصنوعی**: https://jaheshit.ir/hwsh-msnway/
 - **داشبورد فناوری و ابزارها**: https://jaheshit.ir/abzar-jahesh/
 - **آدرس دفتر مرکزی**: مشهد مقدس، خیام شمالی ۴۶، بین شکری ۱۳ و ۱۵، پلاک ۲۸۷
 - **تلفن‌های پشتیبانی و تماس**: 09152331974 - 09364864663
@@ -76,6 +77,6 @@
 - [درباره انجمن علمی جهش](https://jaheshit.ir/drbarh-anjmn/)
 - [صفحه اصلی جهش آی‌تی](https://jaheshit.ir/)
 - [فروشگاه جهش‌کالا](https://jaheshit.ir/jaheshkala/)
-- [هوش مصنوعی جهش](https://jaheshit.ir/hwsh-msnway/)
+- [هوش مصنوعی جهش ۲](https://jahesh-2.vercel.app/)
 - [داشبورد ابزارها](https://jaheshit.ir/abzar-jahesh/)
 - [نقشه کامل سایت XML](https://jaheshit.ir/sitemap.xml)

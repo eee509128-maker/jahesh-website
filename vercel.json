@@ -11,6 +11,36 @@
       "source": "/frwshgah/:match*",
       "destination": "/jaheshkala",
       "permanent": true
+    },
+    {
+      "source": "/hwsh-msnway",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/hwsh-msnway/:match*",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/ai",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/ai/:match*",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/chat",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/chat/:match*",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
     }
   ],
   "rewrites": [

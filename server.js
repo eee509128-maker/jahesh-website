@@ -3691,6 +3691,11 @@ app.get(['/frwshgah', '/frwshgah/*'], (req, res) => {
   res.redirect(301, '/jaheshkala');
 });
 
+// Redirect AI routes to Jahesh 2 (https://jahesh-2.vercel.app/)
+app.get(['/hwsh-msnway', '/hwsh-msnway/*', '/ai', '/ai/*', '/chat', '/chat/*'], (req, res) => {
+  res.redirect(301, 'https://jahesh-2.vercel.app/');
+});
+
 // Serve static assets and html files
 app.use(express.static(__dirname, {
   extensions: ['html'],
