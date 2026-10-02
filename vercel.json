@@ -41,6 +41,26 @@
       "source": "/chat/:match*",
       "destination": "https://jahesh-2.vercel.app/",
       "permanent": true
+    },
+    {
+      "source": "/ai-v13",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/ai-v13/:match*",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/pages/ai-v13",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/pages/ai-v13/:match*",
+      "destination": "https://jahesh-2.vercel.app/",
+      "permanent": true
     }
   ],
   "rewrites": [

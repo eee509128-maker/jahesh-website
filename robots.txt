@@ -1,6 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /ai/
+Disallow: /ai-v13/
+Disallow: /pages/
 Disallow: /chat/
 
 # Generative Engine Optimization (GEO) & AI Crawlers

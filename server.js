@@ -3692,7 +3692,13 @@ app.get(['/frwshgah', '/frwshgah/*'], (req, res) => {
 });
 
 // Redirect AI routes to Jahesh 2 (https://jahesh-2.vercel.app/)
-app.get(['/hwsh-msnway', '/hwsh-msnway/*', '/ai', '/ai/*', '/chat', '/chat/*'], (req, res) => {
+app.get([
+  '/hwsh-msnway', '/hwsh-msnway/*',
+  '/ai', '/ai/*',
+  '/ai-v13', '/ai-v13/*',
+  '/pages/ai-v13', '/pages/ai-v13/*',
+  '/chat', '/chat/*'
+], (req, res) => {
   res.redirect(301, 'https://jahesh-2.vercel.app/');
 });
 
