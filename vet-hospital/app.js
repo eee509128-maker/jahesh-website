@@ -774,6 +774,8 @@ window.proceedToPayment = async function() {
     let zibalData = null;
     const requestEndpoints = [
       '/api/zibal-request',
+      '/api/zibal-request.php',
+      '/api/zibal.php',
       '/vet-hospital/api.php?action=zibal-request',
       '/jaheshkala/api.php?action=zibal-request',
       '/api.php?action=zibal-request',
@@ -847,15 +849,44 @@ async function handlePaymentReturn() {
   if (trackId && (status === "2" || successParam === "1" || status === "1")) {
     showPaymentRedirectLoader("در حال تایید پرداخت و صدور فاکتور رسمی بیمارستان...");
     try {
-      const vRes = await fetchUniversalApi("zibal-verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trackId: trackId,
-          merchant: ZIBAL_MERCHANT_CODE
-        })
-      });
-      const vData = vRes ? await vRes.json().catch(() => null) : null;
+      let vData = null;
+      const verifyEndpoints = [
+        '/api/zibal-verify',
+        '/api/zibal-verify.php',
+        '/vet-hospital/api.php?action=zibal-verify',
+        '/jaheshkala/api.php?action=zibal-verify'
+      ];
+      for (const vep of verifyEndpoints) {
+        try {
+          const vRes = await fetch(vep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              trackId: trackId,
+              merchant: ZIBAL_MERCHANT_CODE
+            })
+          });
+          if (vRes && vRes.ok) {
+            const parsedV = await vRes.json().catch(() => null);
+            if (parsedV && parsedV.success) {
+              vData = parsedV;
+              break;
+            }
+          }
+        } catch (vErr) {}
+      }
+
+      if (!vData) {
+        const fallbackRes = await fetchUniversalApi("zibal-verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trackId: trackId,
+            merchant: ZIBAL_MERCHANT_CODE
+          })
+        });
+        vData = fallbackRes ? await fallbackRes.json().catch(() => null) : null;
+      }
       hidePaymentRedirectLoader();
 
       if ((vData && vData.success) || status === "2") {
