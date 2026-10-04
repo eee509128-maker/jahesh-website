@@ -3315,6 +3315,24 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
       data = { result: -2, message: networkErr.message };
     }
 
+    // If direct request failed or returned IP error (113/115), try Val Town fixed proxy
+    if (!data || data.result !== 100 || !data.trackId) {
+      try {
+        const valTownUrl = 'https://erfanmogaddam--d91a5504c02211f1849a1607ee4eb77e.web.val.run/request';
+        const valRes = await fetch(valTownUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(zibalPayload)
+        });
+        const valData = await valRes.json().catch(() => null);
+        if (valData && valData.trackId) {
+          data = valData;
+        }
+      } catch (valErr) {
+        console.warn('[Zibal] Val Town proxy fallback failed:', valErr);
+      }
+    }
+
     if (data && data.result === 100 && data.trackId) {
       // Auto-save pending order directly to server orders disk
       if (req.body?.orderData) {

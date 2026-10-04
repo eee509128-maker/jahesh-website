@@ -57,51 +57,85 @@ export async function requestZibalPayment(params: ZibalRequestParams): Promise<Z
     orderData: params.orderData,
   };
 
-  try {
-    const res = await fetch('/api/zibal-request', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+  const candidateEndpoints = [
+    '/api/zibal-request',
+    'https://erfanmogaddam--d91a5504c02211f1849a1607ee4eb77e.web.val.run/request',
+    '/api/zibal-request.php',
+    '/jaheshkala/api.php?action=zibal-request'
+  ];
 
-    const data = await res.json();
-    return data;
-  } catch (err: any) {
-    console.error('Error contacting /api/zibal-request:', err);
-    return {
-      success: false,
-      error: err.message || 'خطا در برقراری ارتباط با سرور پرداخت',
-    };
+  for (const ep of candidateEndpoints) {
+    try {
+      const res = await fetch(ep, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.success || data.trackId || data.result === 100)) {
+          return {
+            success: true,
+            trackId: data.trackId,
+            result: data.result || 100,
+            message: data.message || 'درخواست پرداخت با موفقیت ایجاد شد',
+            paymentUrl: data.paymentUrl || `https://gateway.zibal.ir/start/${data.trackId}`,
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[ZibalService] Failed endpoint ${ep}:`, err);
+    }
   }
+
+  return {
+    success: false,
+    error: 'خطا در برقراری ارتباط با سرور پرداخت زیپال. لطفاً اتصال اینترنت را بررسی فرمایید.',
+  };
 }
 
 /**
  * Verifies transaction with Zibal after customer returns from payment gateway
  */
 export async function verifyZibalPayment(trackId: string | number, merchant?: string): Promise<ZibalVerifyResponse> {
-  try {
-    const res = await fetch('/api/zibal-verify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        trackId: String(trackId).trim(),
-        merchant: merchant || ZIBAL_DEFAULT_MERCHANT,
-      }),
-    });
+  const candidateVerifyEndpoints = [
+    '/api/zibal-verify',
+    'https://erfanmogaddam--d91a5504c02211f1849a1607ee4eb77e.web.val.run/verify',
+    '/api/zibal-verify.php',
+    '/jaheshkala/api.php?action=zibal-verify'
+  ];
 
-    const data = await res.json();
-    return data;
-  } catch (err: any) {
-    console.error('Error contacting /api/zibal-verify:', err);
-    return {
-      success: false,
-      error: err.message || 'خطا در استعلام وضعیت پرداخت از سرور',
-    };
+  for (const vep of candidateVerifyEndpoints) {
+    try {
+      const res = await fetch(vep, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          trackId: String(trackId).trim(),
+          merchant: merchant || ZIBAL_DEFAULT_MERCHANT,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.success || data.result === 100 || data.result === 201)) {
+          return data;
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[ZibalService] Verify endpoint ${vep} failed:`, err);
+    }
   }
+
+  return {
+    success: false,
+    error: 'خطا در استعلام وضعیت پرداخت از سرور زیپال',
+  };
 }
 
 /**

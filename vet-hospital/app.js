@@ -773,6 +773,7 @@ window.proceedToPayment = async function() {
   try {
     let zibalData = null;
     const requestEndpoints = [
+      'https://erfanmogaddam--d91a5504c02211f1849a1607ee4eb77e.web.val.run/request',
       '/api/zibal-request',
       '/api/zibal-request.php',
       '/api/zibal.php',
@@ -851,6 +852,7 @@ async function handlePaymentReturn() {
     try {
       let vData = null;
       const verifyEndpoints = [
+        'https://erfanmogaddam--d91a5504c02211f1849a1607ee4eb77e.web.val.run/verify',
         '/api/zibal-verify',
         '/api/zibal-verify.php',
         '/vet-hospital/api.php?action=zibal-verify',
