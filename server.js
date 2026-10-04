@@ -3330,7 +3330,7 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
           })
         });
         const sandboxData = await sandboxRes.json();
-        if (sandboxData.result === 100) {
+        if (sandboxData && sandboxData.result === 100) {
           data = sandboxData;
           isSandboxFallback = true;
           console.log(`[Zibal] Sandbox fallback succeeded with trackId: ${data.trackId}`);
@@ -3340,19 +3340,7 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
       }
     }
 
-    // If external Zibal gateway is completely unreachable, provide a generated trackId simulation fallback
-    if (!data || data.result !== 100) {
-      const simTrackId = Math.floor(10000000 + Math.random() * 90000000);
-      data = {
-        result: 100,
-        trackId: simTrackId,
-        isSimulated: true,
-        message: 'شناسه پرداخت با موفقیت ایجاد شد.'
-      };
-      isSandboxFallback = true;
-    }
-
-    if (data.result === 100) {
+    if (data && data.result === 100 && data.trackId) {
       // Auto-save pending order directly to server orders disk
       if (req.body?.orderData) {
         try {
@@ -3398,24 +3386,21 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
         }
       }
 
-      const paymentUrl = data.isSimulated
-        ? `${finalCallbackUrl}${finalCallbackUrl.includes('?') ? '&' : '?'}trackId=${data.trackId}&status=2&success=1`
-        : `https://gateway.zibal.ir/start/${data.trackId}`;
+      const paymentUrl = `https://gateway.zibal.ir/start/${data.trackId}`;
 
       return res.json({
         success: true,
         result: data.result,
         trackId: data.trackId,
         isSandboxFallback,
-        isSimulated: Boolean(data.isSimulated),
         message: data.message || 'success',
         paymentUrl
       });
     } else {
       return res.status(400).json({
         success: false,
-        result: data.result,
-        message: data.message || 'خطا در ارتباط با درگاه زیبال',
+        result: data ? data.result : -1,
+        message: (data && data.message) || 'خطا در برقراری ارتباط با درگاه پرداخت زیپال.',
         details: data
       });
     }

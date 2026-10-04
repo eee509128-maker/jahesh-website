@@ -533,8 +533,9 @@ let state = {
     departmentId: "surgery-anesthesia",
     professorId: "",
     visitType: "in_person",
-    appointmentDate: "شنبه آینده - ساعت ۰۹:۰۰ صبح",
-    appointmentTime: "۰۹:۰۰ صبح",
+    scheduleId: "sat_morning",
+    appointmentDate: "شنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)",
+    appointmentTime: "۰۹:۰۰ الی ۱۳:۰۰",
     symptoms: "",
     clientName: "",
     clientPhone: "",
@@ -708,7 +709,8 @@ window.selectBookingVisitType = function(type) {
   renderApp();
 };
 
-window.selectBookingDate = function(dateStr, timeStr) {
+window.selectBookingDate = function(scheduleId, dateStr, timeStr) {
+  state.bookingForm.scheduleId = scheduleId;
   state.bookingForm.appointmentDate = dateStr;
   if (timeStr) {
     state.bookingForm.appointmentTime = timeStr;
@@ -716,7 +718,7 @@ window.selectBookingDate = function(dateStr, timeStr) {
   renderApp();
 };
 
-// پرداخت درگاه زیپال با مرچنت اختصاصی و پشتیبانی کامل از فال‌بک
+// پرداخت درگاه زیپال با مرچنت اختصاصی و انتقال مستقیم به شاپرک
 window.proceedToPayment = async function() {
   const f = state.bookingForm;
   if (!f.clientName || !f.clientName.trim()) {
@@ -763,99 +765,65 @@ window.proceedToPayment = async function() {
   };
 
   localStorage.setItem("vet_pending_appointment", JSON.stringify(newAppointment));
-  showPaymentRedirectLoader("در حال انتقال امن به درگاه پرداخت اینترنتی زیپال (شبکه رسمی شاپرک)...");
+  showPaymentRedirectLoader("در حال اتصال به درگاه پرداخت رسمی زیپال (شبکه الکترونیکی شاپرک)...");
 
   try {
-    const candidateEndpoints = ['zibal-request', 'zibal', 'api/zibal-request'];
     let zibalData = null;
+    const requestEndpoints = [
+      '/api/zibal-request',
+      '/api/vet/zibal-request',
+      '/vet-hospital/api/zibal-request',
+      '/api/zibal'
+    ];
 
-    for (const ep of candidateEndpoints) {
+    const payload = {
+      amountInTomans: fee,
+      merchant: ZIBAL_MERCHANT_CODE,
+      description: `پرداخت ویزیت بیمارستان دانشکده دامپزشکی - ${newAppointment.animalName} (${f.clientName})`,
+      mobile: f.clientPhone,
+      orderId: orderId,
+      callbackUrl: window.location.origin + "/vet-hospital/?payment_return=1",
+      appointmentData: newAppointment
+    };
+
+    for (const ep of requestEndpoints) {
       try {
-        const res = await fetchUniversalApi(ep, {
+        const res = await fetch(ep, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amountInTomans: fee,
-            merchant: ZIBAL_MERCHANT_CODE,
-            description: `پرداخت نوبت ویزیت بیمارستان دانشکده دامپزشکی - ${newAppointment.animalName} (${f.clientName})`,
-            mobile: f.clientPhone,
-            orderId: orderId,
-            callbackUrl: window.location.origin + "/vet-hospital/?payment_return=1",
-            appointmentData: newAppointment
-          })
+          body: JSON.stringify(payload)
         });
         if (res && res.ok) {
-          zibalData = await res.json().catch(() => null);
-          if (zibalData && zibalData.success) break;
+          const parsed = await res.json().catch(() => null);
+          if (parsed && parsed.success && parsed.paymentUrl) {
+            zibalData = parsed;
+            break;
+          }
         }
-      } catch (errInner) {}
-    }
-
-    // Direct fallback if fetchUniversalApi did not match
-    if (!zibalData || !zibalData.success) {
-      try {
-        const directRes = await fetch('/api/zibal-request', {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amountInTomans: fee,
-            merchant: ZIBAL_MERCHANT_CODE,
-            description: `پرداخت نوبت بیمارستان دامپزشکی - ${newAppointment.animalName}`,
-            mobile: f.clientPhone,
-            orderId: orderId,
-            callbackUrl: window.location.origin + "/vet-hospital/?payment_return=1",
-            appointmentData: newAppointment
-          })
-        });
-        if (directRes && directRes.ok) {
-          zibalData = await directRes.json().catch(() => null);
-        }
-      } catch (directErr) {}
+      } catch (errInner) {
+        console.warn(`[Payment] Endpoint ${ep} attempt error:`, errInner);
+      }
     }
 
     if (zibalData && zibalData.success && zibalData.paymentUrl) {
-      // Save appointment in memory
+      // ذخیره نوبت در انتظار پرداخت
       state.appointments.unshift({ ...newAppointment, zibalTrackId: zibalData.trackId });
       saveStoredAppointments(state.appointments);
 
-      // Redirect user to payment url
+      // انتقال مستقیم کاربر به درگاه پرداخت زیپال
       window.location.href = zibalData.paymentUrl;
-    } else {
-      // Graceful fallback for local test environment
-      console.warn("Zibal gateway fallback triggered:", zibalData);
-      const simulatedTrackId = String(Date.now()).slice(-8);
-      const confirmedAppointment = {
-        ...newAppointment,
-        id: "VET-" + simulatedTrackId,
-        trackingCode: "VET-" + simulatedTrackId,
-        transactionId: "ZBL-" + simulatedTrackId,
-        paymentStatus: "paid",
-        status: "confirmed",
-        paidAt: new Date().toISOString()
-      };
-
-      try {
-        await fetchUniversalApi("appointments/book", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(confirmedAppointment)
-        });
-      } catch (e) {}
-
-      state.appointments.unshift(confirmedAppointment);
-      saveStoredAppointments(state.appointments);
-      localStorage.removeItem("vet_pending_appointment");
-
-      hidePaymentRedirectLoader();
-      state.bookingModalOpen = false;
-      state.activeInvoice = confirmedAppointment;
-      state.invoiceModalOpen = true;
-      renderApp();
-      if (window.confetti) window.confetti({ particleCount: 100, spread: 80 });
+      return;
     }
+
+    // در صورتی که اتصال به درگاه پرداخت با خطا مواجه شد
+    hidePaymentRedirectLoader();
+    const errMsg = (zibalData && zibalData.message)
+      ? zibalData.message
+      : "عدم دریافت لینک پرداخت از سرور درگاه. لطفاً اتصال اینترنت خود را بررسی و مجدداً تلاش فرمایید.";
+    alert("خطا در ایجاد تراکنش پرداخت درگاه زیپال:\n" + errMsg);
   } catch (err) {
     hidePaymentRedirectLoader();
-    alert("خطای ارتباط با درگاه پرداخت. لطفاً وضعیت اتصال اینترنت را بررسی فرمایید.");
+    alert("خطای اتصال به سرور درگاه پرداخت زیپال: " + (err.message || "لطفاً اتصال اینترنت را بررسی فرمایید."));
   }
 };
 
@@ -2247,14 +2215,14 @@ function renderBookingModal() {
 
   // Available days dynamically gathered with morning and evening clinical shifts
   const availableScheduleOptions = [
-    { label: "شنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "شنبه", time: "۰۹:۰۰ الی ۱۳:۰۰", shift: "صبح", icon: "☀️" },
-    { label: "شنبه آینده - سانس عصر (۱۶:۰۰ الی ۲۰:۰۰)", day: "شنبه", time: "۱۶:۰۰ الی ۲۰:۰۰", shift: "عصر", icon: "🌙" },
-    { label: "یکشنبه آینده - سانس صبح (۱۰:۰۰ الی ۱۴:۰۰)", day: "یکشنبه", time: "۱۰:۰۰ الی ۱۴:۰۰", shift: "صبح", icon: "☀️" },
-    { label: "دوشنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "دوشنبه", time: "۰۹:۰۰ الی ۱۳:۰۰", shift: "صبح", icon: "☀️" },
-    { label: "دوشنبه آینده - سانس عصر (۱۶:۰۰ الی ۲۰:۰۰)", day: "دوشنبه", time: "۱۶:۰۰ الی ۲۰:۰۰", shift: "عصر", icon: "🌙" },
-    { label: "سه‌شنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "سه‌شنبه", time: "۰۹:۰۰ الی ۱۳:۰۰", shift: "صبح", icon: "☀️" },
-    { label: "چهارشنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "چهارشنبه", time: "۰۹:۰۰ الی ۱۳:۰۰", shift: "صبح", icon: "☀️" },
-    { label: "پنجشنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۲:۰۰)", day: "پنجشنبه", time: "۰۹:۰۰ الی ۱۲:۰۰", shift: "صبح", icon: "☀️" }
+    { id: "sat_morning", label: "شنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "شنبه", time: "۰۹:۰۰ الی ۱۳:۰۰", shift: "صبح", icon: "☀️" },
+    { id: "sat_evening", label: "شنبه آینده - سانس عصر (۱۶:۰۰ الی ۲۰:۰۰)", day: "شنبه", time: "۱۶:۰۰ الی ۲۰:۰۰", shift: "عصر", icon: "🌙" },
+    { id: "sun_morning", label: "یکشنبه آینده - سانس صبح (۱۰:۰۰ الی ۱۴:۰۰)", day: "یکشنبه", time: "۱۰:۰۰ الی ۱۴:۰۰", shift: "صبح", icon: "☀️" },
+    { id: "mon_morning", label: "دوشنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "دوشنبه", time: "۰۹:۰۰ الی ۱۳:۰۰", shift: "صبح", icon: "☀️" },
+    { id: "mon_evening", label: "دوشنبه آینده - سانس عصر (۱۶:۰۰ الی ۲۰:۰۰)", day: "دوشنبه", time: "۱۶:۰۰ الی ۲۰:۰۰", shift: "عصر", icon: "🌙" },
+    { id: "tue_morning", label: "سه‌شنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "سه‌شنبه", time: "۰۹:۰۰ الی ۱۳:۰۰", shift: "صبح", icon: "☀️" },
+    { id: "wed_morning", label: "چهارشنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۳:۰۰)", day: "چهارشنبه", time: "۰۹:۰۰ الی ۱۳:۰۰", shift: "صبح", icon: "☀️" },
+    { id: "thu_morning", label: "پنجشنبه آینده - سانس صبح (۰۹:۰۰ الی ۱۲:۰۰)", day: "پنجشنبه", time: "۰۹:۰۰ الی ۱۲:۰۰", shift: "صبح", icon: "☀️" }
   ];
 
   return `
@@ -2372,9 +2340,9 @@ function renderBookingModal() {
               <label class="block text-xs font-bold text-slate-300 mb-2.5">انتخاب روز و سانس ویزیت در کلینیک:</label>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
                 ${availableScheduleOptions.map((opt) => {
-                  const isSelected = f.appointmentDate === opt.label || (f.appointmentDate && f.appointmentDate.includes(opt.day) && f.appointmentDate.includes(opt.shift));
+                  const isSelected = f.scheduleId ? (f.scheduleId === opt.id) : (f.appointmentDate === opt.label);
                   return `
-                    <div onclick="selectBookingDate('${opt.label}', '${opt.time}')" class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${isSelected ? 'bg-emerald-950/90 border-emerald-500 ring-2 ring-emerald-500 shadow-lg shadow-emerald-950/60' : 'bg-slate-800/70 border-slate-700 hover:border-slate-600 hover:bg-slate-800'}">
+                    <div onclick="selectBookingDate('${opt.id}', '${opt.label}', '${opt.time}')" class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${isSelected ? 'bg-emerald-950/90 border-emerald-500 ring-2 ring-emerald-500 shadow-lg shadow-emerald-950/60' : 'bg-slate-800/70 border-slate-700 hover:border-slate-600 hover:bg-slate-800'}">
                       <div class="flex items-center gap-2.5 min-w-0">
                         <span class="text-lg shrink-0">${opt.icon}</span>
                         <div class="min-w-0">
