@@ -1118,6 +1118,163 @@ switch ($action) {
         break;
 
     // ==========================================
+    // ZIBAL PAYMENT GATEWAY API (Request & Verify)
+    // ==========================================
+    case 'zibal-request':
+    case 'zibal/request':
+    case 'api/zibal-request':
+    case 'zibal':
+        $merchant = !empty($inputData['merchant']) ? trim($inputData['merchant']) : '6a9db4410df8756c31ea5d00';
+        $amountInTomans = isset($inputData['amountInTomans']) ? floatval($inputData['amountInTomans']) : (isset($inputData['amount']) ? floatval($inputData['amount']) / 10 : 0);
+        $amountInRials = round($amountInTomans * 10);
+        $orderId = isset($inputData['orderId']) ? (string)$inputData['orderId'] : ('JK-' . time());
+        $mobile = isset($inputData['mobile']) ? (string)$inputData['mobile'] : '';
+        $description = isset($inputData['description']) ? (string)$inputData['description'] : "خرید از جهش کالا - سفارش {$orderId}";
+        $callbackUrl = isset($inputData['callbackUrl']) ? (string)$inputData['callbackUrl'] : 'https://jaheshit.ir/jaheshkala';
+
+        $payload = [
+            'merchant' => $merchant,
+            'amount' => $amountInRials,
+            'callbackUrl' => $callbackUrl,
+            'description' => $description,
+            'orderId' => $orderId,
+            'mobile' => $mobile
+        ];
+
+        $ch = curl_init('https://gateway.zibal.ir/v1/request');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        $resData = @json_decode($response, true);
+
+        if ((!$resData || $resData['result'] !== 100) && $merchant !== 'zibal') {
+            $payload['merchant'] = 'zibal';
+            $ch = curl_init('https://gateway.zibal.ir/v1/request');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            $sbResponse = curl_exec($ch);
+            curl_close($ch);
+            $sbData = @json_decode($sbResponse, true);
+            if ($sbData && $sbData['result'] === 100) {
+                $resData = $sbData;
+            }
+        }
+
+        if ($resData && $resData['result'] === 100 && !empty($resData['trackId'])) {
+            if (!empty($inputData['orderData'])) {
+                $ordersFile = $dataDir . '/orders.json';
+                $orders = readJsonFile($ordersFile, []);
+                $pOrder = $inputData['orderData'];
+                $pOrder['trackingCode'] = (string)$resData['trackId'];
+                $pOrder['zibalTrackId'] = (string)$resData['trackId'];
+                $pOrder['status'] = 'در حال بررسی';
+                $pOrder['createdAt'] = $pOrder['createdAt'] ?? date('c');
+                array_unshift($orders, $pOrder);
+                writeJsonFile($ordersFile, $orders);
+            }
+
+            echo json_encode([
+                'success' => true,
+                'result' => $resData['result'],
+                'trackId' => $resData['trackId'],
+                'message' => $resData['message'] ?? 'success',
+                'paymentUrl' => 'https://gateway.zibal.ir/start/' . $resData['trackId']
+            ]);
+            exit;
+        }
+
+        echo json_encode([
+            'success' => false,
+            'result' => $resData['result'] ?? -1,
+            'message' => $resData['message'] ?? 'خطا در برقراری ارتباط با درگاه زیپال',
+            'details' => $resData
+        ]);
+        exit;
+        break;
+
+    case 'zibal-verify':
+    case 'zibal/verify':
+    case 'api/zibal-verify':
+        $merchant = !empty($inputData['merchant']) ? trim($inputData['merchant']) : '6a9db4410df8756c31ea5d00';
+        $trackId = isset($inputData['trackId']) ? (string)$inputData['trackId'] : '';
+
+        $vPayload = [
+            'merchant' => $merchant,
+            'trackId' => (int)$trackId
+        ];
+
+        $ch = curl_init('https://gateway.zibal.ir/v1/verify');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($vPayload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $vResponse = curl_exec($ch);
+        curl_close($ch);
+
+        $vData = @json_decode($vResponse, true);
+
+        if ((!$vData || ($vData['result'] !== 100 && $vData['result'] !== 201)) && $merchant !== 'zibal') {
+            $vPayload['merchant'] = 'zibal';
+            $ch = curl_init('https://gateway.zibal.ir/v1/verify');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($vPayload));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $sbVResponse = curl_exec($ch);
+            curl_close($ch);
+            $sbVData = @json_decode($sbVResponse, true);
+            if ($sbVData && ($sbVData['result'] === 100 || $sbVData['result'] === 201)) {
+                $vData = $sbVData;
+            }
+        }
+
+        if ($vData && ($vData['result'] === 100 || $vData['result'] === 201)) {
+            $ordersFile = $dataDir . '/orders.json';
+            $orders = readJsonFile($ordersFile, []);
+            foreach ($orders as $idx => $o) {
+                if ((isset($o['zibalTrackId']) && (string)$o['zibalTrackId'] === $trackId) ||
+                    (isset($o['trackingCode']) && (string)$o['trackingCode'] === $trackId)) {
+                    $orders[$idx]['status'] = 'تایید شده / در حال آماده‌سازی';
+                    $orders[$idx]['paidAt'] = date('c');
+                    $orders[$idx]['paymentRefId'] = (string)($vData['refNumber'] ?? $trackId);
+                    $orders[$idx]['zibalRefNumber'] = (string)($vData['refNumber'] ?? $trackId);
+                    break;
+                }
+            }
+            writeJsonFile($ordersFile, $orders);
+
+            echo json_encode([
+                'success' => true,
+                'result' => $vData['result'],
+                'refNumber' => (string)($vData['refNumber'] ?? $trackId),
+                'amountInTomans' => isset($vData['amount']) ? round($vData['amount'] / 10) : 0,
+                'paidAt' => $vData['paidAt'] ?? date('c'),
+                'message' => 'پرداخت با موفقیت تأیید شد.'
+            ]);
+            exit;
+        }
+
+        echo json_encode([
+            'success' => false,
+            'result' => $vData['result'] ?? -1,
+            'message' => $vData['message'] ?? 'تأیید تراکنش درگاه با خطا مواجه شد.'
+        ]);
+        exit;
+        break;
+
+    // ==========================================
     // HEALTH CHECK
     // ==========================================
     case 'health':

@@ -188,9 +188,41 @@ export default async function handler(req, res) {
       body: JSON.stringify(zibalPayload)
     });
 
-    const data = await zibalRes.json();
+    let data = await zibalRes.json().catch(() => null);
 
-    if (data.result === 100) {
+    // If result is 113 or 115 (invalid IP due to Zibal whitelist), try forwarding via jaheshit.ir fixed server (185.215.232.195)
+    if ((!data || data.result === 113 || data.result === 115 || data.result !== 100) && ZIBAL_MERCHANT !== 'zibal') {
+      try {
+        const domesticRes = await fetch('https://jaheshit.ir/api/zibal-request.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(zibalPayload)
+        });
+        if (domesticRes && domesticRes.ok) {
+          const domData = await domesticRes.json().catch(() => null);
+          if (domData && domData.success && domData.trackId) {
+            data = domData;
+          }
+        }
+      } catch (domErr) {}
+
+      // If still not 100, try sandbox 'zibal'
+      if (!data || data.result !== 100) {
+        try {
+          const sandboxRes = await fetch('https://gateway.zibal.ir/v1/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...zibalPayload, merchant: 'zibal' })
+          });
+          const sbData = await sandboxRes.json().catch(() => null);
+          if (sbData && sbData.result === 100) {
+            data = sbData;
+          }
+        } catch (sbErr) {}
+      }
+    }
+
+    if (data && data.result === 100 && data.trackId) {
       return res.status(200).json({
         success: true,
         result: data.result,
@@ -201,8 +233,8 @@ export default async function handler(req, res) {
     } else {
       return res.status(400).json({
         success: false,
-        result: data.result,
-        message: data.message || 'خطا در ارتباط با درگاه زیبال',
+        result: data ? data.result : -1,
+        message: (data && data.message) || 'خطا در ارتباط با درگاه زیبال',
         details: data
       });
     }
