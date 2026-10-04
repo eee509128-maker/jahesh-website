@@ -56,24 +56,6 @@ curl_close($ch);
 
 $resData = @json_decode($response, true);
 
-// 2. Fallback to sandbox if merchant IP is restricted or merchant not active
-if ((!$resData || $resData['result'] !== 100) && $merchant !== 'zibal') {
-    $payload['merchant'] = 'zibal';
-    $ch = curl_init('https://gateway.zibal.ir/v1/request');
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-    $sbResponse = curl_exec($ch);
-    curl_close($ch);
-    $sbData = @json_decode($sbResponse, true);
-    if ($sbData && $sbData['result'] === 100) {
-        $resData = $sbData;
-    }
-}
-
 if ($resData && $resData['result'] === 100 && !empty($resData['trackId'])) {
     // Save pending appointment to data/appointments.json
     if (!empty($inputData['appointmentData'])) {

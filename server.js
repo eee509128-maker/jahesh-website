@@ -3302,7 +3302,6 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
 
     let zibalRes;
     let data;
-    let isSandboxFallback = false;
 
     try {
       zibalRes = await fetch(requestUrl, {
@@ -3314,30 +3313,6 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
     } catch (networkErr) {
       console.warn('[Zibal] Network request error:', networkErr.message);
       data = { result: -2, message: networkErr.message };
-    }
-
-    // If request failed because of invalid IP (result 113), merchant error, or connection issue, fall back to 'zibal' sandbox
-    if ((!data || data.result !== 100) && ZIBAL_MERCHANT !== 'zibal') {
-      console.log(`[Zibal] Request with merchant ${ZIBAL_MERCHANT} failed (result: ${data?.result}). Trying sandbox fallback 'zibal'...`);
-      try {
-        const sandboxRes = await fetch(requestUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...zibalPayload,
-            merchant: 'zibal',
-            description: `[تست سندباکس] ${finalDescription}`
-          })
-        });
-        const sandboxData = await sandboxRes.json();
-        if (sandboxData && sandboxData.result === 100) {
-          data = sandboxData;
-          isSandboxFallback = true;
-          console.log(`[Zibal] Sandbox fallback succeeded with trackId: ${data.trackId}`);
-        }
-      } catch (sandboxErr) {
-        console.error('[Zibal] Sandbox request fallback error:', sandboxErr);
-      }
     }
 
     if (data && data.result === 100 && data.trackId) {
@@ -3442,44 +3417,7 @@ app.post(['/api/zibal-verify', '/api/vet/zibal-verify', '/vet-hospital/api/zibal
       console.warn('[Zibal Verify] Direct request error:', netErr.message);
     }
 
-    // Try sandbox fallback verify if the main merchant verify fails or was made in sandbox
-    if ((!data || (data.result !== 100 && data.result !== 201)) && ZIBAL_MERCHANT !== 'zibal') {
-      console.log(`[Zibal] Verify with merchant ${ZIBAL_MERCHANT} failed (result: ${data?.result}). Trying sandbox fallback...`);
-      try {
-        const sandboxRes = await fetch(verifyUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...verifyPayload,
-            merchant: 'zibal',
-            trackId: Number(trackId)
-          })
-        });
-        const sandboxData = await sandboxRes.json();
-        if (sandboxData.result === 100 || sandboxData.result === 201) {
-          data = sandboxData;
-          isSandboxFallback = true;
-        }
-      } catch (sandboxErr) {
-        console.error('[Zibal] Sandbox verify fallback error:', sandboxErr);
-      }
-    }
-
-    // If sandbox / simulated payment verification
-    if (!data || (data.result !== 100 && data.result !== 201)) {
-      data = {
-        result: 100,
-        status: 1,
-        refNumber: String(trackId || Date.now()),
-        amount: 3800000,
-        paidAt: new Date().toISOString(),
-        cardNumber: '۵۸۹۲۱۰******۷۸۹۰',
-        message: 'پرداخت با موفقیت تأیید شد.'
-      };
-      isSandboxFallback = true;
-    }
-
-    if (data.result === 100 || data.result === 201) {
+    if (data && (data.result === 100 || data.result === 201)) {
       const refNum = data.refNumber ? String(data.refNumber) : String(trackId);
 
       // Auto-update order on disk immediately upon successful verification!

@@ -205,21 +205,6 @@ export default async function handler(req, res) {
           }
         }
       } catch (domErr) {}
-
-      // If still not 100, try sandbox 'zibal'
-      if (!data || data.result !== 100) {
-        try {
-          const sandboxRes = await fetch('https://gateway.zibal.ir/v1/request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...zibalPayload, merchant: 'zibal' })
-          });
-          const sbData = await sandboxRes.json().catch(() => null);
-          if (sbData && sbData.result === 100) {
-            data = sbData;
-          }
-        } catch (sbErr) {}
-      }
     }
 
     if (data && data.result === 100 && data.trackId) {

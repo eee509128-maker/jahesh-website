@@ -42,21 +42,6 @@ curl_close($ch);
 
 $vData = @json_decode($vResponse, true);
 
-if ((!$vData || ($vData['result'] !== 100 && $vData['result'] !== 201)) && $merchant !== 'zibal') {
-    $vPayload['merchant'] = 'zibal';
-    $ch = curl_init('https://gateway.zibal.ir/v1/verify');
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($vPayload));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    $sbVResponse = curl_exec($ch);
-    curl_close($ch);
-    $sbVData = @json_decode($sbVResponse, true);
-    if ($sbVData && ($sbVData['result'] === 100 || $sbVData['result'] === 201)) {
-        $vData = $sbVData;
-    }
-}
-
 if ($vData && ($vData['result'] === 100 || $vData['result'] === 201)) {
     // Update appointment
     $dataDir = __DIR__ . '/../vet-hospital/data';

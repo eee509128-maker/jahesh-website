@@ -77,37 +77,14 @@ serve(async (req) => {
     });
 
     let data = await zibalRes.json();
-    let isSandboxFallback = false;
-
-    // Fallback to sandbox if merchant IP is restricted
-    if ((data.result === 113 || data.result === 115) && ZIBAL_MERCHANT !== 'zibal') {
-      const sandboxRes = await fetch('https://gateway.zibal.ir/v1/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...zibalPayload,
-          merchant: 'zibal',
-          description: `[سندباکس] ${finalDescription}`,
-        }),
-      });
-      const sandboxData = await sandboxRes.json();
-      if (sandboxData.result === 100) {
-        data = sandboxData;
-        isSandboxFallback = true;
-      }
-    }
-
     if (data.result === 100) {
       return new Response(
         JSON.stringify({
           success: true,
           result: data.result,
           trackId: data.trackId,
-          isSandboxFallback,
           paymentUrl: `https://gateway.zibal.ir/start/${data.trackId}`,
-          message: isSandboxFallback
-            ? 'اتصال از طریق درگاه تستی زیبال انجام شد.'
-            : (data.message || 'درخواست پرداخت ثبت شد.'),
+          message: data.message || 'درخواست پرداخت با موفقیت ثبت شد.',
         }),
         {
           status: 200,

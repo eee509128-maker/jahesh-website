@@ -1118,7 +1118,7 @@ switch ($action) {
         break;
 
     // ==========================================
-    // ZIBAL PAYMENT GATEWAY API (Request & Verify)
+    // ZIBAL PAYMENT GATEWAY API (Request & Verify) - 100% REAL PRODUCTION
     // ==========================================
     case 'zibal-request':
     case 'zibal/request':
@@ -1152,23 +1152,6 @@ switch ($action) {
         curl_close($ch);
 
         $resData = @json_decode($response, true);
-
-        if ((!$resData || $resData['result'] !== 100) && $merchant !== 'zibal') {
-            $payload['merchant'] = 'zibal';
-            $ch = curl_init('https://gateway.zibal.ir/v1/request');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-            $sbResponse = curl_exec($ch);
-            curl_close($ch);
-            $sbData = @json_decode($sbResponse, true);
-            if ($sbData && $sbData['result'] === 100) {
-                $resData = $sbData;
-            }
-        }
 
         if ($resData && $resData['result'] === 100 && !empty($resData['trackId'])) {
             if (!empty($inputData['orderData'])) {
@@ -1224,21 +1207,6 @@ switch ($action) {
         curl_close($ch);
 
         $vData = @json_decode($vResponse, true);
-
-        if ((!$vData || ($vData['result'] !== 100 && $vData['result'] !== 201)) && $merchant !== 'zibal') {
-            $vPayload['merchant'] = 'zibal';
-            $ch = curl_init('https://gateway.zibal.ir/v1/verify');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($vPayload));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            $sbVResponse = curl_exec($ch);
-            curl_close($ch);
-            $sbVData = @json_decode($sbVResponse, true);
-            if ($sbVData && ($sbVData['result'] === 100 || $sbVData['result'] === 201)) {
-                $vData = $sbVData;
-            }
-        }
 
         if ($vData && ($vData['result'] === 100 || $vData['result'] === 201)) {
             $ordersFile = $dataDir . '/orders.json';
