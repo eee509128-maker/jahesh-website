@@ -244,7 +244,10 @@ async function fetchUniversalApi(pathOrAction, options = {}) {
 
   const candidateUrls = [
     `/api/vet/${endpointPath}${queryPart}`,
-    `/vet-hospital/api/${endpointPath}${queryPart}`
+    `/vet-hospital/api/${endpointPath}${queryPart}`,
+    `/vet-hospital/api.php?action=${endpointPath}${queryPart ? '&' + queryPart.slice(1) : ''}`,
+    `/jaheshkala/api.php?action=${endpointPath}${queryPart ? '&' + queryPart.slice(1) : ''}`,
+    `/api/${endpointPath}${queryPart}`
   ];
 
   let lastResponse = null;
@@ -771,6 +774,9 @@ window.proceedToPayment = async function() {
     let zibalData = null;
     const requestEndpoints = [
       '/api/zibal-request',
+      '/vet-hospital/api.php?action=zibal-request',
+      '/jaheshkala/api.php?action=zibal-request',
+      '/api.php?action=zibal-request',
       '/api/vet/zibal-request',
       '/vet-hospital/api/zibal-request',
       '/api/zibal'
@@ -793,7 +799,7 @@ window.proceedToPayment = async function() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        if (res && res.ok) {
+        if (res && (res.ok || res.status === 200)) {
           const parsed = await res.json().catch(() => null);
           if (parsed && parsed.success && parsed.paymentUrl) {
             zibalData = parsed;
