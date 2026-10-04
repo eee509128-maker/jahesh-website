@@ -3265,8 +3265,8 @@ function getZibalUrl(endpointPath) {
   return `https://gateway.zibal.ir/v1${cleanEndpoint}`;
 }
 
-// Zibal Payment Request Endpoint (Supports multiple route aliases)
-app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zibal-request', '/api/zibal/request', '/api/zibal'], async (req, res) => {
+// Zibal Payment Request Endpoint
+app.post('/api/zibal-request', async (req, res) => {
   try {
     const { amount, amountInTomans, callbackUrl, description, orderId, mobile, merchant, ...otherFields } = req.body || {};
     const ZIBAL_MERCHANT = merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
@@ -3285,7 +3285,7 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
       });
     }
 
-    const finalCallbackUrl = callbackUrl || 'https://jaheshit.ir/jaheshkala';
+    const finalCallbackUrl = callbackUrl || 'http://localhost:3000/jaheshkala';
     const finalDescription = description || `سفارش شماره ${orderId || 'جهش کالا'}`;
 
     const zibalPayload = {
@@ -3300,25 +3300,18 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
 
     const requestUrl = getZibalUrl('/request');
 
-    let zibalRes;
-    let data;
+    let zibalRes = await fetch(requestUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(zibalPayload)
+    });
+
+    let data = await zibalRes.json();
     let isSandboxFallback = false;
 
-    try {
-      zibalRes = await fetch(requestUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(zibalPayload)
-      });
-      data = await zibalRes.json();
-    } catch (networkErr) {
-      console.warn('[Zibal] Network request error:', networkErr.message);
-      data = { result: -2, message: networkErr.message };
-    }
-
-    // If request failed because of invalid IP (result 113), merchant error, or connection issue, fall back to 'zibal' sandbox
-    if ((!data || data.result !== 100) && ZIBAL_MERCHANT !== 'zibal') {
-      console.log(`[Zibal] Request with merchant ${ZIBAL_MERCHANT} failed (result: ${data?.result}). Trying sandbox fallback 'zibal'...`);
+    // If request failed because of invalid IP (result 113) or other merchant errors, automatically fall back to 'zibal' sandbox
+    if (data.result !== 100 && ZIBAL_MERCHANT !== 'zibal') {
+      console.log(`[Zibal] Request with merchant ${ZIBAL_MERCHANT} failed (result: ${data.result}). Trying sandbox fallback 'zibal'...`);
       try {
         const sandboxRes = await fetch(requestUrl, {
           method: 'POST',
@@ -3330,7 +3323,7 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
           })
         });
         const sandboxData = await sandboxRes.json();
-        if (sandboxData && sandboxData.result === 100) {
+        if (sandboxData.result === 100) {
           data = sandboxData;
           isSandboxFallback = true;
           console.log(`[Zibal] Sandbox fallback succeeded with trackId: ${data.trackId}`);
@@ -3340,7 +3333,7 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
       }
     }
 
-    if (data && data.result === 100 && data.trackId) {
+    if (data.result === 100) {
       // Auto-save pending order directly to server orders disk
       if (req.body?.orderData) {
         try {
@@ -3386,21 +3379,19 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
         }
       }
 
-      const paymentUrl = `https://gateway.zibal.ir/start/${data.trackId}`;
-
       return res.json({
         success: true,
         result: data.result,
         trackId: data.trackId,
         isSandboxFallback,
         message: data.message || 'success',
-        paymentUrl
+        paymentUrl: `https://gateway.zibal.ir/start/${data.trackId}`
       });
     } else {
       return res.status(400).json({
         success: false,
-        result: data ? data.result : -1,
-        message: (data && data.message) || 'خطا در برقراری ارتباط با درگاه پرداخت زیپال.',
+        result: data.result,
+        message: data.message || 'خطا در ارتباط با درگاه زیبال',
         details: data
       });
     }
@@ -3410,8 +3401,8 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
   }
 });
 
-// Zibal Payment Verify Endpoint (Supports multiple route aliases)
-app.post(['/api/zibal-verify', '/api/vet/zibal-verify', '/vet-hospital/api/zibal-verify', '/api/zibal/verify'], async (req, res) => {
+// Zibal Payment Verify Endpoint
+app.post('/api/zibal-verify', async (req, res) => {
   try {
     const { trackId, merchant, ...otherFields } = req.body || {};
     if (!trackId) {
@@ -3427,24 +3418,18 @@ app.post(['/api/zibal-verify', '/api/vet/zibal-verify', '/vet-hospital/api/zibal
       trackId: Number(trackId)
     };
 
-    let zibalRes;
-    let data;
+    let zibalRes = await fetch(verifyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(verifyPayload)
+    });
+
+    let data = await zibalRes.json();
     let isSandboxFallback = false;
 
-    try {
-      zibalRes = await fetch(verifyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(verifyPayload)
-      });
-      data = await zibalRes.json();
-    } catch (netErr) {
-      console.warn('[Zibal Verify] Direct request error:', netErr.message);
-    }
-
     // Try sandbox fallback verify if the main merchant verify fails or was made in sandbox
-    if ((!data || (data.result !== 100 && data.result !== 201)) && ZIBAL_MERCHANT !== 'zibal') {
-      console.log(`[Zibal] Verify with merchant ${ZIBAL_MERCHANT} failed (result: ${data?.result}). Trying sandbox fallback...`);
+    if (data.result !== 100 && data.result !== 201 && ZIBAL_MERCHANT !== 'zibal') {
+      console.log(`[Zibal] Verify with merchant ${ZIBAL_MERCHANT} failed (result: ${data.result}). Trying sandbox fallback...`);
       try {
         const sandboxRes = await fetch(verifyUrl, {
           method: 'POST',
@@ -3463,20 +3448,6 @@ app.post(['/api/zibal-verify', '/api/vet/zibal-verify', '/vet-hospital/api/zibal
       } catch (sandboxErr) {
         console.error('[Zibal] Sandbox verify fallback error:', sandboxErr);
       }
-    }
-
-    // If sandbox / simulated payment verification
-    if (!data || (data.result !== 100 && data.result !== 201)) {
-      data = {
-        result: 100,
-        status: 1,
-        refNumber: String(trackId || Date.now()),
-        amount: 3800000,
-        paidAt: new Date().toISOString(),
-        cardNumber: '۵۸۹۲۱۰******۷۸۹۰',
-        message: 'پرداخت با موفقیت تأیید شد.'
-      };
-      isSandboxFallback = true;
     }
 
     if (data.result === 100 || data.result === 201) {
