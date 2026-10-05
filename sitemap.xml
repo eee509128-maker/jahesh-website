@@ -1,25 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- 1. جهش ای تی / جهش آی تی (صفحه اصلی و خدمات طراحی سایت و نرم‌افزار) -->
+  <!-- 1. انجمن علمی جهش و جهش ای تی / جهش آی تی -->
   <url>
     <loc>https://jaheshit.ir/</loc>
-    <lastmod>2026-10-02</lastmod>
+    <lastmod>2026-10-05</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
-  <!-- 2. فروشگاه آنلاین جهش کالا -->
+  <!-- 2. بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد -->
+  <url>
+    <loc>https://jaheshit.ir/vet-hospital/</loc>
+    <lastmod>2026-10-05</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.98</priority>
+  </url>
+  <!-- 3. فروشگاه آنلاین جهش کالا -->
   <url>
     <loc>https://jaheshit.ir/jaheshkala/</loc>
-    <lastmod>2026-10-02</lastmod>
+    <lastmod>2026-10-05</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
-  <!-- 3. انجمن علمی جهش (تاسیس ۱۳۹۵) -->
+  <!-- 4. انجمن علمی جهش (تاسیس ۱۳۹۵) -->
   <url>
     <loc>https://jaheshit.ir/drbarh-anjmn/</loc>
-    <lastmod>2026-10-02</lastmod>
+    <lastmod>2026-10-05</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.90</priority>
+    <priority>0.92</priority>
   </url>
   <!-- 4. مستندات هوش مصنوعی و داده‌ها (GEO / LLMs context) -->
   <url>

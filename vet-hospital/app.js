@@ -1803,10 +1803,10 @@ function renderHeader() {
           </div>
           <div class="shrink-0 min-w-0">
             <h1 class="text-xs sm:text-base font-black text-white leading-tight">
-              <span class="sm:hidden">بیمارستان دامپزشکی</span>
-              <span class="hidden sm:inline">بیمارستان تخصصی دانشکده دامپزشکی</span>
+              <span class="sm:hidden">بیمارستان دامپزشکی فردوسی</span>
+              <span class="hidden sm:inline">بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد</span>
             </h1>
-            <p class="text-[10px] sm:text-[11px] text-emerald-400 font-semibold whitespace-nowrap hidden md:block">مرکز درمانی، تحقیقاتی و بالینی دانشگاه</p>
+            <p class="text-[10px] sm:text-[11px] text-emerald-400 font-semibold whitespace-nowrap hidden md:block">مرکز درمانی، تحقیقاتی و بالینی دانشگاه فردوسی مشهد</p>
           </div>
         </div>
 
@@ -1904,9 +1904,12 @@ function renderHomeSection() {
           <span>سامانه تریاژ هوشمند هوش مصنوعی و اورژانس تخصصی بیمارستان فعال است</span>
         </div>
 
-        <h2 class="text-3xl sm:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
-          بیمارستان تخصصی دانشکده دامپزشکی
-        </h2>
+        <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black text-white leading-tight mb-4">
+          بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد
+        </h1>
+        <p class="text-xs sm:text-sm text-emerald-400 font-bold mb-4 tracking-wide">
+          بیمارستان تخصصی دانشکده دامپزشکی | مرکز درمانی، تحقیقاتی و بالینی دانشگاه
+        </p>
         
         <p class="text-sm sm:text-lg text-slate-300 max-w-3xl mx-auto leading-relaxed mb-10">
           مرجع آموزش بالینی، جراحی‌های پیشرفته حیوانات، پاتوبیولوژی و تریاژ تشخیصی هوش مصنوعی با حضور اساتید تمام، دانشیاران و متخصصین دارای شماره نظام دامپزشکی.
