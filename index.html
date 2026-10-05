@@ -8,6 +8,12 @@
   <meta charSet="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script>
+    // Enforce primary canonical domain (prevents *.vercel.app from being indexed or viewed instead of jaheshit.ir)
+    if (typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app')) {
+      window.location.replace('https://jaheshit.ir' + window.location.pathname + window.location.search + window.location.hash);
+    }
+  </script>
+  <script>
     // Intercept clicks to /jaheshkala or /jaheshkala/ before Vike router can hijack them
     document.addEventListener('click', function(e) {
       var a = e.target && e.target.closest ? e.target.closest('a') : null;
@@ -42,7 +48,7 @@
   <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
   <meta name="author" content="انجمن علمی جهش (دانشگاه فردوسی مشهد) و جهش آی تی" />
   <meta property="og:url" content="https://jaheshit.ir/" />
-  <meta property="og:title" content="انجمن علمی جهش | وب‌سایت رسمی (دانشگاه فردوسی مشهد) - جهش آی تی" />
+  <meta property="og:title" content="انجمن علمی جهش دانشگاه فردوسی مشهد | وب‌سایت رسمی" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="انجمن علمی جهش | Jahesh Scientific Association" />
   <meta name="description" content="وب‌سایت رسمی انجمن علمی جهش دانشگاه فردوسی مشهد؛ مرجع فعالیت‌های علمی، پژوهشی، آموزش‌های تخصصی، تریاژ هوشمند بیمارستان دانشکده دامپزشکی، فروشگاه جهش‌کالا و خدمات نرم‌افزاری جهش آی‌تی." />
@@ -53,9 +59,9 @@
   <meta name="ai-content-declaration" content="Jahesh IT & Jahesh Scientific Association founded in 1395" />
   <meta property="og:image" content="https://jaheshit.ir/assets/ascend-cover_aPSGjSz0r-u7Gec3vty3n.png" />
   <meta property="twitter:card" content="summary_large_image" />
-  <meta property="twitter:title" content="انجمن علمی جهش | وب‌سایت رسمی (دانشگاه فردوسی مشهد)" />
+  <meta property="twitter:title" content="انجمن علمی جهش دانشگاه فردوسی مشهد | وب‌سایت رسمی" />
   <meta property="twitter:description" content="وب‌سایت رسمی انجمن علمی جهش دانشگاه فردوسی مشهد؛ فعالیت‌های علمی، پژوهشی، بیمارستان دانشکده دامپزشکی و جهش‌کالا." />
-  <title>انجمن علمی جهش | وب‌سایت رسمی (دانشگاه فردوسی مشهد) - جهش آی تی</title>
+  <title>انجمن علمی جهش دانشگاه فردوسی مشهد | وب‌سایت رسمی</title>
   <script type="application/ld+json">{
   "@context": "https://schema.org",
   "@graph": [
@@ -63,7 +69,7 @@
       "@type": "WebSite",
       "@id": "https://jaheshit.ir/#website",
       "url": "https://jaheshit.ir/",
-      "name": "انجمن علمی جهش | وب‌سایت رسمی (دانشگاه فردوسی مشهد) - جهش آی تی",
+      "name": "انجمن علمی جهش دانشگاه فردوسی مشهد | وب‌سایت رسمی",
       "alternateName": [
         "انجمن علمی جهش",
         "انجمن جهش",

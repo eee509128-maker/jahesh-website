@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    // Enforce primary canonical domain (prevents *.vercel.app from being indexed or viewed instead of jaheshit.ir)
+    if (typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app')) {
+      window.location.replace('https://jaheshit.ir' + window.location.pathname + window.location.search + window.location.hash);
+    }
+  </script>
   <title>بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد | سامانه رسمی نوبت‌دهی و تریاژ هوشمند</title>
   <meta name="description" content="سامانه رسمی بیمارستان تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد؛ رزرو نوبت ویزیت حضوری و آنلاین با اساتید هیئت علمی، تریاژ هوشمند تشخیصی با هوش مصنوعی، جراحی‌های پیشرفته حیوانات و آزمایشگاه پاتوبیولوژی." />
   <meta name="keywords" content="بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد, بیمارستان دانشکده دامپزشکی, بیمارستان دامپزشکی دانشگاه فردوسی, بیمارستان دامپزشکی مشهد, دانشکده دامپزشکی دانشگاه فردوسی, نوبت دهی بیمارستان دامپزشکی مشهد, کلینیک تخصصی دامپزشکی فردوسی مشهد, بیمارستان حیوانات مشهد, ویزیت آنلاین دامپزشکی فردوسی, تریاژ هوشمند دامپزشکی, کلینیک دام کوچک و بزرگ فردوسی مشهد" />
@@ -121,6 +127,36 @@
           "@id": "https://jaheshit.ir/vet-hospital/#hospital"
         },
         "inLanguage": "fa-IR"
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://jaheshit.ir/vet-hospital/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "آدرس بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد کجاست؟",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "بیمارستان تخصصی دانشکده دامپزشکی در مشهد، میدان آزادی، پردیس دانشگاه فردوسی مشهد، دانشکده دامپزشکی واقع شده است. تلفن نوبت‌دهی: ۰۵۱-۳۸۸۰۴۰۰۰."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "چگونه می‌توان در بیمارستان دانشکده دامپزشکی دانشگاه فردوسی نوبت گرفت؟",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "از طریق سامانه آنلاین بیمارستان به آدرس https://jaheshit.ir/vet-hospital/ می‌توانید به صورت ۲۴ ساعته بر اساس تخصص، پزشک و زمان مورد نظر اقدام به رزرو نوبت ویزیت حضوری یا آنلاین فرمایید."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "چه کلینیک‌هایی در بیمارستان دانشکده دامپزشکی فردوسی فعال هستند؟",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "کلینیک جراحی و ارتوپدی، داخلی دام‌های کوچک (سگ و گربه)، داخلی دام‌های بزرگ و اسب، طیور و پرندگان زینتی، آزمایشگاه پاتوبیولوژی و رادیولوژی تخصصی."
+            }
+          }
+        ]
       }
     ]
   }
@@ -259,7 +295,86 @@
 <body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col selection:bg-purple-600 selection:text-white antialiased">
   
   <!-- Root Container Managed by Vanilla React Engine -->
-  <div id="vet-app" class="flex-1 flex flex-col"></div>
+  <div id="vet-app" class="flex-1 flex flex-col">
+    <!-- Static Fallback Content for Googlebot, Search Engine Crawlers & Fast SSR -->
+    <header class="bg-slate-900 border-b border-slate-800 p-4">
+      <div class="max-w-7xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <img src="/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png" alt="بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد" class="w-12 h-12 object-contain" />
+          <div>
+            <h1 class="text-xl font-bold text-white">بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد</h1>
+            <p class="text-xs text-emerald-400">سامانه رسمی نوبت‌دهی آنلاین، تریاژ هوشمند و کلینیک‌های تخصصی</p>
+          </div>
+        </div>
+        <div class="hidden md:flex items-center gap-4 text-sm text-slate-300">
+          <span>تلفن تماس: ۰۵۱-۳۸۸۰۴۰۰۰</span>
+          <span>پردیس دانشگاه فردوسی مشهد</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 flex-1">
+      <section class="text-center py-10">
+        <h2 class="text-3xl font-extrabold text-white mb-4">بیمارستان تخصصی دانشکده دامپزشکی دانشگاه فردوسی مشهد</h2>
+        <p class="text-lg text-slate-300 max-w-3xl mx-auto leading-relaxed">
+          قطب علمی، آموزشی و درمانی دامپزشکی شرق کشور. ارائه خدمات تخصصی پزشکی حیوانات خانگی، دام‌های بزرگ، پرندگان و حیات وحش با حضور اساتید برجسته هیئت علمی دانشگاه فردوسی مشهد، اتاق‌های عمل مجهز، آزمایشگاه پاتوبیولوژی و تریاژ تشخیصی ۲۴ ساعته.
+        </p>
+        <div class="flex flex-wrap justify-center gap-4 mt-6">
+          <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4 text-center min-w-[200px]">
+            <h3 class="font-bold text-white">نوبت‌دهی آنلاین</h3>
+            <p class="text-xs text-slate-400 mt-1">رزرو نوبت با اساتید متخصص و هیئت علمی</p>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4 text-center min-w-[200px]">
+            <h3 class="font-bold text-white">تریاژ هوشمند AI</h3>
+            <p class="text-xs text-slate-400 mt-1">ارزیابی فوری وضعیت بالینی حیوان</p>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4 text-center min-w-[200px]">
+            <h3 class="font-bold text-white">اورژانس ۲۴ ساعته</h3>
+            <p class="text-xs text-slate-400 mt-1">پذیرش شبانه‌روزی بیماران بدحال</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="py-6">
+        <h3 class="text-2xl font-bold text-white mb-6">کلینیک‌ها و بخش‌های تخصصی بیمارستان دانشکده دامپزشکی</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+            <h4 class="font-bold text-emerald-400 text-lg">بخش جراحی، ارتوپدی و بیهوشی</h4>
+            <p class="text-sm text-slate-300 mt-2">جراحی بافت نرم، ارتوپدی، ستون فقرات، چشم‌پزشکی و بیهوشی استنشاقی پیشرفته.</p>
+          </div>
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+            <h4 class="font-bold text-emerald-400 text-lg">بخش بیماری‌های داخلی و دام کوچک</h4>
+            <p class="text-sm text-slate-300 mt-2">معاینات تخصصی سگ، گربه، جوندگان، واکسیناسیون، انگل‌زدایی و بیماری‌های مزمن.</p>
+          </div>
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+            <h4 class="font-bold text-emerald-400 text-lg">بخش پاتوبیولوژی و آزمایشگاه</h4>
+            <p class="text-sm text-slate-300 mt-2">آزمایش خون کامل CBC، بیوشیمی، کشت میکروبی، قارچ‌شناسی و سیتولوژی تومورها.</p>
+          </div>
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+            <h4 class="font-bold text-emerald-400 text-lg">بخش طیور و پرندگان زینتی</h4>
+            <p class="text-sm text-slate-300 mt-2">ویزیت تخصصی طوطی‌سانان، قناری، پرندگان شکاری و بیماری‌های ویروسی طیور صنعتی.</p>
+          </div>
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+            <h4 class="font-bold text-emerald-400 text-lg">بخش رادیولوژی و سونوگرافی</h4>
+            <p class="text-sm text-slate-300 mt-2">تصویربرداری دیجیتال، اکوکاردیوگرافی و سونوگرافی داپلر اندام‌های داخلی.</p>
+          </div>
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+            <h4 class="font-bold text-emerald-400 text-lg">بخش دام بزرگ و اسب</h4>
+            <p class="text-sm text-slate-300 mt-2">کلینیک اختصاصی لنگش اسب، مامایی و بیماری‌های تولید مثل گاو و نشخوارکنندگان.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="py-6 border-t border-slate-800 mt-6">
+        <h3 class="text-xl font-bold text-white mb-4">آدرس و راه‌های ارتباطی بیمارستان</h3>
+        <p class="text-slate-300 leading-relaxed">
+          <strong>آدرس:</strong> مشهد، میدان آزادی، پردیس دانشگاه فردوسی مشهد، دانشکده دامپزشکی، بیمارستان تخصصی حیوانات<br />
+          <strong>تلفن نوبت‌دهی و پذیرش:</strong> ۰۵۱-۳۸۸۰۴۰۰۰ / ۰۵۱-۳۸۸۰۵۲۱۰<br />
+          <strong>سامانه آنلاین:</strong> https://jaheshit.ir/vet-hospital/
+        </p>
+      </section>
+    </main>
+  </div>
 
   <!-- Firebase Cloud Integration (Global Online Sync) -->
   <script src="/vet-hospital/firebase-vet.bundle.js"></script>

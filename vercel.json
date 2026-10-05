@@ -1,7 +1,35 @@
 {
   "outputDirectory": ".",
   "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": ".*\\.vercel\\.app"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ],
   "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": ".*\\.vercel\\.app"
+        }
+      ],
+      "destination": "https://jaheshit.ir/:path*",
+      "permanent": true
+    },
     {
       "source": "/frwshgah",
       "destination": "/jaheshkala",
