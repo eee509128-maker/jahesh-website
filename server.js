@@ -3756,18 +3756,19 @@ app.get(['/frwshgah', '/frwshgah/*'], (req, res) => {
   res.redirect(301, '/jaheshkala');
 });
 
-// Redirect /hwsh-msnway to Jahesh 2 AI
-app.get(['/hwsh-msnway', '/hwsh-msnway/*'], (req, res) => {
-  res.redirect(301, 'https://jahesh-2.vercel.app/');
+// Dedicated routes for the 5 Pillars of Jahesh Ecosystem
+// 1. جهش ای تی (Jahesh IT)
+app.get(['/jahesh-it', '/jahesh-it/', '/it', '/it/', '/jaheshit', '/jaheshit/'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'jahesh-it', 'index.html'));
 });
 
-// Redirect legacy AI paths to Homepage / (for users searching جهش ای تی)
-app.get([
-  '/ai', '/ai/*',
-  '/ai-v13', '/ai-v13/*',
-  '/pages/ai-v13', '/pages/ai-v13/*',
-  '/chat', '/chat/*'
-], (req, res) => {
+// 2. هوش مصنوعی جهش (Jahesh AI)
+app.get(['/ai', '/ai/', '/ai-v13', '/ai-v13/', '/hwsh-msnway', '/hwsh-msnway/', '/chat', '/chat/'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'ai', 'index.html'));
+});
+
+// 3. انجمن علمی جهش (Jahesh Scientific Association alias)
+app.get(['/anjoman', '/anjoman/', '/anjoman-elmi-jahesh'], (req, res) => {
   res.redirect(301, '/');
 });
 
