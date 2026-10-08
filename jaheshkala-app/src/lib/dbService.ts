@@ -389,12 +389,6 @@ export const sortProductsByRank = (productsList: Product[]): Product[] => {
   });
 };
 
-// Timestamp tracker to avoid race conditions with background polling/listeners
-export let lastLocalProductSaveTime = 0;
-export const recordLocalProductSave = () => {
-  lastLocalProductSaveTime = Date.now();
-};
-
 // BroadcastChannel for instant (0ms) cross-tab product synchronization
 export const getProductsBroadcastChannel = (): BroadcastChannel | null => {
   if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -530,8 +524,6 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
       productsDocRef,
       (docSnap) => {
         if (isUnsubscribed) return;
-        // If user just performed a local save in the last 20 seconds, do not let stale listener overwrite
-        if (Date.now() - lastLocalProductSaveTime < 20000) return;
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data && Array.isArray(data.products) && data.products.length > 0) {
@@ -562,8 +554,6 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
   // Ensures all users on all networks receive updates with zero disruption
   const pollServer = async () => {
     if (isUnsubscribed) return;
-    // Guard: Prevent polling from reverting user edits within 20 seconds of local save
-    if (Date.now() - lastLocalProductSaveTime < 20000) return;
     try {
       const res = await fetchUniversalApi(`products?_t=${Date.now()}`, { cache: 'no-store' });
       if (res && res.ok) {
@@ -639,7 +629,6 @@ export const broadcastProductsUpdate = (products: Product[]) => {
 };
 
 export const saveAllProductsToDb = async (products: Product[]): Promise<boolean> => {
-  recordLocalProductSave();
   const stampedProducts = products
     .filter((p) => p && p.id)
     .map((p, idx) => ({
@@ -679,9 +668,9 @@ export const saveAllProductsToDb = async (products: Product[]): Promise<boolean>
       },
       { merge: true }
     );
-    await Promise.allSettled(
-      sorted.map((p) => setDoc(doc(db, 'products', p.id), p, { merge: true }))
-    );
+    sorted.forEach((p) => {
+      setDoc(doc(db, 'products', p.id), p, { merge: true }).catch(() => {});
+    });
   } catch (fbErr) {
     console.warn('Save products to Firestore notice:', fbErr);
   }
@@ -703,145 +692,8 @@ export const saveAllProductsToDb = async (products: Product[]): Promise<boolean>
   return true;
 };
 
-// Dedicated ultra-fast Incredible Offer setter: 0ms UI update + full persistent cloud/disk sync
-export const setIncredibleOfferInDb = async (
-  productId: string,
-  options?: {
-    isIncredible?: boolean;
-    timerDuration?: string;
-    expiresAt?: string;
-    makePrimary?: boolean;
-  },
-  existingList?: Product[]
-): Promise<Product[]> => {
-  recordLocalProductSave();
-  const shouldBeIncredible = options?.isIncredible !== false;
-  const timerDuration = options?.timerDuration || 'permanent';
-  const makePrimary = options?.makePrimary !== false;
-
-  let currentProducts: Product[] = [];
-  if (Array.isArray(existingList) && existingList.length > 0) {
-    currentProducts = existingList.map(cleanProductItem).filter((p): p is Product => p !== null);
-  }
-
-  if (currentProducts.length === 0) {
-    try {
-      const raw = localStorage.getItem('jahesh_products');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          currentProducts = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
-        }
-      }
-    } catch {}
-  }
-
-  if (currentProducts.length === 0) {
-    currentProducts = INITIAL_PRODUCTS.map(cleanProductItem).filter((p): p is Product => p !== null);
-  }
-
-  let targetIdx = currentProducts.findIndex((p) => p.id === productId);
-  if (targetIdx < 0) {
-    // Check in INITIAL_PRODUCTS
-    const foundInInitial = INITIAL_PRODUCTS.find((p) => p.id === productId);
-    if (foundInInitial) {
-      currentProducts.push(cleanProductItem(foundInInitial)!);
-      targetIdx = currentProducts.length - 1;
-    } else {
-      console.warn('setIncredibleOfferInDb: product not found', productId);
-      return currentProducts;
-    }
-  }
-
-  const targetProd: Product = { ...currentProducts[targetIdx] };
-
-  if (shouldBeIncredible) {
-    targetProd.isIncredible = true;
-    targetProd.incredibleTimerDuration = timerDuration;
-    if (options?.expiresAt) {
-      targetProd.incredibleExpiresAt = options.expiresAt;
-    } else if (timerDuration === 'permanent') {
-      targetProd.incredibleExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-    } else if (timerDuration === '1day') {
-      targetProd.incredibleExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    } else if (timerDuration === '3days') {
-      targetProd.incredibleExpiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-    } else if (timerDuration === '1week') {
-      targetProd.incredibleExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    } else if (timerDuration === '1month') {
-      targetProd.incredibleExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    } else {
-      targetProd.incredibleExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    }
-    targetProd.updatedAt = new Date().toISOString();
-
-    if (makePrimary) {
-      // Set to rank 1
-      targetProd.displayOrder = 1;
-      targetProd.displayRank = 1;
-
-      // Update full list: demote other products from incredible so this product is uniquely the primary one
-      currentProducts = currentProducts.map((p) => {
-        if (p.id === productId) return targetProd;
-        const curOrder = typeof p.displayOrder === 'number' ? p.displayOrder : 2;
-        return {
-          ...p,
-          isIncredible: false,
-          displayOrder: Math.max(2, curOrder + 1),
-          displayRank: Math.max(2, curOrder + 1),
-        };
-      });
-    } else {
-      currentProducts[targetIdx] = targetProd;
-    }
-  } else {
-    targetProd.isIncredible = false;
-    delete (targetProd as any).incredibleExpiresAt;
-    delete (targetProd as any).incredibleTimerDuration;
-    targetProd.updatedAt = new Date().toISOString();
-    currentProducts[targetIdx] = targetProd;
-  }
-
-  const sorted = sortProductsByRank(currentProducts);
-
-  // 1. Immediately cache locally & broadcast to all tabs (0ms)
-  try {
-    safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
-    broadcastProductsUpdate(sorted);
-  } catch {}
-
-  // 2. Call dedicated server endpoint & universal API
-  try {
-    const payload = {
-      productId,
-      isIncredible: shouldBeIncredible,
-      timerDuration,
-      expiresAt: targetProd.incredibleExpiresAt,
-      makePrimary,
-    };
-    await Promise.allSettled([
-      fetch('/api/products/set-incredible', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }),
-      fetchUniversalApi('products/set-incredible', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }),
-    ]);
-  } catch {}
-
-  // 3. Persist the entire new authoritative list across all cloud layers & disk
-  await saveAllProductsToDb(sorted);
-
-  return sorted;
-};
-
 export const saveProductToDb = async (product: Product): Promise<boolean> => {
   try {
-    recordLocalProductSave();
     if (!product.updatedAt) {
       product.updatedAt = new Date().toISOString();
     }
@@ -892,14 +744,6 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       gallery: cleanGallery,
     };
 
-    if (authoritativeProduct.isIncredible) {
-      authoritativeProduct.displayOrder = 1;
-      authoritativeProduct.displayRank = 1;
-      if (!authoritativeProduct.incredibleExpiresAt) {
-        authoritativeProduct.incredibleExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-      }
-    }
-
     // 1. Direct Server Disk Persistence (/api/products/save & /jaheshkala/api/products/save) - Instant disk write
     try {
       const res = await fetch('/api/products/save', {
@@ -938,28 +782,11 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       }
     } catch {}
 
-    if (authoritativeProduct.isIncredible) {
-      masterList = masterList.map((p) => {
-        if (p.id === authoritativeProduct.id) return authoritativeProduct;
-        const curOrder = typeof p.displayOrder === 'number' ? p.displayOrder : 2;
-        return {
-          ...p,
-          isIncredible: false,
-          displayOrder: Math.max(2, curOrder + 1),
-          displayRank: Math.max(2, curOrder + 1),
-        };
-      });
-      const exists = masterList.some((p) => p.id === authoritativeProduct.id);
-      if (!exists) {
-        masterList = [authoritativeProduct, ...masterList];
-      }
+    const idx = masterList.findIndex((p) => p.id === product.id);
+    if (idx >= 0) {
+      masterList[idx] = authoritativeProduct;
     } else {
-      const idx = masterList.findIndex((p) => p.id === product.id);
-      if (idx >= 0) {
-        masterList[idx] = authoritativeProduct;
-      } else {
-        masterList = [authoritativeProduct, ...masterList];
-      }
+      masterList = [authoritativeProduct, ...masterList];
     }
 
     const sortedMaster = sortProductsByRank(masterList);
@@ -976,8 +803,8 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
     try {
       const cleanAuthoritativeDoc = JSON.parse(JSON.stringify(authoritativeProduct));
       const cleanMasterList = JSON.parse(JSON.stringify(sortedMaster));
-      const firestorePromises: Promise<any>[] = [
-        setDoc(doc(db, 'products', product.id), cleanAuthoritativeDoc, { merge: true }),
+      await Promise.allSettled([
+        setDoc(doc(db, 'products', product.id), cleanAuthoritativeDoc),
         setDoc(
           doc(db, 'settings', 'products'),
           {
@@ -986,13 +813,7 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
           },
           { merge: true }
         ),
-      ];
-      if (authoritativeProduct.isIncredible) {
-        sortedMaster.filter((p) => p.id !== authoritativeProduct.id && !p.isIncredible).forEach((p) => {
-          firestorePromises.push(setDoc(doc(db, 'products', p.id), { isIncredible: false, displayOrder: p.displayOrder, displayRank: p.displayRank }, { merge: true }));
-        });
-      }
-      await Promise.allSettled(firestorePromises);
+      ]);
       console.log(`[Firestore] Saved product ${product.id} and updated settings/products successfully.`);
     } catch (fbErr) {
       console.warn('Firestore save product notice:', fbErr);
@@ -2686,7 +2507,7 @@ export const fetchUniversalApi = async (pathOrAction: string, options?: RequestI
   for (const url of endpoints) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
       const res = await fetch(url, {
         ...options,
         signal: controller.signal,

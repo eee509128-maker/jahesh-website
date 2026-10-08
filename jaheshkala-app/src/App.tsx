@@ -30,8 +30,6 @@ import {
   subscribeToProductsRealtime,
   sortProductsByRank,
   saveAllProductsOrderToDb,
-  saveAllProductsToDb,
-  setIncredibleOfferInDb,
 } from './lib/dbService';
 import {
   verifyZibalPayment,
@@ -1203,65 +1201,28 @@ export default function App() {
   };
 
   const handleAddNewProduct = async (newProduct: Product) => {
-    await saveProductToDb(newProduct);
-    if (newProduct.isIncredible) {
-      const updated = await setIncredibleOfferInDb(newProduct.id, {
-        isIncredible: true,
-        timerDuration: newProduct.incredibleTimerDuration,
-        expiresAt: newProduct.incredibleExpiresAt,
-        makePrimary: true,
-      }, [newProduct, ...products]);
-      setProducts(updated);
-    } else {
-      const filtered = products.filter((p) => p.id !== newProduct.id);
+    setProducts((prev) => {
+      const filtered = prev.filter((p) => p.id !== newProduct.id);
       const updated = sortProductsByRank([newProduct, ...filtered]);
-      setProducts(updated);
       try {
         safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       } catch {}
-      await saveAllProductsToDb(updated);
-    }
+      return updated;
+    });
+    await saveProductToDb(newProduct);
     showToast('محصول جدید در دیتابیس ابری ثبت و منتشر شد.');
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
+    setProducts((prev) => {
+      const updated = sortProductsByRank(prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
+      try {
+        safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     await saveProductToDb(updatedProduct);
-
-    if (updatedProduct.isIncredible) {
-      const updated = await setIncredibleOfferInDb(updatedProduct.id, {
-        isIncredible: true,
-        timerDuration: updatedProduct.incredibleTimerDuration,
-        expiresAt: updatedProduct.incredibleExpiresAt,
-        makePrimary: true,
-      }, products);
-      setProducts(updated);
-    } else {
-      const updated = await setIncredibleOfferInDb(updatedProduct.id, {
-        isIncredible: false,
-        makePrimary: false,
-      }, products);
-      setProducts(updated);
-    }
-    showToast(`محصول «${updatedProduct.title}» و مشخصات آن در دیتابیس به‌روزرسانی شد.`);
-  };
-
-  const handleSetIncredibleProduct = async (
-    productId: string,
-    options?: {
-      isIncredible?: boolean;
-      timerDuration?: string;
-      expiresAt?: string;
-      makePrimary?: boolean;
-    }
-  ) => {
-    const updated = await setIncredibleOfferInDb(productId, options, products);
-    setProducts(updated);
-    const prod = updated.find((p) => p.id === productId);
-    if (options?.isIncredible === false) {
-      showToast(`محصول «${prod?.title || ''}» از پیشنهادهای شگفت‌انگیز خارج شد.`);
-    } else {
-      showToast(`محصول «${prod?.title || ''}» با موفقیت به عنوان پیشنهاد شگفت‌انگیز اصلی ویترین ثبت شد.`);
-    }
+    showToast(`محصول «${updatedProduct.title}» و تصویر آن در دیتابیس به‌روزرسانی شد.`);
   };
 
   const handleReorderProducts = async (orderedList: Product[]) => {
@@ -2008,7 +1969,6 @@ export default function App() {
           products={products}
           onAddNewProduct={handleAddNewProduct}
           onUpdateProduct={handleUpdateProduct}
-          onSetIncredibleProduct={handleSetIncredibleProduct}
           onDeleteProduct={handleDeleteProduct}
           onReorderProducts={handleReorderProducts}
           zibalMerchant={zibalMerchant}

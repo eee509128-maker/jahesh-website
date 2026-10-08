@@ -84,8 +84,6 @@ switch ($action) {
     case 'api/products':
     case 'products/save':
     case 'api/products/save':
-    case 'products/set-incredible':
-    case 'api/products/set-incredible':
     case 'products/delete':
     case 'api/products/delete':
     case 'products/order':
@@ -172,69 +170,6 @@ switch ($action) {
 
             writeJsonFile($productsFile, $prods);
             echo json_encode(['success' => true, 'product' => $product, 'count' => count($prods), 'products' => $prods]);
-            exit;
-        }
-
-        // 3.5 Set / Change Incredible Product
-        if ($action === 'products/set-incredible' || $action === 'api/products/set-incredible') {
-            $pId = isset($inputData['productId']) ? (string)$inputData['productId'] : (isset($_GET['productId']) ? (string)$_GET['productId'] : '');
-            if (empty($pId)) {
-                http_response_code(400);
-                echo json_encode(['error' => 'productId required']);
-                exit;
-            }
-
-            $isIncredible = isset($inputData['isIncredible']) ? (bool)$inputData['isIncredible'] : true;
-            $timerDuration = isset($inputData['timerDuration']) ? (string)$inputData['timerDuration'] : 'permanent';
-            $expiresAt = isset($inputData['expiresAt']) ? (string)$inputData['expiresAt'] : null;
-            $makePrimary = isset($inputData['makePrimary']) ? (bool)$inputData['makePrimary'] : true;
-
-            $prods = readJsonFile($productsFile, []);
-            $foundIndex = -1;
-            foreach ($prods as $idx => $p) {
-                if (isset($p['id']) && (string)$p['id'] === $pId) {
-                    $foundIndex = $idx;
-                    break;
-                }
-            }
-
-            if ($foundIndex < 0) {
-                http_response_code(404);
-                echo json_encode(['error' => 'Product not found']);
-                exit;
-            }
-
-            if ($isIncredible) {
-                if ($makePrimary) {
-                    foreach ($prods as $idx => $p) {
-                        if ((string)$p['id'] !== $pId) {
-                            $prods[$idx]['isIncredible'] = false;
-                        }
-                    }
-                }
-
-                $prods[$foundIndex]['isIncredible'] = true;
-                $prods[$foundIndex]['incredibleTimerDuration'] = $timerDuration;
-                if (!empty($expiresAt)) {
-                    $prods[$foundIndex]['incredibleExpiresAt'] = $expiresAt;
-                } else if ($timerDuration === 'permanent') {
-                    $prods[$foundIndex]['incredibleExpiresAt'] = gmdate('Y-m-d\TH:i:s.000\Z', time() + 365 * 86400);
-                } else {
-                    $prods[$foundIndex]['incredibleExpiresAt'] = gmdate('Y-m-d\TH:i:s.000\Z', time() + 30 * 86400);
-                }
-                if ($makePrimary) {
-                    $prods[$foundIndex]['displayOrder'] = 1;
-                    $prods[$foundIndex]['displayRank'] = 1;
-                }
-                $prods[$foundIndex]['updatedAt'] = gmdate('Y-m-d\TH:i:s.000\Z');
-            } else {
-                $prods[$foundIndex]['isIncredible'] = false;
-                unset($prods[$foundIndex]['incredibleExpiresAt']);
-                $prods[$foundIndex]['updatedAt'] = gmdate('Y-m-d\TH:i:s.000\Z');
-            }
-
-            writeJsonFile($productsFile, $prods);
-            echo json_encode(['success' => true, 'product' => $prods[$foundIndex], 'count' => count($prods), 'products' => $prods]);
             exit;
         }
 

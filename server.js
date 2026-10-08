@@ -895,15 +895,6 @@ app.post(['/api/products/deleted/remove', '/api/products/unmark-deleted'], (req,
   return res.json({ success: true, deleted: getDeletedProductIds() });
 });
 
-// Prevent any browser/proxy caching for all API endpoints
-app.use(['/api', '/jaheshkala/api'], (req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
-  next();
-});
-
 let productsVersion = Date.now();
 
 // GET /api/products/version & /jaheshkala/api/products/version - ultra-lightweight 20-byte change detector
@@ -938,23 +929,6 @@ app.get(['/api/products', '/jaheshkala/api/products'], (req, res) => {
   return res.json(sortProductsByOrder(getDefaultProducts().filter((p) => p && p.id && !deletedIds.has(p.id))));
 });
 
-async function syncProductsToFirestore(products) {
-  try {
-    if (!serverDb || !Array.isArray(products) || products.length === 0) return;
-    await setDoc(doc(serverDb, 'settings', 'products'), {
-      products,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
-    for (const p of products) {
-      if (p && p.id) {
-        setDoc(doc(serverDb, 'products', p.id), p, { merge: true }).catch(() => {});
-      }
-    }
-  } catch (err) {
-    console.warn('[Server Firestore] sync products notice:', err);
-  }
-}
-
 // POST /api/products - replaces entire list on disk
 app.post(['/api/products', '/jaheshkala/api/products'], (req, res) => {
   try {
@@ -974,13 +948,8 @@ app.post(['/api/products', '/jaheshkala/api/products'], (req, res) => {
       if (fs.existsSync(path.dirname(distData))) {
         fs.writeFileSync(distData, JSON.stringify(filtered, null, 2), 'utf8');
       }
-      const publicData = path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(publicData))) {
-        fs.writeFileSync(publicData, JSON.stringify(filtered, null, 2), 'utf8');
-      }
     } catch {}
     productsVersion = Date.now();
-    syncProductsToFirestore(filtered).catch(() => {});
     console.log(`[Products] Successfully persisted ${filtered.length} products to disk. Version: ${productsVersion}`);
     return res.json({ success: true, count: filtered.length, version: productsVersion });
   } catch (err) {
@@ -1010,40 +979,12 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
     if (list.length === 0) {
       list = [...DEFAULT_SERVER_PRODUCTS];
     }
-    const shouldBeIncredible = Boolean(product.isIncredible);
-    let targetIdx = list.findIndex((p) => p.id === product.id);
-
-    if (shouldBeIncredible) {
-      product.isIncredible = true;
-      product.displayOrder = 1;
-      product.displayRank = 1;
-      if (!product.incredibleExpiresAt) {
-        product.incredibleExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-      }
-      product.updatedAt = product.updatedAt || new Date().toISOString();
-      // Demote other products so this product is uniquely #1 in the showcase
-      list = list.map((p) => {
-        if (p.id === product.id) return { ...p, ...product, isIncredible: true, displayOrder: 1, displayRank: 1 };
-        const curOrder = typeof p.displayOrder === 'number' ? p.displayOrder : 2;
-        return {
-          ...p,
-          isIncredible: false,
-          displayOrder: Math.max(2, curOrder + 1),
-          displayRank: Math.max(2, curOrder + 1),
-        };
-      });
-      const exists = list.some((p) => p.id === product.id);
-      if (!exists) {
-        list = [{ ...product, isIncredible: true, displayOrder: 1, displayRank: 1 }, ...list];
-      }
+    const idx = list.findIndex((p) => p.id === product.id);
+    if (idx >= 0) {
+      list[idx] = product;
     } else {
-      if (targetIdx >= 0) {
-        list[targetIdx] = { ...list[targetIdx], ...product, isIncredible: false };
-      } else {
-        list = [{ ...product, isIncredible: false }, ...list];
-      }
+      list = [product, ...list];
     }
-    list = sortProductsByOrder(list);
     const dataDir = path.dirname(PRODUCTS_FILE);
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
@@ -1054,117 +995,12 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
       if (fs.existsSync(path.dirname(distData))) {
         fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
       }
-      const publicData = path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(publicData))) {
-        fs.writeFileSync(publicData, JSON.stringify(list, null, 2), 'utf8');
-      }
     } catch {}
     productsVersion = Date.now();
-    syncProductsToFirestore(list).catch(() => {});
-    const savedProduct = list.find((p) => p.id === product.id) || product;
     console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}. Version: ${productsVersion}`);
-    return res.json({ success: true, products: list, product: savedProduct, version: productsVersion });
+    return res.json({ success: true, products: list, product, version: productsVersion });
   } catch (err) {
     console.error('Error in /api/products/save:', err);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/products/set-incredible - dedicated atomic endpoint to set/change incredible deal
-app.post(['/api/products/set-incredible', '/jaheshkala/api/products/set-incredible'], (req, res) => {
-  try {
-    const { productId, isIncredible = true, timerDuration = 'permanent', expiresAt, makePrimary = true } = req.body || {};
-    if (!productId) {
-      return res.status(400).json({ error: 'productId required' });
-    }
-
-    let list = [];
-    if (fs.existsSync(PRODUCTS_FILE)) {
-      try {
-        const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) list = parsed;
-      } catch {}
-    }
-    if (list.length === 0) {
-      list = [...DEFAULT_SERVER_PRODUCTS];
-    }
-
-    const idx = list.findIndex((p) => p.id === productId);
-    if (idx < 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    const targetProduct = { ...list[idx] };
-    const shouldBeIncredible = Boolean(isIncredible);
-
-    if (shouldBeIncredible) {
-      targetProduct.isIncredible = true;
-      targetProduct.incredibleTimerDuration = timerDuration || 'permanent';
-      targetProduct.incredibleExpiresAt = timerDuration === 'permanent'
-        ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
-        : (expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
-
-      if (makePrimary) {
-        // Demote other products from incredible so this product is uniquely #1 in the showcase
-        list = list.map((p) => {
-          if (p.id === productId) return p;
-          return {
-            ...p,
-            isIncredible: false,
-          };
-        });
-        targetProduct.displayOrder = 1;
-        targetProduct.displayRank = 1;
-      }
-      targetProduct.updatedAt = new Date().toISOString();
-      list[idx] = targetProduct;
-
-      // Re-order so target product is at rank 1
-      if (makePrimary) {
-        list = list.map((p) => {
-          if (p.id === productId) return { ...p, displayOrder: 1, displayRank: 1 };
-          const curOrder = typeof p.displayOrder === 'number' ? p.displayOrder : 2;
-          return {
-            ...p,
-            displayOrder: Math.max(2, curOrder + 1),
-            displayRank: Math.max(2, curOrder + 1),
-          };
-        });
-      }
-    } else {
-      targetProduct.isIncredible = false;
-      delete targetProduct.incredibleExpiresAt;
-      targetProduct.updatedAt = new Date().toISOString();
-      list[idx] = targetProduct;
-    }
-
-    // Sort by rank
-    list = sortProductsByOrder(list);
-
-    const dataDir = path.dirname(PRODUCTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
-
-    try {
-      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(distData))) {
-        fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
-      }
-      const publicData = path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(publicData))) {
-        fs.writeFileSync(publicData, JSON.stringify(list, null, 2), 'utf8');
-      }
-    } catch {}
-
-    productsVersion = Date.now();
-    syncProductsToFirestore(list).catch(() => {});
-    console.log(`[Products] set-incredible executed for ${productId}. isIncredible: ${shouldBeIncredible}. Version: ${productsVersion}`);
-    return res.json({ success: true, product: targetProduct, products: list, version: productsVersion });
-  } catch (err) {
-    console.error('Error in /api/products/set-incredible:', err);
     return res.status(500).json({ error: err.message });
   }
 });
@@ -1222,10 +1058,6 @@ app.post(['/api/products/order', '/api/products/save-all', '/api/products/reorde
       const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
       if (fs.existsSync(path.dirname(distData))) {
         fs.writeFileSync(distData, JSON.stringify(filtered, null, 2), 'utf8');
-      }
-      const publicData = path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(publicData))) {
-        fs.writeFileSync(publicData, JSON.stringify(filtered, null, 2), 'utf8');
       }
     } catch {}
     productsVersion = Date.now();
@@ -3898,36 +3730,13 @@ app.get(['/vet-hospital', '/vet-hospital/*'], (req, res, next) => {
 
 // Serve jaheshkala static files & SPA entry
 const jaheshkalaDir = path.join(__dirname, 'jaheshkala');
-app.get(['/jaheshkala', '/jaheshkala/'], (req, res) => {
-  const indexFile = path.join(jaheshkalaDir, 'index.html');
-  if (fs.existsSync(indexFile)) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    return res.sendFile(indexFile);
-  }
-  res.status(404).send('Not found');
-});
-
-app.use('/jaheshkala', express.static(jaheshkalaDir, {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    }
-  }
-}));
-
-app.get('/jaheshkala/*', (req, res, next) => {
+app.use('/jaheshkala', express.static(jaheshkalaDir));
+app.get(['/jaheshkala', '/jaheshkala/*'], (req, res, next) => {
   if (path.extname(req.path)) {
     return next();
   }
   const indexFile = path.join(jaheshkalaDir, 'index.html');
   if (fs.existsSync(indexFile)) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
     return res.sendFile(indexFile);
   }
   next();
@@ -3971,11 +3780,6 @@ app.use(express.static(__dirname, {
 
 // Fallback for any client-side routed page
 app.use((req, res) => {
-  // Never return HTML for API requests
-  if (req.path.startsWith('/api/') || req.path.startsWith('/jaheshkala/api/') || req.path.includes('api.php')) {
-    return res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
-  }
-
   // If requesting an asset or a file with an extension that wasn't found by express.static, return 404
   if (req.path.startsWith('/assets/') || path.extname(req.path)) {
     return res.status(404).send('Not found');
