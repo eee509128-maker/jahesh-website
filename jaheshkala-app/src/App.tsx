@@ -1203,6 +1203,7 @@ export default function App() {
   };
 
   const handleAddNewProduct = async (newProduct: Product) => {
+    await saveProductToDb(newProduct);
     if (newProduct.isIncredible) {
       const updated = await setIncredibleOfferInDb(newProduct.id, {
         isIncredible: true,
@@ -1220,12 +1221,18 @@ export default function App() {
         } catch {}
         return updated;
       });
-      await saveProductToDb(newProduct);
+      setProducts((prev) => {
+        saveAllProductsToDb(prev).catch(() => {});
+        return prev;
+      });
     }
     showToast('محصول جدید در دیتابیس ابری ثبت و منتشر شد.');
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
+    // 1. First save all edited fields (title, price, image, description, category, discount)
+    await saveProductToDb(updatedProduct);
+
     if (updatedProduct.isIncredible) {
       const updated = await setIncredibleOfferInDb(updatedProduct.id, {
         isIncredible: true,
@@ -1235,6 +1242,7 @@ export default function App() {
       });
       setProducts(updated);
     } else {
+      // If was previously incredible or normal, ensure updated in state & storage
       setProducts((prev) => {
         const updated = sortProductsByRank(prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
         try {
@@ -1242,7 +1250,6 @@ export default function App() {
         } catch {}
         return updated;
       });
-      await saveProductToDb(updatedProduct);
       setProducts((prev) => {
         saveAllProductsToDb(prev).catch(() => {});
         return prev;

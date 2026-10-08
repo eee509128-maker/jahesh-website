@@ -1002,6 +1002,8 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
       list = [...DEFAULT_SERVER_PRODUCTS];
     }
     const shouldBeIncredible = Boolean(product.isIncredible);
+    let targetIdx = list.findIndex((p) => p.id === product.id);
+
     if (shouldBeIncredible) {
       product.isIncredible = true;
       product.displayOrder = 1;
@@ -1026,11 +1028,10 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
         list = [{ ...product, isIncredible: true, displayOrder: 1, displayRank: 1 }, ...list];
       }
     } else {
-      const idx = list.findIndex((p) => p.id === product.id);
-      if (idx >= 0) {
-        list[idx] = { ...list[idx], ...product };
+      if (targetIdx >= 0) {
+        list[targetIdx] = { ...list[targetIdx], ...product, isIncredible: false };
       } else {
-        list = [product, ...list];
+        list = [{ ...product, isIncredible: false }, ...list];
       }
     }
     list = sortProductsByOrder(list);
@@ -1051,8 +1052,9 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
     } catch {}
     productsVersion = Date.now();
     syncProductsToFirestore(list).catch(() => {});
+    const savedProduct = list.find((p) => p.id === product.id) || product;
     console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}. Version: ${productsVersion}`);
-    return res.json({ success: true, products: list, product: list[idx >= 0 ? idx : 0], version: productsVersion });
+    return res.json({ success: true, products: list, product: savedProduct, version: productsVersion });
   } catch (err) {
     console.error('Error in /api/products/save:', err);
     return res.status(500).json({ error: err.message });
