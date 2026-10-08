@@ -1,1 +1,0 @@
-import{r as e,R as s}from"./chunk-_4i898Gl.js";const l=e.forwardRef(({value:a,defaultValue:t,...r},o)=>{const{renderer:n}=e.useContext(s),d=n==="canvas"?String(a??t):void 0;return e.createElement("textarea",{...r,key:d,defaultValue:a??t,ref:o})});l.displayName="Textarea";export{l as d};
