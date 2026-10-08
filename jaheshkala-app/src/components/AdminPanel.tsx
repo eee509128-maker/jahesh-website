@@ -8,7 +8,8 @@ import {
   Flame, Percent, Truck, Check, Ticket, ToggleLeft, ToggleRight, ArrowDownRight, Calculator, Users, MessageCircle, ArrowLeft, Reply, Paperclip, Image as ImageIcon, CornerUpRight, Download,
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
   ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette, BarChart3, TrendingUp, Filter, ArrowUpDown,
-  Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown
+  Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown,
+  Zap
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool } from '../types';
 import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank } from '../lib/dbService';
@@ -29,6 +30,15 @@ interface AdminPanelProps {
   products: Product[];
   onAddNewProduct: (newProduct: Product) => void;
   onUpdateProduct?: (product: Product) => void;
+  onSetIncredibleProduct?: (
+    productId: string,
+    options?: {
+      isIncredible?: boolean;
+      timerDuration?: string;
+      expiresAt?: string;
+      makePrimary?: boolean;
+    }
+  ) => Promise<void> | void;
   onDeleteProduct: (productId: string) => void;
   onReorderProducts?: (orderedList: Product[]) => void;
   coupons?: Coupon[];
@@ -59,6 +69,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   products = [],
   onAddNewProduct,
   onUpdateProduct,
+  onSetIncredibleProduct,
   onDeleteProduct,
   onReorderProducts,
   coupons = [],
@@ -893,6 +904,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isFreeShipping, setIsFreeShipping] = useState(true);
   const [isInStock, setIsInStock] = useState(true);
 
+  // Quick Incredible Manager & Switcher State (1-Click Instant Save & Cloud Sync)
+  const [selectedQuickIncredibleId, setSelectedQuickIncredibleId] = useState<string>('');
+  const [quickIncredibleDuration, setQuickIncredibleDuration] = useState<'1day' | '3days' | '1week' | '1month' | 'permanent' | 'custom'>('permanent');
+  const [quickIncredibleCustomExpires, setQuickIncredibleCustomExpires] = useState<string>('');
+  const [incredibleFeedbackMsg, setIncredibleFeedbackMsg] = useState<string>('');
+  const [isSettingIncredible, setIsSettingIncredible] = useState<boolean>(false);
+
+  // Quick 1-click modal for individual product cards
+  const [quickIncredibleModal, setQuickIncredibleModal] = useState<{
+    isOpen: boolean;
+    product: Product | null;
+    duration: '1day' | '3days' | '1week' | '1month' | 'permanent' | 'custom';
+    expiresAt: string;
+  }>({
+    isOpen: false,
+    product: null,
+    duration: 'permanent',
+    expiresAt: '',
+  });
+
   // Subscription Settings Flag & Daily Price
   const [isSubscription, setIsSubscription] = useState(false);
   const [pricePerDayInput, setPricePerDayInput] = useState('250000');
@@ -1097,6 +1128,61 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     else if (duration === 'permanent') target += 365 * 24 * 60 * 60 * 1000; // 1 year rolling / permanent
     else if (duration === 'custom' && customHours) target += customHours * 60 * 60 * 1000;
     setIncredibleExpiresAt(new Date(target).toISOString());
+  };
+
+  const handleApplyQuickIncredible = async (productId: string, duration?: string, customExpires?: string) => {
+    if (!productId) return;
+    const dur = (duration || quickIncredibleDuration || 'permanent') as any;
+    let expires = customExpires || quickIncredibleCustomExpires;
+    if (!expires) {
+      let target = Date.now();
+      if (dur === '1day') target += 24 * 60 * 60 * 1000;
+      else if (dur === '3days') target += 3 * 24 * 60 * 60 * 1000;
+      else if (dur === '1week') target += 7 * 24 * 60 * 60 * 1000;
+      else if (dur === '1month') target += 30 * 24 * 60 * 60 * 1000;
+      else if (dur === 'permanent') target += 365 * 24 * 60 * 60 * 1000;
+      expires = new Date(target).toISOString();
+    }
+
+    setIsSettingIncredible(true);
+    try {
+      if (onSetIncredibleProduct) {
+        await onSetIncredibleProduct(productId, {
+          isIncredible: true,
+          timerDuration: dur,
+          expiresAt: expires,
+          makePrimary: true,
+        });
+      }
+      const prod = products.find((p) => p.id === productId);
+      setIncredibleFeedbackMsg(`محصول «${prod?.title || 'انتخابی'}» فوراً به عنوان پیشنهاد شگفت‌انگیز اصلی ویترین ذخیره و منتشر شد!`);
+      setTimeout(() => setIncredibleFeedbackMsg(''), 4500);
+      setQuickIncredibleModal({ isOpen: false, product: null, duration: 'permanent', expiresAt: '' });
+      setSelectedQuickIncredibleId('');
+    } catch (e) {
+      console.error('Error applying incredible:', e);
+    } finally {
+      setIsSettingIncredible(false);
+    }
+  };
+
+  const handleRemoveIncredible = async (productId: string) => {
+    if (!productId) return;
+    setIsSettingIncredible(true);
+    try {
+      if (onSetIncredibleProduct) {
+        await onSetIncredibleProduct(productId, {
+          isIncredible: false,
+        });
+      }
+      setIncredibleFeedbackMsg('محصول با موفقیت از پیشنهادهای شگفت‌انگیز خارج شد.');
+      setTimeout(() => setIncredibleFeedbackMsg(''), 4000);
+      setQuickIncredibleModal({ isOpen: false, product: null, duration: 'permanent', expiresAt: '' });
+    } catch (e) {
+      console.error('Error removing incredible:', e);
+    } finally {
+      setIsSettingIncredible(false);
+    }
   };
 
   const formatPersianDateTime = (isoDate?: string) => {
@@ -1441,7 +1527,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newPrice.trim()) return;
 
@@ -1547,10 +1633,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     };
 
     if (editingProductId && onUpdateProduct) {
-      onUpdateProduct(productData);
+      await onUpdateProduct(productData);
       setFormSuccess('تغییرات محصول با موفقیت در دیتابیس ذخیره شد!');
-    } else {
-      onAddNewProduct(productData);
+    } else if (onAddNewProduct) {
+      await onAddNewProduct(productData);
       setFormSuccess(`محصول «${productData.title}» با قیمت ${formatPrice(priceNum)} در دیتابیس ثبت و منتشر شد!`);
     }
     
@@ -2519,6 +2605,191 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     )}
 
+                    {/* 2.6 DEDICATED INCREDIBLE OFFER & LIVE COUNTDOWN TIMER MANAGER */}
+                    {prodFilterTab === 'incredible' && (
+                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#2a0c46] via-[#1b0933] to-[#110524] border-2 border-rose-500/60 shadow-2xl space-y-4 animate-in fade-in">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-rose-800/40">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 flex items-center justify-center shrink-0 shadow-md">
+                              <Zap className="w-5 h-5 text-rose-400 fill-rose-400 animate-pulse" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-black text-white flex items-center gap-2">
+                                <span>مدیریت ویژه و فوری پیشنهاد شگفت‌انگیز ویترین جهش‌کالا</span>
+                                <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/40 font-bold">
+                                  ساعت شمارش معکوس زنده ویترین
+                                </span>
+                              </h4>
+                              <p className="text-[11px] text-slate-300 mt-0.5">
+                                با تغییر و انتخاب کالا در این بخش، کالا بلافاصله در رتبه ۱ ویترین قرار گرفته، برای تمام کاربران و حساب‌ها ثبت دائم شده و ساعت شمارش معکوس زنده در صفحه اصلی فعال می‌شود.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {incredibleFeedbackMsg && (
+                          <div className="p-3 rounded-2xl bg-emerald-950/80 border border-emerald-500/60 text-xs text-emerald-300 flex items-center gap-2 animate-in fade-in shadow-lg font-bold">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span>{incredibleFeedbackMsg}</span>
+                          </div>
+                        )}
+
+                        {/* Current Active Incredible Offer Status */}
+                        {(() => {
+                          const activeIncredible = products.find((p) => p.isIncredible) || null;
+                          return (
+                            <div className="p-3.5 sm:p-4 rounded-xl bg-black/50 border border-rose-500/30 space-y-3">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <span className="text-xs text-rose-300 font-bold flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5 text-rose-400" />
+                                  <span>کالای شگفت‌انگیز فعال کنونی در سایت:</span>
+                                </span>
+                                {activeIncredible && (
+                                  <span className="text-[10px] bg-rose-950 px-2 py-0.5 rounded border border-rose-600/40 text-rose-200 font-mono font-bold">
+                                    ⏳ زمان باقی‌مانده: {formatRemainingTime(activeIncredible.incredibleExpiresAt)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {activeIncredible ? (
+                                <div className="flex items-center justify-between gap-3 flex-wrap bg-[#1c0d35] p-3 rounded-xl border border-purple-800/40">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <img
+                                      src={activeIncredible.image}
+                                      alt={activeIncredible.title}
+                                      className="w-14 h-14 rounded-xl object-cover border border-rose-500/50 shrink-0 shadow-md"
+                                    />
+                                    <div className="min-w-0">
+                                      <h5 className="text-xs sm:text-sm font-bold text-white truncate max-w-xs sm:max-w-md">
+                                        {activeIncredible.title}
+                                      </h5>
+                                      <div className="flex items-center gap-2 mt-1 text-xs">
+                                        <span className="text-amber-300 font-black font-mono">
+                                          {formatPrice(activeIncredible.price)}
+                                        </span>
+                                        {activeIncredible.discountPercent && (
+                                          <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.2 rounded font-black">
+                                            {activeIncredible.discountPercent}% تخفیف
+                                          </span>
+                                        )}
+                                        <span className="text-[10px] text-slate-400">
+                                          ({activeIncredible.category})
+                                        </span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-400 mt-1">
+                                        انقضا: <strong className="text-rose-200 font-mono">{formatPersianDateTime(activeIncredible.incredibleExpiresAt)}</strong>
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setQuickIncredibleModal({
+                                        isOpen: true,
+                                        product: activeIncredible,
+                                        duration: (activeIncredible.incredibleTimerDuration as any) || 'permanent',
+                                        expiresAt: activeIncredible.incredibleExpiresAt || '',
+                                      })}
+                                      className="px-3 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 hover:text-white text-xs font-bold transition-all border border-purple-700/60 cursor-pointer flex items-center gap-1"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                                      <span>ویرایش زمان و انقضا</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isSettingIncredible}
+                                      onClick={() => handleRemoveIncredible(activeIncredible.id)}
+                                      className="px-3 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-rose-100 text-xs font-bold transition-all border border-rose-800/60 cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                                      title="حذف از پیشنهادهای شگفت‌انگیز ویترین"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                      <span>خروج از شگفت‌انگیز</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="p-3 text-center bg-black/40 rounded-xl border border-dashed border-rose-500/30 text-xs text-slate-400">
+                                  در حال حاضر هیچ کالایی به عنوان پیشنهاد شگفت‌انگیز ثبت نشده است. از منوی زیر می‌توانید در ۱ ثانیه کالای جدید را انتخاب و فعال کنید.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Instant Product Switcher Box */}
+                        <div className="p-3.5 sm:p-4 rounded-xl bg-[#180c35] border border-purple-800/60 space-y-3">
+                          <h5 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                            <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                            <span>تغییر و جایگزینی فوری کالای شگفت‌انگیز ویترین:</span>
+                          </h5>
+
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end">
+                            {/* Product Selector Dropdown */}
+                            <div className="md:col-span-5 space-y-1">
+                              <label className="text-[11px] text-slate-300 font-bold block">
+                                انتخاب کالا از کل محصولات فروشگاه ({products.length} کالا):
+                              </label>
+                              <select
+                                value={selectedQuickIncredibleId}
+                                onChange={(e) => setSelectedQuickIncredibleId(e.target.value)}
+                                className="w-full bg-black/60 border border-purple-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-400"
+                              >
+                                <option value="">-- یک محصول را برای شگفت‌انگیز شدن انتخاب کنید --</option>
+                                {products.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.title} - ({formatPrice(p.price)}) {p.isIncredible ? '⭐ (شگفت‌انگیز کنونی)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Duration Picker */}
+                            <div className="md:col-span-4 space-y-1">
+                              <label className="text-[11px] text-slate-300 font-bold block">
+                                مدت زمان اعتبار تایمر شمارش معکوس:
+                              </label>
+                              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 text-[10px]">
+                                {[
+                                  { id: 'permanent', label: 'دائمی' },
+                                  { id: '1month', label: '۱ ماه' },
+                                  { id: '1week', label: '۱ هفته' },
+                                  { id: '3days', label: '۳ روز' },
+                                  { id: '1day', label: '۱ روز' },
+                                ].map((d) => (
+                                  <button
+                                    key={d.id}
+                                    type="button"
+                                    onClick={() => setQuickIncredibleDuration(d.id as any)}
+                                    className={`py-1.5 px-1 rounded-lg font-bold border transition-all text-center cursor-pointer ${
+                                      quickIncredibleDuration === d.id
+                                        ? 'bg-rose-600 text-white border-rose-400 shadow-xs'
+                                        : 'bg-purple-950/60 text-slate-300 hover:text-white border-purple-800/40'
+                                    }`}
+                                  >
+                                    {d.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Apply Button */}
+                            <div className="md:col-span-3">
+                              <button
+                                type="button"
+                                disabled={!selectedQuickIncredibleId || isSettingIncredible}
+                                onClick={() => handleApplyQuickIncredible(selectedQuickIncredibleId)}
+                                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-xs shadow-lg shadow-rose-950/50 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                <Zap className="w-4 h-4 fill-white" />
+                                <span>{isSettingIncredible ? 'در حال ثبت و انتشار...' : '⚡ اعمال فوری شگفت‌انگیز'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* 3. PRODUCTS GRID */}
                     {processedProducts.length === 0 ? (
                       <div className="p-8 text-center bg-[#150d33] border border-purple-900/50 rounded-2xl space-y-3">
@@ -2615,6 +2886,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   >
                                     <Sliders className="w-4 h-4" />
                                   </button>
+
+                                  {currentUser?.role === 'admin' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setQuickIncredibleModal({
+                                        isOpen: true,
+                                        product: prod,
+                                        duration: (prod.incredibleTimerDuration as any) || 'permanent',
+                                        expiresAt: prod.incredibleExpiresAt || '',
+                                      })}
+                                      className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                        prod.isIncredible
+                                          ? 'text-rose-300 bg-rose-600/30 border border-rose-500/60 shadow-xs shadow-rose-900/50 hover:bg-rose-600/50'
+                                          : 'text-slate-400 hover:text-rose-400 hover:bg-rose-950/40'
+                                      }`}
+                                      title={prod.isIncredible ? 'تنظیم تایمر یا خروج از شگفت‌انگیز' : '⚡ تبدیل فوری به پیشنهاد شگفت‌انگیز ویترین'}
+                                    >
+                                      <Zap className={`w-4 h-4 ${prod.isIncredible ? 'fill-rose-400 text-rose-300' : ''}`} />
+                                    </button>
+                                  )}
 
                                   {currentUser?.role === 'admin' && (
                                     <button
@@ -7627,6 +7918,154 @@ on public.users for delete using (true);`;
           </div>
         )}
 
+        {/* Quick Incredible Offer Modal */}
+        {quickIncredibleModal.isOpen && quickIncredibleModal.product && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+            <div className="relative w-full max-w-lg bg-gradient-to-b from-[#1c0d38] to-[#120826] border border-rose-500/50 rounded-3xl shadow-2xl overflow-hidden text-right" dir="rtl">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-rose-900/40 bg-black/40">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-amber-500 text-white flex items-center justify-center shadow-lg shadow-rose-900/50">
+                    <Zap className="w-5 h-5 fill-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white">تنظیم کالای شگفت‌انگیز ویترین</h3>
+                    <p className="text-[10px] text-rose-300">انتخاب تایمر و انتشار فوری در صفحه اصلی فروشگاه</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setQuickIncredibleModal({ isOpen: false, product: null, duration: 'permanent', expiresAt: '' })}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 space-y-4">
+                {/* Product Info Card */}
+                <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-black/50 border border-purple-800/40">
+                  <img
+                    src={quickIncredibleModal.product.image || getFallbackProductImage(quickIncredibleModal.product.category)}
+                    alt={quickIncredibleModal.product.title}
+                    className="w-16 h-16 rounded-xl object-cover border border-purple-700/50 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-sm font-black text-white truncate">
+                      {quickIncredibleModal.product.title}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-1 text-xs">
+                      <span className="text-amber-300 font-mono font-bold">
+                        {formatPrice(quickIncredibleModal.product.price)}
+                      </span>
+                      {quickIncredibleModal.product.discountPercent ? (
+                        <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.2 rounded font-black">
+                          {quickIncredibleModal.product.discountPercent}% تخفیف
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1.5">
+                      {quickIncredibleModal.product.isIncredible ? (
+                        <span className="text-[10px] text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-500/40 font-bold flex items-center gap-1 w-fit">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <span>هم‌اکنون پیشنهاد شگفت‌انگیز فعال است</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 bg-black/40 px-2 py-0.5 rounded-md border border-slate-700 font-medium">
+                          کالای معمولی (با تأیید زیر جایگزین ویترین می‌شود)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Duration Picker */}
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-200 font-bold flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-rose-400" />
+                    <span>مدت اعتبار تایمر معکوس شگفت‌انگیز:</span>
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 text-xs">
+                    {[
+                      { id: 'permanent', label: 'دائمی' },
+                      { id: '1month', label: '۱ ماه' },
+                      { id: '1week', label: '۱ هفته' },
+                      { id: '3days', label: '۳ روز' },
+                      { id: '1day', label: '۱ روز' },
+                    ].map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          let target = Date.now();
+                          if (d.id === '1day') target += 24 * 60 * 60 * 1000;
+                          else if (d.id === '3days') target += 3 * 24 * 60 * 60 * 1000;
+                          else if (d.id === '1week') target += 7 * 24 * 60 * 60 * 1000;
+                          else if (d.id === '1month') target += 30 * 24 * 60 * 60 * 1000;
+                          else if (d.id === 'permanent') target += 365 * 24 * 60 * 60 * 1000;
+                          setQuickIncredibleModal((prev) => ({
+                            ...prev,
+                            duration: d.id as any,
+                            expiresAt: new Date(target).toISOString(),
+                          }));
+                        }}
+                        className={`py-2 px-1 rounded-xl font-bold border transition-all text-center cursor-pointer text-xs ${
+                          quickIncredibleModal.duration === d.id
+                            ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-950/50 scale-[1.02]'
+                            : 'bg-purple-950/60 text-slate-300 hover:text-white border-purple-800/40 hover:bg-purple-900/60'
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {incredibleFeedbackMsg && (
+                  <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{incredibleFeedbackMsg}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between gap-2 px-5 py-3.5 border-t border-rose-900/40 bg-black/40">
+                <button
+                  type="button"
+                  onClick={() => setQuickIncredibleModal({ isOpen: false, product: null, duration: 'permanent', expiresAt: '' })}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                >
+                  انصراف
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {quickIncredibleModal.product.isIncredible && (
+                    <button
+                      type="button"
+                      disabled={isSettingIncredible}
+                      onClick={() => handleRemoveIncredible(quickIncredibleModal.product!.id)}
+                      className="px-3 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-xs font-bold transition-all border border-rose-800/60 cursor-pointer disabled:opacity-50"
+                    >
+                      خروج از شگفت‌انگیز
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={isSettingIncredible}
+                    onClick={() => handleApplyQuickIncredible(quickIncredibleModal.product!.id, quickIncredibleModal.duration, quickIncredibleModal.expiresAt)}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-xs shadow-lg shadow-rose-950/50 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Zap className="w-4 h-4 fill-white" />
+                    <span>{isSettingIncredible ? 'در حال ثبت دیتابیس...' : '⚡ اعمال و انتشار فوری'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

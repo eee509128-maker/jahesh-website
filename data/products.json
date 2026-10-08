@@ -4,19 +4,19 @@
     "brand": "جهش‌آی‌تی (Jahesh IT)",
     "title": "پکیج طلایی طراحی سایت اختصاصی جهش",
     "displayRank": 1,
-    "incredibleTimerDuration": "1month",
+    "incredibleTimerDuration": "permanent",
     "isGolden": true,
     "inStock": true,
     "shortDescription": "طراحی سایت مدرن، ریسپانسیو و پرسرعت",
     "category": "طراحی سایت و خدمات وب",
-    "incredibleExpiresAt": "2026-10-19T05:35:07.372Z",
+    "incredibleExpiresAt": "2027-10-08T08:34:13.462Z",
     "rating": 5,
     "isSubscription": false,
     "targetGuilds": [
       "طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات"
     ],
     "warranty": "۱ ماه پشتیبانی فنی رایگان + هاست و دامین رایگان",
-    "updatedAt": "2026-09-19T05:35:17.226Z",
+    "updatedAt": "2026-10-08T08:34:13.462Z",
     "hasCustomPlans": false,
     "isIncredible": true,
     "id": "pkg-golden-jahesh",
@@ -52,7 +52,7 @@
     "category": "نرم‌افزار و سامانه‌های هوشمند",
     "couponDiscountPercent": 10,
     "isAiAppProduct": true,
-    "updatedAt": "2026-09-18T10:19:50.329Z",
+    "updatedAt": "2026-10-08T08:30:47.868Z",
     "isGolden": false,
     "aiAppDefaultDays": 30,
     "isSubscription": true,
@@ -87,7 +87,25 @@
     "inStock": true,
     "isIncredible": false,
     "warranty": "پشتیبانی فنی اختصاصی + اتصال دیتابیس ابری و پشتیبان‌گیری",
-    "badge": "سامانه هوشمند املاک"
+    "badge": "سامانه هوشمند املاک",
+    "incredibleTimerDuration": "1month",
+    "incredibleExpiresAt": "2026-11-07T08:30:47.868Z"
+  },
+  {
+    "id": "prod-1790538341809",
+    "title": "اپلیکیشن هوشمند جهش شنتیا",
+    "category": "کالای دیجیتال",
+    "price": 250000,
+    "image": "/uploads/products/prod-1790538341809.webp",
+    "gallery": [],
+    "updatedAt": "2026-09-28T17:31:46.568Z",
+    "downloadUrl": "/uploads/apps/shantia.apk",
+    "appDownloadUrl": "/uploads/apps/shantia.apk",
+    "appVersion": "1.0.0",
+    "appFileSize": "18.5 مگابایت",
+    "isIncredible": false,
+    "displayOrder": 5,
+    "displayRank": 5
   },
   {
     "category": "خدمات و تبلیغات دیجیتال",
@@ -193,19 +211,14 @@
     "fullDescription": "کمپین تبلیغاتی هوشمند جهش با بهره‌گیری از هوش مصنوعی، دیتابیس دقیق مشاغل، سناریونویسی حرفه‌ای، تولید تیزر و پوستر اختصاصی و اجرای هدفمند به شما کمک می‌کند مخاطبان واقعی کسب‌وکارتان را جذب نمایید.",
     "deliveryDays": "شروع فوری کمپین در کمتر از ۲۴ ساعت",
     "isPopular": true,
-    "displayOrder": 3,
-    "displayRank": 3
-  },
-  {
-    "id": "prod-1790538341809",
-    "title": "اپلیکیشن هوشمند جهش شنتیا",
-    "downloadUrl": "/uploads/apps/shantia.apk"
+    "displayOrder": 6,
+    "displayRank": 6
   },
   {
     "rating": 5,
     "couponCode": "IRANDATA",
     "category": "خدمات و نرم‌افزار",
-    "displayRank": 5,
+    "displayRank": 8,
     "gallery": [],
     "image": "/jaheshkala/images/user_img_dfa71dd157.jpg",
     "price": 22500000,
@@ -236,7 +249,7 @@
     "discountPercent": 10,
     "deliveryDays": "دانلود فوری و آنی پس از پرداخت",
     "couponDiscountPercent": 1,
-    "displayOrder": 5,
+    "displayOrder": 8,
     "brand": "جهش دیتا / جهش کالا",
     "title": "بانک جامع اطلاعات مشاغل و اصناف کشور"
   },
@@ -250,7 +263,7 @@
     "isGolden": false,
     "hasCustomPlans": false,
     "isIncredible": false,
-    "displayOrder": 6,
+    "displayOrder": 9,
     "discountPercent": 90,
     "deliveryDays": "ارسال در ۱ تا ۳ روز کاری",
     "id": "prod-1789798520429",
@@ -263,7 +276,7 @@
     "warranty": "۷ روز ضمانت بازگشت کالا",
     "badge": "90% تخفیف",
     "isPopular": false,
-    "displayRank": 6,
+    "displayRank": 9,
     "price": 2500000,
     "image": "/uploads/products/prod-1789798520429.webp",
     "features": [
