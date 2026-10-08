@@ -399,7 +399,93 @@ export const getProductsBroadcastChannel = (): BroadcastChannel | null => {
   return null;
 };
 
+export interface IncredibleOfferSetting {
+  productId: string;
+  duration?: '1day' | '3days' | '1week' | '1month' | 'permanent' | 'custom' | string;
+  expiresAt?: string;
+  updatedAt?: string;
+}
+
+export const fetchIncredibleOfferFromDb = async (): Promise<IncredibleOfferSetting | null> => {
+  // 1. Direct Server API (< 15ms)
+  try {
+    const res = await fetchUniversalApi(`incredible-offer?_t=${Date.now()}`, { cache: 'no-store' });
+    if (res && res.ok) {
+      const data = await res.json();
+      if (data && data.productId) {
+        safeSetLocalStorage('jahesh_incredible_offer', JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch {}
+
+  // 2. Firebase Firestore
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'incredible_offer'));
+    if (snap.exists()) {
+      const data = snap.data() as IncredibleOfferSetting;
+      if (data && data.productId) {
+        safeSetLocalStorage('jahesh_incredible_offer', JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch {}
+
+  // 3. LocalStorage
+  try {
+    const saved = localStorage.getItem('jahesh_incredible_offer');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.productId) return parsed;
+    }
+  } catch {}
+
+  return null;
+};
+
+export const enforceIncredibleOffer = (products: Product[], offer?: IncredibleOfferSetting | null): Product[] => {
+  if (!Array.isArray(products) || products.length === 0) return products;
+  let targetId = offer?.productId;
+  if (!targetId) {
+    try {
+      const saved = localStorage.getItem('jahesh_incredible_offer');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.productId) targetId = parsed.productId;
+      }
+    } catch {}
+  }
+  if (!targetId) {
+    const currentInc = products.find((p) => p && Boolean(p.isIncredible));
+    if (currentInc) targetId = currentInc.id;
+  }
+  if (!targetId) return products;
+
+  const duration = offer?.duration || 'permanent';
+  const expiresAt = offer?.expiresAt;
+
+  return products.map((p) => {
+    if (String(p.id) === String(targetId)) {
+      return {
+        ...p,
+        isIncredible: true,
+        incredibleTimerDuration: duration || p.incredibleTimerDuration || 'permanent',
+        incredibleExpiresAt: expiresAt || p.incredibleExpiresAt,
+      };
+    }
+    return {
+      ...p,
+      isIncredible: false,
+    };
+  });
+};
+
 export const fetchProductsFromDb = async (): Promise<Product[]> => {
+  let activeOffer: IncredibleOfferSetting | null = null;
+  try {
+    activeOffer = await fetchIncredibleOfferFromDb();
+  } catch {}
+
   // 1. Direct Server API (/api/products & /jaheshkala/api/products) - FASTEST & MOST AUTHORITATIVE (< 15ms)
   try {
     const res = await fetchUniversalApi(`products?_t=${Date.now()}`, { cache: 'no-store' });
@@ -411,7 +497,8 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
           .map(cleanProductItem)
           .filter((p): p is Product => p !== null);
         if (cleaned.length > 0) {
-          const sorted = sortProductsByRank(cleaned);
+          const enforced = enforceIncredibleOffer(cleaned, activeOffer);
+          const sorted = sortProductsByRank(enforced);
           safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
           return sorted;
         }
@@ -431,7 +518,8 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
           .map(cleanProductItem)
           .filter((p): p is Product => p !== null);
         if (cleaned.length > 0) {
-          const sorted = sortProductsByRank(cleaned);
+          const enforced = enforceIncredibleOffer(cleaned, activeOffer);
+          const sorted = sortProductsByRank(enforced);
           safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
           return sorted;
         }
@@ -451,7 +539,8 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
           .map(cleanProductItem)
           .filter((p): p is Product => p !== null);
         if (cleaned.length > 0) {
-          return sortProductsByRank(cleaned);
+          const enforced = enforceIncredibleOffer(cleaned, activeOffer);
+          return sortProductsByRank(enforced);
         }
       }
     }
@@ -464,7 +553,8 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     .map(cleanProductItem)
     .filter((p): p is Product => p !== null && !deletedIds.has(p.id));
 
-  const fallbackList = sortProductsByRank(rawFallback);
+  const enforcedFallback = enforceIncredibleOffer(rawFallback, activeOffer);
+  const fallbackList = sortProductsByRank(enforcedFallback);
   try {
     safeSetLocalStorage('jahesh_products', JSON.stringify(fallbackList));
   } catch {}
@@ -531,35 +621,12 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
               .map(cleanProductItem)
               .filter((p): p is Product => p !== null);
             if (cleaned.length > 0) {
-              let effectiveList = cleaned;
+              let activeOffer: IncredibleOfferSetting | null = null;
               try {
-                const rawLocal = localStorage.getItem('jahesh_products');
-                if (rawLocal) {
-                  const localParsed: Product[] = JSON.parse(rawLocal);
-                  if (Array.isArray(localParsed)) {
-                    const localIncredible = localParsed.find((p) => p && Boolean(p.isIncredible));
-                    const incomingIncredible = cleaned.find((p) => p && Boolean(p.isIncredible));
-                    if (localIncredible && (!incomingIncredible || localIncredible.id !== incomingIncredible.id)) {
-                      const localTime = localIncredible.updatedAt ? new Date(localIncredible.updatedAt).getTime() : 0;
-                      const incomingTime = incomingIncredible?.updatedAt ? new Date(incomingIncredible.updatedAt).getTime() : 0;
-                      if (localTime >= incomingTime) {
-                        effectiveList = cleaned.map((p) => {
-                          if (p.id === localIncredible.id) {
-                            return {
-                              ...p,
-                              isIncredible: true,
-                              incredibleTimerDuration: localIncredible.incredibleTimerDuration,
-                              incredibleExpiresAt: localIncredible.incredibleExpiresAt,
-                              updatedAt: localIncredible.updatedAt,
-                            };
-                          }
-                          return { ...p, isIncredible: false };
-                        });
-                      }
-                    }
-                  }
-                }
+                const saved = localStorage.getItem('jahesh_incredible_offer');
+                if (saved) activeOffer = JSON.parse(saved);
               } catch {}
+              const effectiveList = enforceIncredibleOffer(cleaned, activeOffer);
 
               const fingerprint = JSON.stringify(effectiveList);
               if (fingerprint !== lastProductFingerprint) {
@@ -594,35 +661,12 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
             .map(cleanProductItem)
             .filter((p): p is Product => p !== null);
 
-          let effectiveList = cleaned;
+          let activeOffer: IncredibleOfferSetting | null = null;
           try {
-            const rawLocal = localStorage.getItem('jahesh_products');
-            if (rawLocal) {
-              const localParsed: Product[] = JSON.parse(rawLocal);
-              if (Array.isArray(localParsed)) {
-                const localIncredible = localParsed.find((p) => p && Boolean(p.isIncredible));
-                const incomingIncredible = cleaned.find((p) => p && Boolean(p.isIncredible));
-                if (localIncredible && (!incomingIncredible || localIncredible.id !== incomingIncredible.id)) {
-                  const localTime = localIncredible.updatedAt ? new Date(localIncredible.updatedAt).getTime() : 0;
-                  const incomingTime = incomingIncredible?.updatedAt ? new Date(incomingIncredible.updatedAt).getTime() : 0;
-                  if (localTime >= incomingTime) {
-                    effectiveList = cleaned.map((p) => {
-                      if (p.id === localIncredible.id) {
-                        return {
-                          ...p,
-                          isIncredible: true,
-                          incredibleTimerDuration: localIncredible.incredibleTimerDuration,
-                          incredibleExpiresAt: localIncredible.incredibleExpiresAt,
-                          updatedAt: localIncredible.updatedAt,
-                        };
-                      }
-                      return { ...p, isIncredible: false };
-                    });
-                  }
-                }
-              }
-            }
+            const saved = localStorage.getItem('jahesh_incredible_offer');
+            if (saved) activeOffer = JSON.parse(saved);
           } catch {}
+          const effectiveList = enforceIncredibleOffer(cleaned, activeOffer);
 
           const fingerprint = JSON.stringify(effectiveList);
 
@@ -975,9 +1019,19 @@ export const setIncredibleProductInDb = async (
 
     const sortedList = sortProductsByRank(updatedList);
 
-    // 2. Instant local UI update (0ms)
+    // 2. Instant local UI update & dedicated storage (0ms)
+    const offerData: IncredibleOfferSetting = {
+      productId: cleanId,
+      duration,
+      expiresAt: targetExpiresAt,
+      updatedAt: nowIso,
+    };
     try {
+      safeSetLocalStorage('jahesh_incredible_offer', JSON.stringify(offerData));
       safeSetLocalStorage('jahesh_products', JSON.stringify(sortedList));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('jahesh-incredible-updated', { detail: offerData }));
+      }
       broadcastProductsUpdate(sortedList);
     } catch {}
 
@@ -988,6 +1042,21 @@ export const setIncredibleProductInDb = async (
       expiresAt: targetExpiresAt,
     };
     Promise.allSettled([
+      fetchUniversalApi('incredible-offer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serverPayload),
+      }),
+      fetch('/api/incredible-offer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serverPayload),
+      }),
+      fetch('/jaheshkala/api/incredible-offer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serverPayload),
+      }),
       fetch('/api/products/set-incredible', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1015,6 +1084,7 @@ export const setIncredibleProductInDb = async (
       const targetProd = sortedList.find((p) => p.id === cleanId);
       const otherProds = sortedList.filter((p) => p.id !== cleanId);
       const firestoreTasks: Promise<any>[] = [
+        setDoc(doc(db, 'settings', 'incredible_offer'), offerData, { merge: true }),
         setDoc(
           doc(db, 'settings', 'products'),
           {

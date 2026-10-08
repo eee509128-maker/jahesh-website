@@ -1214,6 +1214,13 @@ export default function App() {
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
+    if (updatedProduct.isIncredible) {
+      handleSetIncredibleProduct(
+        updatedProduct.id,
+        (updatedProduct.incredibleTimerDuration as any) || 'permanent',
+        updatedProduct.incredibleExpiresAt
+      );
+    }
     setProducts((prev) => {
       const mapped = prev.map((p) => {
         if (p.id === updatedProduct.id) return updatedProduct;

@@ -9,14 +9,14 @@
     "inStock": true,
     "shortDescription": "طراحی سایت مدرن، ریسپانسیو و پرسرعت",
     "category": "طراحی سایت و خدمات وب",
-    "incredibleExpiresAt": "2026-11-07T17:33:36.784Z",
+    "incredibleExpiresAt": "2026-11-07T19:09:11.568Z",
     "rating": 5,
     "isSubscription": false,
     "targetGuilds": [
       "طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات"
     ],
     "warranty": "۱ ماه پشتیبانی فنی رایگان + هاست و دامین رایگان",
-    "updatedAt": "2026-10-08T17:33:36.784Z",
+    "updatedAt": "2026-10-08T19:09:11.568Z",
     "hasCustomPlans": false,
     "isIncredible": true,
     "id": "pkg-golden-jahesh",
@@ -52,7 +52,7 @@
     "category": "نرم‌افزار و سامانه‌های هوشمند",
     "couponDiscountPercent": 10,
     "isAiAppProduct": true,
-    "updatedAt": "2026-10-08T17:33:27.691Z",
+    "updatedAt": "2026-10-08T19:08:53.677Z",
     "isGolden": false,
     "aiAppDefaultDays": 30,
     "isSubscription": true,
@@ -89,7 +89,7 @@
     "warranty": "پشتیبانی فنی اختصاصی + اتصال دیتابیس ابری و پشتیبان‌گیری",
     "badge": "سامانه هوشمند املاک",
     "incredibleTimerDuration": "permanent",
-    "incredibleExpiresAt": "2027-10-08T17:33:27.691Z"
+    "incredibleExpiresAt": "2027-10-08T19:08:53.677Z"
   },
   {
     "category": "خدمات و تبلیغات دیجیتال",

@@ -47,11 +47,38 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Track active incredible offer ID from dedicated storage & events
+  const [activeOfferId, setActiveOfferId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('jahesh_incredible_offer');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.productId) return parsed.productId;
+      }
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    const handleIncredibleUpdate = (e: any) => {
+      if (e.detail?.productId) {
+        setActiveOfferId(e.detail.productId);
+        setCurrentIndex(0);
+      }
+    };
+    window.addEventListener('jahesh-incredible-updated', handleIncredibleUpdate);
+    return () => window.removeEventListener('jahesh-incredible-updated', handleIncredibleUpdate);
+  }, []);
+
   // Filter products that explicitly have isIncredible === true
-  // Prioritize the most recently designated incredible product (updatedAt), then rank
+  // Prioritize the dedicated incredible product, then most recently designated (updatedAt), then rank
   const incredibleProducts = [...products]
     .filter((p) => p && Boolean(p.isIncredible))
     .sort((a, b) => {
+      if (activeOfferId) {
+        if (a.id === activeOfferId) return -1;
+        if (b.id === activeOfferId) return 1;
+      }
       const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       if (!isNaN(timeA) && !isNaN(timeB) && timeA !== timeB) {

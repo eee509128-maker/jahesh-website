@@ -35,25 +35,49 @@ export default async function handler(req, res) {
       } catch {}
 
       // 2. Check settings/products first
+      let returnList = [];
       try {
         const settingsSnap = await getDoc(doc(db, 'settings', 'products'));
         if (settingsSnap.exists()) {
           const sData = settingsSnap.data();
           if (sData && Array.isArray(sData.products)) {
-            const filtered = sData.products.filter((p) => p && p.id && !deletedIds.has(String(p.id)));
-            return res.status(200).json({ success: true, count: filtered.length, products: filtered });
+            returnList = sData.products.filter((p) => p && p.id && !deletedIds.has(String(p.id)));
           }
         }
       } catch {}
 
       // 3. Fallback to individual docs collection
-      const snap = await getDocs(collection(db, 'products'));
-      const products = [];
-      snap.forEach((d) => {
-        const item = d.data();
-        if (item && item.id && !deletedIds.has(String(item.id))) products.push(item);
-      });
-      return res.status(200).json({ success: true, count: products.length, products });
+      if (returnList.length === 0) {
+        const snap = await getDocs(collection(db, 'products'));
+        snap.forEach((d) => {
+          const item = d.data();
+          if (item && item.id && !deletedIds.has(String(item.id))) returnList.push(item);
+        });
+      }
+
+      // 4. Enforce settings/incredible_offer
+      try {
+        const incSnap = await getDoc(doc(db, 'settings', 'incredible_offer'));
+        if (incSnap.exists()) {
+          const incData = incSnap.data();
+          if (incData && incData.productId) {
+            const incTargetId = String(incData.productId);
+            returnList = returnList.map((p) => {
+              if (String(p.id) === incTargetId) {
+                return {
+                  ...p,
+                  isIncredible: true,
+                  incredibleTimerDuration: incData.duration || p.incredibleTimerDuration || 'permanent',
+                  incredibleExpiresAt: incData.expiresAt || p.incredibleExpiresAt,
+                };
+              }
+              return { ...p, isIncredible: false };
+            });
+          }
+        }
+      } catch {}
+
+      return res.status(200).json({ success: true, count: returnList.length, products: returnList });
     } catch (err) {
       console.error('Fetch products error:', err);
       return res.status(500).json({ error: 'Failed to fetch products', details: String(err) });

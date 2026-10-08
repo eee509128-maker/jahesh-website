@@ -15,6 +15,13 @@
   RewriteRule ^vet-hospital/api/zibal-request/?$ /api/zibal-request.php [L,QSA]
   RewriteRule ^vet-hospital/api/zibal-verify/?$ /api/zibal-verify.php [L,QSA]
 
+  # Route jaheshkala API calls to jaheshkala/api.php
+  RewriteRule ^jaheshkala/api/(.*)$ /jaheshkala/api.php?action=$1 [L,QSA]
+  RewriteRule ^api/incredible-offer/?$ /jaheshkala/api.php?action=incredible-offer [L,QSA]
+  RewriteRule ^api/banners/?$ /jaheshkala/api.php?action=banners [L,QSA]
+  RewriteRule ^api/products/set-incredible/?$ /jaheshkala/api.php?action=products/set-incredible [L,QSA]
+  RewriteRule ^api/products/?$ /jaheshkala/api.php?action=products [L,QSA]
+
   # Route other vet api calls to vet-hospital/api.php
   RewriteRule ^api/vet/(.*)$ /vet-hospital/api.php?action=$1 [L,QSA]
   RewriteRule ^vet-hospital/api/(.*)$ /vet-hospital/api.php?action=$1 [L,QSA]

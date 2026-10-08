@@ -69,12 +69,87 @@ $ordersFile   = $dataDir . '/orders.json';
 $deletedOrdersFile = $dataDir . '/deleted_orders.json';
 $productsFile = $dataDir . '/products.json';
 $deletedProductsFile = $dataDir . '/deleted_products.json';
+$incredibleOfferFile = $dataDir . '/incredible_offer.json';
 $bannersFile  = $dataDir . '/banners.json';
 $toolsFile    = $dataDir . '/tools.json';
 $usersFile    = $dataDir . '/users.json';
 $licensesFile = $dataDir . '/licenses.json';
 
 switch ($action) {
+
+    // ==========================================
+    // INCREDIBLE OFFER API (Dedicated Instant Sync)
+    // ==========================================
+    case 'incredible-offer':
+    case 'get_incredible_offer':
+    case 'api/incredible-offer':
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' || !empty($inputData['productId'])) {
+            $pId = isset($inputData['productId']) ? (string)$inputData['productId'] : (isset($inputData['id']) ? (string)$inputData['id'] : '');
+            $duration = isset($inputData['duration']) ? (string)$inputData['duration'] : 'permanent';
+            $expiresAt = isset($inputData['expiresAt']) ? (string)$inputData['expiresAt'] : '';
+            if (empty($expiresAt)) {
+                $now = time();
+                if ($duration === '1day') $now += 86400;
+                else if ($duration === '3days') $now += 3 * 86400;
+                else if ($duration === '1week') $now += 7 * 86400;
+                else if ($duration === '1month') $now += 30 * 86400;
+                else $now += 365 * 86400;
+                $expiresAt = date('c', $now);
+            }
+            if (!empty($pId)) {
+                $nowIso = date('c');
+                $offerData = [
+                    'productId' => $pId,
+                    'duration' => $duration,
+                    'expiresAt' => $expiresAt,
+                    'updatedAt' => $nowIso
+                ];
+                writeJsonFile($incredibleOfferFile, $offerData);
+
+                $prods = readJsonFile($productsFile, []);
+                if (!empty($prods)) {
+                    foreach ($prods as $k => $item) {
+                        if (isset($item['id']) && (string)$item['id'] === $pId) {
+                            $prods[$k]['isIncredible'] = true;
+                            $prods[$k]['incredibleTimerDuration'] = $duration;
+                            $prods[$k]['incredibleExpiresAt'] = $expiresAt;
+                            $prods[$k]['updatedAt'] = $nowIso;
+                        } else {
+                            $prods[$k]['isIncredible'] = false;
+                        }
+                    }
+                    writeJsonFile($productsFile, $prods);
+                }
+                echo json_encode(['success' => true, 'productId' => $pId, 'duration' => $duration, 'expiresAt' => $expiresAt, 'incredible' => $offerData, 'products' => $prods]);
+                exit;
+            }
+            http_response_code(400);
+            echo json_encode(['error' => 'productId required']);
+            exit;
+        }
+
+        // GET incredible offer
+        $offer = readJsonFile($incredibleOfferFile, null);
+        if ($offer && !empty($offer['productId'])) {
+            echo json_encode(array_merge(['success' => true], $offer));
+            exit;
+        }
+        $prods = readJsonFile($productsFile, []);
+        foreach ($prods as $item) {
+            if (!empty($item['isIncredible']) && !empty($item['id'])) {
+                echo json_encode([
+                    'success' => true,
+                    'productId' => (string)$item['id'],
+                    'duration' => $item['incredibleTimerDuration'] ?? 'permanent',
+                    'expiresAt' => $item['incredibleExpiresAt'] ?? date('c', time() + 365 * 86400),
+                    'updatedAt' => $item['updatedAt'] ?? date('c')
+                ]);
+                exit;
+            }
+        }
+        echo json_encode(['success' => false, 'message' => 'No active incredible offer']);
+        exit;
+        break;
 
     // ==========================================
     // PRODUCTS API (Zero-VPN, cPanel & Serverless)
@@ -84,6 +159,8 @@ switch ($action) {
     case 'api/products':
     case 'products/save':
     case 'api/products/save':
+    case 'products/set-incredible':
+    case 'api/products/set-incredible':
     case 'products/delete':
     case 'api/products/delete':
     case 'products/order':
@@ -168,8 +245,53 @@ switch ($action) {
                 array_unshift($prods, $product);
             }
 
+            // If product is marked as incredible offer, unset it from all other products
+            if (!empty($product['isIncredible'])) {
+                foreach ($prods as $k => $item) {
+                    if (isset($item['id']) && (string)$item['id'] !== $pId) {
+                        $prods[$k]['isIncredible'] = false;
+                    }
+                }
+            }
+
             writeJsonFile($productsFile, $prods);
             echo json_encode(['success' => true, 'product' => $product, 'count' => count($prods), 'products' => $prods]);
+            exit;
+        }
+
+        // 3.5 Set Incredible Offer Exclusively
+        if ($action === 'products/set-incredible' || $action === 'api/products/set-incredible') {
+            $pId = isset($inputData['productId']) ? (string)$inputData['productId'] : (isset($inputData['id']) ? (string)$inputData['id'] : '');
+            $duration = isset($inputData['duration']) ? (string)$inputData['duration'] : 'permanent';
+            $expiresAt = isset($inputData['expiresAt']) ? (string)$inputData['expiresAt'] : '';
+            if (empty($expiresAt)) {
+                $now = time();
+                if ($duration === '1day') $now += 86400;
+                else if ($duration === '3days') $now += 3 * 86400;
+                else if ($duration === '1week') $now += 7 * 86400;
+                else if ($duration === '1month') $now += 30 * 86400;
+                else $now += 365 * 86400;
+                $expiresAt = date('c', $now);
+            }
+            if (!empty($pId)) {
+                $prods = readJsonFile($productsFile, []);
+                $nowIso = date('c');
+                foreach ($prods as $k => $item) {
+                    if (isset($item['id']) && (string)$item['id'] === $pId) {
+                        $prods[$k]['isIncredible'] = true;
+                        $prods[$k]['incredibleTimerDuration'] = $duration;
+                        $prods[$k]['incredibleExpiresAt'] = $expiresAt;
+                        $prods[$k]['updatedAt'] = $nowIso;
+                    } else {
+                        $prods[$k]['isIncredible'] = false;
+                    }
+                }
+                writeJsonFile($productsFile, $prods);
+                echo json_encode(['success' => true, 'productId' => $pId, 'duration' => $duration, 'expiresAt' => $expiresAt, 'products' => $prods]);
+                exit;
+            }
+            http_response_code(400);
+            echo json_encode(['error' => 'productId required']);
             exit;
         }
 
@@ -208,6 +330,18 @@ switch ($action) {
                 $id = isset($p['id']) ? (string)$p['id'] : '';
                 return !empty($id) && !isset($delProdSet[$id]);
             }));
+        }
+        $incOffer = readJsonFile($incredibleOfferFile, null);
+        if ($incOffer && !empty($incOffer['productId'])) {
+            $incTargetId = (string)$incOffer['productId'];
+            foreach ($prods as $k => $item) {
+                $isTarget = (isset($item['id']) && (string)$item['id'] === $incTargetId);
+                $prods[$k]['isIncredible'] = $isTarget;
+                if ($isTarget) {
+                    if (!empty($incOffer['duration'])) $prods[$k]['incredibleTimerDuration'] = $incOffer['duration'];
+                    if (!empty($incOffer['expiresAt'])) $prods[$k]['incredibleExpiresAt'] = $incOffer['expiresAt'];
+                }
+            }
         }
         echo json_encode($prods);
         exit;

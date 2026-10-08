@@ -672,6 +672,121 @@ app.post('/api/upload-tool-image', (req, res) => {
 // ==========================================
 const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
 const DELETED_PRODUCTS_FILE = path.join(__dirname, 'data', 'deleted_products.json');
+const INCREDIBLE_OFFER_FILE = path.join(__dirname, 'data', 'incredible_offer.json');
+
+function getStoredIncredibleOffer() {
+  const candidates = [
+    INCREDIBLE_OFFER_FILE,
+    path.join(__dirname, 'jaheshkala', 'data', 'incredible_offer.json'),
+    path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'incredible_offer.json')
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) {
+        const raw = fs.readFileSync(c, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.productId) return parsed;
+      }
+    } catch {}
+  }
+  // Fallback: check products.json for any product explicitly marked isIncredible
+  try {
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+      const prods = JSON.parse(raw);
+      if (Array.isArray(prods)) {
+        const found = prods.find((p) => p && Boolean(p.isIncredible));
+        if (found) {
+          return {
+            productId: String(found.id),
+            duration: found.incredibleTimerDuration || 'permanent',
+            expiresAt: found.incredibleExpiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            updatedAt: found.updatedAt || new Date().toISOString()
+          };
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function setStoredIncredibleOffer(productId, duration = 'permanent', expiresAt) {
+  if (!productId) return null;
+  const cleanId = String(productId).trim();
+  let calculatedExpiresAt = expiresAt;
+  if (!calculatedExpiresAt) {
+    let target = Date.now();
+    if (duration === '1day') target += 24 * 60 * 60 * 1000;
+    else if (duration === '3days') target += 3 * 24 * 60 * 60 * 1000;
+    else if (duration === '1week') target += 7 * 24 * 60 * 60 * 1000;
+    else if (duration === '1month') target += 30 * 24 * 60 * 60 * 1000;
+    else if (duration === 'permanent') target += 365 * 24 * 60 * 60 * 1000;
+    calculatedExpiresAt = new Date(target).toISOString();
+  }
+  const nowIso = new Date().toISOString();
+  const offerData = {
+    productId: cleanId,
+    duration,
+    expiresAt: calculatedExpiresAt,
+    updatedAt: nowIso
+  };
+
+  const locations = [
+    INCREDIBLE_OFFER_FILE,
+    path.join(__dirname, 'jaheshkala', 'data', 'incredible_offer.json'),
+    path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'incredible_offer.json')
+  ];
+  for (const loc of locations) {
+    try {
+      const d = path.dirname(loc);
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(loc, JSON.stringify(offerData, null, 2), 'utf8');
+    } catch {}
+  }
+
+  // Also synchronize all products.json files on disk to guarantee exclusivity
+  let list = [];
+  if (fs.existsSync(PRODUCTS_FILE)) {
+    try {
+      const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed;
+    } catch {}
+  }
+  if (list.length === 0) {
+    list = [...DEFAULT_SERVER_PRODUCTS];
+  }
+
+  list = list.map((p) => {
+    if (String(p.id) === cleanId) {
+      return {
+        ...p,
+        isIncredible: true,
+        incredibleTimerDuration: duration,
+        incredibleExpiresAt: calculatedExpiresAt,
+        updatedAt: nowIso
+      };
+    }
+    return { ...p, isIncredible: false };
+  });
+
+  const prodLocations = [
+    PRODUCTS_FILE,
+    path.join(__dirname, 'jaheshkala', 'data', 'products.json'),
+    path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'products.json')
+  ];
+  for (const ploc of prodLocations) {
+    try {
+      const d = path.dirname(ploc);
+      if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(ploc, JSON.stringify(list, null, 2), 'utf8');
+    } catch {}
+  }
+
+  productsVersion = Date.now();
+  console.log(`[Incredible Offer] Exclusively activated ${cleanId} until ${calculatedExpiresAt}. Version: ${productsVersion}`);
+  return { offerData, list };
+}
 
 function getDeletedProductIds() {
   try {
@@ -912,21 +1027,80 @@ app.get(['/api/products', '/jaheshkala/api/products'], (req, res) => {
   res.setHeader('Expires', '0');
   res.setHeader('x-products-version', String(productsVersion));
 
+  let finalProducts = [];
   try {
     if (fs.existsSync(PRODUCTS_FILE)) {
       const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const valid = parsed.filter((p) => p && p.id);
-        return res.json(sortProductsByOrder(valid));
+        finalProducts = parsed.filter((p) => p && p.id);
       }
     }
   } catch (err) {
     console.error('Error reading products.json:', err);
   }
 
-  const deletedIds = new Set(getDeletedProductIds());
-  return res.json(sortProductsByOrder(getDefaultProducts().filter((p) => p && p.id && !deletedIds.has(p.id))));
+  if (finalProducts.length === 0) {
+    const deletedIds = new Set(getDeletedProductIds());
+    finalProducts = getDefaultProducts().filter((p) => p && p.id && !deletedIds.has(p.id));
+  }
+
+  // Authoritatively enforce the active Incredible Offer from incredible_offer.json
+  const activeOffer = getStoredIncredibleOffer();
+  if (activeOffer && activeOffer.productId) {
+    const targetId = String(activeOffer.productId);
+    finalProducts = finalProducts.map((p) => {
+      if (String(p.id) === targetId) {
+        return {
+          ...p,
+          isIncredible: true,
+          incredibleTimerDuration: activeOffer.duration || p.incredibleTimerDuration || 'permanent',
+          incredibleExpiresAt: activeOffer.expiresAt || p.incredibleExpiresAt,
+        };
+      }
+      return {
+        ...p,
+        isIncredible: false,
+      };
+    });
+  }
+
+  return res.json(sortProductsByOrder(finalProducts));
+});
+
+// GET /api/incredible-offer & /jaheshkala/api/incredible-offer
+app.get(['/api/incredible-offer', '/jaheshkala/api/incredible-offer'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  const offer = getStoredIncredibleOffer();
+  if (offer) {
+    return res.json({ success: true, ...offer });
+  }
+  return res.json({ success: false, message: 'No active incredible offer' });
+});
+
+// POST /api/incredible-offer & /jaheshkala/api/incredible-offer
+app.post(['/api/incredible-offer', '/jaheshkala/api/incredible-offer'], (req, res) => {
+  try {
+    const { productId, duration = 'permanent', expiresAt } = req.body || {};
+    if (!productId) {
+      return res.status(400).json({ error: 'productId is required' });
+    }
+    const result = setStoredIncredibleOffer(productId, duration, expiresAt);
+    if (!result) {
+      return res.status(500).json({ error: 'Failed to persist incredible offer' });
+    }
+    return res.json({
+      success: true,
+      ...result.offerData,
+      products: result.list,
+      version: productsVersion,
+    });
+  } catch (err) {
+    console.error('Error in /api/incredible-offer POST:', err);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /api/products - replaces entire list on disk
@@ -1016,71 +1190,14 @@ app.post(['/api/products/set-incredible', '/jaheshkala/api/products/set-incredib
     if (!productId) {
       return res.status(400).json({ error: 'productId is required' });
     }
-
-    let list = [];
-    if (fs.existsSync(PRODUCTS_FILE)) {
-      try {
-        const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) list = parsed;
-      } catch {}
+    const result = setStoredIncredibleOffer(productId, duration, expiresAt);
+    if (!result) {
+      return res.status(500).json({ error: 'Failed to set incredible offer' });
     }
-    if (list.length === 0) {
-      list = [...DEFAULT_SERVER_PRODUCTS];
-    }
-
-    const targetIdx = list.findIndex((p) => p.id === productId);
-    if (targetIdx < 0) {
-      return res.status(404).json({ error: `Product with ID ${productId} not found` });
-    }
-
-    let calculatedExpiresAt = expiresAt;
-    if (!calculatedExpiresAt) {
-      let target = Date.now();
-      if (duration === '1day') target += 24 * 60 * 60 * 1000;
-      else if (duration === '3days') target += 3 * 24 * 60 * 60 * 1000;
-      else if (duration === '1week') target += 7 * 24 * 60 * 60 * 1000;
-      else if (duration === '1month') target += 30 * 24 * 60 * 60 * 1000;
-      else if (duration === 'permanent') target += 365 * 24 * 60 * 60 * 1000;
-      calculatedExpiresAt = new Date(target).toISOString();
-    }
-
-    const nowIso = new Date().toISOString();
-    list = list.map((p) => {
-      if (p.id === productId) {
-        return {
-          ...p,
-          isIncredible: true,
-          incredibleTimerDuration: duration,
-          incredibleExpiresAt: calculatedExpiresAt,
-          updatedAt: nowIso,
-        };
-      }
-      return {
-        ...p,
-        isIncredible: false,
-      };
-    });
-
-    const dataDir = path.dirname(PRODUCTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
-    try {
-      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(distData))) {
-        fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
-      }
-    } catch {}
-    productsVersion = Date.now();
-    console.log(`[Products] Exclusively activated Incredible Offer for ${productId} until ${calculatedExpiresAt}. Version: ${productsVersion}`);
     return res.json({
       success: true,
-      productId,
-      duration,
-      expiresAt: calculatedExpiresAt,
-      products: list,
+      ...result.offerData,
+      products: result.list,
       version: productsVersion,
     });
   } catch (err) {
@@ -2440,6 +2557,10 @@ app.get(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.php
   if (action === 'orders/deleted' || action === 'deleted_orders' || action === 'api/orders/deleted') {
     return res.json(readDeletedOrdersFromDisk());
   }
+  if (action === 'incredible-offer' || action === 'get_incredible_offer' || action === 'api/incredible-offer') {
+    const offer = getStoredIncredibleOffer();
+    return res.json(offer ? { success: true, ...offer } : { success: false });
+  }
   if (action === 'products' || action === 'get_products' || action === 'api/products') {
     let list = [];
     if (fs.existsSync(PRODUCTS_FILE)) {
@@ -2450,6 +2571,20 @@ app.get(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.php
       } catch {}
     }
     if (list.length === 0) list = [...DEFAULT_SERVER_PRODUCTS];
+    const activeOffer = getStoredIncredibleOffer();
+    if (activeOffer && activeOffer.productId) {
+      list = list.map((p) => {
+        if (String(p.id) === String(activeOffer.productId)) {
+          return {
+            ...p,
+            isIncredible: true,
+            incredibleTimerDuration: activeOffer.duration || p.incredibleTimerDuration || 'permanent',
+            incredibleExpiresAt: activeOffer.expiresAt || p.incredibleExpiresAt,
+          };
+        }
+        return { ...p, isIncredible: false };
+      });
+    }
     return res.json(sortProductsByOrder(list.filter((p) => p && p.id)));
   }
   if (action === 'banners' || action === 'get_banners') {
@@ -2468,6 +2603,17 @@ app.post(['/api/chats', '/jaheshkala/api/chats', '/api.php', '/jaheshkala/api.ph
   try {
     const incoming = req.body;
     const action = req.query.action || req.query.endpoint || (incoming && incoming.action);
+
+    // Incredible Offer via api.php emulator
+    if (action === 'incredible-offer' || action === 'api/incredible-offer' || action === 'products/set-incredible' || action === 'api/products/set-incredible') {
+      const pId = incoming?.productId || incoming?.id;
+      const duration = incoming?.duration || 'permanent';
+      const expiresAt = incoming?.expiresAt;
+      if (!pId) return res.status(400).json({ error: 'productId is required' });
+      const result = setStoredIncredibleOffer(pId, duration, expiresAt);
+      if (!result) return res.status(500).json({ error: 'Failed to persist incredible offer' });
+      return res.json({ success: true, ...result.offerData, products: result.list, version: productsVersion });
+    }
 
     // Products upsert & delete via api.php emulator
     if (action === 'products/save' || action === 'save_product' || action === 'api/products/save') {
