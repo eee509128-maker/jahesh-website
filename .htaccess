@@ -1,0 +1,16 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Allow direct PHP endpoints
+  RewriteRule ^api/zibal-request/?$ /api/zibal-request.php [L,QSA]
+  RewriteRule ^api/zibal-verify/?$ /api/zibal-verify.php [L,QSA]
+  RewriteRule ^api/vet/zibal-request/?$ /api/zibal-request.php [L,QSA]
+  RewriteRule ^api/vet/zibal-verify/?$ /api/zibal-verify.php [L,QSA]
+  RewriteRule ^vet-hospital/api/zibal-request/?$ /api/zibal-request.php [L,QSA]
+  RewriteRule ^vet-hospital/api/zibal-verify/?$ /api/zibal-verify.php [L,QSA]
+
+  # Route other vet api calls to vet-hospital/api.php
+  RewriteRule ^api/vet/(.*)$ /vet-hospital/api.php?action=$1 [L,QSA]
+  RewriteRule ^vet-hospital/api/(.*)$ /vet-hospital/api.php?action=$1 [L,QSA]
+</IfModule>
