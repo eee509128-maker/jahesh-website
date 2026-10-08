@@ -789,6 +789,13 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       masterList = [authoritativeProduct, ...masterList];
     }
 
+    // Exclusivity: If this product is set as the Incredible Offer, unset it from all other products
+    if (authoritativeProduct.isIncredible) {
+      masterList = masterList.map((p) =>
+        p.id === authoritativeProduct.id ? authoritativeProduct : { ...p, isIncredible: false }
+      );
+    }
+
     const sortedMaster = sortProductsByRank(masterList);
 
     // 3. Update local storage & broadcast event immediately (0ms)
@@ -837,6 +844,131 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
   } catch (err) {
     console.warn('Save product exception:', err);
     return false;
+  }
+};
+
+/**
+ * Dedicated, instant atomic function to set or change the store's Incredible Offer.
+ * Unsets isIncredible on all other products and persists to localStorage, server disk, Firestore, and Supabase.
+ */
+export const setIncredibleProductInDb = async (
+  productId: string,
+  duration: '1day' | '3days' | '1week' | '1month' | 'permanent' | 'custom' = 'permanent',
+  customExpiresAt?: string
+): Promise<Product[] | null> => {
+  try {
+    const cleanId = String(productId).trim();
+    if (!cleanId) return null;
+
+    let targetExpiresAt = customExpiresAt;
+    if (!targetExpiresAt) {
+      let target = Date.now();
+      if (duration === '1day') target += 24 * 60 * 60 * 1000;
+      else if (duration === '3days') target += 3 * 24 * 60 * 60 * 1000;
+      else if (duration === '1week') target += 7 * 24 * 60 * 60 * 1000;
+      else if (duration === '1month') target += 30 * 24 * 60 * 60 * 1000;
+      else if (duration === 'permanent') target += 365 * 24 * 60 * 60 * 1000;
+      targetExpiresAt = new Date(target).toISOString();
+    }
+
+    // 1. Get current products starting from local cache
+    let currentList: Product[] = [];
+    try {
+      const saved = localStorage.getItem('jahesh_products');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          currentList = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
+        }
+      }
+    } catch {}
+
+    if (currentList.length === 0) {
+      currentList = await fetchProductsFromDb();
+    }
+
+    const nowIso = new Date().toISOString();
+    const updatedList = currentList.map((p) => {
+      if (p.id === cleanId) {
+        return {
+          ...p,
+          isIncredible: true,
+          incredibleTimerDuration: duration,
+          incredibleExpiresAt: targetExpiresAt,
+          updatedAt: nowIso,
+        };
+      }
+      return {
+        ...p,
+        isIncredible: false,
+      };
+    });
+
+    const sortedList = sortProductsByRank(updatedList);
+
+    // 2. Instant local UI update (0ms)
+    try {
+      safeSetLocalStorage('jahesh_products', JSON.stringify(sortedList));
+      broadcastProductsUpdate(sortedList);
+    } catch {}
+
+    // 3. Server persistence via dedicated endpoint & full list
+    try {
+      await fetch('/api/products/set-incredible', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: cleanId,
+          duration,
+          expiresAt: targetExpiresAt,
+        }),
+      });
+    } catch {
+      try {
+        await fetchUniversalApi('products/save-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ products: sortedList }),
+        });
+      } catch {}
+    }
+
+    // 4. Firebase Firestore persistence
+    try {
+      const targetProd = sortedList.find((p) => p.id === cleanId);
+      await Promise.allSettled([
+        setDoc(
+          doc(db, 'settings', 'products'),
+          {
+            products: sortedList,
+            updatedAt: nowIso,
+          },
+          { merge: true }
+        ),
+        targetProd ? setDoc(doc(db, 'products', cleanId), targetProd, { merge: true }) : Promise.resolve(),
+      ]);
+    } catch (fbErr) {
+      console.warn('Firestore setIncredible notice:', fbErr);
+    }
+
+    // 5. Supabase persistence
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_PRODUCTS',
+          user_name: 'لیست محصولات سامانه',
+          messages: sortedList,
+          last_updated: nowIso,
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch {}
+
+    return sortedList;
+  } catch (err) {
+    console.error('setIncredibleProductInDb error:', err);
+    return null;
   }
 };
 

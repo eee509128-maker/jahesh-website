@@ -9,14 +9,14 @@
     "inStock": true,
     "shortDescription": "طراحی سایت مدرن، ریسپانسیو و پرسرعت",
     "category": "طراحی سایت و خدمات وب",
-    "incredibleExpiresAt": "2026-10-19T05:35:07.372Z",
+    "incredibleExpiresAt": "2026-11-07T17:33:36.784Z",
     "rating": 5,
     "isSubscription": false,
     "targetGuilds": [
       "طراحی سایت، وب، اپلیکیشن و فناوری اطلاعات"
     ],
     "warranty": "۱ ماه پشتیبانی فنی رایگان + هاست و دامین رایگان",
-    "updatedAt": "2026-09-19T05:35:17.226Z",
+    "updatedAt": "2026-10-08T17:33:36.784Z",
     "hasCustomPlans": false,
     "isIncredible": true,
     "id": "pkg-golden-jahesh",
@@ -52,7 +52,7 @@
     "category": "نرم‌افزار و سامانه‌های هوشمند",
     "couponDiscountPercent": 10,
     "isAiAppProduct": true,
-    "updatedAt": "2026-09-18T10:19:50.329Z",
+    "updatedAt": "2026-10-08T17:33:27.691Z",
     "isGolden": false,
     "aiAppDefaultDays": 30,
     "isSubscription": true,
@@ -87,7 +87,9 @@
     "inStock": true,
     "isIncredible": false,
     "warranty": "پشتیبانی فنی اختصاصی + اتصال دیتابیس ابری و پشتیبان‌گیری",
-    "badge": "سامانه هوشمند املاک"
+    "badge": "سامانه هوشمند املاک",
+    "incredibleTimerDuration": "permanent",
+    "incredibleExpiresAt": "2027-10-08T17:33:27.691Z"
   },
   {
     "category": "خدمات و تبلیغات دیجیتال",
@@ -199,7 +201,8 @@
   {
     "id": "prod-1790538341809",
     "title": "اپلیکیشن هوشمند جهش شنتیا",
-    "downloadUrl": "/uploads/apps/shantia.apk"
+    "downloadUrl": "/uploads/apps/shantia.apk",
+    "isIncredible": false
   },
   {
     "rating": 5,

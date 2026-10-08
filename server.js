@@ -985,6 +985,10 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
     } else {
       list = [product, ...list];
     }
+    // If this product is set as the Incredible Offer, ensure exclusivity across all other products
+    if (product.isIncredible) {
+      list = list.map((p) => (p.id === product.id ? product : { ...p, isIncredible: false }));
+    }
     const dataDir = path.dirname(PRODUCTS_FILE);
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
@@ -997,10 +1001,90 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
       }
     } catch {}
     productsVersion = Date.now();
-    console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}. Version: ${productsVersion}`);
+    console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}. isIncredible: ${Boolean(product.isIncredible)}. Version: ${productsVersion}`);
     return res.json({ success: true, products: list, product, version: productsVersion });
   } catch (err) {
     console.error('Error in /api/products/save:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/products/set-incredible - dedicated atomic endpoint to set or change the store's Incredible Offer
+app.post(['/api/products/set-incredible', '/jaheshkala/api/products/set-incredible'], (req, res) => {
+  try {
+    const { productId, duration = 'permanent', expiresAt } = req.body || {};
+    if (!productId) {
+      return res.status(400).json({ error: 'productId is required' });
+    }
+
+    let list = [];
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      try {
+        const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch {}
+    }
+    if (list.length === 0) {
+      list = [...DEFAULT_SERVER_PRODUCTS];
+    }
+
+    const targetIdx = list.findIndex((p) => p.id === productId);
+    if (targetIdx < 0) {
+      return res.status(404).json({ error: `Product with ID ${productId} not found` });
+    }
+
+    let calculatedExpiresAt = expiresAt;
+    if (!calculatedExpiresAt) {
+      let target = Date.now();
+      if (duration === '1day') target += 24 * 60 * 60 * 1000;
+      else if (duration === '3days') target += 3 * 24 * 60 * 60 * 1000;
+      else if (duration === '1week') target += 7 * 24 * 60 * 60 * 1000;
+      else if (duration === '1month') target += 30 * 24 * 60 * 60 * 1000;
+      else if (duration === 'permanent') target += 365 * 24 * 60 * 60 * 1000;
+      calculatedExpiresAt = new Date(target).toISOString();
+    }
+
+    const nowIso = new Date().toISOString();
+    list = list.map((p) => {
+      if (p.id === productId) {
+        return {
+          ...p,
+          isIncredible: true,
+          incredibleTimerDuration: duration,
+          incredibleExpiresAt: calculatedExpiresAt,
+          updatedAt: nowIso,
+        };
+      }
+      return {
+        ...p,
+        isIncredible: false,
+      };
+    });
+
+    const dataDir = path.dirname(PRODUCTS_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    try {
+      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
+      if (fs.existsSync(path.dirname(distData))) {
+        fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
+      }
+    } catch {}
+    productsVersion = Date.now();
+    console.log(`[Products] Exclusively activated Incredible Offer for ${productId} until ${calculatedExpiresAt}. Version: ${productsVersion}`);
+    return res.json({
+      success: true,
+      productId,
+      duration,
+      expiresAt: calculatedExpiresAt,
+      products: list,
+      version: productsVersion,
+    });
+  } catch (err) {
+    console.error('Error in /api/products/set-incredible:', err);
     return res.status(500).json({ error: err.message });
   }
 });

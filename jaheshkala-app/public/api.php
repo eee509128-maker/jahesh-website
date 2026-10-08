@@ -168,6 +168,15 @@ switch ($action) {
                 array_unshift($prods, $product);
             }
 
+            // If product is marked as incredible offer, unset it from all other products
+            if (!empty($product['isIncredible'])) {
+                foreach ($prods as $k => $item) {
+                    if (isset($item['id']) && (string)$item['id'] !== $pId) {
+                        $prods[$k]['isIncredible'] = false;
+                    }
+                }
+            }
+
             writeJsonFile($productsFile, $prods);
             echo json_encode(['success' => true, 'product' => $product, 'count' => count($prods), 'products' => $prods]);
             exit;

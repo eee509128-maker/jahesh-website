@@ -47,14 +47,26 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Filter products that explicitly have isIncredible === true and sort by rank
+  // Filter products that explicitly have isIncredible === true
+  // Prioritize the most recently designated incredible product (updatedAt), then rank
   const incredibleProducts = [...products]
     .filter((p) => p && Boolean(p.isIncredible))
     .sort((a, b) => {
+      const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      if (!isNaN(timeA) && !isNaN(timeB) && timeA !== timeB) {
+        return timeB - timeA;
+      }
       const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
       const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
       return orderA - orderB;
     });
+
+  // Automatically reset to 0 when the primary product changes or is updated
+  const primaryId = incredibleProducts[0]?.id;
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [primaryId]);
 
   const safeIndex = incredibleProducts.length > 0 ? (currentIndex % incredibleProducts.length) : 0;
   const activeProduct = incredibleProducts[safeIndex];

@@ -1215,7 +1215,12 @@ export default function App() {
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
     setProducts((prev) => {
-      const updated = sortProductsByRank(prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
+      const mapped = prev.map((p) => {
+        if (p.id === updatedProduct.id) return updatedProduct;
+        if (updatedProduct.isIncredible) return { ...p, isIncredible: false };
+        return p;
+      });
+      const updated = sortProductsByRank(mapped);
       try {
         safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       } catch {}
@@ -1223,6 +1228,20 @@ export default function App() {
     });
     await saveProductToDb(updatedProduct);
     showToast(`محصول «${updatedProduct.title}» و تصویر آن در دیتابیس به‌روزرسانی شد.`);
+  };
+
+  const handleSetIncredibleProduct = async (
+    productId: string,
+    duration: '1day' | '3days' | '1week' | '1month' | 'permanent' | 'custom' = 'permanent',
+    customExpiresAt?: string
+  ) => {
+    const { setIncredibleProductInDb } = await import('./lib/dbService');
+    const updated = await setIncredibleProductInDb(productId, duration, customExpiresAt);
+    if (updated && updated.length > 0) {
+      setProducts(updated);
+    }
+    const target = products.find((p) => p.id === productId);
+    showToast(`محصول «${target?.title || 'انتخابی'}» به عنوان پیشنهاد شگفت‌انگیز صفحه اصلی ثبت و منتشر شد.`);
   };
 
   const handleReorderProducts = async (orderedList: Product[]) => {
@@ -1971,6 +1990,7 @@ export default function App() {
           onUpdateProduct={handleUpdateProduct}
           onDeleteProduct={handleDeleteProduct}
           onReorderProducts={handleReorderProducts}
+          onSetIncredibleProduct={handleSetIncredibleProduct}
           zibalMerchant={zibalMerchant}
           onUpdateZibalMerchant={handleUpdateZibalMerchant}
           coupons={coupons}

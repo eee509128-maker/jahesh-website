@@ -71,6 +71,29 @@ export default async function handler(req, res) {
       const docRef = doc(db, 'products', String(product.id));
       await setDoc(docRef, product, { merge: true });
 
+      // If product is marked as Incredible Offer, sync settings/products so other products are not incredible
+      try {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'products'));
+        if (settingsSnap.exists()) {
+          const sData = settingsSnap.data();
+          if (sData && Array.isArray(sData.products)) {
+            let list = sData.products;
+            const idx = list.findIndex((p) => String(p?.id) === String(product.id));
+            if (idx >= 0) {
+              list[idx] = { ...list[idx], ...product };
+            } else {
+              list = [product, ...list];
+            }
+            if (product.isIncredible) {
+              list = list.map((p) => (String(p?.id) === String(product.id) ? { ...p, ...product } : { ...p, isIncredible: false }));
+            }
+            await setDoc(doc(db, 'settings', 'products'), { products: list, updatedAt: new Date().toISOString() }, { merge: true });
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Firestore settings/products sync notice in api/products.js:', syncErr);
+      }
+
       // Remove from settings/deleted_products if present
       try {
         const delSnap = await getDoc(doc(db, 'settings', 'deleted_products'));
