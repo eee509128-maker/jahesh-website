@@ -895,6 +895,15 @@ app.post(['/api/products/deleted/remove', '/api/products/unmark-deleted'], (req,
   return res.json({ success: true, deleted: getDeletedProductIds() });
 });
 
+// Prevent any browser/proxy caching for all API endpoints
+app.use(['/api', '/jaheshkala/api'], (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
+
 let productsVersion = Date.now();
 
 // GET /api/products/version & /jaheshkala/api/products/version - ultra-lightweight 20-byte change detector
@@ -3889,13 +3898,36 @@ app.get(['/vet-hospital', '/vet-hospital/*'], (req, res, next) => {
 
 // Serve jaheshkala static files & SPA entry
 const jaheshkalaDir = path.join(__dirname, 'jaheshkala');
-app.use('/jaheshkala', express.static(jaheshkalaDir));
-app.get(['/jaheshkala', '/jaheshkala/*'], (req, res, next) => {
+app.get(['/jaheshkala', '/jaheshkala/'], (req, res) => {
+  const indexFile = path.join(jaheshkalaDir, 'index.html');
+  if (fs.existsSync(indexFile)) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    return res.sendFile(indexFile);
+  }
+  res.status(404).send('Not found');
+});
+
+app.use('/jaheshkala', express.static(jaheshkalaDir, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+
+app.get('/jaheshkala/*', (req, res, next) => {
   if (path.extname(req.path)) {
     return next();
   }
   const indexFile = path.join(jaheshkalaDir, 'index.html');
   if (fs.existsSync(indexFile)) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     return res.sendFile(indexFile);
   }
   next();

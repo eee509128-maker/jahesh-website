@@ -530,8 +530,8 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
       productsDocRef,
       (docSnap) => {
         if (isUnsubscribed) return;
-        // If user just performed a local save in the last 6 seconds, do not let stale listener overwrite
-        if (Date.now() - lastLocalProductSaveTime < 6000) return;
+        // If user just performed a local save in the last 20 seconds, do not let stale listener overwrite
+        if (Date.now() - lastLocalProductSaveTime < 20000) return;
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data && Array.isArray(data.products) && data.products.length > 0) {
@@ -562,8 +562,8 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
   // Ensures all users on all networks receive updates with zero disruption
   const pollServer = async () => {
     if (isUnsubscribed) return;
-    // Guard: Prevent polling from reverting user edits within 8 seconds of local save
-    if (Date.now() - lastLocalProductSaveTime < 8000) return;
+    // Guard: Prevent polling from reverting user edits within 20 seconds of local save
+    if (Date.now() - lastLocalProductSaveTime < 20000) return;
     try {
       const res = await fetchUniversalApi(`products?_t=${Date.now()}`, { cache: 'no-store' });
       if (res && res.ok) {
@@ -711,7 +711,8 @@ export const setIncredibleOfferInDb = async (
     timerDuration?: string;
     expiresAt?: string;
     makePrimary?: boolean;
-  }
+  },
+  existingList?: Product[]
 ): Promise<Product[]> => {
   recordLocalProductSave();
   const shouldBeIncredible = options?.isIncredible !== false;
@@ -719,24 +720,37 @@ export const setIncredibleOfferInDb = async (
   const makePrimary = options?.makePrimary !== false;
 
   let currentProducts: Product[] = [];
-  try {
-    const raw = localStorage.getItem('jahesh_products');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        currentProducts = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
+  if (Array.isArray(existingList) && existingList.length > 0) {
+    currentProducts = existingList.map(cleanProductItem).filter((p): p is Product => p !== null);
+  }
+
+  if (currentProducts.length === 0) {
+    try {
+      const raw = localStorage.getItem('jahesh_products');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          currentProducts = parsed.map(cleanProductItem).filter((p): p is Product => p !== null);
+        }
       }
-    }
-  } catch {}
+    } catch {}
+  }
 
   if (currentProducts.length === 0) {
     currentProducts = INITIAL_PRODUCTS.map(cleanProductItem).filter((p): p is Product => p !== null);
   }
 
-  const targetIdx = currentProducts.findIndex((p) => p.id === productId);
+  let targetIdx = currentProducts.findIndex((p) => p.id === productId);
   if (targetIdx < 0) {
-    console.warn('setIncredibleOfferInDb: product not found', productId);
-    return currentProducts;
+    // Check in INITIAL_PRODUCTS
+    const foundInInitial = INITIAL_PRODUCTS.find((p) => p.id === productId);
+    if (foundInInitial) {
+      currentProducts.push(cleanProductItem(foundInInitial)!);
+      targetIdx = currentProducts.length - 1;
+    } else {
+      console.warn('setIncredibleOfferInDb: product not found', productId);
+      return currentProducts;
+    }
   }
 
   const targetProd: Product = { ...currentProducts[targetIdx] };
@@ -2672,7 +2686,7 @@ export const fetchUniversalApi = async (pathOrAction: string, options?: RequestI
   for (const url of endpoints) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const res = await fetch(url, {
         ...options,
         signal: controller.signal,

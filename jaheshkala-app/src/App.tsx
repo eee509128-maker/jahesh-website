@@ -1210,27 +1210,21 @@ export default function App() {
         timerDuration: newProduct.incredibleTimerDuration,
         expiresAt: newProduct.incredibleExpiresAt,
         makePrimary: true,
-      });
+      }, [newProduct, ...products]);
       setProducts(updated);
     } else {
-      setProducts((prev) => {
-        const filtered = prev.filter((p) => p.id !== newProduct.id);
-        const updated = sortProductsByRank([newProduct, ...filtered]);
-        try {
-          safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-      setProducts((prev) => {
-        saveAllProductsToDb(prev).catch(() => {});
-        return prev;
-      });
+      const filtered = products.filter((p) => p.id !== newProduct.id);
+      const updated = sortProductsByRank([newProduct, ...filtered]);
+      setProducts(updated);
+      try {
+        safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
+      } catch {}
+      await saveAllProductsToDb(updated);
     }
     showToast('محصول جدید در دیتابیس ابری ثبت و منتشر شد.');
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
-    // 1. First save all edited fields (title, price, image, description, category, discount)
     await saveProductToDb(updatedProduct);
 
     if (updatedProduct.isIncredible) {
@@ -1239,21 +1233,14 @@ export default function App() {
         timerDuration: updatedProduct.incredibleTimerDuration,
         expiresAt: updatedProduct.incredibleExpiresAt,
         makePrimary: true,
-      });
+      }, products);
       setProducts(updated);
     } else {
-      // If was previously incredible or normal, ensure updated in state & storage
-      setProducts((prev) => {
-        const updated = sortProductsByRank(prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
-        try {
-          safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-      setProducts((prev) => {
-        saveAllProductsToDb(prev).catch(() => {});
-        return prev;
-      });
+      const updated = await setIncredibleOfferInDb(updatedProduct.id, {
+        isIncredible: false,
+        makePrimary: false,
+      }, products);
+      setProducts(updated);
     }
     showToast(`محصول «${updatedProduct.title}» و مشخصات آن در دیتابیس به‌روزرسانی شد.`);
   };
@@ -1267,7 +1254,7 @@ export default function App() {
       makePrimary?: boolean;
     }
   ) => {
-    const updated = await setIncredibleOfferInDb(productId, options);
+    const updated = await setIncredibleOfferInDb(productId, options, products);
     setProducts(updated);
     const prod = updated.find((p) => p.id === productId);
     if (options?.isIncredible === false) {
