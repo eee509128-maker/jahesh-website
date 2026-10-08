@@ -2,6 +2,11 @@
   RewriteEngine On
   RewriteBase /
 
+  # 301 Permanent Redirect for jahesh-it to root domain
+  RewriteRule ^jahesh-it(/.*)?$ https://jaheshit.ir/ [R=301,L,NC]
+  RewriteRule ^it(/.*)?$ https://jaheshit.ir/ [R=301,L,NC]
+  RewriteRule ^frwshgah(/.*)?$ /jaheshkala/ [R=301,L,NC]
+
   # Allow direct PHP endpoints
   RewriteRule ^api/zibal-request/?$ /api/zibal-request.php [L,QSA]
   RewriteRule ^api/zibal-verify/?$ /api/zibal-verify.php [L,QSA]

@@ -3841,9 +3841,9 @@ app.get(['/frwshgah', '/frwshgah/*'], (req, res) => {
 });
 
 // Dedicated routes for the 5 Pillars of Jahesh Ecosystem
-// 1. جهش ای تی (Jahesh IT)
-app.get(['/jahesh-it', '/jahesh-it/', '/it', '/it/', '/jaheshit', '/jaheshit/'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'jahesh-it', 'index.html'));
+// 1. جهش ای تی (Jahesh IT) -> 301 Permanent Redirect to root homepage
+app.get(['/jahesh-it', '/jahesh-it/*', '/it', '/it/*', '/jaheshit', '/jaheshit/*'], (_req, res) => {
+  return res.redirect(301, '/');
 });
 
 // 2. هوش مصنوعی جهش (Jahesh AI)

@@ -84,6 +84,8 @@ switch ($action) {
     case 'api/products':
     case 'products/save':
     case 'api/products/save':
+    case 'products/set-incredible':
+    case 'api/products/set-incredible':
     case 'products/delete':
     case 'api/products/delete':
     case 'products/order':
@@ -179,6 +181,42 @@ switch ($action) {
 
             writeJsonFile($productsFile, $prods);
             echo json_encode(['success' => true, 'product' => $product, 'count' => count($prods), 'products' => $prods]);
+            exit;
+        }
+
+        // 3.5 Set Incredible Offer Exclusively
+        if ($action === 'products/set-incredible' || $action === 'api/products/set-incredible') {
+            $pId = isset($inputData['productId']) ? (string)$inputData['productId'] : (isset($inputData['id']) ? (string)$inputData['id'] : '');
+            $duration = isset($inputData['duration']) ? (string)$inputData['duration'] : 'permanent';
+            $expiresAt = isset($inputData['expiresAt']) ? (string)$inputData['expiresAt'] : '';
+            if (empty($expiresAt)) {
+                $now = time();
+                if ($duration === '1day') $now += 86400;
+                else if ($duration === '3days') $now += 3 * 86400;
+                else if ($duration === '1week') $now += 7 * 86400;
+                else if ($duration === '1month') $now += 30 * 86400;
+                else $now += 365 * 86400;
+                $expiresAt = date('c', $now);
+            }
+            if (!empty($pId)) {
+                $prods = readJsonFile($productsFile, []);
+                $nowIso = date('c');
+                foreach ($prods as $k => $item) {
+                    if (isset($item['id']) && (string)$item['id'] === $pId) {
+                        $prods[$k]['isIncredible'] = true;
+                        $prods[$k]['incredibleTimerDuration'] = $duration;
+                        $prods[$k]['incredibleExpiresAt'] = $expiresAt;
+                        $prods[$k]['updatedAt'] = $nowIso;
+                    } else {
+                        $prods[$k]['isIncredible'] = false;
+                    }
+                }
+                writeJsonFile($productsFile, $prods);
+                echo json_encode(['success' => true, 'productId' => $pId, 'duration' => $duration, 'expiresAt' => $expiresAt, 'products' => $prods]);
+                exit;
+            }
+            http_response_code(400);
+            echo json_encode(['error' => 'productId required']);
             exit;
         }
 

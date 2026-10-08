@@ -62,7 +62,54 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const product = req.body;
+      const body = req.body;
+      if (!body) {
+        return res.status(400).json({ error: 'Missing request body' });
+      }
+
+      // Case A: Full products list save-all
+      if (Array.isArray(body) || (Array.isArray(body.products) && body.products.length > 0)) {
+        const incoming = Array.isArray(body) ? body : body.products;
+        await setDoc(doc(db, 'settings', 'products'), { products: incoming, updatedAt: new Date().toISOString() }, { merge: true });
+        return res.status(200).json({ success: true, count: incoming.length, products: incoming });
+      }
+
+      // Case B: Dedicated set-incredible request
+      const isSetIncredible = Boolean(body.productId && (body.duration || body.expiresAt || body.action === 'set-incredible'));
+      if (isSetIncredible) {
+        const pId = String(body.productId).trim();
+        const duration = body.duration || 'permanent';
+        let expiresAt = body.expiresAt;
+        if (!expiresAt) {
+          let t = Date.now();
+          if (duration === '1day') t += 86400000;
+          else if (duration === '3days') t += 3 * 86400000;
+          else if (duration === '1week') t += 7 * 86400000;
+          else if (duration === '1month') t += 30 * 86400000;
+          else t += 365 * 86400000;
+          expiresAt = new Date(t).toISOString();
+        }
+        const nowIso = new Date().toISOString();
+        try {
+          const sSnap = await getDoc(doc(db, 'settings', 'products'));
+          if (sSnap.exists()) {
+            const list = (sSnap.data()?.products || []).map((p) => {
+              if (String(p?.id) === pId) {
+                return { ...p, isIncredible: true, incredibleTimerDuration: duration, incredibleExpiresAt: expiresAt, updatedAt: nowIso };
+              }
+              return { ...p, isIncredible: false };
+            });
+            await setDoc(doc(db, 'settings', 'products'), { products: list, updatedAt: nowIso }, { merge: true });
+          }
+        } catch {}
+        try {
+          await setDoc(doc(db, 'products', pId), { isIncredible: true, incredibleTimerDuration: duration, incredibleExpiresAt: expiresAt, updatedAt: nowIso }, { merge: true });
+        } catch {}
+        return res.status(200).json({ success: true, productId: pId, duration, expiresAt });
+      }
+
+      // Case C: Single product upsert
+      const product = body;
       if (!product || !product.id) {
         return res.status(400).json({ error: 'Missing product or product ID' });
       }

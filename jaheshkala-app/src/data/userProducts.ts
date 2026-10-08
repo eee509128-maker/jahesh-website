@@ -20,7 +20,7 @@ export const USER_RESTORED_PRODUCTS: Product[] = [
     "warranty": "۱ ماه پشتیبانی فنی رایگان + هاست و دامین رایگان",
     "updatedAt": "2026-09-19T05:35:17.226Z",
     "hasCustomPlans": false,
-    "isIncredible": true,
+    "isIncredible": false,
     "id": "pkg-golden-jahesh",
     "gallery": [],
     "isPopular": true,

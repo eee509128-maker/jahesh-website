@@ -1235,13 +1235,51 @@ export default function App() {
     duration: '1day' | '3days' | '1week' | '1month' | 'permanent' | 'custom' = 'permanent',
     customExpiresAt?: string
   ) => {
+    let targetIso = customExpiresAt;
+    if (!targetIso || duration !== 'custom') {
+      let target = Date.now();
+      if (duration === '1day') target += 24 * 60 * 60 * 1000;
+      else if (duration === '3days') target += 3 * 24 * 60 * 60 * 1000;
+      else if (duration === '1week') target += 7 * 24 * 60 * 60 * 1000;
+      else if (duration === '1month') target += 30 * 24 * 60 * 60 * 1000;
+      else if (duration === 'permanent') target += 365 * 24 * 60 * 60 * 1000;
+      targetIso = new Date(target).toISOString();
+    }
+    const nowIso = new Date().toISOString();
+
+    // 1. Instant optimistic UI state update (0ms latency!)
+    setProducts((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id === productId) {
+          return {
+            ...p,
+            isIncredible: true,
+            incredibleTimerDuration: duration,
+            incredibleExpiresAt: targetIso,
+            updatedAt: nowIso,
+          };
+        }
+        return {
+          ...p,
+          isIncredible: false,
+        };
+      });
+      const sorted = sortProductsByRank(updated);
+      try {
+        safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+      } catch {}
+      return sorted;
+    });
+
+    const target = products.find((p) => p.id === productId);
+    showToast(`محصول «${target?.title || 'انتخابی'}» فوراً به عنوان پیشنهاد شگفت‌انگیز صفحه اصلی ثبت شد.`);
+
+    // 2. Persist across cloud, server disk, and database in background
     const { setIncredibleProductInDb } = await import('./lib/dbService');
-    const updated = await setIncredibleProductInDb(productId, duration, customExpiresAt);
+    const updated = await setIncredibleProductInDb(productId, duration, targetIso);
     if (updated && updated.length > 0) {
       setProducts(updated);
     }
-    const target = products.find((p) => p.id === productId);
-    showToast(`محصول «${target?.title || 'انتخابی'}» به عنوان پیشنهاد شگفت‌انگیز صفحه اصلی ثبت و منتشر شد.`);
   };
 
   const handleReorderProducts = async (orderedList: Product[]) => {

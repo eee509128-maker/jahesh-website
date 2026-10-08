@@ -531,10 +531,40 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
               .map(cleanProductItem)
               .filter((p): p is Product => p !== null);
             if (cleaned.length > 0) {
-              const fingerprint = JSON.stringify(cleaned);
+              let effectiveList = cleaned;
+              try {
+                const rawLocal = localStorage.getItem('jahesh_products');
+                if (rawLocal) {
+                  const localParsed: Product[] = JSON.parse(rawLocal);
+                  if (Array.isArray(localParsed)) {
+                    const localIncredible = localParsed.find((p) => p && Boolean(p.isIncredible));
+                    const incomingIncredible = cleaned.find((p) => p && Boolean(p.isIncredible));
+                    if (localIncredible && (!incomingIncredible || localIncredible.id !== incomingIncredible.id)) {
+                      const localTime = localIncredible.updatedAt ? new Date(localIncredible.updatedAt).getTime() : 0;
+                      const incomingTime = incomingIncredible?.updatedAt ? new Date(incomingIncredible.updatedAt).getTime() : 0;
+                      if (localTime >= incomingTime) {
+                        effectiveList = cleaned.map((p) => {
+                          if (p.id === localIncredible.id) {
+                            return {
+                              ...p,
+                              isIncredible: true,
+                              incredibleTimerDuration: localIncredible.incredibleTimerDuration,
+                              incredibleExpiresAt: localIncredible.incredibleExpiresAt,
+                              updatedAt: localIncredible.updatedAt,
+                            };
+                          }
+                          return { ...p, isIncredible: false };
+                        });
+                      }
+                    }
+                  }
+                }
+              } catch {}
+
+              const fingerprint = JSON.stringify(effectiveList);
               if (fingerprint !== lastProductFingerprint) {
                 lastProductFingerprint = fingerprint;
-                const sorted = sortProductsByRank(cleaned);
+                const sorted = sortProductsByRank(effectiveList);
                 safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
                 callback(sorted);
               }
@@ -563,11 +593,42 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
           const cleaned = list
             .map(cleanProductItem)
             .filter((p): p is Product => p !== null);
-          const fingerprint = JSON.stringify(cleaned);
+
+          let effectiveList = cleaned;
+          try {
+            const rawLocal = localStorage.getItem('jahesh_products');
+            if (rawLocal) {
+              const localParsed: Product[] = JSON.parse(rawLocal);
+              if (Array.isArray(localParsed)) {
+                const localIncredible = localParsed.find((p) => p && Boolean(p.isIncredible));
+                const incomingIncredible = cleaned.find((p) => p && Boolean(p.isIncredible));
+                if (localIncredible && (!incomingIncredible || localIncredible.id !== incomingIncredible.id)) {
+                  const localTime = localIncredible.updatedAt ? new Date(localIncredible.updatedAt).getTime() : 0;
+                  const incomingTime = incomingIncredible?.updatedAt ? new Date(incomingIncredible.updatedAt).getTime() : 0;
+                  if (localTime >= incomingTime) {
+                    effectiveList = cleaned.map((p) => {
+                      if (p.id === localIncredible.id) {
+                        return {
+                          ...p,
+                          isIncredible: true,
+                          incredibleTimerDuration: localIncredible.incredibleTimerDuration,
+                          incredibleExpiresAt: localIncredible.incredibleExpiresAt,
+                          updatedAt: localIncredible.updatedAt,
+                        };
+                      }
+                      return { ...p, isIncredible: false };
+                    });
+                  }
+                }
+              }
+            }
+          } catch {}
+
+          const fingerprint = JSON.stringify(effectiveList);
 
           if (fingerprint !== lastProductFingerprint) {
             lastProductFingerprint = fingerprint;
-            const sorted = sortProductsByRank(cleaned);
+            const sorted = sortProductsByRank(effectiveList);
             safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
             callback(sorted);
           }
@@ -810,7 +871,7 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
     try {
       const cleanAuthoritativeDoc = JSON.parse(JSON.stringify(authoritativeProduct));
       const cleanMasterList = JSON.parse(JSON.stringify(sortedMaster));
-      await Promise.allSettled([
+      const tasks: Promise<any>[] = [
         setDoc(doc(db, 'products', product.id), cleanAuthoritativeDoc),
         setDoc(
           doc(db, 'settings', 'products'),
@@ -820,7 +881,15 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
           },
           { merge: true }
         ),
-      ]);
+      ];
+      if (authoritativeProduct.isIncredible) {
+        for (const p of sortedMaster) {
+          if (p.id !== product.id) {
+            tasks.push(setDoc(doc(db, 'products', p.id), { isIncredible: false, updatedAt: new Date().toISOString() }, { merge: true }));
+          }
+        }
+      }
+      await Promise.allSettled(tasks);
       console.log(`[Firestore] Saved product ${product.id} and updated settings/products successfully.`);
     } catch (fbErr) {
       console.warn('Firestore save product notice:', fbErr);
@@ -912,31 +981,40 @@ export const setIncredibleProductInDb = async (
       broadcastProductsUpdate(sortedList);
     } catch {}
 
-    // 3. Server persistence via dedicated endpoint & full list
-    try {
-      await fetch('/api/products/set-incredible', {
+    // 3. Server persistence via dedicated endpoint & full list across all backend flavors
+    const serverPayload = {
+      productId: cleanId,
+      duration,
+      expiresAt: targetExpiresAt,
+    };
+    Promise.allSettled([
+      fetch('/api/products/set-incredible', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: cleanId,
-          duration,
-          expiresAt: targetExpiresAt,
-        }),
-      });
-    } catch {
-      try {
-        await fetchUniversalApi('products/save-all', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ products: sortedList }),
-        });
-      } catch {}
-    }
+        body: JSON.stringify(serverPayload),
+      }),
+      fetch('/jaheshkala/api/products/set-incredible', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serverPayload),
+      }),
+      fetchUniversalApi('products/set-incredible', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serverPayload),
+      }),
+      fetchUniversalApi('products/save-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products: sortedList }),
+      }),
+    ]).catch(() => {});
 
     // 4. Firebase Firestore persistence
     try {
       const targetProd = sortedList.find((p) => p.id === cleanId);
-      await Promise.allSettled([
+      const otherProds = sortedList.filter((p) => p.id !== cleanId);
+      const firestoreTasks: Promise<any>[] = [
         setDoc(
           doc(db, 'settings', 'products'),
           {
@@ -945,8 +1023,16 @@ export const setIncredibleProductInDb = async (
           },
           { merge: true }
         ),
-        targetProd ? setDoc(doc(db, 'products', cleanId), targetProd, { merge: true }) : Promise.resolve(),
-      ]);
+      ];
+      if (targetProd) {
+        firestoreTasks.push(setDoc(doc(db, 'products', cleanId), targetProd, { merge: true }));
+      }
+      for (const op of otherProds) {
+        firestoreTasks.push(
+          setDoc(doc(db, 'products', op.id), { isIncredible: false, updatedAt: nowIso }, { merge: true })
+        );
+      }
+      await Promise.allSettled(firestoreTasks);
     } catch (fbErr) {
       console.warn('Firestore setIncredible notice:', fbErr);
     }
