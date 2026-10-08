@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- ۱. انجمن علمی جهش -->
+  <url>
+    <loc>https://jaheshit.ir/</loc>
+    <lastmod>2026-10-08</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- ۲. جهش کالا -->
+  <url>
+    <loc>https://jaheshit.ir/jaheshkala/</loc>
+    <lastmod>2026-10-08</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- ۴. بیمارستان دانشکده دامپزشکی جهش -->
+  <url>
+    <loc>https://jaheshit.ir/vet-hospital/</loc>
+    <lastmod>2026-10-06</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- ۵. هوش مصنوعی جهش ۲ (جهش 2) -->
+  <url>
+    <loc>https://jaheshit.ir/ai/</loc>
+    <lastmod>2026-10-08</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- درباره انجمن علمی جهش -->
+  <url>
+    <loc>https://jaheshit.ir/drbarh-anjmn/</loc>
+    <lastmod>2026-10-06</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+  <!-- داشبورد تکنولوژی جهش -->
+  <url>
+    <loc>https://jaheshit.ir/abzar-jahesh/</loc>
+    <lastmod>2026-10-06</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <!-- اخبار -->
+  <url>
+    <loc>https://jaheshit.ir/akhbar/</loc>
+    <lastmod>2026-10-06</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <!-- هوش مصنوعی و مستندات LLM -->
+  <url>
+    <loc>https://jaheshit.ir/llms.txt</loc>
+    <lastmod>2026-10-06</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>
+</urlset>
