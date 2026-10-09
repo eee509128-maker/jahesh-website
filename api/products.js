@@ -87,12 +87,19 @@ export default async function handler(req, res) {
 
         // If this product is set as incredible offer, unmark any previous incredible offer
         if (product.isIncredible) {
+          const prevIncredibleIds = [];
           currentProducts = currentProducts.map((p) => {
             if (p && p.id !== product.id && p.isIncredible) {
+              prevIncredibleIds.push(p.id);
               return { ...p, isIncredible: false };
             }
             return p;
           });
+          for (const prevId of prevIncredibleIds) {
+            try {
+              await setDoc(doc(db, 'products', String(prevId)), { isIncredible: false, updatedAt: new Date().toISOString() }, { merge: true });
+            } catch {}
+          }
         }
 
         const pIdx = currentProducts.findIndex((p) => p && p.id === product.id);

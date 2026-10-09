@@ -65,7 +65,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!product) return null;
 
-  const effectiveDownloadUrl = product.downloadUrl || (product as any).appDownloadUrl || (product.id === 'prod-1790538341809' || product.title?.includes('شنتیا') ? '/uploads/apps/shantia.apk' : undefined);
+  const rawDownloadUrl = product.downloadUrl || (product as any).appDownloadUrl || (product.id === 'prod-1790538341809' || product.title?.includes('شنتیا') ? '/uploads/apps/shantia.apk' : undefined);
+  const effectiveDownloadUrl = rawDownloadUrl
+    ? (rawDownloadUrl.startsWith('http://') || rawDownloadUrl.startsWith('https://') || rawDownloadUrl.startsWith('/')
+        ? rawDownloadUrl
+        : '/' + rawDownloadUrl)
+    : undefined;
 
   const allImages = [product.image, ...(product.gallery || [])].filter(
     (url, idx, arr) => url && typeof url === 'string' && url.trim() !== '' && arr.indexOf(url) === idx

@@ -137,8 +137,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '250mb' }));
+app.use(express.urlencoded({ extended: true, limit: '250mb' }));
 
 // Static uploads directory for banners and user-uploaded media
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
@@ -158,20 +158,132 @@ const DIST_APPS_UPLOADS_DIR = path.join(__dirname, 'jaheshkala', 'uploads', 'app
 if (!fs.existsSync(DIST_APPS_UPLOADS_DIR)) {
   fs.mkdirSync(DIST_APPS_UPLOADS_DIR, { recursive: true });
 }
+const APP_SRC_UPLOADS_DIR = path.join(__dirname, 'jaheshkala-app', 'public', 'uploads', 'apps');
+if (!fs.existsSync(APP_SRC_UPLOADS_DIR)) {
+  fs.mkdirSync(APP_SRC_UPLOADS_DIR, { recursive: true });
+}
 const JAHESH_IMAGES_DIR = path.join(__dirname, 'jaheshkala', 'images');
 if (!fs.existsSync(JAHESH_IMAGES_DIR)) {
   fs.mkdirSync(JAHESH_IMAGES_DIR, { recursive: true });
 }
+
+// Robust Streamer for APK and App Downloads with Full HTTP Range (206) and Resume Support
+function serveAppDownload(req, res, targetFilename) {
+  const rawTarget = targetFilename || req.params?.filename || req.query?.file || 'shantia.apk';
+  const cleanName = path.basename(String(rawTarget).trim());
+
+  const candidatePaths = [
+    path.join(APPS_UPLOADS_DIR, cleanName),
+    path.join(DIST_APPS_UPLOADS_DIR, cleanName),
+    path.join(APP_SRC_UPLOADS_DIR, cleanName),
+    path.join(__dirname, 'public', 'uploads', 'apps', cleanName),
+    path.join(UPLOADS_DIR, cleanName),
+    path.join(__dirname, 'jaheshkala', 'uploads', cleanName),
+    path.join(__dirname, 'jaheshkala-app', 'public', cleanName),
+    path.join(__dirname, cleanName)
+  ];
+
+  let resolvedPath = candidatePaths.find((p) => fs.existsSync(p) && fs.statSync(p).isFile());
+
+  // If specific file not found by exact name, look for any .apk file in the apps folders
+  if (!resolvedPath) {
+    const searchDirs = [APPS_UPLOADS_DIR, DIST_APPS_UPLOADS_DIR, APP_SRC_UPLOADS_DIR];
+    for (const sDir of searchDirs) {
+      if (fs.existsSync(sDir)) {
+        try {
+          const files = fs.readdirSync(sDir);
+          const apk = files.find((f) => f.toLowerCase().endsWith('.apk'));
+          if (apk) {
+            resolvedPath = path.join(sDir, apk);
+            break;
+          }
+        } catch {}
+      }
+    }
+  }
+
+  if (!resolvedPath || !fs.existsSync(resolvedPath)) {
+    return res.status(404).send(`فایل دانلودی «${cleanName}» روی سرور یافت نشد. لطفاً مطمئن شوید فایل را در پوشه uploads/apps قرار داده‌اید.`);
+  }
+
+  const stat = fs.statSync(resolvedPath);
+  const fileSize = stat.size;
+  const ext = path.extname(cleanName).toLowerCase();
+  let mimeType = 'application/vnd.android.package-archive';
+  if (ext === '.zip') mimeType = 'application/zip';
+  else if (ext === '.exe') mimeType = 'application/x-msdownload';
+  else if (ext !== '.apk') mimeType = 'application/octet-stream';
+
+  const range = req.headers.range;
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    if (start >= fileSize || end >= fileSize) {
+      res.setHeader('Content-Range', `bytes */${fileSize}`);
+      return res.status(416).send('Requested Range Not Satisfiable');
+    }
+    const chunksize = end - start + 1;
+    const fileStream = fs.createReadStream(resolvedPath, { start, end });
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunksize,
+      'Content-Type': mimeType,
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(cleanName)}"`,
+      'Cache-Control': 'public, max-age=86400',
+    });
+    fileStream.pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': fileSize,
+      'Content-Type': mimeType,
+      'Content-Disposition': `attachment; filename="${encodeURIComponent(cleanName)}"`,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'public, max-age=86400',
+    });
+    fs.createReadStream(resolvedPath).pipe(res);
+  }
+}
+
+// Dedicated routes for downloading apps (shantia and others)
+app.get([
+  '/api/download/app',
+  '/api/download/shantia',
+  '/api/download-app',
+  '/download/shantia.apk',
+  '/uploads/apps/:filename',
+  '/jaheshkala/uploads/apps/:filename',
+  '/apps/:filename'
+], (req, res) => {
+  serveAppDownload(req, res, req.params?.filename || 'shantia.apk');
+});
+
 const staticUploadsOptions = {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.apk')) {
       res.setHeader('Content-Type', 'application/vnd.android.package-archive');
       res.setHeader('Content-Disposition', 'attachment; filename="' + path.basename(filePath) + '"');
+      res.setHeader('Accept-Ranges', 'bytes');
     }
   }
 };
-app.use('/uploads', express.static(UPLOADS_DIR, staticUploadsOptions));
-app.use('/jaheshkala/uploads', express.static(UPLOADS_DIR, staticUploadsOptions));
+
+// Multi-folder static serving fallback for uploads
+const allUploadsDirs = [
+  UPLOADS_DIR,
+  path.join(__dirname, 'jaheshkala', 'uploads'),
+  path.join(__dirname, 'jaheshkala-app', 'public', 'uploads'),
+  path.join(__dirname, 'public', 'uploads')
+];
+
+allUploadsDirs.forEach((dir) => {
+  if (fs.existsSync(dir)) {
+    app.use('/uploads', express.static(dir, staticUploadsOptions));
+    app.use('/jaheshkala/uploads', express.static(dir, staticUploadsOptions));
+  }
+});
+
 app.use('/jaheshkala/images', express.static(JAHESH_IMAGES_DIR));
 app.use('/images', express.static(JAHESH_IMAGES_DIR));
 
@@ -843,12 +955,24 @@ app.post(['/api/upload-app-file', '/api/upload-app', '/jaheshkala/api/upload-app
     const filePath = path.join(APPS_UPLOADS_DIR, safeName);
     fs.writeFileSync(filePath, buffer);
 
-    // Also mirror to jaheshkala dist directory
+    // Also mirror to jaheshkala and jaheshkala-app dist directories
     try {
       if (!fs.existsSync(DIST_APPS_UPLOADS_DIR)) {
         fs.mkdirSync(DIST_APPS_UPLOADS_DIR, { recursive: true });
       }
       fs.writeFileSync(path.join(DIST_APPS_UPLOADS_DIR, safeName), buffer);
+
+      if (!fs.existsSync(APP_SRC_UPLOADS_DIR)) {
+        fs.mkdirSync(APP_SRC_UPLOADS_DIR, { recursive: true });
+      }
+      fs.writeFileSync(path.join(APP_SRC_UPLOADS_DIR, safeName), buffer);
+
+      // If user uploaded a Shantia package, keep shantia.apk updated as canonical alias
+      if (cleanBaseName.toLowerCase().includes('shantia') || cleanBaseName.includes('شنتیا')) {
+        fs.writeFileSync(path.join(APPS_UPLOADS_DIR, 'shantia.apk'), buffer);
+        fs.writeFileSync(path.join(DIST_APPS_UPLOADS_DIR, 'shantia.apk'), buffer);
+        fs.writeFileSync(path.join(APP_SRC_UPLOADS_DIR, 'shantia.apk'), buffer);
+      }
     } catch {}
 
     const publicUrl = `/uploads/apps/${safeName}`;

@@ -47,16 +47,17 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Filter products that explicitly have isIncredible === true and sort by rank/recency
+  // Filter products that explicitly have isIncredible === true
+  // Sort by recency (newest updatedAt first) so the newly designated incredible offer ALWAYS appears immediately as the primary offer!
   const incredibleProducts = [...products]
     .filter((p) => p && Boolean(p.isIncredible))
     .sort((a, b) => {
-      const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
-      const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
-      if (orderA !== orderB) return orderA - orderB;
       const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
       const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-      return timeB - timeA;
+      if (timeA !== timeB) return timeB - timeA;
+      const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
+      const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
+      return orderA - orderB;
     });
 
   const safeIndex = incredibleProducts.length > 0 ? (currentIndex % incredibleProducts.length) : 0;

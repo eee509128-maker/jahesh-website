@@ -783,9 +783,11 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
     } catch {}
 
     // If this product is being designated as the incredible offer, unmark any previous ones
+    const previousIncredibleIds: string[] = [];
     if (authoritativeProduct.isIncredible) {
       masterList = masterList.map((p) => {
         if (p && p.id !== product.id && p.isIncredible) {
+          previousIncredibleIds.push(p.id);
           return { ...p, isIncredible: false };
         }
         return p;
@@ -809,12 +811,17 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       console.warn('LocalStorage save product warning:', err);
     }
 
-    // 4. Firebase Firestore sync: Save BOTH individual doc in products collection AND settings/products
+    // 4. Firebase Firestore sync: Save individual doc in products collection, unmark previous ones, and update settings/products
     try {
       const cleanAuthoritativeDoc = JSON.parse(JSON.stringify(authoritativeProduct));
       const cleanMasterList = JSON.parse(JSON.stringify(sortedMaster));
+      const previousDocPromises = previousIncredibleIds.map((prevId) =>
+        setDoc(doc(db, 'products', prevId), { isIncredible: false, updatedAt: new Date().toISOString() }, { merge: true })
+      );
+
       await Promise.allSettled([
         setDoc(doc(db, 'products', product.id), cleanAuthoritativeDoc),
+        ...previousDocPromises,
         setDoc(
           doc(db, 'settings', 'products'),
           {
@@ -828,6 +835,15 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
     } catch (fbErr) {
       console.warn('Firestore save product notice:', fbErr);
     }
+
+    // 4.1 Sync full updated list to disk endpoints (/api/products)
+    try {
+      fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sortedMaster),
+      }).catch(() => {});
+    } catch {}
 
     // 5. Supabase sync
     try {

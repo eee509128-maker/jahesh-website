@@ -929,8 +929,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 120 * 1024 * 1024) {
-      alert('حجم فایل انتخابی بیش از ۱۲۰ مگابایت است. لطفاً فایل کم‌حجم‌تر انتخاب کنید یا آن را در هاست دانلود / گوگل درایو آپلود کرده و لینک مستقیم آن را در کادر قرار دهید.');
+    if (file.size > 250 * 1024 * 1024) {
+      alert('حجم فایل انتخابی بیش از ۲۵۰ مگابایت است. لطفاً فایل کم‌حجم‌تر انتخاب کنید یا آن را در هاست دانلود / گوگل درایو آپلود کرده و لینک مستقیم آن را در کادر قرار دهید.');
       return;
     }
 
@@ -3859,7 +3859,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <input
                           type="text"
                           value={newDownloadUrl}
-                          onChange={(e) => setNewDownloadUrl(e.target.value)}
+                          onChange={(e) => {
+                            let val = e.target.value;
+                            if (val && !val.startsWith('http://') && !val.startsWith('https://') && !val.startsWith('/')) {
+                              val = '/' + val;
+                            }
+                            setNewDownloadUrl(val);
+                          }}
+                          onBlur={(e) => {
+                            let val = e.target.value.trim();
+                            if (val && !val.startsWith('http://') && !val.startsWith('https://') && !val.startsWith('/')) {
+                              val = '/' + val;
+                            }
+                            setNewDownloadUrl(val);
+                          }}
                           placeholder="مثلاً: /uploads/apps/shantia.apk یا https://.../app.apk"
                           className="flex-1 bg-[#070e1c] border border-cyan-700/60 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 font-mono text-left dir-ltr"
                         />
