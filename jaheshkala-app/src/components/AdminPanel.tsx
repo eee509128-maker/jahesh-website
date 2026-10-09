@@ -1539,8 +1539,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       aiAppPlatform: isAiAppProduct ? aiAppPlatform : undefined,
       aiAppDefaultDays: isAiAppProduct ? Math.max(1, aiAppDefaultDays || 7) : undefined,
       aiAppCustomPromptNote: isAiAppProduct ? aiAppCustomPromptNote.trim() : undefined,
-      downloadUrl: newDownloadUrl.trim() || undefined,
-      appDownloadUrl: newDownloadUrl.trim() || undefined,
+      downloadUrl: (() => {
+        let u = newDownloadUrl.trim().replace(/\/+$/, '');
+        if (u && !u.startsWith('http://') && !u.startsWith('https://') && !u.startsWith('/')) u = '/' + u;
+        return u || undefined;
+      })(),
+      appDownloadUrl: (() => {
+        let u = newDownloadUrl.trim().replace(/\/+$/, '');
+        if (u && !u.startsWith('http://') && !u.startsWith('https://') && !u.startsWith('/')) u = '/' + u;
+        return u || undefined;
+      })(),
       appVersion: newAppVersion.trim() || undefined,
       appFileSize: newAppFileSize.trim() || undefined,
       displayOrder: typeof newDisplayOrder === 'number' && newDisplayOrder > 0 ? newDisplayOrder : (existingProduct?.displayOrder || existingProduct?.displayRank || undefined),
@@ -3902,8 +3910,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                         {newDownloadUrl && (
                           <a
-                            href={newDownloadUrl}
-                            download
+                            href={(() => {
+                              let u = newDownloadUrl.trim().replace(/\/+$/, '');
+                              if (u && !u.startsWith('http://') && !u.startsWith('https://') && !u.startsWith('/')) u = '/' + u;
+                              return u || '#';
+                            })()}
+                            download="shantia.apk"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center justify-center gap-1.5 bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition-colors shrink-0 whitespace-nowrap cursor-pointer"

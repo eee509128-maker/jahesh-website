@@ -16,6 +16,61 @@
           "value": "noindex, nofollow"
         }
       ]
+    },
+    {
+      "source": "/(.*)\\.apk",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"shantia.apk\""
+        },
+        {
+          "key": "Accept-Ranges",
+          "value": "bytes"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/uploads/apps/(.*)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
+        },
+        {
+          "key": "Accept-Ranges",
+          "value": "bytes"
+        }
+      ]
+    },
+    {
+      "source": "/jaheshkala/uploads/apps/(.*)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
+        },
+        {
+          "key": "Accept-Ranges",
+          "value": "bytes"
+        }
+      ]
     }
   ],
   "redirects": [
@@ -169,12 +224,28 @@
       "destination": "/jaheshkala/assets/:path*"
     },
     {
+      "source": "/uploads/apps/:filename",
+      "destination": "/jaheshkala/uploads/apps/:filename"
+    },
+    {
+      "source": "/jaheshkala/uploads/apps/:filename",
+      "destination": "/jaheshkala/uploads/apps/:filename"
+    },
+    {
+      "source": "/download/:filename",
+      "destination": "/jaheshkala/uploads/apps/:filename"
+    },
+    {
+      "source": "/api/download-app",
+      "destination": "/jaheshkala/uploads/apps/shantia.apk"
+    },
+    {
       "source": "/jaheshkala/uploads/:path*",
       "destination": "/jaheshkala/uploads/:path*"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "/uploads/:path*"
+      "destination": "/jaheshkala/uploads/:path*"
     },
     {
       "source": "/jaheshkala",

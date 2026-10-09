@@ -8,7 +8,7 @@ export default defineConfig(() => {
     base: '/jaheshkala/',
     build: {
       outDir: path.resolve(__dirname, '../jaheshkala'),
-      emptyOutDir: true,
+      emptyOutDir: false,
     },
     plugins: [react(), tailwindcss()],
     resolve: {

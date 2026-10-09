@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "build": "cd jaheshkala-app && npm install && npx vite build",
+    "build": "node scripts/sync-apps.js && cd jaheshkala-app && npm install && npx vite build && node ../scripts/sync-apps.js",
     "lint": "node --check server.js",
     "start": "node server.js"
   },
