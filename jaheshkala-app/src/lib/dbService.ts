@@ -782,6 +782,16 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       }
     } catch {}
 
+    // If this product is being designated as the incredible offer, unmark any previous ones
+    if (authoritativeProduct.isIncredible) {
+      masterList = masterList.map((p) => {
+        if (p && p.id !== product.id && p.isIncredible) {
+          return { ...p, isIncredible: false };
+        }
+        return p;
+      });
+    }
+
     const idx = masterList.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
       masterList[idx] = authoritativeProduct;

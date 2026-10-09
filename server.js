@@ -979,6 +979,17 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
     if (list.length === 0) {
       list = [...DEFAULT_SERVER_PRODUCTS];
     }
+
+    // If product is set as incredible offer, unmark any other products so this product is the active incredible offer!
+    if (product.isIncredible) {
+      list = list.map((p) => {
+        if (p && p.id !== product.id && p.isIncredible) {
+          return { ...p, isIncredible: false };
+        }
+        return p;
+      });
+    }
+
     const idx = list.findIndex((p) => p.id === product.id);
     if (idx >= 0) {
       list[idx] = product;
@@ -994,6 +1005,10 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
       const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
       if (fs.existsSync(path.dirname(distData))) {
         fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
+      }
+      const appData = path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'products.json');
+      if (fs.existsSync(path.dirname(appData))) {
+        fs.writeFileSync(appData, JSON.stringify(list, null, 2), 'utf8');
       }
     } catch {}
     productsVersion = Date.now();
@@ -3751,20 +3766,28 @@ app.get('/47887509.txt', (req, res) => {
   res.status(404).send('Not found');
 });
 
-// Redirect /frwshgah to /jaheshkala
+// Redirect /frwshgah to /jaheshkala/
 app.get(['/frwshgah', '/frwshgah/*'], (req, res) => {
-  res.redirect(301, '/jaheshkala');
+  res.redirect(301, '/jaheshkala/');
+});
+
+// Trailing-slash normalization for core pillars to prevent duplicate indexing
+app.get('/vet-hospital', (req, res) => {
+  res.redirect(301, '/vet-hospital/');
+});
+app.get('/jaheshkala', (req, res) => {
+  res.redirect(301, '/jaheshkala/');
 });
 
 // Dedicated routes for the 5 Pillars of Jahesh Ecosystem
-// 1. جهش ای تی (Jahesh IT)
-app.get(['/jahesh-it', '/jahesh-it/', '/it', '/it/', '/jaheshit', '/jaheshit/'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'jahesh-it', 'index.html'));
+// 1. جهش ای تی (Jahesh IT) -> باید مستقیماً برود به سایت اصلی https://jaheshit.ir/
+app.get(['/jahesh-it', '/jahesh-it/', '/jahesh-it/*', '/it', '/it/', '/it/*', '/jaheshit', '/jaheshit/', '/jaheshit/*'], (req, res) => {
+  res.redirect(301, '/');
 });
 
-// 2. هوش مصنوعی جهش (Jahesh AI)
-app.get(['/ai', '/ai/', '/ai-v13', '/ai-v13/', '/hwsh-msnway', '/hwsh-msnway/', '/chat', '/chat/'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'ai', 'index.html'));
+// 2. هوش مصنوعی جهش (Jahesh AI) -> باید مستقیماً برود به https://jahesh-2.vercel.app/
+app.get(['/ai', '/ai/', '/ai/*', '/ai-v13', '/ai-v13/', '/ai-v13/*', '/hwsh-msnway', '/hwsh-msnway/', '/hwsh-msnway/*', '/chat', '/chat/', '/chat/*'], (req, res) => {
+  res.redirect(301, 'https://jahesh-2.vercel.app/');
 });
 
 // 3. انجمن علمی جهش (Jahesh Scientific Association alias)

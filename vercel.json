@@ -32,12 +32,32 @@
     },
     {
       "source": "/frwshgah",
-      "destination": "/jaheshkala",
+      "destination": "/jaheshkala/",
       "permanent": true
     },
     {
       "source": "/frwshgah/:match*",
-      "destination": "/jaheshkala",
+      "destination": "/jaheshkala/",
+      "permanent": true
+    },
+    {
+      "source": "/vet-hospital",
+      "destination": "/vet-hospital/",
+      "permanent": true
+    },
+    {
+      "source": "/jaheshkala",
+      "destination": "/jaheshkala/",
+      "permanent": true
+    },
+    {
+      "source": "/jahesh-it",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/jahesh-it/:match*",
+      "destination": "/",
       "permanent": true
     },
     {
@@ -52,42 +72,42 @@
     },
     {
       "source": "/ai",
-      "destination": "/",
+      "destination": "https://jahesh-2.vercel.app/",
       "permanent": true
     },
     {
       "source": "/ai/:match*",
-      "destination": "/",
+      "destination": "https://jahesh-2.vercel.app/",
       "permanent": true
     },
     {
       "source": "/chat",
-      "destination": "/",
+      "destination": "https://jahesh-2.vercel.app/",
       "permanent": true
     },
     {
       "source": "/chat/:match*",
-      "destination": "/",
+      "destination": "https://jahesh-2.vercel.app/",
       "permanent": true
     },
     {
       "source": "/ai-v13",
-      "destination": "/",
+      "destination": "https://jahesh-2.vercel.app/",
       "permanent": true
     },
     {
       "source": "/ai-v13/:match*",
-      "destination": "/",
+      "destination": "https://jahesh-2.vercel.app/",
       "permanent": true
     },
     {
       "source": "/pages/ai-v13",
-      "destination": "/",
+      "destination": "https://jahesh-2.vercel.app/",
       "permanent": true
     },
     {
       "source": "/pages/ai-v13/:match*",
-      "destination": "/",
+      "destination": "https://jahesh-2.vercel.app/",
       "permanent": true
     }
   ],

@@ -71,6 +71,46 @@ export default async function handler(req, res) {
       const docRef = doc(db, 'products', String(product.id));
       await setDoc(docRef, product, { merge: true });
 
+      // 2. Synchronize into settings/products so GET /api/products returns updated data immediately
+      try {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'products'));
+        let currentProducts = [];
+        if (settingsSnap.exists() && Array.isArray(settingsSnap.data()?.products)) {
+          currentProducts = settingsSnap.data().products;
+        } else {
+          const allDocs = await getDocs(collection(db, 'products'));
+          allDocs.forEach((d) => {
+            const itm = d.data();
+            if (itm && itm.id) currentProducts.push(itm);
+          });
+        }
+
+        // If this product is set as incredible offer, unmark any previous incredible offer
+        if (product.isIncredible) {
+          currentProducts = currentProducts.map((p) => {
+            if (p && p.id !== product.id && p.isIncredible) {
+              return { ...p, isIncredible: false };
+            }
+            return p;
+          });
+        }
+
+        const pIdx = currentProducts.findIndex((p) => p && p.id === product.id);
+        if (pIdx >= 0) {
+          currentProducts[pIdx] = { ...currentProducts[pIdx], ...product };
+        } else {
+          currentProducts = [product, ...currentProducts];
+        }
+
+        await setDoc(
+          doc(db, 'settings', 'products'),
+          { products: currentProducts, updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      } catch (syncErr) {
+        console.warn('Sync settings/products warning:', syncErr);
+      }
+
       // Remove from settings/deleted_products if present
       try {
         const delSnap = await getDoc(doc(db, 'settings', 'deleted_products'));

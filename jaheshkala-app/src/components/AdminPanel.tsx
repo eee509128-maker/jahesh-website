@@ -30,6 +30,7 @@ interface AdminPanelProps {
   onAddNewProduct: (newProduct: Product) => void;
   onUpdateProduct?: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
+  onToggleIncredible?: (product: Product) => void;
   onReorderProducts?: (orderedList: Product[]) => void;
   coupons?: Coupon[];
   onAddNewCoupon?: (newCoupon: Coupon) => void;
@@ -60,6 +61,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onAddNewProduct,
   onUpdateProduct,
   onDeleteProduct,
+  onToggleIncredible,
   onReorderProducts,
   coupons = [],
   onAddNewCoupon,
@@ -2445,6 +2447,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                                 {/* Reorder Controls & Direct Numeric Input */}
                                 <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                                  {onToggleIncredible && currentUser?.role === 'admin' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onToggleIncredible(prod)}
+                                      className={`px-2 py-1 transition-all rounded-xl flex items-center gap-1 text-[11px] font-bold cursor-pointer border ${
+                                        prod.isIncredible
+                                          ? 'bg-rose-500/25 text-rose-300 border-rose-500/60 hover:bg-rose-500/40 shadow-xs shadow-rose-500/30'
+                                          : 'bg-purple-950/60 text-slate-400 border-purple-800/60 hover:text-rose-300 hover:border-rose-500/40'
+                                      }`}
+                                      title={prod.isIncredible ? 'حذف از پیشنهاد شگفت‌انگیز' : 'تنظیم فوری به عنوان پیشنهاد شگفت‌انگیز اصلی'}
+                                    >
+                                      <Percent className={`w-3.5 h-3.5 ${prod.isIncredible ? 'text-rose-400 fill-rose-400/20' : 'text-slate-400'}`} />
+                                      <span>{prod.isIncredible ? 'شگفت‌انگیز فعال' : 'شگفت‌انگیز'}</span>
+                                    </button>
+                                  )}
                                   <div className="flex items-center gap-1.5 bg-black/70 border border-amber-500/50 px-2.5 py-1 rounded-xl shadow-inner">
                                     <span className="text-[11px] text-amber-300 font-black whitespace-nowrap">رتبه:</span>
                                     <input
@@ -2601,6 +2618,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               <div className="flex items-center justify-between pt-2.5 border-t border-purple-900/40 mt-1">
                                 <span className="text-[11px] text-slate-400 truncate max-w-[130px]">{prod.deliveryDays}</span>
                                 <div className="flex items-center gap-1">
+                                  {onToggleIncredible && currentUser?.role === 'admin' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onToggleIncredible(prod)}
+                                      className={`p-1.5 transition-all rounded-lg flex items-center gap-1 cursor-pointer border ${
+                                        prod.isIncredible
+                                          ? 'bg-rose-500/25 text-rose-300 border-rose-500/60 hover:bg-rose-500/40 shadow-xs shadow-rose-500/30'
+                                          : 'bg-purple-950/60 text-slate-400 border-purple-800/60 hover:text-rose-300 hover:border-rose-500/40 hover:bg-purple-900/60'
+                                      }`}
+                                      title={prod.isIncredible ? 'حذف از باکس پیشنهاد شگفت‌انگیز' : 'تنظیم فوری به عنوان پیشنهاد شگفت‌انگیز اصلی'}
+                                    >
+                                      <Percent className={`w-3.5 h-3.5 ${prod.isIncredible ? 'text-rose-400 fill-rose-400/20' : 'text-slate-400'}`} />
+                                      <span className="text-[10px] font-bold">
+                                        {prod.isIncredible ? 'شگفت‌انگیز' : 'تنظیم'}
+                                      </span>
+                                    </button>
+                                  )}
+
                                   <button
                                     onClick={() => {
                                       setQuickViewEditModal({

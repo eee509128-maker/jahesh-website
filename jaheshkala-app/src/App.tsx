@@ -1202,7 +1202,10 @@ export default function App() {
 
   const handleAddNewProduct = async (newProduct: Product) => {
     setProducts((prev) => {
-      const filtered = prev.filter((p) => p.id !== newProduct.id);
+      let filtered = prev.filter((p) => p.id !== newProduct.id);
+      if (newProduct.isIncredible) {
+        filtered = filtered.map((p) => (p.isIncredible ? { ...p, isIncredible: false } : p));
+      }
       const updated = sortProductsByRank([newProduct, ...filtered]);
       try {
         safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
@@ -1215,14 +1218,37 @@ export default function App() {
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
     setProducts((prev) => {
-      const updated = sortProductsByRank(prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
+      let list = prev;
+      if (updatedProduct.isIncredible) {
+        list = list.map((p) => (p.id !== updatedProduct.id && p.isIncredible ? { ...p, isIncredible: false } : p));
+      }
+      const updated = sortProductsByRank(list.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
       try {
         safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       } catch {}
       return updated;
     });
     await saveProductToDb(updatedProduct);
-    showToast(`محصول «${updatedProduct.title}» و تصویر آن در دیتابیس به‌روزرسانی شد.`);
+    showToast(`محصول «${updatedProduct.title}» و وضعیت آن در دیتابیس به‌روزرسانی شد.`);
+  };
+
+  const handleToggleIncredible = async (targetProduct: Product) => {
+    const nextState = !targetProduct.isIncredible;
+    const updated: Product = {
+      ...targetProduct,
+      isIncredible: nextState,
+      incredibleTimerDuration: nextState ? (targetProduct.incredibleTimerDuration || 'permanent') : undefined,
+      incredibleExpiresAt: nextState
+        ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+        : undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    await handleUpdateProduct(updated);
+    showToast(
+      nextState
+        ? `محصول «${targetProduct.title}» به عنوان پیشنهاد شگفت‌انگیز اصلی تنظیم شد.`
+        : `محصول «${targetProduct.title}» از پیشنهاد شگفت‌انگیز خارج شد.`
+    );
   };
 
   const handleReorderProducts = async (orderedList: Product[]) => {
@@ -1970,6 +1996,7 @@ export default function App() {
           onAddNewProduct={handleAddNewProduct}
           onUpdateProduct={handleUpdateProduct}
           onDeleteProduct={handleDeleteProduct}
+          onToggleIncredible={handleToggleIncredible}
           onReorderProducts={handleReorderProducts}
           zibalMerchant={zibalMerchant}
           onUpdateZibalMerchant={handleUpdateZibalMerchant}

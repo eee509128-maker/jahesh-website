@@ -47,17 +47,29 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Filter products that explicitly have isIncredible === true and sort by rank
+  // Filter products that explicitly have isIncredible === true and sort by rank/recency
   const incredibleProducts = [...products]
     .filter((p) => p && Boolean(p.isIncredible))
     .sort((a, b) => {
       const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
       const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
-      return orderA - orderB;
+      if (orderA !== orderB) return orderA - orderB;
+      const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return timeB - timeA;
     });
 
   const safeIndex = incredibleProducts.length > 0 ? (currentIndex % incredibleProducts.length) : 0;
   const activeProduct = incredibleProducts[safeIndex];
+
+  // Auto rotation if multiple incredible offers exist
+  useEffect(() => {
+    if (incredibleProducts.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % incredibleProducts.length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [incredibleProducts.length]);
 
   // Dynamic Countdown Timer connected directly to product's expiration
   const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft(activeProduct?.incredibleExpiresAt));

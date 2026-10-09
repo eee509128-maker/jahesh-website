@@ -2,6 +2,15 @@
   RewriteEngine On
   RewriteBase /
 
+  # 1. Permanent redirect /jahesh-it directly to root https://jaheshit.ir/
+  RewriteRule ^jahesh-it(/.*)?$ / [R=301,L]
+
+  # 2. Permanent redirect /ai and /ai-v13 directly to https://jahesh-2.vercel.app/
+  RewriteRule ^(ai|ai-v13|hwsh-msnway|chat)(/.*)?$ https://jahesh-2.vercel.app/ [R=301,L]
+
+  # 3. Canonical trailing slash for vet-hospital
+  RewriteRule ^vet-hospital$ /vet-hospital/ [R=301,L]
+
   # Allow direct PHP endpoints
   RewriteRule ^api/zibal-request/?$ /api/zibal-request.php [L,QSA]
   RewriteRule ^api/zibal-verify/?$ /api/zibal-verify.php [L,QSA]

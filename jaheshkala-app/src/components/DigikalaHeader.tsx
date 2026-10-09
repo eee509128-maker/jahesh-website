@@ -504,18 +504,9 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
             </button>
 
             <a
-              href="/vet-hospital/"
-              className="ms-auto flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 border border-emerald-300 dark:border-emerald-600/50 text-emerald-950 dark:text-emerald-300 transition-all text-[11px] sm:text-xs font-bold shrink-0 shadow-xs"
-              title="بیمارستان تخصصی دانشکده دامپزشکی"
-            >
-              <span>🏥</span>
-              <span>بیمارستان دامپزشکی</span>
-            </a>
-
-            <a
               id="back-to-main-site-btn"
               href="/"
-              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 border border-purple-300 dark:border-purple-700/50 text-purple-950 dark:text-purple-200 hover:text-purple-900 dark:hover:text-white transition-all text-[11px] sm:text-xs font-bold shrink-0 shadow-xs"
+              className="ms-auto flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 dark:hover:bg-purple-800/60 border border-purple-300 dark:border-purple-700/50 text-purple-950 dark:text-purple-200 hover:text-purple-900 dark:hover:text-white transition-all text-[11px] sm:text-xs font-bold shrink-0 shadow-xs"
               title="بازگشت به صفحه اصلی جهش"
             >
               <span className="text-amber-600 dark:text-amber-400">←</span>
