@@ -3192,16 +3192,33 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
       });
     }
 
-    // 6. Evaluate expiration & days remaining dynamically
+    // 6. Evaluate expiration & days/hours remaining dynamically
     const now = new Date();
-    const startDate = targetLicense.startDate ? new Date(targetLicense.startDate) : now;
-    let expiresAt = targetLicense.expiresAt
-      ? new Date(targetLicense.expiresAt)
-      : new Date(startDate.getTime() + (targetLicense.days || 7) * 24 * 60 * 60 * 1000);
+    let days = Number(targetLicense.days) || 7;
+    let expiresAt = null;
+    if (targetLicense.expiresAt) {
+      const parsed = new Date(targetLicense.expiresAt);
+      if (!isNaN(parsed.getTime())) expiresAt = parsed;
+    }
+    // If invalid or missing, calculate strictly from current time + days * 24h to guarantee full 24h per day
+    if (!expiresAt) {
+      expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    }
+    const startDate = targetLicense.startDate && !isNaN(new Date(targetLicense.startDate).getTime())
+      ? new Date(targetLicense.startDate)
+      : now;
 
     const diffMs = expiresAt.getTime() - now.getTime();
     const isExpired = diffMs <= 0;
-    const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const totalHoursRemaining = isExpired ? 0 : Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
+    const daysRemaining = isExpired ? 0 : Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    const hoursRemaining = isExpired
+      ? 0
+      : totalHoursRemaining <= 24
+      ? totalHoursRemaining
+      : Math.max(0, Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
+    const minutesRemaining = isExpired ? 0 : Math.max(0, Math.floor((diffMs % (1000 * 60)) / (1000 * 60)));
+    const secondsRemaining = isExpired ? 0 : Math.max(0, Math.floor((diffMs % (1000 * 60)) / 1000));
 
     if (isExpired) {
       return res.json({
@@ -3210,8 +3227,12 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
         expired: true,
         status: 'expired',
         daysRemaining: 0,
+        hoursRemaining: 0,
+        totalHoursRemaining: 0,
+        remainingHours: 0,
         startDate: startDate.toISOString(),
         expiresAt: expiresAt.toISOString(),
+        expiresAtTimestamp: expiresAt.getTime(),
         productId: targetLicense.productId || cleanProd,
         productTitle: targetLicense.productTitle || appName || 'اپلیکیشن جهش',
         renewUrl: 'https://jaheshit.ir/jaheshkala',
@@ -3219,7 +3240,7 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
       });
     }
 
-    // 7. Return success with token & dynamic remaining days
+    // 7. Return success with token & dynamic remaining days & hours
     const token = Buffer.from(
       JSON.stringify({
         u: targetLicense.username,
@@ -3236,17 +3257,29 @@ app.post(['/api/app-auth', '/jaheshkala/api/app-auth'], (req, res) => {
       status: 'active',
       token,
       daysRemaining,
+      hoursRemaining: totalHoursRemaining <= 24 ? totalHoursRemaining : hoursRemaining,
+      remainingHours: totalHoursRemaining,
+      totalHoursRemaining,
+      hours: totalHoursRemaining,
+      remainingMinutes: Math.max(0, Math.ceil(diffMs / (1000 * 60))),
+      remainingSeconds: Math.max(0, Math.ceil(diffMs / 1000)),
+      durationDays: days,
+      durationHours: days * 24,
       startDate: startDate.toISOString(),
       expiresAt: expiresAt.toISOString(),
+      expiresAtTimestamp: expiresAt.getTime(),
+      expiresAtUnix: Math.floor(expiresAt.getTime() / 1000),
       licenseKey: targetLicense.licenseKey || 'JA-APP-ACTIVE',
       productId: targetLicense.productId || cleanProd || 'pkg-amlak-jahesh',
-      productTitle: targetLicense.productTitle || appName || 'سامانه مدیریت املاک جهش',
+      productTitle: targetLicense.productTitle || appName || 'اپلیکیشن و نرم‌افزار هوشمند جهش',
       user: {
         username: targetLicense.username,
         fullName: targetLicense.buyerName || 'کاربر گرامی جهش',
         phone: targetLicense.phone || '',
       },
-      message: `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${daysRemaining} روز اعتبار می‌باشد.`,
+      message: totalHoursRemaining <= 24
+        ? `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${totalHoursRemaining} ساعت (${daysRemaining} روز) اعتبار فعال است.`
+        : `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${daysRemaining} روز اعتبار می‌باشد.`,
     });
   } catch (err) {
     console.error('Error in /api/app-auth:', err);
@@ -3282,25 +3315,33 @@ app.post(['/api/app-auth/verify', '/jaheshkala/api/app-auth/verify'], (req, res)
             message: 'این نشست متعلق به محصول دیگری است.',
           });
         }
-        if (decoded.exp && decoded.exp < now) {
+        const expMs = decoded.exp ? (decoded.exp < 1e12 ? decoded.exp * 1000 : decoded.exp) : null;
+        if (expMs && expMs < now) {
           return res.json({
             success: false,
             expired: true,
             status: 'expired',
             daysRemaining: 0,
+            hoursRemaining: 0,
+            totalHoursRemaining: 0,
             renewUrl: 'https://jaheshit.ir/jaheshkala',
             message: 'مدت اعتبار توکن اشتراک به پایان رسیده است.',
           });
         }
-        const diffMs = (decoded.exp || now) - now;
-        const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        const diffMs = (expMs || now) - now;
+        const totalHoursRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
+        const daysRemaining = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
         return res.json({
           success: true,
           expired: false,
           status: 'active',
           daysRemaining,
+          hoursRemaining: totalHoursRemaining,
+          remainingHours: totalHoursRemaining,
+          totalHoursRemaining,
+          hours: totalHoursRemaining,
           username: decoded.u,
-          message: 'نشست و لایسنس معتبر است.',
+          message: totalHoursRemaining <= 24 ? `نشست و لایسنس معتبر است (${totalHoursRemaining} ساعت باقیمانده).` : `نشست و لایسنس معتبر است (${daysRemaining} روز باقیمانده).`,
         });
       } catch {}
     }
@@ -3330,16 +3371,32 @@ app.post(['/api/app-auth/verify', '/jaheshkala/api/app-auth/verify'], (req, res)
         expired: true,
         status: 'not_found',
         daysRemaining: 0,
+        hoursRemaining: 0,
+        totalHoursRemaining: 0,
         renewUrl: 'https://jaheshit.ir/jaheshkala',
         message: 'لایسنس فعالی برای این محصول یافت نشد.',
       });
     }
 
     const now = new Date();
-    const expiresAt = new Date(targetLicense.expiresAt);
+    let days = Number(targetLicense.days) || 7;
+    let expiresAt = null;
+    if (targetLicense.expiresAt) {
+      const parsed = new Date(targetLicense.expiresAt);
+      if (!isNaN(parsed.getTime())) expiresAt = parsed;
+    }
+    if (!expiresAt) {
+      expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    }
     const diffMs = expiresAt.getTime() - now.getTime();
     const isExpired = diffMs <= 0;
-    const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const totalHoursRemaining = isExpired ? 0 : Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
+    const daysRemaining = isExpired ? 0 : Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    const hoursRemaining = isExpired
+      ? 0
+      : totalHoursRemaining <= 24
+      ? totalHoursRemaining
+      : Math.max(0, Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
 
     if (isExpired) {
       return res.json({
@@ -3347,6 +3404,8 @@ app.post(['/api/app-auth/verify', '/jaheshkala/api/app-auth/verify'], (req, res)
         expired: true,
         status: 'expired',
         daysRemaining: 0,
+        hoursRemaining: 0,
+        totalHoursRemaining: 0,
         productId: targetLicense.productId,
         renewUrl: 'https://jaheshit.ir/jaheshkala',
         message: 'اشتراک شما منقضی شده است. جهت تمدید به سایت جهش کالا مراجعه فرمایید.',
@@ -3358,9 +3417,16 @@ app.post(['/api/app-auth/verify', '/jaheshkala/api/app-auth/verify'], (req, res)
       expired: false,
       status: 'active',
       daysRemaining,
+      hoursRemaining: totalHoursRemaining <= 24 ? totalHoursRemaining : hoursRemaining,
+      remainingHours: totalHoursRemaining,
+      totalHoursRemaining,
+      hours: totalHoursRemaining,
+      remainingMinutes: Math.max(0, Math.ceil(diffMs / (1000 * 60))),
       productId: targetLicense.productId,
       expiresAt: expiresAt.toISOString(),
-      message: `لایسنس معتبر است (${daysRemaining} روز باقیمانده).`,
+      expiresAtTimestamp: expiresAt.getTime(),
+      expiresAtUnix: Math.floor(expiresAt.getTime() / 1000),
+      message: totalHoursRemaining <= 24 ? `لایسنس معتبر است (${totalHoursRemaining} ساعت باقیمانده).` : `لایسنس معتبر است (${daysRemaining} روز باقیمانده).`,
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

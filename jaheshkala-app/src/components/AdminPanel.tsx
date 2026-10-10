@@ -8,16 +8,17 @@ import {
   Flame, Percent, Truck, Check, Ticket, ToggleLeft, ToggleRight, ArrowDownRight, Calculator, Users, MessageCircle, ArrowLeft, Reply, Paperclip, Image as ImageIcon, CornerUpRight, Download,
   Search, UserPlus, Shield, UserCheck, Key, Lock, Copy, Camera, Upload, Plus, Eye, Images,
   ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette, BarChart3, TrendingUp, Filter, ArrowUpDown,
-  Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown
+  KeyRound,
+  Zap
 } from 'lucide-react';
-import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool } from '../types';
+import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool, AppSubscriptionLicense } from '../types';
 import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { renderFormattedBannerTitle } from '../lib/bannerUtils';
 import { JAHESH_OFFICIAL_25_GUILDS } from '../data/guildProducts';
-import { buildAiAppPrompt } from '../lib/appLicenseService';
+import { buildAiAppPrompt, parseSubscriptionDays, checkLicenseStatus } from '../lib/appLicenseService';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -48,6 +49,13 @@ interface AdminPanelProps {
   currentUser?: User | null;
   onAdminInstantPurchase?: (product: Product, quantity?: number) => void;
   onOpenAmlakApp?: () => void;
+  onGrantUserLicense?: (
+    targetUser: User,
+    product: Product,
+    durationDays: number,
+    plan?: SubscriptionPlan,
+    adminNotes?: string
+  ) => Promise<{ success: boolean; order?: Order; appLicense?: AppSubscriptionLicense; amlakLicense?: any; message?: string }>;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -79,6 +87,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   currentUser,
   onAdminInstantPurchase,
   onOpenAmlakApp,
+  onGrantUserLicense,
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats' | 'dashboard-tools'>('orders');
 
@@ -94,6 +103,68 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [toolActionMessage, setToolActionMessage] = useState<string | null>(null);
   const [toolDeleteConfirmId, setToolDeleteConfirmId] = useState<string | null>(null);
   const [productDeleteConfirmId, setProductDeleteConfirmId] = useState<string | null>(null);
+
+  // ==========================================
+  // Grant Licensed Product to Registered User State
+  // ==========================================
+  const [isGrantLicenseModalOpen, setIsGrantLicenseModalOpen] = useState(false);
+  const [grantSelectedUser, setGrantSelectedUser] = useState<User | null>(null);
+  const [grantSelectedProduct, setGrantSelectedProduct] = useState<Product | null>(null);
+  const [grantSelectedPlan, setGrantSelectedPlan] = useState<SubscriptionPlan | null>(null);
+  const [grantDurationDays, setGrantDurationDays] = useState<number>(1); // Default 1 day (24 full hours)
+  const [grantCustomDaysInput, setGrantCustomDaysInput] = useState<string>('1');
+  const [grantAdminNotes, setGrantAdminNotes] = useState<string>('');
+  const [grantUserSearchTerm, setGrantUserSearchTerm] = useState<string>('');
+  const [grantProductSearchTerm, setGrantProductSearchTerm] = useState<string>('');
+  const [grantIsSubmitting, setGrantIsSubmitting] = useState(false);
+  const [grantSuccessDialog, setGrantSuccessDialog] = useState<{
+    isOpen: boolean;
+    user: User;
+    product: Product;
+    days: number;
+    order: Order;
+    license: any;
+  } | null>(null);
+  const [grantCopiedField, setGrantCopiedField] = useState<string | null>(null);
+
+  const handleExecuteGrantLicense = async () => {
+    if (!grantSelectedUser) {
+      alert('لطفاً کاربر مورد نظر را انتخاب فرمایید.');
+      return;
+    }
+    if (!grantSelectedProduct) {
+      alert('لطفاً محصول مورد نظر را انتخاب فرمایید.');
+      return;
+    }
+    const safeDays = Math.max(1, parseSubscriptionDays(grantDurationDays || grantCustomDaysInput, 1));
+    setGrantIsSubmitting(true);
+    try {
+      if (onGrantUserLicense) {
+        const result = await onGrantUserLicense(
+          grantSelectedUser,
+          grantSelectedProduct,
+          safeDays,
+          grantSelectedPlan || undefined,
+          grantAdminNotes || undefined
+        );
+        if (result && result.order) {
+          setGrantSuccessDialog({
+            isOpen: true,
+            user: grantSelectedUser,
+            product: grantSelectedProduct,
+            days: safeDays,
+            order: result.order,
+            license: result.appLicense || result.amlakLicense,
+          });
+          setIsGrantLicenseModalOpen(false);
+        }
+      }
+    } catch (err: any) {
+      alert('خطا در اعطای لایسنس: ' + (err?.message || 'خطای سرور'));
+    } finally {
+      setGrantIsSubmitting(false);
+    }
+  };
 
   // Form fields for adding/editing tool
   const [toolTitle, setToolTitle] = useState('');
@@ -4200,15 +4271,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               {/* Duration / Period */}
                               <div>
                                 <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                                  مدت زمان / دوره اشتراک:
+                                  عنوان دوره اشتراک:
                                 </label>
                                 <input
                                   type="text"
                                   value={plan.durationLabel || ''}
-                                  onChange={(e) => handleUpdatePlan(index, { durationLabel: e.target.value })}
-                                  placeholder="مثلاً: دوره ۱ ماهه یا ۳۰ روزه"
+                                  onChange={(e) => {
+                                    const nextLabel = e.target.value;
+                                    const parsedDays = parseSubscriptionDays(nextLabel, plan.durationDays || 30);
+                                    handleUpdatePlan(index, { durationLabel: nextLabel, durationDays: parsedDays });
+                                  }}
+                                  placeholder="مثلاً: دوره ۱ روزه یا ۳۰ روزه"
                                   className="w-full bg-[#180f33] border border-purple-700/60 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
                                 />
+                              </div>
+
+                              {/* Exact Duration in Days */}
+                              <div>
+                                <label className="text-[11px] font-bold text-amber-300 block mb-1">
+                                  مدت دقیق لایسنس (به روز):
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={3650}
+                                  value={plan.durationDays || 30}
+                                  onChange={(e) => handleUpdatePlan(index, { durationDays: parseInt(e.target.value, 10) || 1 })}
+                                  placeholder="مثلاً: 1 یا 7 یا 30"
+                                  className="w-full bg-[#180f33] border border-amber-500/70 rounded-xl px-3 py-1.5 text-xs text-amber-300 font-bold font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                                  {plan.durationDays === 1 ? '⚡ ۲۴ ساعت کامل محاسبه می‌شود' : `معادل ${(plan.durationDays || 30) * 24} ساعت`}
+                                </span>
                               </div>
 
                               {/* Short Subtitle */}
@@ -5925,7 +6019,22 @@ on public.users for delete using (true);`;
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setGrantSelectedUser(usersList[0] || null);
+                      setGrantSelectedProduct(products.find((p) => p.isSubscription || p.category === 'اشتراک نرم‌افزار' || p.aiAppName) || products[0] || null);
+                      setGrantDurationDays(1);
+                      setGrantCustomDaysInput('1');
+                      setIsGrantLicenseModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs font-black px-4 py-2.5 rounded-xl shadow-lg shadow-amber-500/25 transition-all cursor-pointer ring-1 ring-amber-300"
+                    title="اعطای لایسنس و دسترسی ۱۰۰٪ رایگان به هر کاربر و ثبت مستقیم در سفارشات"
+                  >
+                    <Zap className="w-4 h-4 fill-slate-950" />
+                    <span>⚡ اعطای لایسنس رایگان به کاربر</span>
+                  </button>
+
                   <button
                     onClick={handleRefreshUsersList}
                     disabled={isRefreshingUsers}
@@ -5952,6 +6061,38 @@ on public.users for delete using (true);`;
                     <span>افزودن کاربر جدید</span>
                   </button>
                 </div>
+              </div>
+
+              {/* Dedicated Hero Banner for Free License Granting */}
+              <div className="bg-gradient-to-r from-purple-950/70 via-indigo-950/60 to-amber-950/40 border border-amber-400/40 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+                <div className="flex items-center gap-3 text-right">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 shrink-0 shadow-md">
+                    <Key className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1.5">
+                      <span>بخش اختصاصی مدیریت: اعطای لایسنس و اشتراک رایگان به کاربران سایت</span>
+                      <span className="text-[10px] bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full font-mono">100% FREE</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                      امکان انتخاب هر کاربر ثبت‌نام‌شده و باز کردن دسترسی نرم‌افزارها و هوش مصنوعی با مدت دلخواه (۱ روزه ۲۴ ساعته کامل، ۷ روزه، ۳۰ روزه یا دائمی) و ثبت آنی در پیگیری سفارشات کاربر.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGrantSelectedUser(usersList[0] || null);
+                    setGrantSelectedProduct(products.find((p) => p.isSubscription || p.category === 'اشتراک نرم‌افزار' || p.aiAppName) || products[0] || null);
+                    setGrantDurationDays(1);
+                    setGrantCustomDaysInput('1');
+                    setIsGrantLicenseModalOpen(true);
+                  }}
+                  className="whitespace-nowrap px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer shrink-0"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>ثبت و اعطای لایسنس جدید</span>
+                </button>
               </div>
 
               {/* Notification Banner */}
@@ -6120,6 +6261,24 @@ on public.users for delete using (true);`;
                               </td>
                               <td className="p-3.5 text-center whitespace-nowrap">
                                 <div className="flex items-center justify-center gap-2">
+                                  {/* Quick Grant License Button */}
+                                  <button
+                                    onClick={() => {
+                                      setGrantSelectedUser(user);
+                                      setGrantSelectedProduct(
+                                        products.find((p) => p.isSubscription || p.category === 'اشتراک نرم‌افزار' || p.aiAppName) || products[0] || null
+                                      );
+                                      setGrantDurationDays(1);
+                                      setGrantCustomDaysInput('1');
+                                      setIsGrantLicenseModalOpen(true);
+                                    }}
+                                    title={`اعطای لایسنس و دسترسی رایگان به «${user.fullName || user.username}»`}
+                                    className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-400/50 transition-colors flex items-center gap-1 font-bold text-[11px] cursor-pointer"
+                                  >
+                                    <Key className="w-3.5 h-3.5 text-amber-400" />
+                                    <span className="hidden xl:inline">اعطای لایسنس</span>
+                                  </button>
+
                                   {/* Edit button */}
                                   <button
                                     onClick={() => setEditingUser(user)}
@@ -7363,6 +7522,57 @@ on public.users for delete using (true);`;
                     </div>
                   </div>
                 )}
+
+                {/* نمایش لایسنس نرم‌افزار / هوش مصنوعی صادر شده برای مشتری */}
+                {selectedOrder.appLicense && (() => {
+                  const lic = selectedOrder.appLicense;
+                  const { isExpired, daysRemaining, totalHoursRemaining, formattedExpiryFa } = checkLicenseStatus(lic);
+                  return (
+                    <div className="bg-purple-950/40 border border-amber-400/60 rounded-xl p-3 text-right space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-amber-300 font-bold">
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>⚡ اطلاعات لایسنس نرم‌افزار ({lic.appName || lic.productTitle}):</span>
+                        </span>
+                        <span className="font-mono text-[11px] bg-amber-500/20 px-2 py-0.5 rounded text-amber-300 border border-amber-500/30">
+                          {lic.licenseKey}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[11px] bg-black/50 p-2 rounded-lg border border-purple-800/40 font-mono">
+                        <div>
+                          <span className="text-slate-400 font-sans block text-[10px]">نام کاربری (Username):</span>
+                          <span className="text-white font-bold">{lic.username}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 font-sans block text-[10px]">رمز عبور (Password):</span>
+                          <span className="text-amber-300 font-bold">{lic.password}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] pt-1 border-t border-purple-900/40">
+                        <span className="text-slate-300">
+                          مدت: <strong className="text-white">{lic.days === 1 ? '۲۴ ساعت کامل (۱ روز)' : `${lic.days} روز`}</strong> • انقضا: <strong className="text-amber-300">{formattedExpiryFa}</strong>
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${isExpired ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'}`}>
+                          {isExpired ? 'منقضی شده' : totalHoursRemaining <= 24 ? `${totalHoursRemaining} ساعت باقیمانده` : `${daysRemaining} روز باقیمانده`}
+                        </span>
+                      </div>
+                      {lic.downloadUrl && (
+                        <div className="pt-1">
+                          <a
+                            href={lic.downloadUrl}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-[11px] text-emerald-300 hover:text-emerald-200 font-bold bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded-lg"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>دانلود فایل نصبی ({lic.appName || lic.productTitle})</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="flex items-center gap-2 pt-2">
@@ -7681,6 +7891,595 @@ on public.users for delete using (true);`;
                 >
                   <Check className="w-4 h-4" />
                   <span>{editingTool ? 'ذخیره و اعمال تغییرات طرح' : 'ثبت طرح در داشبورد'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* Modal: Grant Licensed Product to Registered User (Free)    */}
+        {/* ========================================================= */}
+        {isGrantLicenseModalOpen && (
+          <div
+            className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in"
+            dir="rtl"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !grantIsSubmitting) {
+                setIsGrantLicenseModalOpen(false);
+              }
+            }}
+          >
+            <div
+              className="bg-[#100826] border-2 border-amber-400/80 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl shadow-amber-500/20 text-white flex flex-col max-h-[92vh] animate-in zoom-in-95"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-[#230f45] via-[#2f135e] to-[#1a0b33] p-4 sm:p-5 border-b border-amber-400/40 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 font-black shadow-md shrink-0">
+                    <Key className="w-5 h-5 fill-slate-950" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-amber-300 leading-tight flex items-center gap-2">
+                      <span>اعطای لایسنس و اشتراک رایگان به کاربر</span>
+                      <span className="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-mono font-bold">۱۰۰٪ رایگان</span>
+                    </h3>
+                    <p className="text-[11px] text-purple-200/90 mt-0.5">
+                      ثبت آنی و خودکار در بخش پیگیری سفارشات کاربر با اعتبار و کلید لایسنس معتبر
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => !grantIsSubmitting && setIsGrantLicenseModalOpen(false)}
+                  disabled={grantIsSubmitting}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+                  title="بستن"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-4 bg-gradient-to-b from-[#130b28] to-[#0c0617] text-xs">
+                {/* Step 1: Target User */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-amber-400" />
+                    <span>۱. کاربر دریافت‌کننده لایسنس (مشتری ثبت‌نام‌شده):</span>
+                  </label>
+
+                  {/* User Search Input */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="جستجوی کاربر بر اساس نام، موبایل یا نام کاربری..."
+                      value={grantUserSearchTerm}
+                      onChange={(e) => setGrantUserSearchTerm(e.target.value)}
+                      className="w-full bg-[#180f33] border border-purple-800/70 rounded-xl pr-9 pl-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  {/* User Selector Dropdown / Selected User Card */}
+                  <div className="max-h-36 overflow-y-auto rounded-xl border border-purple-900/60 bg-[#120926] divide-y divide-purple-900/40">
+                    {usersList
+                      .filter((u) => {
+                        if (!grantUserSearchTerm.trim()) return true;
+                        const term = grantUserSearchTerm.toLowerCase();
+                        return (
+                          u.fullName?.toLowerCase().includes(term) ||
+                          u.username?.toLowerCase().includes(term) ||
+                          u.phone?.includes(term) ||
+                          u.email?.toLowerCase().includes(term)
+                        );
+                      })
+                      .map((u) => {
+                        const isSelected = grantSelectedUser?.id === u.id || grantSelectedUser?.username === u.username;
+                        return (
+                          <div
+                            key={u.id}
+                            onClick={() => setGrantSelectedUser(u)}
+                            className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-amber-500/20 text-white font-bold border-r-4 border-amber-400'
+                                : 'hover:bg-purple-900/30 text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-7 h-7 rounded-full bg-purple-950 border border-purple-700/60 flex items-center justify-center text-amber-300 text-[11px] font-bold">
+                                {u.fullName ? u.fullName.charAt(0) : 'U'}
+                              </span>
+                              <div>
+                                <div className="text-white font-bold">{u.fullName || u.username}</div>
+                                <div className="text-[10px] text-slate-400 font-mono" dir="ltr">
+                                  @{u.username} • {u.phone}
+                                </div>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <span className="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-black flex items-center gap-1">
+                                <Check className="w-3 h-3" />
+                                انتخاب شده
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* Step 2: Licensed Product Selection */}
+                <div className="space-y-2 pt-2 border-t border-purple-900/50">
+                  <label className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                    <Package className="w-4 h-4 text-amber-400" />
+                    <span>۲. انتخاب محصول یا نرم‌افزار جهت صدور لایسنس:</span>
+                  </label>
+
+                  {/* Product Search */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="جستجوی محصول در فروشگاه..."
+                      value={grantProductSearchTerm}
+                      onChange={(e) => setGrantProductSearchTerm(e.target.value)}
+                      className="w-full bg-[#180f33] border border-purple-800/70 rounded-xl pr-9 pl-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  <div className="max-h-44 overflow-y-auto rounded-xl border border-purple-900/60 bg-[#120926] divide-y divide-purple-900/40">
+                    {products
+                      .filter((p) => {
+                        if (!grantProductSearchTerm.trim()) return true;
+                        const term = grantProductSearchTerm.toLowerCase();
+                        return (
+                          p.title?.toLowerCase().includes(term) ||
+                          p.category?.toLowerCase().includes(term) ||
+                          p.aiAppName?.toLowerCase().includes(term)
+                        );
+                      })
+                      .map((prod) => {
+                        const isSelected = grantSelectedProduct?.id === prod.id;
+                        const isSubOrApp = prod.isSubscription || prod.category === 'اشتراک نرم‌افزار' || Boolean(prod.aiAppName) || prod.id === 'pkg-amlak-jahesh';
+                        return (
+                          <div
+                            key={prod.id}
+                            onClick={() => {
+                              setGrantSelectedProduct(prod);
+                              setGrantSelectedPlan(prod.subscriptionPlans?.[0] || null);
+                            }}
+                            className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-amber-500/20 text-white font-bold border-r-4 border-amber-400'
+                                : 'hover:bg-purple-900/30 text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              {prod.image ? (
+                                <img
+                                  src={prod.image}
+                                  alt={prod.title}
+                                  className="w-8 h-8 rounded-lg object-cover border border-purple-700/50 shrink-0"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = getFallbackProductImage();
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg bg-purple-900 flex items-center justify-center text-amber-300 shrink-0">
+                                  ⚡
+                                </div>
+                              )}
+                              <div>
+                                <div className="text-white font-bold text-xs">{prod.title}</div>
+                                <div className="text-[10px] text-purple-300/80 flex items-center gap-1.5 mt-0.5">
+                                  <span>{prod.category}</span>
+                                  {isSubOrApp && (
+                                    <span className="text-[9px] bg-purple-900/90 text-amber-300 px-1.5 py-0.2 rounded border border-purple-700/60 font-bold">
+                                      لایسنس نرم‌افزار
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[10px] text-amber-400 font-mono font-bold">رایگان برای کاربر</span>
+                              {isSelected && <Check className="w-4 h-4 text-amber-400" />}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Sub-plan selection if product has custom plans */}
+                  {grantSelectedProduct?.subscriptionPlans && grantSelectedProduct.subscriptionPlans.length > 0 && (
+                    <div className="bg-[#180f33] p-3 rounded-xl border border-purple-800/80 space-y-2 mt-2">
+                      <span className="text-[11px] font-bold text-amber-200 block">
+                        پلن انتخابی این محصول (اختیاری):
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {grantSelectedProduct.subscriptionPlans.map((pl) => {
+                          const isPlSelected = grantSelectedPlan?.id === pl.id;
+                          return (
+                            <button
+                              key={pl.id}
+                              type="button"
+                              onClick={() => {
+                                setGrantSelectedPlan(pl);
+                                if (pl.durationDays) {
+                                  setGrantDurationDays(pl.durationDays);
+                                  setGrantCustomDaysInput(String(pl.durationDays));
+                                }
+                              }}
+                              className={`p-2 rounded-lg border text-right transition-all cursor-pointer ${
+                                isPlSelected
+                                  ? 'bg-amber-500/25 border-amber-400 text-white font-bold ring-1 ring-amber-400'
+                                  : 'bg-black/30 border-purple-900 text-slate-300 hover:border-purple-600'
+                              }`}
+                            >
+                              <div className="font-bold text-xs">{pl.name}</div>
+                              <div className="text-[10px] text-amber-300 mt-0.5">
+                                {pl.durationDays ? `${pl.durationDays} روزه` : pl.durationLabel}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Step 3: Duration Selection */}
+                <div className="space-y-2 pt-2 border-t border-purple-900/50">
+                  <label className="text-xs font-black text-amber-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-amber-400" />
+                      <span>۳. تعیین مدت زمان اشتراک و انقضای لایسنس:</span>
+                    </span>
+                    <span className="text-[11px] text-amber-300 font-mono font-bold bg-amber-400/15 px-2 py-0.5 rounded-lg border border-amber-400/30">
+                      {grantDurationDays === 1 ? '⚡ ۲۴ ساعت کامل' : grantDurationDays >= 3650 ? 'دائمی (مادام‌العمر)' : `${grantDurationDays} روز`}
+                    </span>
+                  </label>
+
+                  {/* Preset Pills */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { label: '⚡ ۱ روزه (۲۴ ساعت کامل)', days: 1, highlight: true },
+                      { label: '۷ روزه (۱ هفته)', days: 7 },
+                      { label: '۳۰ روزه (۱ ماه)', days: 30 },
+                      { label: '۹۰ روزه (۳ ماه)', days: 90 },
+                      { label: '۱۸۰ روزه (۶ ماه)', days: 180 },
+                      { label: '۳۶۵ روزه (۱ سال)', days: 365 },
+                      { label: '👑 دائمی / مادام‌العمر', days: 3650, gold: true },
+                    ].map((btn) => {
+                      const isSel = grantDurationDays === btn.days;
+                      return (
+                        <button
+                          key={btn.days}
+                          type="button"
+                          onClick={() => {
+                            setGrantDurationDays(btn.days);
+                            setGrantCustomDaysInput(String(btn.days));
+                          }}
+                          className={`p-2 rounded-xl border text-center transition-all cursor-pointer font-bold text-xs ${
+                            isSel
+                              ? btn.gold
+                                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 border-amber-300 shadow-md font-black ring-2 ring-amber-300'
+                                : 'bg-gradient-to-r from-amber-500/30 to-purple-600/40 border-amber-400 text-white shadow-md ring-2 ring-amber-400'
+                              : 'bg-[#180f33] border-purple-900/60 text-slate-300 hover:border-purple-600'
+                          }`}
+                        >
+                          {btn.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom Days Input */}
+                  <div className="flex items-center justify-between gap-3 bg-[#180f33] p-2.5 rounded-xl border border-purple-800/60 mt-1">
+                    <span className="text-slate-300 text-xs font-bold">یا وارد کردن تعداد روزهای دلخواه:</span>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={1}
+                        max={3650}
+                        value={grantCustomDaysInput}
+                        onChange={(e) => {
+                          setGrantCustomDaysInput(e.target.value);
+                          const val = parseInt(e.target.value, 10);
+                          if (!isNaN(val) && val >= 1) {
+                            setGrantDurationDays(val);
+                          }
+                        }}
+                        className="w-20 bg-black/60 border border-amber-400/80 rounded-lg px-2 py-1 text-center font-mono font-bold text-amber-300 text-xs focus:outline-none"
+                      />
+                      <span className="text-slate-400 text-xs">روز</span>
+                    </div>
+                  </div>
+
+                  {/* Guaranteed 24 Hours Info Banner */}
+                  {grantDurationDays === 1 && (
+                    <div className="bg-emerald-950/50 border border-emerald-500/50 p-2.5 rounded-xl text-emerald-300 text-[11px] flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>
+                        <strong>محاسبه تضمینی ۲۴ ساعته:</strong> لایسنس ۱ روزه دقیقاً به مدت ۲۴ ساعت کامل (۸۶,۴۰۰ ثانیه) از لحظه صدور اعتبار دارد و به هیچ عنوان زودتر منقضی نخواهد شد.
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Step 4: Notes */}
+                <div className="space-y-1.5 pt-2 border-t border-purple-900/50">
+                  <label className="text-xs font-bold text-slate-300 block">
+                    ۴. یادداشت مدیریت یا دلیل اعطا (اختیاری):
+                  </label>
+                  <input
+                    type="text"
+                    value={grantAdminNotes}
+                    onChange={(e) => setGrantAdminNotes(e.target.value)}
+                    placeholder="مثلاً: اعطای دسترسی رایگان به مناسبت همکاری / تست محصول"
+                    className="w-full bg-[#180f33] border border-purple-800/70 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                {/* Live Preview Card */}
+                {grantSelectedUser && grantSelectedProduct && (() => {
+                  const safeDays = Math.max(1, parseSubscriptionDays(grantDurationDays || grantCustomDaysInput, 1));
+                  const previewExpiry = new Date(Date.now() + safeDays * 24 * 60 * 60 * 1000);
+                  let previewExpiryFa = '';
+                  try {
+                    previewExpiryFa = previewExpiry.toLocaleDateString('fa-IR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+                  } catch {
+                    previewExpiryFa = previewExpiry.toISOString();
+                  }
+
+                  return (
+                    <div className="bg-gradient-to-r from-amber-950/30 via-[#1b0f38] to-purple-950/40 p-3.5 rounded-2xl border border-amber-400/50 space-y-2">
+                      <div className="text-[11px] font-black text-amber-300 flex items-center justify-between">
+                        <span>خلاصه سفارش و لایسنس قبل از ثبت:</span>
+                        <span className="text-[10px] bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 font-bold">
+                          ثبت مستقیم در حساب مشتری
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-300">
+                        <div>
+                          کاربر: <strong className="text-white">{grantSelectedUser.fullName || grantSelectedUser.username}</strong> ({grantSelectedUser.phone})
+                        </div>
+                        <div>
+                          محصول: <strong className="text-amber-300">{grantSelectedProduct.title}</strong>
+                        </div>
+                        <div>
+                          مدت اعتبار: <strong className="text-white font-mono">{safeDays === 1 ? '۲۴ ساعت کامل (۱ روز)' : `${safeDays} روز`}</strong>
+                        </div>
+                        <div>
+                          تاریخ انقضا: <strong className="text-emerald-300 font-mono">{previewExpiryFa}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between p-4 sm:p-5 border-t border-purple-900/80 bg-[#160d34] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsGrantLicenseModalOpen(false)}
+                  disabled={grantIsSubmitting}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                >
+                  انصراف
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExecuteGrantLicense}
+                  disabled={grantIsSubmitting || !grantSelectedUser || !grantSelectedProduct}
+                  className="px-6 py-2.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {grantIsSubmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>در حال صدور لایسنس و ثبت سفارش...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4 fill-slate-950" />
+                      <span>⚡ صدور آنی لایسنس و ثبت رایگان در سفارشات کاربر</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* Modal: Grant Success & Celebration Dialog                 */}
+        {/* ========================================================= */}
+        {grantSuccessDialog && grantSuccessDialog.isOpen && (
+          <div
+            className="fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-5 bg-black/90 backdrop-blur-md animate-in fade-in"
+            dir="rtl"
+          >
+            <div
+              className="bg-[#12082b] border-2 border-emerald-400/90 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl shadow-emerald-500/25 text-white flex flex-col max-h-[92vh] animate-in zoom-in-95"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-emerald-950/80 via-teal-950/80 to-[#12082b] p-5 border-b border-emerald-500/40 text-center relative">
+                <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-slate-950 mx-auto mb-2 shadow-lg shadow-emerald-500/30">
+                  <Sparkles className="w-8 h-8 fill-slate-950" />
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-emerald-300">
+                  🎉 لایسنس با موفقیت صادر و فعال شد!
+                </h3>
+                <p className="text-xs text-slate-300 mt-1">
+                  سفارش ۱۰۰٪ رایگان در حساب «{grantSuccessDialog.user.fullName || grantSuccessDialog.user.username}» ثبت گردید.
+                </p>
+                <button
+                  onClick={() => setGrantSuccessDialog(null)}
+                  className="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 overflow-y-auto space-y-3.5 bg-gradient-to-b from-[#140b2e] to-[#0c0617] text-xs">
+                {/* Product & Duration */}
+                <div className="bg-black/40 p-3 rounded-2xl border border-purple-800/50 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-bold">محصول اختصاص‌یافته:</span>
+                    <span className="font-bold text-amber-300 text-xs sm:text-sm">{grantSuccessDialog.product.title}</span>
+                  </div>
+                  <div className="text-left">
+                    <span className="text-[10px] text-slate-400 block font-bold">مدت زمان اعتبار:</span>
+                    <span className="font-black text-emerald-300 font-mono text-xs">
+                      {grantSuccessDialog.days === 1 ? '۲۴ ساعت کامل' : grantSuccessDialog.days >= 3650 ? 'دائمی VIP' : `${grantSuccessDialog.days} روز`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Order Details */}
+                <div className="bg-purple-950/30 p-3 rounded-2xl border border-purple-800/50 flex items-center justify-between text-[11px]">
+                  <div>
+                    <span className="text-slate-400">شناسه سفارش: </span>
+                    <strong className="text-white font-mono">{grantSuccessDialog.order.id}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">کد پیگیری: </span>
+                    <strong className="text-amber-300 font-mono">{grantSuccessDialog.order.trackingCode}</strong>
+                  </div>
+                </div>
+
+                {/* Credentials */}
+                {grantSuccessDialog.license && (
+                  <div className="space-y-2 bg-[#170e33] p-3.5 rounded-2xl border border-amber-400/50">
+                    <span className="text-xs font-black text-amber-300 block mb-1">
+                      مشخصات ورود به اپلیکیشن و لایسنس نرم‌افزار:
+                    </span>
+
+                    {/* Username */}
+                    <div className="flex items-center justify-between bg-black/50 p-2.5 rounded-xl border border-purple-800/60">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">نام کاربری ورود (Username):</span>
+                        <span className="font-mono font-bold text-amber-300 text-xs">
+                          {grantSuccessDialog.license.username}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(grantSuccessDialog.license.username);
+                          setGrantCopiedField('u');
+                          setTimeout(() => setGrantCopiedField(null), 2000);
+                        }}
+                        className="px-2.5 py-1 bg-purple-800 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>{grantCopiedField === 'u' ? 'کپی شد!' : 'کپی'}</span>
+                      </button>
+                    </div>
+
+                    {/* Password */}
+                    <div className="flex items-center justify-between bg-black/50 p-2.5 rounded-xl border border-purple-800/60">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">رمز عبور ورود (Password):</span>
+                        <span className="font-mono font-bold text-emerald-300 text-xs tracking-wider">
+                          {grantSuccessDialog.license.password}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(grantSuccessDialog.license.password);
+                          setGrantCopiedField('p');
+                          setTimeout(() => setGrantCopiedField(null), 2000);
+                        }}
+                        className="px-2.5 py-1 bg-purple-800 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>{grantCopiedField === 'p' ? 'کپی شد!' : 'کپی'}</span>
+                      </button>
+                    </div>
+
+                    {/* License Key */}
+                    <div className="flex items-center justify-between bg-black/50 p-2.5 rounded-xl border border-purple-800/60">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">کلید لایسنس (License Key):</span>
+                        <span className="font-mono font-bold text-cyan-300 text-xs">
+                          {grantSuccessDialog.license.licenseKey}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(grantSuccessDialog.license.licenseKey);
+                          setGrantCopiedField('k');
+                          setTimeout(() => setGrantCopiedField(null), 2000);
+                        }}
+                        className="px-2.5 py-1 bg-purple-800 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>{grantCopiedField === 'k' ? 'کپی شد!' : 'کپی'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Expiry Timestamp */}
+                {grantSuccessDialog.license?.expiresAt && (
+                  <div className="bg-black/30 p-2.5 rounded-xl border border-purple-900/40 text-[11px] text-slate-300 flex items-center justify-between">
+                    <span>تاریخ دقیق پایان اشتراک:</span>
+                    <strong className="text-emerald-300 font-mono">
+                      {new Date(grantSuccessDialog.license.expiresAt).toLocaleDateString('fa-IR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </strong>
+                  </div>
+                )}
+
+                {/* Download URL button */}
+                {(grantSuccessDialog.license?.downloadUrl || grantSuccessDialog.product.downloadUrl || (grantSuccessDialog.product as any)?.appDownloadUrl) && (
+                  <a
+                    href={grantSuccessDialog.license?.downloadUrl || grantSuccessDialog.product.downloadUrl || (grantSuccessDialog.product as any)?.appDownloadUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer no-underline"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>دانلود فایل نصبی اپلیکیشن ({grantSuccessDialog.product.title})</span>
+                  </a>
+                )}
+
+                <div className="bg-emerald-950/40 border border-emerald-500/40 p-2.5 rounded-xl text-emerald-300 text-[11px] flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>
+                    این سفارش بلافاصله در پنل کاربری خریدار (بخش پیگیری سفارشات) قابل مشاهده است و لایسنس در تمامی دستگاه‌های او فعال می‌باشد.
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-purple-900/80 bg-[#160d34] flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => setGrantSuccessDialog(null)}
+                  className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  متوجه شدم و بستن
                 </button>
               </div>
             </div>

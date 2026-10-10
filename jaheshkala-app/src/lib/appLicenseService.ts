@@ -88,6 +88,63 @@ export function generateDeterministicAppLicenseKey(seed: string): string {
 }
 
 /**
+ * Robustly parses subscription duration in days from any format (number, string, Persian digits, plan label)
+ */
+export function parseSubscriptionDays(val: any, fallback = 7): number {
+  if (typeof val === 'number' && !isNaN(val) && val > 0) return val;
+  if (!val) return fallback;
+  const str = String(val).trim();
+  if (
+    str === '1' ||
+    str === '1day' ||
+    str === '۱' ||
+    str.includes('یک روز') ||
+    str.includes('۱ روز') ||
+    str.includes('1 روز') ||
+    str.includes('یکروزه') ||
+    str.includes('۱روزه') ||
+    str.includes('1روزه')
+  ) {
+    return 1;
+  }
+  if (str === '3' || str === '3days' || str === '۳' || str.includes('سه روز') || str.includes('۳ روز')) {
+    return 3;
+  }
+  if (str === '7' || str === '1week' || str === '۷' || str.includes('هفت روز') || str.includes('۷ روز') || str.includes('یک هفته') || str.includes('۱ هفته')) {
+    return 7;
+  }
+  if (str === '30' || str === '1month' || str === '۳۰' || str.includes('یک ماه') || str.includes('۱ ماه') || str.includes('۳۰ روز')) {
+    return 30;
+  }
+  if (str === '90' || str === '3months' || str === '۹۰' || str.includes('سه ماه') || str.includes('۳ ماه')) {
+    return 90;
+  }
+  if (str === '180' || str === '6months' || str === '۱۸۰' || str.includes('شش ماه') || str.includes('۶ ماه')) {
+    return 180;
+  }
+  if (str === '365' || str === '1year' || str === '۳۶۵' || str.includes('یک سال') || str.includes('۱ سال') || str.includes('۳۶۵ روز')) {
+    return 365;
+  }
+  if (str.includes('permanent') || str.includes('دائمی') || str.includes('مادام')) {
+    return 3650;
+  }
+
+  // Parse Persian digits to English
+  const normalized = str.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+  const match = normalized.match(/\d+/);
+  if (match) {
+    const parsedNum = parseInt(match[0], 10);
+    if (!isNaN(parsedNum) && parsedNum > 0) {
+      if (str.includes('ماه') || str.includes('month')) return parsedNum * 30;
+      if (str.includes('سال') || str.includes('year')) return parsedNum * 365;
+      if (str.includes('هفته') || str.includes('week')) return parsedNum * 7;
+      return parsedNum;
+    }
+  }
+  return fallback;
+}
+
+/**
  * Creates an AppSubscriptionLicense for an order with exact duration.
  * Can be called as:
  *  generateAppLicense(order, user) OR
@@ -110,10 +167,10 @@ export function generateAppLicense(
     const aiItem = order.items?.find((it) => isAiAppProduct(it?.product));
     if (aiItem && aiItem.product) {
       resolvedProduct = aiItem.product;
-      resolvedDays = aiItem.subscriptionDays || aiItem.product.aiAppDefaultDays || 7;
+      resolvedDays = aiItem.subscriptionDays || aiItem.product.aiAppDefaultDays || (aiItem.selectedPlan?.durationDays) || 7;
     } else if (order.items && order.items[0]?.product) {
       resolvedProduct = order.items[0].product;
-      resolvedDays = order.items[0].subscriptionDays || resolvedProduct.aiAppDefaultDays || 7;
+      resolvedDays = order.items[0].subscriptionDays || resolvedProduct.aiAppDefaultDays || (order.items[0].selectedPlan?.durationDays) || 7;
     }
   } else if (productOrUser) {
     resolvedProduct = productOrUser as Partial<Product>;
@@ -123,7 +180,7 @@ export function generateAppLicense(
     const aiItem = order.items?.find((it) => isAiAppProduct(it?.product));
     if (aiItem && aiItem.product) {
       resolvedProduct = aiItem.product;
-      resolvedDays = aiItem.subscriptionDays || aiItem.product.aiAppDefaultDays || 7;
+      resolvedDays = aiItem.subscriptionDays || aiItem.product.aiAppDefaultDays || (aiItem.selectedPlan?.durationDays) || 7;
     }
   }
 
@@ -143,9 +200,11 @@ export function generateAppLicense(
     exactUsername = 'user_' + Math.floor(1000 + Math.random() * 9000);
   }
 
-  const safeDays = Math.max(1, resolvedDays || 7);
+  const safeDays = Math.max(1, parseSubscriptionDays(resolvedDays, 7));
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + safeDays * 24 * 60 * 60 * 1000);
+  // Guarantee a full 24 hours (86,400,000 ms) per day from activation time
+  const durationMs = safeDays * 24 * 60 * 60 * 1000;
+  const expiresAt = new Date(now.getTime() + durationMs);
 
   const licenseId = `lic_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const seed = `${exactUsername}_${resolvedProduct.id || 'app'}_${order.id || ''}`;
@@ -162,6 +221,8 @@ export function generateAppLicense(
     phone: order.customerPhone || resolvedUser?.phone || '',
     orderId: order.id || '',
     days: safeDays,
+    durationHours: safeDays * 24,
+    totalHoursRemaining: safeDays * 24,
     startDate: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     status: 'active',
@@ -245,32 +306,81 @@ export async function saveAppLicenseToServer(license: AppSubscriptionLicense): P
 export const registerAppLicenseOnServer = saveAppLicenseToServer;
 
 /**
- * Calculates remaining days and expiration state
+ * Calculates remaining days, hours and expiration state accurately
  */
 export function checkLicenseStatus(license?: AppSubscriptionLicense | null): {
   isExpired: boolean;
   daysRemaining: number;
+  hoursRemaining: number;
+  totalHoursRemaining: number;
   formattedExpiryFa: string;
+  remainingText: string;
 } {
   if (!license || !license.expiresAt) {
-    return { isExpired: true, daysRemaining: 0, formattedExpiryFa: 'منقضی شده' };
+    return {
+      isExpired: true,
+      daysRemaining: 0,
+      hoursRemaining: 0,
+      totalHoursRemaining: 0,
+      formattedExpiryFa: 'منقضی شده',
+      remainingText: 'منقضی شده',
+    };
   }
 
-  const expiry = new Date(license.expiresAt);
+  let expiry = new Date(license.expiresAt);
+  if (isNaN(expiry.getTime())) {
+    const days = typeof license.days === 'number' && license.days > 0 ? license.days : 7;
+    const start = license.startDate ? new Date(license.startDate) : new Date();
+    const validStart = isNaN(start.getTime()) ? new Date() : start;
+    expiry = new Date(validStart.getTime() + days * 24 * 60 * 60 * 1000);
+  }
+
   const now = new Date();
   const diffMs = expiry.getTime() - now.getTime();
   const isExpired = diffMs <= 0;
-  const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-  const formattedExpiryFa = expiry.toLocaleDateString('fa-IR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const totalHoursRemaining = isExpired ? 0 : Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
+  const daysRemaining = isExpired ? 0 : Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  // Crucial: for 24 hours or less, hoursRemaining must be totalHoursRemaining, NEVER 0 from modulo!
+  const hoursRemaining = isExpired
+    ? 0
+    : totalHoursRemaining <= 24
+    ? totalHoursRemaining
+    : Math.max(0, Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
+  const minutesRemaining = isExpired ? 0 : Math.max(0, Math.floor((diffMs % (1000 * 60)) / (1000 * 60)));
 
-  return { isExpired, daysRemaining, formattedExpiryFa };
+  let remainingText = '';
+  if (isExpired) {
+    remainingText = 'اشتراک پایان یافته';
+  } else if (totalHoursRemaining <= 24) {
+    remainingText = `${totalHoursRemaining} ساعت باقیمانده (اشتراک ۲۴ ساعته)`;
+  } else if (daysRemaining > 1) {
+    remainingText = `${daysRemaining} روز باقیمانده`;
+  } else {
+    remainingText = `${totalHoursRemaining} ساعت باقیمانده`;
+  }
+
+  let formattedExpiryFa = '';
+  try {
+    formattedExpiryFa = expiry.toLocaleDateString('fa-IR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    formattedExpiryFa = expiry.toISOString();
+  }
+
+  return {
+    isExpired,
+    daysRemaining,
+    hoursRemaining,
+    totalHoursRemaining,
+    formattedExpiryFa,
+    remainingText,
+  };
 }
 
 /**

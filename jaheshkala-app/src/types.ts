@@ -171,6 +171,7 @@ export interface AmlakSubscriptionLicense {
   days: number;
   startDate: string;
   expiresAt: string;
+  formattedExpiryFa?: string;
   status: 'active' | 'expired';
   downloadUrl?: string;
 }
@@ -187,6 +188,8 @@ export interface AppSubscriptionLicense {
   phone: string;
   orderId: string;
   days: number;
+  durationHours?: number;
+  totalHoursRemaining?: number;
   startDate: string;
   expiresAt: string;
   status: 'active' | 'expired';

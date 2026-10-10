@@ -1046,11 +1046,17 @@ switch ($action) {
             }
 
             // Check expiration
-            $expiresAt = isset($targetLicense['expiresAt']) ? strtotime($targetLicense['expiresAt']) : 0;
             $now = time();
+            $days = isset($targetLicense['days']) ? intval($targetLicense['days']) : 7;
+            if ($days <= 0) $days = 7;
+            $expiresAt = isset($targetLicense['expiresAt']) ? strtotime($targetLicense['expiresAt']) : 0;
+            if ($expiresAt <= 0) {
+                $expiresAt = $now + ($days * 86400);
+            }
             $diffSec = $expiresAt - $now;
-            $isExpired = $expiresAt > 0 && $diffSec <= 0;
-            $daysRemaining = $isExpired ? 0 : ceil(max(0, $diffSec) / 86400);
+            $isExpired = $diffSec <= 0;
+            $totalHours = $isExpired ? 0 : ceil(max(0, $diffSec) / 3600);
+            $daysRemaining = $isExpired ? 0 : max(1, ceil(max(0, $diffSec) / 86400));
 
             if ($isExpired) {
                 http_response_code(403);
@@ -1060,13 +1066,18 @@ switch ($action) {
                     'expired' => true,
                     'status' => 'expired',
                     'daysRemaining' => 0,
-                    'expiresAt' => $targetLicense['expiresAt'] ?? '',
+                    'hoursRemaining' => 0,
+                    'totalHoursRemaining' => 0,
+                    'remainingHours' => 0,
+                    'expiresAt' => date('c', $expiresAt),
+                    'expiresAtTimestamp' => $expiresAt * 1000,
+                    'expiresAtUnix' => $expiresAt,
                     'message' => 'اعتبار لایسنس شما به پایان رسیده است. جهت تمدید اشتراک به سایت جهش مراجعه فرمایید.',
                 ]);
                 exit;
             }
 
-            $token = base64_encode(json_encode(['u' => $cleanUser, 'prod' => $targetLicense['productId'] ?? '', 'exp' => $expiresAt]));
+            $token = base64_encode(json_encode(['u' => $cleanUser, 'prod' => $targetLicense['productId'] ?? '', 'exp' => $expiresAt * 1000]));
             echo json_encode([
                 'success' => true,
                 'authenticated' => true,
@@ -1074,8 +1085,18 @@ switch ($action) {
                 'status' => 'active',
                 'token' => $token,
                 'daysRemaining' => $daysRemaining,
+                'hoursRemaining' => $totalHours,
+                'remainingHours' => $totalHours,
+                'totalHoursRemaining' => $totalHours,
+                'hours' => $totalHours,
+                'remainingMinutes' => ceil(max(0, $diffSec) / 60),
+                'remainingSeconds' => max(0, $diffSec),
+                'durationDays' => $days,
+                'durationHours' => $days * 24,
                 'startDate' => $targetLicense['startDate'] ?? date('c', $now),
-                'expiresAt' => $targetLicense['expiresAt'] ?? date('c', $now + 7 * 86400),
+                'expiresAt' => date('c', $expiresAt),
+                'expiresAtTimestamp' => $expiresAt * 1000,
+                'expiresAtUnix' => $expiresAt,
                 'licenseKey' => $targetLicense['licenseKey'] ?? '',
                 'productId' => $targetLicense['productId'] ?? ($cleanProd ?: 'pkg-software-jahesh'),
                 'productTitle' => $targetLicense['productTitle'] ?? ($targetLicense['appName'] ?? 'نرم‌افزار هوشمند جهش'),
@@ -1084,7 +1105,7 @@ switch ($action) {
                     'fullName' => $targetLicense['buyerName'] ?? 'کاربر گرامی جهش',
                     'phone' => $targetLicense['phone'] ?? '',
                 ],
-                'message' => "ورود موفقیت‌آمیز بود. اشتراک شما دارای {$daysRemaining} روز اعتبار می‌باشد.",
+                'message' => $totalHours <= 24 ? "ورود موفقیت‌آمیز بود. اشتراک شما دارای {$totalHours} ساعت ({$daysRemaining} روز) اعتبار فعال است." : "ورود موفقیت‌آمیز بود. اشتراک شما دارای {$daysRemaining} روز اعتبار می‌باشد.",
             ]);
             exit;
         }

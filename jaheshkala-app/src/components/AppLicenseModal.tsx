@@ -39,7 +39,7 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
 
   const effectiveLicenseDownloadUrl = license.downloadUrl || (license as any).appDownloadUrl || (license.productId === 'prod-1790538341809' || license.productTitle?.includes('شنتیا') || license.appName?.includes('شنتیا') ? '/uploads/apps/shantia.apk' : undefined);
 
-  const { isExpired, daysRemaining, formattedExpiryFa } = checkLicenseStatus(license);
+  const { isExpired, daysRemaining, totalHoursRemaining, formattedExpiryFa, remainingText } = checkLicenseStatus(license);
 
   const handleCopy = (text: string, fieldName: string) => {
     try {
@@ -56,7 +56,7 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
 نام کاربری: ${license.username}
 رمز عبور: ${license.password}
 کلید لایسنس: ${license.licenseKey}
-مدت اشتراک: ${license.days} روز (اعتبار تا: ${formattedExpiryFa})`;
+مدت اشتراک: ${license.days === 1 ? '۱ روز (۲۴ ساعت کامل)' : `${license.days} روز`} (اعتبار تا: ${formattedExpiryFa})`;
     handleCopy(allText, 'all');
   };
 
@@ -157,7 +157,7 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
               </div>
               <div className="flex items-center gap-1.5 text-[11px] bg-purple-900/60 text-purple-200 px-2 py-0.5 rounded-lg border border-purple-700/50">
                 <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span>اعتبار: <strong>{license.days} روزه</strong> ({daysRemaining} روز باقیمانده)</span>
+                <span>اعتبار: <strong>{license.days === 1 ? '۲۴ ساعت کامل (۱ روز)' : `${license.days} روزه`}</strong> ({license.days === 1 || daysRemaining <= 1 ? `${totalHoursRemaining} ساعت باقیمانده` : `${daysRemaining} روز باقیمانده`})</span>
               </div>
             </div>
 

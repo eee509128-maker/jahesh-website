@@ -208,10 +208,24 @@ export default async function handler(req, res) {
 
     if (found) {
       const now = new Date();
-      const expiry = parseExpiryDate(found.expiresAt, found.days || 30);
+      let days = Number(found.days) || 7;
+      let expiry = null;
+      if (found.expiresAt) {
+        const parsed = new Date(found.expiresAt);
+        if (!isNaN(parsed.getTime())) expiry = parsed;
+      }
+      if (!expiry) {
+        expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+      }
       const diffMs = expiry.getTime() - now.getTime();
       const isExpired = diffMs <= 0;
-      const daysRemaining = isExpired ? 0 : Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      const totalHoursRemaining = isExpired ? 0 : Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
+      const daysRemaining = isExpired ? 0 : Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      const hoursRemaining = isExpired
+        ? 0
+        : totalHoursRemaining <= 24
+        ? totalHoursRemaining
+        : Math.max(0, Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
 
       if (isExpired) {
         return res.status(200).json({
@@ -220,7 +234,11 @@ export default async function handler(req, res) {
           expired: true,
           status: 'expired',
           daysRemaining: 0,
-          expiresAt: found.expiresAt,
+          hoursRemaining: 0,
+          totalHoursRemaining: 0,
+          remainingHours: 0,
+          expiresAt: expiry.toISOString(),
+          expiresAtTimestamp: expiry.getTime(),
           productId: found.productId,
           productTitle: found.productTitle || found.appName,
           message: 'مدت زمان اشتراک شما به پایان رسیده است. جهت تمدید اشتراک به سایت جهش‌کالا مراجعه فرمایید.',
@@ -236,8 +254,18 @@ export default async function handler(req, res) {
         token: found.licenseKey || found.id,
         licenseKey: found.licenseKey,
         daysRemaining,
-        startDate: found.startDate,
-        expiresAt: found.expiresAt,
+        hoursRemaining: totalHoursRemaining <= 24 ? totalHoursRemaining : hoursRemaining,
+        remainingHours: totalHoursRemaining,
+        totalHoursRemaining,
+        hours: totalHoursRemaining,
+        remainingMinutes: Math.max(0, Math.ceil(diffMs / (1000 * 60))),
+        remainingSeconds: Math.max(0, Math.ceil(diffMs / 1000)),
+        durationDays: days,
+        durationHours: days * 24,
+        startDate: found.startDate || now.toISOString(),
+        expiresAt: expiry.toISOString(),
+        expiresAtTimestamp: expiry.getTime(),
+        expiresAtUnix: Math.floor(expiry.getTime() / 1000),
         productId: found.productId,
         productTitle: found.productTitle || found.appName,
         user: {
@@ -245,7 +273,9 @@ export default async function handler(req, res) {
           fullName: found.buyerName,
           phone: found.phone,
         },
-        message: `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${daysRemaining} روز اعتبار فعال است.`,
+        message: totalHoursRemaining <= 24
+          ? `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${totalHoursRemaining} ساعت (${daysRemaining} روز) اعتبار فعال است.`
+          : `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${daysRemaining} روز اعتبار فعال است.`,
       });
     }
 

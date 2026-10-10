@@ -37,8 +37,8 @@ import {
   clearPendingOrder,
   ZIBAL_DEFAULT_MERCHANT,
 } from './lib/zibalService';
-import { hasAmlakInItems, generateAmlakLicense } from './lib/amlakLicenseService';
-import { hasAiAppInItems, generateAppLicense, registerAppLicenseOnServer, checkLicenseStatus } from './lib/appLicenseService';
+import { hasAmlakInItems, generateAmlakLicense, saveAmlakLicenseLocally, syncAmlakLicenseWithServer } from './lib/amlakLicenseService';
+import { hasAiAppInItems, generateAppLicense, registerAppLicenseOnServer, checkLicenseStatus, saveAppLicenseLocally, parseSubscriptionDays } from './lib/appLicenseService';
 import { AppSubscriptionLicense } from './types';
 import { AppLicenseModal } from './components/AppLicenseModal';
 import { isProductMatchingCategoryOrGuild, isProductMatchingSearchQuery } from './lib/guildMatcher';
@@ -1062,6 +1062,117 @@ export default function App() {
     showToast(`سفارش رایگان «${product.title}» برای حساب مدیریت با موفقیت در سیستم ثبت شد.`);
   };
 
+  // Grant Licensed Product directly & 100% Free to any Registered User (from Admin Panel)
+  const handleGrantUserLicense = async (
+    targetUser: User,
+    product: Product,
+    durationDays: number,
+    plan?: SubscriptionPlan,
+    adminNotes?: string
+  ) => {
+    const safeDays = Math.max(1, parseSubscriptionDays(durationDays || plan?.durationDays || product.aiAppDefaultDays, 1));
+    const now = new Date();
+    // Guarantee full 24 hours per day (e.g. 1 day = 24 * 60 * 60 * 1000 ms)
+    const durationMs = safeDays * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(now.getTime() + durationMs);
+
+    const orderId = 'JAHESH-GRT-' + Math.floor(10000 + Math.random() * 90000).toString();
+    const isAmlak = isAmlakProduct({ product, quantity: 1 }) || product.id === 'pkg-amlak-jahesh' || product.title?.includes('املاک');
+
+    const modifiedProduct: Product = {
+      ...product,
+      price: 0,
+      subscriptionDays: safeDays,
+    };
+
+    const newOrder: Order = {
+      id: orderId,
+      trackingCode: 'GRT-' + Date.now().toString().slice(-6),
+      paymentRefId: 'FREE-GRANT-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      userId: targetUser.id || targetUser.username || `user-${Date.now()}`,
+      customerName: targetUser.fullName || targetUser.username || 'کاربر گرامی جهش',
+      customerPhone: targetUser.phone || '',
+      customerEmail: targetUser.email || '',
+      requestedDomain: product.domainIncluded ? 'دامنه اختصاصی اهدایی مدیریت' : undefined,
+      clientNotes: adminNotes || `اعطای مستقیم لایسنس و دسترسی ۱۰۰٪ رایگان توسط مدیریت برای ${targetUser.fullName || targetUser.username}`,
+      items: [
+        {
+          product: modifiedProduct,
+          quantity: 1,
+          subscriptionDays: safeDays,
+          selectedPlan: plan,
+          requestedDomain: product.domainIncluded ? 'دامنه اختصاصی اهدایی مدیریت' : undefined,
+          clientNotes: adminNotes || 'اعطای مستقیم توسط مدیریت فروشگاه',
+        },
+      ],
+      totalAmount: 0,
+      discountAmount: Number(product.price) || 0,
+      appliedCouponCode: 'ADMIN-FREE-GRANT',
+      status: 'تایید شده / در حال آماده‌سازی',
+      paymentGateway: 'اعطای مستقیم مدیریت (۱۰۰٪ رایگان)',
+      acceptedTerms: true,
+      createdAt: now.toISOString(),
+      date: now.toLocaleDateString('fa-IR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+
+    if (isAmlak) {
+      const generatedAmlakLic = generateAmlakLicense(newOrder, targetUser);
+      generatedAmlakLic.days = safeDays;
+      generatedAmlakLic.startDate = now.toISOString();
+      generatedAmlakLic.expiresAt = expiresAt.toISOString();
+      generatedAmlakLic.formattedExpiryFa = expiresAt.toLocaleDateString('fa-IR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      newOrder.amlakLicense = generatedAmlakLic;
+      saveAmlakLicenseLocally(generatedAmlakLic);
+      syncAmlakLicenseWithServer(generatedAmlakLic).catch(() => {});
+    }
+
+    // Generate App License for all digital app/software products
+    const generatedAppLic = generateAppLicense(newOrder, targetUser, safeDays);
+    generatedAppLic.days = safeDays;
+    generatedAppLic.durationHours = safeDays * 24;
+    generatedAppLic.totalHoursRemaining = safeDays * 24;
+    generatedAppLic.startDate = now.toISOString();
+    generatedAppLic.expiresAt = expiresAt.toISOString();
+    generatedAppLic.status = 'active';
+    if (product.downloadUrl || (product as any)?.appDownloadUrl) {
+      generatedAppLic.downloadUrl = product.downloadUrl || (product as any)?.appDownloadUrl;
+    } else if (product.id === 'prod-1790538341809' || product.title?.includes('شنتیا')) {
+      generatedAppLic.downloadUrl = '/uploads/apps/shantia.apk';
+    }
+    newOrder.appLicense = generatedAppLic;
+    saveAppLicenseLocally(generatedAppLic);
+    registerAppLicenseOnServer(generatedAppLic).catch(() => {});
+
+    // Save order to persistent DB and memory state
+    await saveOrderToDb(newOrder);
+    setOrders((prev) => [newOrder, ...prev]);
+
+    // Dispatch real-time event for components
+    window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: newOrder }));
+
+    showToast(`لایسنس ${safeDays === 1 ? '۲۴ ساعته (۱ روز)' : `${safeDays} روزه`} برای «${targetUser.fullName || targetUser.username}» با موفقیت صادر و در سفارشات کاربر ثبت شد.`);
+
+    return {
+      success: true,
+      order: newOrder,
+      appLicense: newOrder.appLicense,
+      amlakLicense: newOrder.amlakLicense,
+      message: `سفارش و لایسنس رایگان با موفقیت برای کاربر صادر گردید.`,
+    };
+  };
+
   // Admin Free Checkout from Cart (completely bypasses Zibal gateway)
   const handleAdminCartFreeCheckout = async (appliedCoupon?: { code: string; discountPercent: number; discountAmount: number }) => {
     const adminUser = currentUser || {
@@ -2011,6 +2122,7 @@ export default function App() {
           banners={banners}
           onSaveBanner={handleSaveBanner}
           onDeleteBanner={handleDeleteBanner}
+          onGrantUserLicense={handleGrantUserLicense}
         />
       )}
 

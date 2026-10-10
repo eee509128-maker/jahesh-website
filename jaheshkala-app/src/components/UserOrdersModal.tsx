@@ -166,6 +166,10 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
       if (cleanUserId && orderUserId === cleanUserId) return true;
       if (cleanPhone && orderPhone && orderPhone === cleanPhone) return true;
       if (cleanEmail && orderEmail && orderEmail === cleanEmail) return true;
+      if (currentUser?.username && (
+        orderUserId?.toLowerCase() === currentUser.username.toLowerCase() ||
+        o.customerName?.toLowerCase() === currentUser.username.toLowerCase()
+      )) return true;
 
       return false;
     })
@@ -657,7 +661,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                     const isUserCopied = copiedField === `ai-user-${order.id}`;
                     const isPassCopied = copiedField === `ai-pass-${order.id}`;
                     const isKeyCopied = copiedField === `ai-key-${order.id}`;
-                    const { isExpired, daysRemaining, formattedExpiryFa } = checkLicenseStatus(license);
+                    const { isExpired, daysRemaining, totalHoursRemaining, formattedExpiryFa, remainingText } = checkLicenseStatus(license);
 
                     return (
                       <div className="bg-gradient-to-br from-indigo-950/30 via-[#180f35] to-purple-950/40 border border-amber-400/70 rounded-2xl p-4 text-right space-y-3 shadow-md my-2 text-slate-100">
@@ -680,7 +684,13 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                                 : 'bg-emerald-900/60 text-emerald-200 border border-emerald-500/50'
                             }`}>
                               <span className={`w-2 h-2 rounded-full ${isExpired ? 'bg-rose-400' : 'bg-emerald-400 animate-pulse'}`} />
-                              <span>{isExpired ? 'اشتراک پایان یافته' : `اشتراک فعال (${daysRemaining} روز باقیمانده)`}</span>
+                              <span>
+                                {isExpired
+                                  ? 'اشتراک پایان یافته'
+                                  : totalHoursRemaining <= 24
+                                  ? `اشتراک فعال (${totalHoursRemaining} ساعت باقیمانده)`
+                                  : `اشتراک فعال (${daysRemaining} روز باقیمانده)`}
+                              </span>
                             </span>
                           </div>
                         </div>
@@ -737,7 +747,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
 
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1 text-xs">
                           <span className="text-[11px] text-slate-300">
-                            مدت اشتراک: <strong>{license.days} روز</strong> • تاریخ انقضا: <strong className="text-amber-300">{formattedExpiryFa}</strong>
+                            مدت اشتراک: <strong>{license.days === 1 ? '۱ روز (۲۴ ساعت کامل)' : `${license.days} روز`}</strong> • تاریخ انقضا: <strong className="text-amber-300">{formattedExpiryFa}</strong>
                           </span>
 
                           <button
