@@ -37,7 +37,7 @@ import {
   clearPendingOrder,
   ZIBAL_DEFAULT_MERCHANT,
 } from './lib/zibalService';
-import { hasAmlakInItems, generateAmlakLicense, saveAmlakLicenseLocally, syncAmlakLicenseWithServer } from './lib/amlakLicenseService';
+import { hasAmlakInItems, generateAmlakLicense, saveAmlakLicenseLocally, syncAmlakLicenseWithServer, isAmlakProduct } from './lib/amlakLicenseService';
 import { hasAiAppInItems, generateAppLicense, registerAppLicenseOnServer, checkLicenseStatus, saveAppLicenseLocally, parseSubscriptionDays } from './lib/appLicenseService';
 import { AppSubscriptionLicense } from './types';
 import { AppLicenseModal } from './components/AppLicenseModal';
