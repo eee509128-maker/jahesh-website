@@ -550,53 +550,8 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
     console.warn('Firestore onSnapshot initialization notice:', fbErr);
   }
 
-  // 5. Domestic Server Polling (every 2.5 seconds fallback)
-  // Ensures all users on all networks receive updates with zero disruption
-  const pollServer = async () => {
-    if (isUnsubscribed) return;
-    try {
-      const res = await fetchUniversalApi(`products?_t=${Date.now()}`, { cache: 'no-store' });
-      if (res && res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (data?.products || []);
-        if (Array.isArray(list) && list.length > 0) {
-          const cleaned = list
-            .map(cleanProductItem)
-            .filter((p): p is Product => p !== null);
-          const fingerprint = JSON.stringify(cleaned);
-
-          if (fingerprint !== lastProductFingerprint) {
-            lastProductFingerprint = fingerprint;
-            const sorted = sortProductsByRank(cleaned);
-            safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
-            callback(sorted);
-          }
-        }
-      }
-    } catch {}
-  };
-
-  // Run initial poll quickly after 300ms, then every 2500ms
-  const initialPollTimer = setTimeout(pollServer, 300);
-  const pollInterval = setInterval(pollServer, 2500);
-
-  // 5. Instant refresh when user switches back to this tab/window
-  const handleVisibilityOrFocus = () => {
-    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-      pollServer();
-    }
-  };
-  if (typeof window !== 'undefined') {
-    window.addEventListener('focus', pollServer);
-  }
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-  }
-
   return () => {
     isUnsubscribed = true;
-    clearTimeout(initialPollTimer);
-    clearInterval(pollInterval);
     if (unsubscribeFirestore) {
       try {
         unsubscribeFirestore();
@@ -605,10 +560,6 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
     if (typeof window !== 'undefined') {
       window.removeEventListener('jahesh-products-updated', handleLocalEvent);
       window.removeEventListener('storage', handleStorageEvent);
-      window.removeEventListener('focus', pollServer);
-    }
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     }
     if (bc) {
       try { bc.close(); } catch {}
@@ -2719,7 +2670,7 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
   };
 
   pollServer();
-  intervalId = setInterval(pollServer, 1500);
+  intervalId = setInterval(pollServer, 30000);
 
   return () => {
     isUnsubscribed = true;
@@ -2795,7 +2746,7 @@ export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any
   };
 
   pollSingle();
-  intervalId = setInterval(pollSingle, 1500);
+  intervalId = setInterval(pollSingle, 30000);
 
   return () => {
     isUnsubscribed = true;
