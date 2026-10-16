@@ -90,7 +90,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onOpenAmlakApp,
   onGrantUserLicense,
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats' | 'dashboard-tools'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats' | 'dashboard-tools' | 'backup-restore'>('orders');
 
   // ==========================================
   // Dashboard Tools Management State
@@ -1833,6 +1833,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span className="bg-purple-900 text-purple-200 text-[10px] px-2 py-0.5 rounded-full">
                 {bannersList.length}
               </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('backup-restore')}
+              className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'backup-restore'
+                  ? 'border-emerald-400 text-emerald-300 font-black'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Download className="w-4 h-4 text-emerald-400" />
+              <span>پشتیبان‌گیری و بازیابی اطلاعات</span>
             </button>
 
             <button
@@ -5999,6 +6011,129 @@ on public.users for delete using (true);`;
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {/* TAB: BACKUP & RESTORE */}
+          {activeTab === 'backup-restore' && (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-950 p-6 rounded-3xl border border-emerald-500/30 shadow-2xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40">
+                    <Download className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white">پشتیبان‌گیری و بازیابی اطلاعات سایت</h3>
+                    <p className="text-xs text-emerald-300/80 mt-0.5">
+                      دریافت فایل پشتیبان کامل از تمامی محصولات، بنرها، سفارشات، کدهای تخفیف و کاربران، و بازیابی آن با یک کلیک.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-6">
+                  {/* Export Backup Card */}
+                  <div className="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-white font-bold text-sm mb-2">
+                        <FileText className="w-4 h-4 text-emerald-400" />
+                        <span>دانلود فایل پشتیبان (Backup)</span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        با کلیک روی دکمه زیر، یک فایل JSON حاوی تمامی محصولات ({products.length} عدد)، بنرها ({bannersList.length} عدد)، سفارشات و اطلاعات سایت دانلود می‌شود تا در هر زمان خواستید از آن استفاده کنید.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        try {
+                          const backupData = {
+                            version: '1.0',
+                            timestamp: new Date().toISOString(),
+                            products,
+                            banners: bannersList,
+                            orders,
+                            coupons,
+                            users: usersList,
+                          };
+                          const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+                          const downloadAnchor = document.createElement('a');
+                          downloadAnchor.setAttribute('href', dataStr);
+                          downloadAnchor.setAttribute('download', `jahesh-backup-${new Date().toISOString().slice(0, 10)}.json`);
+                          document.body.appendChild(downloadAnchor);
+                          downloadAnchor.click();
+                          downloadAnchor.remove();
+                          alert('فایل پشتیبان سایت با موفقیت دانلود شد!');
+                        } catch (err: any) {
+                          alert('خطا در ایجاد پشتیبان: ' + err.message);
+                        }
+                      }}
+                      className="mt-5 w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>دانلود فایل پشتیبان کامل (.json)</span>
+                    </button>
+                  </div>
+
+                  {/* Import Restore Card */}
+                  <div className="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-white font-bold text-sm mb-2">
+                        <Upload className="w-4 h-4 text-cyan-400" />
+                        <span>بازیابی اطلاعات از فایل پشتیبان (Restore)</span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        اگر اطلاعات سایت تغییر کرد یا ریست شد، فایل پشتیبان قبلی خود را انتخاب کنید تا تمامی محصولات، بنرها و اطلاعات به صورت آنی در سایت و دیتابیس ابری بازگردانی شوند.
+                      </p>
+                    </div>
+
+                    <div className="mt-5">
+                      <label className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer">
+                        <Upload className="w-4 h-4" />
+                        <span>انتخاب و بارگذاری فایل پشتیبان</span>
+                        <input
+                          type="file"
+                          accept=".json"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = async (event) => {
+                              try {
+                                const json = JSON.parse(event.target?.result as string);
+                                if (!json || typeof json !== 'object') {
+                                  throw new Error('فایل JSON نامعتبر است.');
+                                }
+                                if (confirm('آیا مطمئن هستید که می‌خواهید اطلاعات پشتیبان را روی سایت بارگذاری کنید؟ محصولات و بنرها جایگزین خواهند شد.')) {
+                                  if (Array.isArray(json.products) && json.products.length > 0) {
+                                    await fetch('/api/products', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify(json.products),
+                                    });
+                                  }
+                                  if (Array.isArray(json.banners) && json.banners.length > 0) {
+                                    await fetch('/api/banners', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify(json.banners),
+                                    });
+                                  }
+                                  alert('اطلاعات با موفقیت بازیابی شد! صفحه به‌روزرسانی می‌شود.');
+                                  window.location.reload();
+                                }
+                              } catch (err: any) {
+                                alert('خطا در خواندن فایل پشتیبان: ' + err.message);
+                              }
+                            };
+                            reader.readAsText(file);
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
