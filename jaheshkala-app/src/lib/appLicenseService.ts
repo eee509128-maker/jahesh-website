@@ -90,11 +90,8 @@ export function generateDeterministicAppLicenseKey(seed: string): string {
 /**
  * Robustly parses subscription duration in days from any format (number, string, Persian digits, plan label)
  */
-export function parseSubscriptionDays(val: any, fallback = 30): number {
-  if (typeof val === 'number' && !isNaN(val) && val > 0) {
-    if (val > 1000 && val !== 3650) return 30;
-    return val;
-  }
+export function parseSubscriptionDays(val: any, fallback = 7): number {
+  if (typeof val === 'number' && !isNaN(val) && val > 0) return val;
   if (!val) return fallback;
   const str = String(val).trim();
   if (
@@ -128,7 +125,7 @@ export function parseSubscriptionDays(val: any, fallback = 30): number {
   if (str === '365' || str === '1year' || str === '۳۶۵' || str.includes('یک سال') || str.includes('۱ سال') || str.includes('۳۶۵ روز')) {
     return 365;
   }
-  if (str.includes('permanent') || str.includes('دائمی') || str.includes('مادام') || str === '3650') {
+  if (str.includes('permanent') || str.includes('دائمی') || str.includes('مادام')) {
     return 3650;
   }
 
@@ -138,7 +135,6 @@ export function parseSubscriptionDays(val: any, fallback = 30): number {
   if (match) {
     const parsedNum = parseInt(match[0], 10);
     if (!isNaN(parsedNum) && parsedNum > 0) {
-      if (parsedNum > 1000 && parsedNum !== 3650) return 30;
       if (str.includes('ماه') || str.includes('month')) return parsedNum * 30;
       if (str.includes('سال') || str.includes('year')) return parsedNum * 365;
       if (str.includes('هفته') || str.includes('week')) return parsedNum * 7;
@@ -149,7 +145,10 @@ export function parseSubscriptionDays(val: any, fallback = 30): number {
 }
 
 /**
- * Creates an AppSubscriptionLicense for an order with exact duration and precise expiration time.
+ * Creates an AppSubscriptionLicense for an order with exact duration.
+ * Can be called as:
+ *  generateAppLicense(order, user) OR
+ *  generateAppLicense(order, product, durationDays, user)
  */
 export function generateAppLicense(
   order: Partial<Order>,
@@ -159,28 +158,51 @@ export function generateAppLicense(
 ): AppSubscriptionLicense {
   let resolvedProduct: Partial<Product> = {};
   let resolvedUser: User | null | undefined = user;
-  let resolvedDays: any = durationDays;
+  let resolvedDays: number = durationDays || 7;
 
-  // Extract from order items or product/user params robustly
-  if (!resolvedDays && order.items && order.items.length > 0) {
-    const aiItem = order.items.find((it) => isAiAppProduct(it?.product));
-    const targetItem = aiItem || order.items[0];
-    if (targetItem) {
-      resolvedDays = targetItem.subscriptionDays || targetItem.selectedPlan?.durationDays || targetItem.product?.aiAppDefaultDays;
-      if (targetItem.product) resolvedProduct = targetItem.product;
+  // Check if second param is actually a User (has username/phone/fullName/role)
+  if (productOrUser && ('role' in productOrUser || ('fullName' in productOrUser && !('price' in productOrUser)))) {
+    resolvedUser = productOrUser as User;
+    // Find AI product or first item from order
+    const aiItem = order.items?.find((it) => isAiAppProduct(it?.product));
+    if (aiItem && aiItem.product) {
+      resolvedProduct = aiItem.product;
+      resolvedDays = aiItem.subscriptionDays || aiItem.product.aiAppDefaultDays || (aiItem.selectedPlan?.durationDays) || 7;
+    } else if (order.items && order.items[0]?.product) {
+      resolvedProduct = order.items[0].product;
+      resolvedDays = order.items[0].subscriptionDays || resolvedProduct.aiAppDefaultDays || (order.items[0].selectedPlan?.durationDays) || 7;
+    }
+  } else if (productOrUser) {
+    resolvedProduct = productOrUser as Partial<Product>;
+    resolvedDays = durationDays || resolvedProduct.aiAppDefaultDays || 7;
+  } else {
+    // Neither passed, extract from order.items
+    const aiItem = order.items?.find((it) => isAiAppProduct(it?.product));
+    if (aiItem && aiItem.product) {
+      resolvedProduct = aiItem.product;
+      resolvedDays = aiItem.subscriptionDays || aiItem.product.aiAppDefaultDays || (aiItem.selectedPlan?.durationDays) || 7;
     }
   }
 
-  if (productOrUser && ('role' in productOrUser || ('fullName' in productOrUser && !('price' in productOrUser)))) {
-    resolvedUser = productOrUser as User;
-  } else if (productOrUser) {
-    resolvedProduct = productOrUser as Partial<Product>;
-    if (!resolvedDays) resolvedDays = resolvedProduct.aiAppDefaultDays;
+  // Determine clean username
+  let exactUsername = '';
+  if (resolvedUser?.username && resolvedUser.username.trim().length > 0) {
+    exactUsername = resolvedUser.username.trim();
+  } else if (order.customerPhone && order.customerPhone.trim().length > 0) {
+    exactUsername = order.customerPhone.trim();
+  } else if (resolvedUser?.phone && resolvedUser.phone.trim().length > 0) {
+    exactUsername = resolvedUser.phone.trim();
+  } else if (order.trackingCode) {
+    exactUsername = order.trackingCode.trim();
+  } else if (order.id) {
+    exactUsername = order.id.trim();
+  } else {
+    exactUsername = 'user_' + Math.floor(1000 + Math.random() * 9000);
   }
 
-  const safeDays = Math.max(1, parseSubscriptionDays(resolvedDays, 30));
+  const safeDays = Math.max(1, parseSubscriptionDays(resolvedDays, 7));
   const now = new Date();
-  // Exact 24 hours per day (86,400,000 ms) from exact timestamp
+  // Guarantee a full 24 hours (86,400,000 ms) per day from activation time
   const durationMs = safeDays * 24 * 60 * 60 * 1000;
   const expiresAt = new Date(now.getTime() + durationMs);
 
