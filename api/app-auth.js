@@ -195,10 +195,12 @@ export default async function handler(req, res) {
       const credsMatch = (userMatch && passMatch) || keyMatch;
       if (!credsMatch) return false;
 
-      // Product isolation check: If product is specified, allow if matching or standard amlak/app
-      if (cleanProd && lic.productId && lic.productId !== cleanProd) {
-        // If it's the general amlak package, allow
-        if (lic.productId !== 'pkg-amlak-jahesh') {
+      // STRICT Product isolation: if the request specifies a productId,
+      // ONLY allow licenses that have that exact same productId.
+      // This prevents a user's license for one product being used to access another.
+      if (cleanProd) {
+        const licProd = String(lic.productId || '').trim();
+        if (licProd && licProd !== cleanProd) {
           return false;
         }
       }
@@ -215,7 +217,10 @@ export default async function handler(req, res) {
         if (!isNaN(parsed.getTime())) expiry = parsed;
       }
       if (!expiry) {
-        expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+        // Use startDate + days if available, otherwise fall back to now + days
+        const startRef = found.startDate ? new Date(found.startDate) : now;
+        const validStart = isNaN(startRef.getTime()) ? now : startRef;
+        expiry = new Date(validStart.getTime() + days * 24 * 60 * 60 * 1000);
       }
       const diffMs = expiry.getTime() - now.getTime();
       const isExpired = diffMs <= 0;
