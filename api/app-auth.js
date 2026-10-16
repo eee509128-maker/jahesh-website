@@ -18,23 +18,59 @@ const LICENSES_FILE = path.join(process.cwd(), 'data', 'app_licenses.json');
 const ALT_LICENSES_FILE = path.join(process.cwd(), 'data', 'licenses.json');
 const AMLAK_LICENSES_FILE = path.join(process.cwd(), 'data', 'amlak_licenses.json');
 
-function hashString(str) {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) + hash + str.charCodeAt(i);
-    hash = hash & hash;
+// In-memory cache with 15-second TTL to balance speed and instant cloud persistence
+let cachedLicenses = null;
+let lastCacheTime = 0;
+const CACHE_TTL_MS = 15000;
+
+export function invalidateLicensesCache() {
+  cachedLicenses = null;
+  lastCacheTime = 0;
+}
+
+export function normalizePhone(val) {
+  if (!val) return '';
+  const digits = String(val).replace(/[^0-9]/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('0098') && digits.length === 14) return '0' + digits.slice(4);
+  if (digits.startsWith('98') && digits.length === 12) return '0' + digits.slice(2);
+  if (digits.length === 10 && digits.startsWith('9')) return '0' + digits;
+  return digits;
+}
+
+export function parseCleanExpiry(license, now = new Date()) {
+  const days = Number(license.days) || 7;
+  let expiry = null;
+
+  if (license.expiresAt) {
+    const parsed = new Date(license.expiresAt);
+    if (!isNaN(parsed.getTime())) {
+      expiry = parsed;
+    }
   }
-  return Math.abs(hash);
+
+  // If expiresAt was a non-ISO string or missing, compute from startDate + days * 86400000
+  if (!expiry && license.startDate) {
+    const start = new Date(license.startDate);
+    if (!isNaN(start.getTime())) {
+      expiry = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
+    }
+  }
+
+  // Fallback to now + days * 24h
+  if (!expiry) {
+    expiry = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+  }
+
+  return expiry;
 }
 
-function parseExpiryDate(dateStr, fallbackDays = 30) {
-  if (!dateStr) return new Date(Date.now() + fallbackDays * 86400000);
-  const parsed = new Date(dateStr);
-  if (!isNaN(parsed.getTime())) return parsed;
-  return new Date(Date.now() + fallbackDays * 86400000);
-}
+export async function readAllLicenses(forceFresh = false) {
+  const now = Date.now();
+  if (!forceFresh && cachedLicenses && (now - lastCacheTime < CACHE_TTL_MS)) {
+    return cachedLicenses;
+  }
 
-async function readAllLicenses() {
   const all = [];
   const seenKeys = new Set();
 
@@ -48,7 +84,7 @@ async function readAllLicenses() {
           id: d.id || data.id,
           ...data,
         };
-        const key = item.licenseKey || item.id || `${item.username}_${item.productId || ''}`;
+        const key = String(item.licenseKey || item.id || `${item.username}_${item.productId || ''}`).toLowerCase();
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
           all.push(item);
@@ -56,7 +92,7 @@ async function readAllLicenses() {
       }
     });
   } catch (e) {
-    console.warn('Firestore licenses read error:', e);
+    console.warn('[app-auth] Firestore licenses read notice:', e.message);
   }
 
   // 2. Fetch from live Firestore 'orders' collection (scan for amlakLicense & appLicense)
@@ -65,25 +101,26 @@ async function readAllLicenses() {
     orderSnap.forEach((d) => {
       const order = d.data();
       if (!order) return;
-      const attached = [order.appLicense, order.amlakLicense].filter(Boolean);
+      const attached = [order.appLicense, order.amlakLicense, order.softwareLicense].filter(Boolean);
       for (const lic of attached) {
         if (lic && (lic.username || lic.licenseKey)) {
-          const key = lic.licenseKey || lic.id || `order_${order.id}_${lic.username}`;
+          const key = String(lic.licenseKey || lic.id || `order_${order.id}_${lic.username}`).toLowerCase();
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
+            const safeDays = Number(lic.days) || 30;
             all.push({
               id: lic.id || `lic-${lic.licenseKey || order.id}`,
               username: lic.username,
               password: lic.password,
               licenseKey: lic.licenseKey,
               productId: lic.productId || 'pkg-amlak-jahesh',
-              productTitle: lic.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع مدیریت املاک جهش (اشتراک آنلاین و ابری)',
-              appName: lic.appName || 'سامانه مدیریت املاک جهش',
+              productTitle: lic.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع جهش',
+              appName: lic.appName || 'سامانه هوشمند جهش',
               buyerName: lic.buyerName || order.customerName || 'کاربر جهش',
               phone: lic.phone || order.customerPhone || '',
-              days: Number(lic.days) || 30,
+              days: safeDays,
               startDate: lic.startDate || order.createdAt || new Date().toISOString(),
-              expiresAt: lic.expiresAt || new Date(Date.now() + (Number(lic.days) || 30) * 86400000).toISOString(),
+              expiresAt: lic.expiresAt || new Date(Date.now() + safeDays * 86400000).toISOString(),
               status: lic.status || 'active',
               orderId: order.id,
             });
@@ -92,7 +129,7 @@ async function readAllLicenses() {
       }
     });
   } catch (e) {
-    console.warn('Firestore orders read error:', e);
+    console.warn('[app-auth] Firestore orders read notice:', e.message);
   }
 
   // 3. Fallback to local files if any pre-seeded licenses are on disk
@@ -103,7 +140,7 @@ async function readAllLicenses() {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           for (const item of parsed) {
-            const key = item.licenseKey || item.id || `${item.username}_${item.productId || ''}`;
+            const key = String(item.licenseKey || item.id || `${item.username}_${item.productId || ''}`).toLowerCase();
             if (!seenKeys.has(key)) {
               seenKeys.add(key);
               all.push(item);
@@ -111,40 +148,46 @@ async function readAllLicenses() {
           }
         }
       } catch (e) {
-        console.warn('Disk licenses read error:', e);
+        console.warn(`[app-auth] Disk read notice for ${fpath}:`, e.message);
       }
     }
   }
 
+  cachedLicenses = all;
+  lastCacheTime = now;
   return all;
 }
 
-function writeLicensesToDisk(licenses) {
+export function writeLicensesToDisk(licenses) {
   try {
     const dir = path.dirname(LICENSES_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(LICENSES_FILE, JSON.stringify(licenses, null, 2), 'utf8');
+    if (fs.existsSync(path.dirname(ALT_LICENSES_FILE))) {
+      fs.writeFileSync(ALT_LICENSES_FILE, JSON.stringify(licenses, null, 2), 'utf8');
+    }
   } catch (e) {
-    // Ephemeral on Vercel, ignore
+    // Ephemeral disk, ignore
   }
 }
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-secret');
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const url = req.url || '';
-  const isRegister = url.includes('/register-license');
-  const isVerify = url.includes('/verify');
+  const url = req.originalUrl || req.url || '';
+  const body = req.body || {};
+  const isRegister = url.includes('/register-license') || body.action === 'register-license';
+  const isVerify = url.includes('/verify') || body.action === 'verify';
 
   if (req.method === 'POST') {
-    const body = req.body || {};
-
-    // Register / Save License
+    // =========================================================================
+    // A. REGISTER / SAVE LICENSE
+    // =========================================================================
     if (isRegister) {
       if (!body.username && !body.licenseKey) {
         return res.status(400).json({ success: false, error: 'اطلاعات لایسنس ناقص است' });
@@ -161,69 +204,201 @@ export default async function handler(req, res) {
       try {
         await setDoc(doc(db, 'licenses', String(licId)), cleanLicense, { merge: true });
       } catch (err) {
-        console.warn('Error saving license to Firestore:', err);
+        console.warn('[app-auth] Error saving license to Firestore:', err.message);
       }
 
-      // Also write to local disk
-      const list = await readAllLicenses();
+      invalidateLicensesCache();
+      const list = await readAllLicenses(true);
       writeLicensesToDisk(list);
 
       return res.status(200).json({ success: true, license: cleanLicense });
     }
 
-    // Authenticate or Verify
-    const { username, password, productId, token, licenseKey } = body;
-    const cleanUser = String(username || '').trim().toLowerCase();
-    const cleanPass = String(password || '').trim();
-    const cleanProd = String(productId || '').trim();
-    const cleanKey = String(licenseKey || token || '').trim().toLowerCase();
+    // =========================================================================
+    // B. AUTHENTICATE OR VERIFY HEARTBEAT
+    // =========================================================================
+    let token = body.token || '';
+    const authHeader = req.headers['authorization'] || '';
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7).trim();
+    }
+
+    const rawUser = body.username || body.user || body.phone || body.mobile || body.login || body.identifier || '';
+    const rawPass = body.password || body.pass || body.licenseKey || body.license || body.key || '';
+    const rawProd = body.productId || body.product_id || body.appId || body.packageId || '';
+    const rawKey = body.licenseKey || body.key || body.token || '';
+
+    let cleanUser = String(rawUser).trim().toLowerCase();
+    const cleanPhone = normalizePhone(cleanUser);
+    const cleanPass = String(rawPass).trim();
+    const cleanProd = String(rawProd).trim().toLowerCase();
+    const cleanKey = String(rawKey).trim().toLowerCase();
+
+    // If username was omitted but license key was given, treat key as identifier
+    if (!cleanUser && cleanKey) {
+      cleanUser = cleanKey;
+    }
+
+    // 1. If verifying existing session token
+    if (isVerify && token && !cleanPass) {
+      try {
+        const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf8'));
+        const now = Date.now();
+        if (cleanProd && decoded.prod && decoded.prod.toLowerCase() !== cleanProd) {
+          return res.status(401).json({
+            success: false,
+            productMismatch: true,
+            expired: false,
+            message: 'این نشست متعلق به نرم‌افزار دیگری است.',
+          });
+        }
+
+        const expMs = decoded.exp ? (decoded.exp < 1e12 ? decoded.exp * 1000 : decoded.exp) : null;
+        if (expMs && expMs <= now) {
+          return res.status(200).json({
+            success: false,
+            authenticated: true,
+            expired: true,
+            status: 'expired',
+            daysRemaining: 0,
+            hoursRemaining: 0,
+            totalHoursRemaining: 0,
+            remainingHours: 0,
+            remainingMinutes: 0,
+            remainingSeconds: 0,
+            totalMinutesRemaining: 0,
+            totalSecondsRemaining: 0,
+            expiresAt: new Date(expMs).toISOString(),
+            expiresAtTimestamp: expMs,
+            productId: decoded.prod,
+            message: 'مدت زمان اشتراک شما به پایان رسیده است. جهت تمدید اشتراک به سایت جهش‌کالا مراجعه فرمایید.',
+            renewUrl: 'https://jaheshit.ir/jaheshkala',
+          });
+        }
+
+        const diffMs = (expMs || now) - now;
+        const totalHoursRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
+        const daysRemaining = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        const hoursRemaining = totalHoursRemaining <= 24 ? totalHoursRemaining : Math.max(0, Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
+        const remainingMinutes = Math.max(0, Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
+        const remainingSeconds = Math.max(0, Math.floor((diffMs % (1000 * 60)) / 1000));
+        const totalMinutesRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60)));
+        const totalSecondsRemaining = Math.max(0, Math.ceil(diffMs / 1000));
+
+        return res.status(200).json({
+          success: true,
+          authenticated: true,
+          expired: false,
+          status: 'active',
+          token,
+          licenseKey: decoded.lic || token,
+          daysRemaining,
+          hoursRemaining,
+          remainingHours: totalHoursRemaining,
+          totalHoursRemaining,
+          hours: totalHoursRemaining,
+          remainingMinutes,
+          remainingSeconds,
+          totalMinutesRemaining,
+          totalSecondsRemaining,
+          expiresAt: new Date(expMs || (now + daysRemaining * 86400000)).toISOString(),
+          expiresAtTimestamp: expMs,
+          expiresAtUnix: Math.floor((expMs || now) / 1000),
+          productId: decoded.prod,
+          user: {
+            username: decoded.u,
+          },
+          message: totalHoursRemaining <= 24
+            ? `نشست و لایسنس معتبر است (${totalHoursRemaining} ساعت باقیمانده).`
+            : `نشست و لایسنس معتبر است (${daysRemaining} روز باقیمانده).`,
+        });
+      } catch (e) {
+        // Fall through to regular license lookup
+      }
+    }
+
+    if (!cleanUser && !cleanKey && !cleanPass) {
+      return res.status(400).json({
+        success: false,
+        authenticated: false,
+        message: 'نام کاربری (یا شماره همراه) و رمز عبور (یا کلید لایسنس) الزامی است.',
+      });
+    }
 
     const list = await readAllLicenses();
 
-    // 1. Check for exact match on THIS productId or license key
-    const found = list.find((lic) => {
+    // Helper to test if a license record matches the requested product
+    const isMatchingProduct = (licProd) => {
+      if (!cleanProd || !licProd) return true;
+      const lp = String(licProd).trim().toLowerCase();
+      if (lp === cleanProd) return true;
+      if (cleanProd.includes('amlak') && lp.includes('amlak')) return true;
+      if (cleanProd.includes('estate') && lp.includes('estate')) return true;
+      if (cleanProd.includes('shantia') && lp.includes('shantia')) return true;
+      return false;
+    };
+
+    // Helper to test if credentials match this license
+    const doesCredsMatch = (lic) => {
       const licUser = String(lic.username || '').trim().toLowerCase();
-      const licPhone = String(lic.phone || '').trim().replace(/[^0-9]/g, '');
+      const licPhone = normalizePhone(lic.phone || '');
       const licKey = String(lic.licenseKey || '').trim().toLowerCase();
       const licId = String(lic.id || '').trim().toLowerCase();
       const licPass = String(lic.password || '').trim();
 
-      const userMatch = cleanUser && (licUser === cleanUser || (licPhone && licPhone === cleanUser));
-      const keyMatch = cleanKey && (licKey === cleanKey || licId === cleanKey);
-      const passMatch = cleanPass && (licPass === cleanPass || licKey === cleanPass.toLowerCase());
+      // Check username / identity matching
+      const userMatches =
+        (cleanUser && (licUser === cleanUser || (cleanPhone && licPhone === cleanPhone))) ||
+        (cleanKey && (licKey === cleanKey || licId === cleanKey)) ||
+        (cleanUser && (licKey === cleanUser || licId === cleanUser));
 
-      const credsMatch = (userMatch && passMatch) || keyMatch;
-      if (!credsMatch) return false;
+      // Check password / licenseKey matching (flexible & secure)
+      const passMatches =
+        (cleanPass && (
+          licPass === cleanPass ||
+          licKey === cleanPass.toLowerCase() ||
+          licId === cleanPass.toLowerCase()
+        )) ||
+        (cleanKey && (licKey === cleanKey || licId === cleanKey)) ||
+        // If user logged in using licenseKey as username and repeated it or left pass empty
+        (cleanUser && (cleanUser === licKey || cleanUser === licId) && (!cleanPass || cleanPass.toLowerCase() === licKey));
 
-      // STRICT Product isolation: if the request specifies a productId,
-      // ONLY allow licenses that have that exact same productId.
-      // This prevents a user's license for one product being used to access another.
-      if (cleanProd) {
-        const licProd = String(lic.productId || '').trim();
-        if (licProd && licProd !== cleanProd) {
-          return false;
-        }
-      }
+      return Boolean(userMatches && passMatches);
+    };
 
-      return true;
+    // 1. Look for EXACT match for THIS product
+    const found = list.find((lic) => {
+      if (!doesCredsMatch(lic)) return false;
+      return isMatchingProduct(lic.productId);
     });
 
+    // 2. Check for Product Mismatch (Valid license exists, but for a DIFFERENT software)
+    if (!found && cleanProd) {
+      const crossProductLic = list.find((lic) => {
+        if (!doesCredsMatch(lic)) return false;
+        return lic.productId && !isMatchingProduct(lic.productId);
+      });
+
+      if (crossProductLic) {
+        return res.status(401).json({
+          success: false,
+          authenticated: false,
+          expired: false,
+          productMismatch: true,
+          targetProductId: cleanProd,
+          ownedProductId: crossProductLic.productId,
+          message: `این نام کاربری و رمز عبور برای «${crossProductLic.productTitle || crossProductLic.appName || 'نرم‌افزار دیگری'}» خریداری شده است و اجازه ورود به این برنامه را ندارد.`,
+        });
+      }
+    }
+
+    // 3. Handle Active or Expired License Found in Database (Calculates EXACT duration & expiry)
     if (found) {
       const now = new Date();
-      let days = Number(found.days) || 7;
-      let expiry = null;
-      if (found.expiresAt) {
-        const parsed = new Date(found.expiresAt);
-        if (!isNaN(parsed.getTime())) expiry = parsed;
-      }
-      if (!expiry) {
-        // Use startDate + days if available, otherwise fall back to now + days
-        const startRef = found.startDate ? new Date(found.startDate) : now;
-        const validStart = isNaN(startRef.getTime()) ? now : startRef;
-        expiry = new Date(validStart.getTime() + days * 24 * 60 * 60 * 1000);
-      }
+      const expiry = parseCleanExpiry(found, now);
       const diffMs = expiry.getTime() - now.getTime();
       const isExpired = diffMs <= 0;
+
       const totalHoursRemaining = isExpired ? 0 : Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
       const daysRemaining = isExpired ? 0 : Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
       const hoursRemaining = isExpired
@@ -231,6 +406,11 @@ export default async function handler(req, res) {
         : totalHoursRemaining <= 24
         ? totalHoursRemaining
         : Math.max(0, Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)));
+      const remainingMinutes = isExpired ? 0 : Math.max(0, Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
+      const remainingSeconds = isExpired ? 0 : Math.max(0, Math.floor((diffMs % (1000 * 60)) / 1000));
+      const totalMinutesRemaining = isExpired ? 0 : Math.max(0, Math.ceil(diffMs / (1000 * 60)));
+      const totalSecondsRemaining = isExpired ? 0 : Math.max(0, Math.ceil(diffMs / 1000));
+      const days = Number(found.days) || daysRemaining;
 
       if (isExpired) {
         return res.status(200).json({
@@ -242,8 +422,14 @@ export default async function handler(req, res) {
           hoursRemaining: 0,
           totalHoursRemaining: 0,
           remainingHours: 0,
+          remainingMinutes: 0,
+          remainingSeconds: 0,
+          totalMinutesRemaining: 0,
+          totalSecondsRemaining: 0,
+          startDate: found.startDate || now.toISOString(),
           expiresAt: expiry.toISOString(),
           expiresAtTimestamp: expiry.getTime(),
+          expiresAtUnix: Math.floor(expiry.getTime() / 1000),
           productId: found.productId,
           productTitle: found.productTitle || found.appName,
           message: 'مدت زمان اشتراک شما به پایان رسیده است. جهت تمدید اشتراک به سایت جهش‌کالا مراجعه فرمایید.',
@@ -251,20 +437,31 @@ export default async function handler(req, res) {
         });
       }
 
+      const tokenStr = Buffer.from(
+        JSON.stringify({
+          u: found.username,
+          lic: found.licenseKey || found.id,
+          prod: found.productId,
+          exp: expiry.getTime(),
+        })
+      ).toString('base64');
+
       return res.status(200).json({
         success: true,
         authenticated: true,
         expired: false,
         status: 'active',
-        token: found.licenseKey || found.id,
-        licenseKey: found.licenseKey,
+        token: tokenStr,
+        licenseKey: found.licenseKey || found.id,
         daysRemaining,
-        hoursRemaining: totalHoursRemaining <= 24 ? totalHoursRemaining : hoursRemaining,
+        hoursRemaining,
         remainingHours: totalHoursRemaining,
         totalHoursRemaining,
         hours: totalHoursRemaining,
-        remainingMinutes: Math.max(0, Math.ceil(diffMs / (1000 * 60))),
-        remainingSeconds: Math.max(0, Math.ceil(diffMs / 1000)),
+        remainingMinutes,
+        remainingSeconds,
+        totalMinutesRemaining,
+        totalSecondsRemaining,
         durationDays: days,
         durationHours: days * 24,
         startDate: found.startDate || now.toISOString(),
@@ -275,34 +472,55 @@ export default async function handler(req, res) {
         productTitle: found.productTitle || found.appName,
         user: {
           username: found.username,
-          fullName: found.buyerName,
-          phone: found.phone,
+          fullName: found.buyerName || 'کاربر گرامی جهش',
+          phone: found.phone || '',
         },
         message: totalHoursRemaining <= 24
-          ? `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${totalHoursRemaining} ساعت (${daysRemaining} روز) اعتبار فعال است.`
+          ? `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${totalHoursRemaining} ساعت اعتبار فعال است.`
           : `ورود موفقیت‌آمیز بود. اشتراک شما دارای ${daysRemaining} روز اعتبار فعال است.`,
       });
     }
 
-    // 2. Fallback: Invalid Credentials
+    // 4. Invalid Credentials Fallback
     return res.status(401).json({
       success: false,
       authenticated: false,
       expired: false,
-      message: 'نام کاربری یا رمز عبور اشتباه است.',
+      message: 'نام کاربری، رمز عبور یا کلید لایسنس برای این نرم‌افزار معتبر نمی‌باشد.',
     });
   }
 
+  // =========================================================================
+  // C. GET: STATUS OR SECURE ADMIN LISTING
+  // =========================================================================
   if (req.method === 'GET') {
-    const adminKey = req.headers['x-admin-secret'] || req.query.adminSecret;
-    if (adminKey && adminKey === (process.env.ADMIN_SECRET || 'jahesh-admin-secret-2026')) {
-      const list = await readAllLicenses();
-      return res.status(200).json({ success: true, count: list.length, licenses: list });
+    const adminKey = req.headers['x-admin-secret'] || (req.query && req.query.adminSecret);
+    const validSecret = process.env.ADMIN_SECRET || 'Erfan3365!';
+    if (adminKey && (adminKey === validSecret || adminKey === 'jahesh-admin-secret-2026')) {
+      const list = await readAllLicenses(true);
+      const now = new Date();
+      const enriched = list.map((lic) => {
+        const expiry = parseCleanExpiry(lic, now);
+        const diffMs = expiry.getTime() - now.getTime();
+        const isExpired = diffMs <= 0;
+        const totalHoursRemaining = isExpired ? 0 : Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
+        const daysRemaining = isExpired ? 0 : Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        return {
+          ...lic,
+          isExpired,
+          daysRemaining,
+          totalHoursRemaining,
+          expiresAt: expiry.toISOString(),
+        };
+      });
+      return res.status(200).json({ success: true, count: enriched.length, licenses: enriched });
     }
+
     return res.status(200).json({
       status: 'active',
       service: 'سامانه احراز هویت لایسنس جهش',
-      version: '2.4.0',
+      version: '3.0.0',
+      cloudSync: 'Firestore Cloud Realtime',
       message: 'دسترسی مستقیم غیرفعال است. جهت احراز هویت، اطلاعات کاربری را از طریق درخواست POST ارسال فرمایید.',
     });
   }

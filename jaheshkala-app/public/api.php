@@ -954,32 +954,7 @@ switch ($action) {
             $cleanPass = trim((string)$rawPass);
             $cleanProd = trim(strtolower((string)$rawProd));
 
-            // Admin Master VIP Access
-            if (($cleanUser === 'jahesh' || $cleanUser === 'admin' || $cleanUser === '09152331974') &&
-                ($cleanPass === 'jahesh1395' || strpos($cleanPass, 'JK-') === 0 || strpos($cleanPass, 'JA-APP-') === 0)) {
-                $now = time();
-                $expiresAt = $now + (3650 * 86400);
-                echo json_encode([
-                    'success' => true,
-                    'authenticated' => true,
-                    'expired' => false,
-                    'status' => 'active',
-                    'token' => base64_encode(json_encode(['u' => $cleanUser, 'role' => 'admin', 'exp' => $expiresAt])),
-                    'daysRemaining' => 3650,
-                    'startDate' => date('c', $now),
-                    'expiresAt' => date('c', $expiresAt),
-                    'licenseKey' => (strpos($cleanPass, 'JA-APP-') === 0) ? $cleanPass : 'JA-APP-2026-PXGMZ8',
-                    'productId' => $cleanProd ?: 'pkg-amlak-jahesh',
-                    'productTitle' => 'سامانه مدیریت املاک جهش (دسترسی VIP)',
-                    'user' => [
-                        'username' => $cleanUser,
-                        'fullName' => 'مدیر سامانه جهش',
-                        'phone' => '09152331974',
-                    ],
-                    'message' => 'ورود موفقیت‌آمیز بود. دسترسی اشتراک فعال است.',
-                ]);
-                exit;
-            }
+
 
             // Find in licenses
             $targetLicense = null;
