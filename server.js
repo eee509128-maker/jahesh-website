@@ -3590,7 +3590,7 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
         success: true,
         result: data.result,
         trackId: data.trackId,
-        isSandboxFallback,
+        isSandboxFallback: false,
         message: data.message || 'success',
         paymentUrl
       });
