@@ -2901,7 +2901,21 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
     }
   } catch (e) {}
 
-  // 2. Fallback: Try LocalStorage
+  // 2. Direct Firebase Cloud Firestore
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'banners'));
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data && Array.isArray(data.banners) && data.banners.length > 0) {
+        try {
+          safeSetLocalStorage('jahesh_banners', JSON.stringify(data.banners));
+        } catch {}
+        return data.banners;
+      }
+    }
+  } catch (fbErr) {}
+
+  // 3. Fallback: Try LocalStorage
   try {
     const saved = localStorage.getItem('jahesh_banners');
     if (saved) {
@@ -2910,7 +2924,7 @@ export const fetchBannersFromDb = async (): Promise<BannerSlide[]> => {
     }
   } catch {}
 
-  // 3. Final Fallback: INITIAL_BANNERS
+  // 4. Final Fallback: INITIAL_BANNERS
   return INITIAL_BANNERS;
 };
 
@@ -2921,7 +2935,14 @@ export const saveAllBannersToDb = async (banners: BannerSlide[]): Promise<boolea
     window.dispatchEvent(new CustomEvent('jahesh-banners-updated', { detail: banners }));
   } catch {}
 
-  // 2. Send to Universal Server Cloud API (Vercel Serverless + PHP Backend)
+  // 2. Direct Firestore Cloud Write
+  try {
+    await setDoc(doc(db, 'settings', 'banners'), { banners, updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (fbErr) {
+    console.warn('Firestore save banners error:', fbErr);
+  }
+
+  // 3. Send to Universal Server Cloud API (Node.js Server / Vercel)
   try {
     fetchUniversalApi('banners', {
       method: 'POST',
@@ -2931,6 +2952,47 @@ export const saveAllBannersToDb = async (banners: BannerSlide[]): Promise<boolea
   } catch {}
 
   return true;
+};
+
+export const subscribeToBannersRealtime = (callback: (banners: BannerSlide[]) => void) => {
+  let isUnsubscribed = false;
+
+  const handleLocalEvent = (e: any) => {
+    if (isUnsubscribed) return;
+    if (e.detail && Array.isArray(e.detail)) {
+      callback(e.detail);
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('jahesh-banners-updated', handleLocalEvent);
+  }
+
+  let unsubscribeFirestore: (() => void) | null = null;
+  try {
+    const bannersDocRef = doc(db, 'settings', 'banners');
+    unsubscribeFirestore = onSnapshot(
+      bannersDocRef,
+      (docSnap) => {
+        if (isUnsubscribed) return;
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.banners) && data.banners.length > 0) {
+            safeSetLocalStorage('jahesh_banners', JSON.stringify(data.banners));
+            callback(data.banners);
+          }
+        }
+      },
+      (err) => console.warn('Firestore live banners listener notice:', err)
+    );
+  } catch (e) {}
+
+  return () => {
+    isUnsubscribed = true;
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('jahesh-banners-updated', handleLocalEvent);
+    }
+    if (unsubscribeFirestore) unsubscribeFirestore();
+  };
 };
 
 export const saveBannerToDb = async (banner: BannerSlide, fullList?: BannerSlide[]): Promise<boolean> => {

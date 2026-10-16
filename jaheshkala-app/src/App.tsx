@@ -28,6 +28,7 @@ import {
   parseOrderTimestamp,
   safeSetLocalStorage,
   subscribeToProductsRealtime,
+  subscribeToBannersRealtime,
   sortProductsByRank,
   saveAllProductsOrderToDb,
 } from './lib/dbService';
@@ -593,11 +594,18 @@ export default function App() {
 
     loadCloudData();
 
-    // Subscribe to Supabase real-time cloud changes for instant multi-user synchronization
+    // Subscribe to Firestore real-time cloud changes for instant multi-user synchronization
     const unsubscribeRealtimeProducts = subscribeToProductsRealtime((updatedList) => {
       if (isMounted && Array.isArray(updatedList) && updatedList.length > 0) {
         const cleaned = sanitizeProductsList(updatedList);
         setProducts(cleaned);
+      }
+    });
+
+    // Subscribe to Firestore real-time banners changes
+    const unsubscribeRealtimeBanners = subscribeToBannersRealtime((updatedBanners) => {
+      if (isMounted && Array.isArray(updatedBanners) && updatedBanners.length > 0) {
+        setBanners(updatedBanners);
       }
     });
 
@@ -652,6 +660,9 @@ export default function App() {
       isMounted = false;
       if (typeof unsubscribeRealtimeProducts === 'function') {
         unsubscribeRealtimeProducts();
+      }
+      if (typeof unsubscribeRealtimeBanners === 'function') {
+        unsubscribeRealtimeBanners();
       }
       window.removeEventListener('jahesh-user-updated', handleUserUpdatedEvent);
       window.removeEventListener('jahesh-users-updated', handleUsersUpdatedEvent);

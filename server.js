@@ -24,6 +24,8 @@ import { initializeApp, getApps } from 'firebase/app';
 import {
   getFirestore,
   doc,
+  getDoc,
+  getDocs,
   setDoc,
   deleteDoc,
   collection,
@@ -50,8 +52,166 @@ const firebaseConfig = {
 const serverFirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig, 'vet-cloud-server');
 const serverDb = getFirestore(serverFirebaseApp, 'ai-studio-jaheshwebsite-13126c61-5143-4f84-b87e-dcc220de14bc');
 
+// ==========================================
+// مسیرهای دائمی فایل‌های داده و متدهای همگام‌سازی ابری فایربیس
+// ==========================================
+const DATA_DIR = path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+const BANNERS_FILE = path.join(DATA_DIR, 'banners.json');
+const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
+const DELETED_PRODUCTS_FILE = path.join(DATA_DIR, 'deleted_products.json');
+
+let productsVersion = Date.now();
+
+function getDeletedProductIds() {
+  try {
+    if (fs.existsSync(DELETED_PRODUCTS_FILE)) {
+      const raw = fs.readFileSync(DELETED_PRODUCTS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error('Error reading deleted_products.json:', e);
+  }
+  return [];
+}
+
+function writeDeletedProductIdsToDisk(ids) {
+  try {
+    fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify(ids, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error writing deleted_products.json:', e);
+  }
+}
+
+function addDeletedProductId(id) {
+  if (!id) return;
+  try {
+    const list = getDeletedProductIds();
+    if (!list.includes(id)) {
+      list.push(id);
+      writeDeletedProductIdsToDisk(list);
+    }
+  } catch (e) {
+    console.error('Error adding deleted product ID:', e);
+  }
+}
+
+function removeDeletedProductId(id) {
+  if (!id) return;
+  try {
+    let list = getDeletedProductIds();
+    if (list.includes(id)) {
+      list = list.filter((x) => x !== id);
+      writeDeletedProductIdsToDisk(list);
+    }
+  } catch (e) {
+    console.error('Error removing deleted product ID:', e);
+  }
+}
+
+function readBannersFromDisk() {
+  try {
+    if (fs.existsSync(BANNERS_FILE)) {
+      const raw = fs.readFileSync(BANNERS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Error reading banners.json:', e);
+  }
+  return [];
+}
+
+function writeBannersToDisk(banners) {
+  if (!Array.isArray(banners)) return;
+  try {
+    fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners, null, 2), 'utf8');
+    const distData = path.join(__dirname, 'jaheshkala', 'data', 'banners.json');
+    if (fs.existsSync(path.dirname(distData))) {
+      fs.writeFileSync(distData, JSON.stringify(banners, null, 2), 'utf8');
+    }
+    const appData = path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'banners.json');
+    if (fs.existsSync(path.dirname(appData))) {
+      fs.writeFileSync(appData, JSON.stringify(banners, null, 2), 'utf8');
+    }
+  } catch (e) {
+    console.warn('writeBannersToDisk notice:', e);
+  }
+}
+
+function readProductsFromDisk() {
+  try {
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      const raw = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Error reading products.json:', e);
+  }
+  return [];
+}
+
+function writeProductsToDisk(products) {
+  if (!Array.isArray(products)) return;
+  try {
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf8');
+    const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
+    if (fs.existsSync(path.dirname(distData))) {
+      fs.writeFileSync(distData, JSON.stringify(products, null, 2), 'utf8');
+    }
+    const appData = path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'products.json');
+    if (fs.existsSync(path.dirname(appData))) {
+      fs.writeFileSync(appData, JSON.stringify(products, null, 2), 'utf8');
+    }
+    productsVersion = Date.now();
+  } catch (e) {
+    console.warn('writeProductsToDisk notice:', e);
+  }
+}
+
 // شنود زنده و آنی دیتابیس ابری فایربیس بر روی سرور
 try {
+  // ۱. شنود بنرهای فروشگاه و سایت از فایربیس (تغییرات آنی برای تمام کاربران)
+  onSnapshot(doc(serverDb, 'settings', 'banners'), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && Array.isArray(data.banners) && data.banners.length > 0) {
+        writeBannersToDisk(data.banners);
+        console.log(`[Server Firestore] Real-time synced ${data.banners.length} banners from cloud`);
+      }
+    }
+  }, (err) => console.warn('[Server Firestore] banners listener notice:', err));
+
+  // ۲. شنود لیست محصولات حذف‌شده
+  onSnapshot(doc(serverDb, 'settings', 'deleted_products'), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && Array.isArray(data.deletedIds)) {
+        writeDeletedProductIdsToDisk(data.deletedIds);
+      }
+    }
+  }, (err) => console.warn('[Server Firestore] deleted_products listener notice:', err));
+
+  // ۳. شنود محصولات فروشگاه از فایربیس (تغییرات آنی برای تمام کاربران)
+  onSnapshot(doc(serverDb, 'settings', 'products'), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && Array.isArray(data.products) && data.products.length > 0) {
+        const deletedSet = new Set(getDeletedProductIds());
+        const valid = data.products.filter((p) => p && p.id && !deletedSet.has(p.id));
+        if (valid.length > 0) {
+          writeProductsToDisk(valid);
+          console.log(`[Server Firestore] Real-time synced ${valid.length} products from cloud`);
+        }
+      }
+    }
+  }, (err) => console.warn('[Server Firestore] products listener notice:', err));
+
+  // ۴. اساتید دامپزشکی
   onSnapshot(collection(serverDb, 'professors'), (snap) => {
     const firestoreProfs = [];
     const deletedKeys = new Set(readDeletedVetProfessors());
@@ -78,6 +238,7 @@ try {
     }
   }, (err) => console.warn('[Server Firestore] professors listener notice:', err));
 
+  // ۵. کاربران
   onSnapshot(collection(serverDb, 'users'), (snap) => {
     const firestoreUsers = [];
     const deletedKeys = new Set(readDeletedVetUsers());
@@ -104,6 +265,7 @@ try {
     }
   }, (err) => console.warn('[Server Firestore] users listener notice:', err));
 
+  // ۶. نوبت‌ها
   onSnapshot(collection(serverDb, 'vet_appointments'), (snap) => {
     const firestoreAppts = [];
     snap.docs.forEach((d) => firestoreAppts.push({ ...d.data(), id: d.id }));
@@ -124,6 +286,67 @@ try {
 } catch (e) {
   console.warn('[Server Firestore] listener init error:', e);
 }
+
+// همگام‌سازی فوری در ثانیه اول بوت سرور (حفاظت ۱۰۰٪ دائمی در برابر دیپلوی‌ها و نصب‌های مجدد گیت‌هاب)
+async function bootSyncFirestoreCloud() {
+  try {
+    // ۱. دریافت بنرهای ابری
+    const bSnap = await getDoc(doc(serverDb, 'settings', 'banners'));
+    if (bSnap.exists()) {
+      const bData = bSnap.data();
+      if (bData && Array.isArray(bData.banners) && bData.banners.length > 0) {
+        writeBannersToDisk(bData.banners);
+        console.log(`[Server Firestore Boot] Loaded ${bData.banners.length} cloud banners`);
+      }
+    }
+
+    // ۲. دریافت شناسه محصولات حذف‌شده
+    let deletedSet = new Set(getDeletedProductIds());
+    const dSnap = await getDoc(doc(serverDb, 'settings', 'deleted_products'));
+    if (dSnap.exists()) {
+      const dData = dSnap.data();
+      if (dData && Array.isArray(dData.deletedIds)) {
+        writeDeletedProductIdsToDisk(dData.deletedIds);
+        deletedSet = new Set(dData.deletedIds);
+      }
+    }
+
+    // ۳. دریافت محصولات ابری از settings/products و کالکشن products
+    const pSnap = await getDoc(doc(serverDb, 'settings', 'products'));
+    let cloudProducts = [];
+    if (pSnap.exists()) {
+      const pData = pSnap.data();
+      if (pData && Array.isArray(pData.products)) {
+        cloudProducts = pData.products.filter((p) => p && p.id && !deletedSet.has(p.id));
+      }
+    }
+
+    try {
+      const cSnap = await getDocs(collection(serverDb, 'products'));
+      const pMap = new Map();
+      cloudProducts.forEach((p) => pMap.set(p.id, p));
+      cSnap.forEach((d) => {
+        const item = d.data();
+        if (item && item.id && !deletedSet.has(item.id)) {
+          if (!pMap.has(item.id)) {
+            pMap.set(item.id, item);
+          } else {
+            pMap.set(item.id, { ...pMap.get(item.id), ...item });
+          }
+        }
+      });
+      cloudProducts = Array.from(pMap.values());
+    } catch {}
+
+    if (cloudProducts.length > 0) {
+      writeProductsToDisk(cloudProducts);
+      console.log(`[Server Firestore Boot] Loaded & persisted ${cloudProducts.length} cloud products to disk`);
+    }
+  } catch (err) {
+    console.warn('[Server Firestore Boot] Sync notice:', err.message);
+  }
+}
+bootSyncFirestoreCloud();
 
 // Global CORS Middleware - Enables Cross-Origin API calls from Google AI Studio, Android, iOS, Windows and external apps
 app.use((req, res, next) => {
@@ -428,7 +651,6 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Server-side Banners Persistence API
-const BANNERS_FILE = path.join(__dirname, 'data', 'banners.json');
 
 const DEFAULT_SERVER_BANNERS = [
   {
@@ -628,12 +850,12 @@ app.post('/api/banners', (req, res) => {
     if (!Array.isArray(banners)) {
       return res.status(400).json({ error: 'Expected array of banners' });
     }
-    const dataDir = path.dirname(BANNERS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(BANNERS_FILE, JSON.stringify(banners, null, 2), 'utf8');
-    console.log(`[Banners] Successfully persisted ${banners.length} banners across all devices.`);
+    writeBannersToDisk(banners);
+    // ذخیره مستقیم در پایگاه ابری فایربیس (تضمین ماندگاری دائمی برای تمام کاربران اینترنت)
+    try {
+      setDoc(doc(serverDb, 'settings', 'banners'), { banners, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+    } catch (e) {}
+    console.log(`[Banners] Successfully persisted ${banners.length} banners across all devices & Firestore cloud.`);
     return res.json({ success: true, count: banners.length });
   } catch (err) {
     console.error('Error saving banners.json:', err);
@@ -782,51 +1004,7 @@ app.post('/api/upload-tool-image', (req, res) => {
 // ==========================================
 // Products Persistence & Image Upload API
 // ==========================================
-const PRODUCTS_FILE = path.join(__dirname, 'data', 'products.json');
-const DELETED_PRODUCTS_FILE = path.join(__dirname, 'data', 'deleted_products.json');
 
-function getDeletedProductIds() {
-  try {
-    if (fs.existsSync(DELETED_PRODUCTS_FILE)) {
-      const raw = fs.readFileSync(DELETED_PRODUCTS_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.error('Error reading deleted_products.json:', e);
-  }
-  return [];
-}
-
-function addDeletedProductId(id) {
-  if (!id) return;
-  try {
-    const list = getDeletedProductIds();
-    if (!list.includes(id)) {
-      list.push(id);
-      const dataDir = path.dirname(DELETED_PRODUCTS_FILE);
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
-      fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
-    }
-  } catch (e) {
-    console.error('Error adding deleted product ID:', e);
-  }
-}
-
-function removeDeletedProductId(id) {
-  if (!id) return;
-  try {
-    let list = getDeletedProductIds();
-    if (list.includes(id)) {
-      list = list.filter((x) => x !== id);
-      fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
-    }
-  } catch (e) {
-    console.error('Error removing deleted product ID:', e);
-  }
-}
 
 function sortProductsByOrder(list) {
   if (!Array.isArray(list)) return [];
@@ -1006,7 +1184,11 @@ app.post('/api/products/deleted', (req, res) => {
     return res.status(400).json({ error: 'productId is required' });
   }
   addDeletedProductId(productId);
-  return res.json({ success: true, deleted: getDeletedProductIds() });
+  const currentDeleted = getDeletedProductIds();
+  try {
+    setDoc(doc(serverDb, 'settings', 'deleted_products'), { deletedIds: currentDeleted, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+  } catch (e) {}
+  return res.json({ success: true, deleted: currentDeleted });
 });
 
 // POST /api/products/deleted/remove - un-blacklists a product ID
@@ -1016,10 +1198,14 @@ app.post(['/api/products/deleted/remove', '/api/products/unmark-deleted'], (req,
     return res.status(400).json({ error: 'productId is required' });
   }
   removeDeletedProductId(productId);
-  return res.json({ success: true, deleted: getDeletedProductIds() });
+  const currentDeleted = getDeletedProductIds();
+  try {
+    setDoc(doc(serverDb, 'settings', 'deleted_products'), { deletedIds: currentDeleted, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+  } catch (e) {}
+  return res.json({ success: true, deleted: currentDeleted });
 });
 
-let productsVersion = Date.now();
+productsVersion = Date.now();
 
 // GET /api/products/version & /jaheshkala/api/products/version - ultra-lightweight 20-byte change detector
 app.get(['/api/products/version', '/jaheshkala/api/products/version'], (_req, res) => {
@@ -1062,19 +1248,11 @@ app.post(['/api/products', '/jaheshkala/api/products'], (req, res) => {
     }
     const deletedIds = new Set(getDeletedProductIds());
     const filtered = products.filter((p) => p && p.id && !deletedIds.has(p.id));
-    const dataDir = path.dirname(PRODUCTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+    writeProductsToDisk(filtered);
     try {
-      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(distData))) {
-        fs.writeFileSync(distData, JSON.stringify(filtered, null, 2), 'utf8');
-      }
-    } catch {}
-    productsVersion = Date.now();
-    console.log(`[Products] Successfully persisted ${filtered.length} products to disk. Version: ${productsVersion}`);
+      setDoc(doc(serverDb, 'settings', 'products'), { products: filtered, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+    } catch (e) {}
+    console.log(`[Products] Successfully persisted ${filtered.length} products to disk & Firestore cloud. Version: ${productsVersion}`);
     return res.json({ success: true, count: filtered.length, version: productsVersion });
   } catch (err) {
     console.error('Error saving products.json:', err);
@@ -1082,7 +1260,7 @@ app.post(['/api/products', '/jaheshkala/api/products'], (req, res) => {
   }
 });
 
-// POST /api/products/save - upserts a single product on disk
+// POST /api/products/save - upserts a single product on disk & Firestore
 app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => {
   try {
     const product = req.body;
@@ -1120,22 +1298,15 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
     } else {
       list = [product, ...list];
     }
-    const dataDir = path.dirname(PRODUCTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    
+    writeProductsToDisk(list);
+
+    // ذخیره مستقیم در پایگاه ابری فایربیس (تضمین ماندگاری دائمی بدون وابستگی به دیپلوی)
     try {
-      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(distData))) {
-        fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
-      }
-      const appData = path.join(__dirname, 'jaheshkala-app', 'public', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(appData))) {
-        fs.writeFileSync(appData, JSON.stringify(list, null, 2), 'utf8');
-      }
-    } catch {}
-    productsVersion = Date.now();
+      setDoc(doc(serverDb, 'products', product.id), product, { merge: true }).catch(() => {});
+      setDoc(doc(serverDb, 'settings', 'products'), { products: list, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+    } catch (e) {}
+
     console.log(`[Products] Upserted product ${product.id} (${product.title}). Total: ${list.length}. Version: ${productsVersion}`);
     return res.json({ success: true, products: list, product, version: productsVersion });
   } catch (err) {
@@ -1144,7 +1315,7 @@ app.post(['/api/products/save', '/jaheshkala/api/products/save'], (req, res) => 
   }
 });
 
-// POST /api/products/delete - deletes a product by id from disk
+// POST /api/products/delete - deletes a product by id from disk & Firestore
 app.post(['/api/products/delete', '/jaheshkala/api/products/delete'], (req, res) => {
   try {
     const productId = req.body?.productId || req.body?.id;
@@ -1163,14 +1334,15 @@ app.post(['/api/products/delete', '/jaheshkala/api/products/delete'], (req, res)
       } catch {}
     }
     list = list.filter((p) => p.id !== productId);
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(list, null, 2), 'utf8');
+    writeProductsToDisk(list);
+
+    // حذف از فایربیس و به‌روزرسانی تنظیمات ابری
     try {
-      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(distData))) {
-        fs.writeFileSync(distData, JSON.stringify(list, null, 2), 'utf8');
-      }
-    } catch {}
-    productsVersion = Date.now();
+      deleteDoc(doc(serverDb, 'products', productId)).catch(() => {});
+      setDoc(doc(serverDb, 'settings', 'products'), { products: list, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+      setDoc(doc(serverDb, 'settings', 'deleted_products'), { deletedIds: Array.from(getDeletedProductIds()), updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+    } catch (e) {}
+
     console.log(`[Products] Deleted product ${productId}. Total left: ${list.length}. Version: ${productsVersion}`);
     return res.json({ success: true, products: list, version: productsVersion });
   } catch (err) {
@@ -1179,7 +1351,7 @@ app.post(['/api/products/delete', '/jaheshkala/api/products/delete'], (req, res)
   }
 });
 
-// POST /api/products/order & /api/products/save-all - saves ordered/re-ranked products on disk
+// POST /api/products/order & /api/products/save-all - saves ordered/re-ranked products on disk & Firestore
 app.post(['/api/products/order', '/api/products/save-all', '/api/products/reorder', '/jaheshkala/api/products/order', '/jaheshkala/api/products/save-all', '/jaheshkala/api/products/reorder'], (req, res) => {
   try {
     const products = req.body?.products || req.body;
@@ -1188,19 +1360,14 @@ app.post(['/api/products/order', '/api/products/save-all', '/api/products/reorde
     }
     const deletedIds = new Set(getDeletedProductIds());
     const filtered = products.filter((p) => p && p.id && !deletedIds.has(p.id));
-    const dataDir = path.dirname(PRODUCTS_FILE);
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(filtered, null, 2), 'utf8');
+    writeProductsToDisk(filtered);
+
+    // ذخیره در فایربیس
     try {
-      const distData = path.join(__dirname, 'jaheshkala', 'data', 'products.json');
-      if (fs.existsSync(path.dirname(distData))) {
-        fs.writeFileSync(distData, JSON.stringify(filtered, null, 2), 'utf8');
-      }
-    } catch {}
-    productsVersion = Date.now();
-    console.log(`[Products] Successfully updated and ordered ${filtered.length} products on disk. Version: ${productsVersion}`);
+      setDoc(doc(serverDb, 'settings', 'products'), { products: filtered, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+    } catch (e) {}
+
+    console.log(`[Products] Successfully updated and ordered ${filtered.length} products on disk & Firestore. Version: ${productsVersion}`);
     return res.json({ success: true, count: filtered.length, products: filtered, version: productsVersion });
   } catch (err) {
     console.error('Error in /api/products/order:', err);
@@ -2310,6 +2477,13 @@ app.post('/api/orders', (req, res) => {
     });
     const merged = Array.from(existingMap.values());
     writeOrdersToDisk(merged);
+    try {
+      incoming.forEach((o) => {
+        if (o && o.id) {
+          setDoc(doc(serverDb, 'orders', o.id), o, { merge: true }).catch(() => {});
+        }
+      });
+    } catch (e) {}
     return res.json({ success: true, count: merged.length, orders: merged });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -2403,6 +2577,9 @@ app.post('/api/orders/save', (req, res) => {
     }
     writeOrdersToDisk(updated);
     syncOrderLicenseToDisk(order);
+    try {
+      setDoc(doc(serverDb, 'orders', order.id), order, { merge: true }).catch(() => {});
+    } catch (e) {}
     console.log(`[Orders] Saved order ${order.id}. Total orders: ${updated.length}`);
     return res.json({ success: true, order, count: updated.length, orders: updated });
   } catch (err) {

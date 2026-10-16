@@ -44,5 +44,8 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+    match /media_cache/{mediaId} {
+      allow read, write: if true;
+    }
   }
 }
