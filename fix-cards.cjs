@@ -18,7 +18,7 @@ const card1 = makeCard("جهش 1", "/chat");
 const card12 = makeCard("جهش 1.2", "/ai");
 const card13 = makeCard("جهش 1.3", "/ai-v13");
 const card14 = makeCard("جهش 1.4", "/copy-1/untitled4");
-const card2 = makeCard("جهش 2", "https://jahesh-2.vercel.app/");
+const card2 = makeCard("جهش 2", "https://jahesh-2-six.vercel.app/");
 
 // Find the outer section that wraps the cards
 // Notice in the previous step we replaced fullSectionRegex with:

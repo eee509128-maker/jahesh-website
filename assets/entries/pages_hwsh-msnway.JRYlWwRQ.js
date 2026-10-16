@@ -13,7 +13,7 @@ c.jsx("section",{style:{maxWidth:"1000px",margin:"0 auto 50px",padding:"0 20px"}
        c.jsx("span",{style:{background:"linear-gradient(135deg, #ec4899, #f43f5e)",color:"#fff",padding:"6px 18px",borderRadius:"9999px",fontSize:"14px",fontWeight:"bold",display:"inline-block",marginBottom:"20px"},children:"نسخه پرچمدار • پیشرفته‌ترین مدل"}),
        c.jsx("h2",{style:{fontSize:"clamp(26px, 5vw, 36px)",color:"#fff",fontWeight:"bold",marginBottom:"16px"},children:"هوش مصنوعی جهش ۲"}),
        c.jsx("p",{style:{color:"#e2e8f0",fontSize:"17px",maxWidth:"700px",margin:"0 auto 30px",lineHeight:"1.8"},children:"جدیدترین و پیشرفته‌ترین نسل هوش مصنوعی جهش با بالاترین سرعت پردازش و دقت بالا در پاسخگویی. مناسب برای امور تحلیلی پیچیده، کدنویسی و پژوهش‌های تخصصی."}),
-       c.jsx("a",{href:"https://jahesh-2.vercel.app/",target:"_blank",rel:"noopener noreferrer",style:{display:"inline-flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(135deg, #ec4899, #f43f5e)",color:"#fff",padding:"16px 36px",borderRadius:"14px",fontSize:"18px",fontWeight:"bold",textDecoration:"none",boxShadow:"0 10px 25px rgba(236, 72, 153, 0.4)",transition:"all 0.3s ease"},className:"hover:scale-105",children:"ورود به محیط جهش ۲ ←"})
+       c.jsx("a",{href:"https://jahesh-2-six.vercel.app/",target:"_blank",rel:"noopener noreferrer",style:{display:"inline-flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(135deg, #ec4899, #f43f5e)",color:"#fff",padding:"16px 36px",borderRadius:"14px",fontSize:"18px",fontWeight:"bold",textDecoration:"none",boxShadow:"0 10px 25px rgba(236, 72, 153, 0.4)",transition:"all 0.3s ease"},className:"hover:scale-105",children:"ورود به محیط جهش ۲ ←"})
     ]})
   ]})
 }),

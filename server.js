@@ -3756,9 +3756,9 @@ app.get(['/jahesh-it', '/jahesh-it/', '/jahesh-it/*', '/it', '/it/', '/it/*', '/
   res.redirect(301, '/');
 });
 
-// 2. هوش مصنوعی جهش (Jahesh AI) -> باید مستقیماً برود به https://jahesh-2.vercel.app/
+// 2. هوش مصنوعی جهش (Jahesh AI) -> باید مستقیماً برود به https://jahesh-2-six.vercel.app/
 app.get(['/ai', '/ai/', '/ai/*', '/ai-v13', '/ai-v13/', '/ai-v13/*', '/hwsh-msnway', '/hwsh-msnway/', '/hwsh-msnway/*', '/chat', '/chat/', '/chat/*'], (req, res) => {
-  res.redirect(301, 'https://jahesh-2.vercel.app/');
+  res.redirect(301, 'https://jahesh-2-six.vercel.app/');
 });
 
 // 3. انجمن علمی جهش (Jahesh Scientific Association alias)

@@ -63,7 +63,7 @@ to{height:0}}[data-ani='expand'],[data-ani='expand'][data-state='open'],[data-an
         نسخه جدید هوش مصنوعی با قابلیت‌های پیشرفته در دسترس قرار گرفت
       </p>
     </div>
-    <a href="https://jahesh-2.vercel.app/" target="_blank" rel="noopener noreferrer"
+    <a href="https://jahesh-2-six.vercel.app/" target="_blank" rel="noopener noreferrer"
        style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(to left,#7c3aed,#d946ef);padding:12px 24px;border-radius:12px;color:#fff;font-weight:bold;text-decoration:none;box-shadow:0 10px 25px rgba(139,92,246,0.5);">
       استفاده از هوش مصنوعی جهش 2 ←
     </a>
