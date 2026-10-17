@@ -1002,6 +1002,137 @@ app.post('/api/upload-tool-image', (req, res) => {
 });
 
 // ==========================================
+// Full Site 0 to 100 Backup & Restore API (داشبورد، محصولات، بنرها، سفارشات، لایسنس‌ها، کاربران، رسیدها و...)
+// ==========================================
+app.get(['/api/backup-full', '/jaheshkala/api/backup-full', '/api/admin/backup-full'], async (req, res) => {
+  try {
+    const readSafeJson = (p) => {
+      try {
+        if (fs.existsSync(p)) {
+          return JSON.parse(fs.readFileSync(p, 'utf8'));
+        }
+      } catch (err) {
+        console.warn(`[Backup] Notice reading ${p}:`, err.message);
+      }
+      return [];
+    };
+
+    const products = readSafeJson(path.join(__dirname, 'data', 'products.json'));
+    const banners = readSafeJson(path.join(__dirname, 'data', 'banners.json'));
+    const orders = readSafeJson(path.join(__dirname, 'data', 'orders.json'));
+    const appLicenses = readSafeJson(path.join(__dirname, 'data', 'app_licenses.json'));
+    const amlakLicenses = readSafeJson(path.join(__dirname, 'data', 'licenses.json'));
+    const tools = readSafeJson(path.join(__dirname, 'data', 'tools.json'));
+    const users = readSafeJson(path.join(__dirname, 'data', 'users.json'));
+    const deletedProducts = readSafeJson(path.join(__dirname, 'data', 'deleted_products.json'));
+
+    const fullBackup = {
+      system: 'JAHESH_KALA_PLATFORM',
+      version: '2.5.0-full-backup',
+      timestamp: new Date().toISOString(),
+      exportDateFa: new Intl.DateTimeFormat('fa-IR', { dateStyle: 'full', timeStyle: 'medium', timeZone: 'Asia/Tehran' }).format(new Date()),
+      siteUrl: 'https://jaheshit.ir',
+      summary: {
+        productsCount: products.length,
+        bannersCount: banners.length,
+        ordersCount: orders.length,
+        appLicensesCount: appLicenses.length,
+        amlakLicensesCount: amlakLicenses.length,
+        totalLicensesCount: appLicenses.length + amlakLicenses.length,
+        toolsCount: tools.length,
+        usersCount: users.length,
+      },
+      data: {
+        products,
+        banners,
+        orders,
+        appLicenses,
+        amlakLicenses,
+        dashboardTools: tools,
+        users,
+        deletedProducts,
+      }
+    };
+
+    if (req.query.download === 'true') {
+      const fileName = `jahesh-full-backup-zero-to-hundred-${new Date().toISOString().slice(0, 10)}.json`;
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    }
+
+    return res.json(fullBackup);
+  } catch (err) {
+    console.error('Error generating full backup:', err);
+    return res.status(500).json({ success: false, error: 'خطا در تهیه پشتیبان کامل', details: err.message });
+  }
+});
+
+app.post(['/api/restore-full', '/jaheshkala/api/restore-full', '/api/admin/restore-full'], async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const backupData = payload.data || payload;
+
+    const dataDir = path.join(__dirname, 'data');
+    const jaheshDataDir = path.join(__dirname, 'jaheshkala', 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    if (!fs.existsSync(jaheshDataDir)) fs.mkdirSync(jaheshDataDir, { recursive: true });
+
+    const writeBoth = (fileName, content) => {
+      if (!content || !Array.isArray(content)) return;
+      const str = JSON.stringify(content, null, 2);
+      fs.writeFileSync(path.join(dataDir, fileName), str, 'utf8');
+      fs.writeFileSync(path.join(jaheshDataDir, fileName), str, 'utf8');
+    };
+
+    let restoredItems = {};
+
+    if (Array.isArray(backupData.products)) {
+      writeBoth('products.json', backupData.products);
+      restoredItems.products = backupData.products.length;
+    }
+    if (Array.isArray(backupData.banners)) {
+      writeBoth('banners.json', backupData.banners);
+      restoredItems.banners = backupData.banners.length;
+    }
+    if (Array.isArray(backupData.orders)) {
+      writeBoth('orders.json', backupData.orders);
+      restoredItems.orders = backupData.orders.length;
+    }
+    if (Array.isArray(backupData.appLicenses)) {
+      writeBoth('app_licenses.json', backupData.appLicenses);
+      restoredItems.appLicenses = backupData.appLicenses.length;
+    }
+    if (Array.isArray(backupData.amlakLicenses)) {
+      writeBoth('licenses.json', backupData.amlakLicenses);
+      restoredItems.amlakLicenses = backupData.amlakLicenses.length;
+    }
+    if (Array.isArray(backupData.dashboardTools) || Array.isArray(backupData.tools)) {
+      const t = backupData.dashboardTools || backupData.tools;
+      writeBoth('tools.json', t);
+      restoredItems.dashboardTools = t.length;
+    }
+    if (Array.isArray(backupData.users)) {
+      writeBoth('users.json', backupData.users);
+      restoredItems.users = backupData.users.length;
+    }
+    if (Array.isArray(backupData.deletedProducts)) {
+      writeBoth('deleted_products.json', backupData.deletedProducts);
+      restoredItems.deletedProducts = backupData.deletedProducts.length;
+    }
+
+    return res.json({
+      success: true,
+      message: 'تمامی بخش‌های سایت (صفر تا صد) با موفقیت بازیابی و در هاست ذخیره شدند.',
+      restoredItems,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Error restoring full backup:', err);
+    return res.status(500).json({ success: false, error: 'خطا در بازگردانی پشتیبان کامل', details: err.message });
+  }
+});
+
+// ==========================================
 // Products Persistence & Image Upload API
 // ==========================================
 

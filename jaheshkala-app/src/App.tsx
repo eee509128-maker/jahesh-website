@@ -1338,20 +1338,28 @@ export default function App() {
     showToast('محصول جدید در دیتابیس ابری ثبت و منتشر شد.');
   };
 
-  const handleUpdateProduct = async (updatedProduct: Product) => {
+  const handleUpdateProduct = async (updatedProduct: Product, oldId?: string) => {
     setProducts((prev) => {
       let list = prev;
       if (updatedProduct.isIncredible) {
         list = list.map((p) => (p.id !== updatedProduct.id && p.isIncredible ? { ...p, isIncredible: false } : p));
       }
-      const updated = sortProductsByRank(list.map((p) => (p.id === updatedProduct.id ? updatedProduct : p)));
+      const targetId = oldId || updatedProduct.id;
+      const updated = sortProductsByRank(list.map((p) => (p.id === targetId ? updatedProduct : p)));
       try {
         safeSetLocalStorage('jahesh_products', JSON.stringify(updated));
       } catch {}
       return updated;
     });
+    if (oldId && oldId !== updatedProduct.id) {
+      try {
+        await deleteProductFromDb(oldId);
+      } catch (e) {
+        console.warn('Notice removing old product ID:', e);
+      }
+    }
     await saveProductToDb(updatedProduct);
-    showToast(`محصول «${updatedProduct.title}» و وضعیت آن در دیتابیس به‌روزرسانی شد.`);
+    showToast(`محصول «${updatedProduct.title}» با شناسه «${updatedProduct.id}» با موفقیت ذخیره شد.`);
   };
 
   const handleToggleIncredible = async (targetProduct: Product) => {

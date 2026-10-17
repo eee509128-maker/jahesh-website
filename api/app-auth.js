@@ -328,13 +328,49 @@ export default async function handler(req, res) {
     const list = await readAllLicenses();
 
     // Helper to test if a license record matches the requested product
-    const isMatchingProduct = (licProd) => {
+    const isMatchingProduct = (licProd, lic) => {
       if (!cleanProd || !licProd) return true;
       const lp = String(licProd).trim().toLowerCase();
-      if (lp === cleanProd) return true;
-      if (cleanProd.includes('amlak') && lp.includes('amlak')) return true;
-      if (cleanProd.includes('estate') && lp.includes('estate')) return true;
-      if (cleanProd.includes('shantia') && lp.includes('shantia')) return true;
+      const cp = String(cleanProd).trim().toLowerCase();
+      if (lp === cp) return true;
+
+      // Known product ID aliases & app titles (e.g. apps previously compiled by the owner)
+      // 1. BookSender (جهش بوکسندر)
+      const isBooksenderCp = cp.includes('book') || cp.includes('بوکسند') || cp === 'prod-1791906359183' || cp === 'prod-1792056566188';
+      const isBooksenderLp = lp.includes('book') || lp.includes('بوکسند') || lp === 'prod-1791906359183' || lp === 'prod-1792056566188' ||
+        String(lic?.productTitle || '').toLowerCase().includes('بوکسندر') || String(lic?.appName || '').toLowerCase().includes('بوکسندر');
+      if (isBooksenderCp && isBooksenderLp) return true;
+
+      // 2. Shantia (اپلیکیشن هوشمند جهش شنتیا)
+      const isShantiaCp = cp.includes('shantia') || cp.includes('شنتیا') || cp === 'prod-1790538341809';
+      const isShantiaLp = lp.includes('shantia') || lp.includes('شنتیا') || lp === 'prod-1790538341809' ||
+        String(lic?.productTitle || '').toLowerCase().includes('شنتیا') || String(lic?.appName || '').toLowerCase().includes('شنتیا');
+      if (isShantiaCp && isShantiaLp) return true;
+
+      // 3. Payeshlatory (جهش پایشلاتوری / پاسخگوی خودکار)
+      const isPayeshCp = cp.includes('payesh') || cp.includes('پایش') || cp === 'prod-1791831962863' || cp === 'prod-1792057013830';
+      const isPayeshLp = lp.includes('payesh') || lp.includes('پایش') || lp === 'prod-1791831962863' || lp === 'prod-1792057013830' ||
+        String(lic?.productTitle || '').toLowerCase().includes('پایش') || String(lic?.appName || '').toLowerCase().includes('پایش');
+      if (isPayeshCp && isPayeshLp) return true;
+
+      // 4. Marketing (سامانه مارکتینگ و ارسال پیامک انبوه)
+      const isMarketCp = cp.includes('market') || cp.includes('مارکت') || cp === 'prod-1791829363896';
+      const isMarketLp = lp.includes('market') || lp.includes('مارکت') || lp === 'prod-1791829363896' ||
+        String(lic?.productTitle || '').toLowerCase().includes('مارکتینگ');
+      if (isMarketCp && isMarketLp) return true;
+
+      // 5. Amlak (سامانه مدیریت املاک جهش)
+      const isAmlakCp = cp.includes('amlak') || cp.includes('املاک') || cp.includes('estate') || cp === 'pkg-amlak-jahesh';
+      const isAmlakLp = lp.includes('amlak') || lp.includes('املاک') || lp.includes('estate') || lp === 'pkg-amlak-jahesh' ||
+        String(lic?.productTitle || '').toLowerCase().includes('املاک') || String(lic?.appName || '').toLowerCase().includes('املاک');
+      if (isAmlakCp && isAmlakLp) return true;
+
+      // 6. Shekan / Anti-sanction (تحریم شکن)
+      const isShekanCp = cp.includes('shekan') || cp.includes('شکن') || cp === 'prod-1789798520429';
+      const isShekanLp = lp.includes('shekan') || lp.includes('شکن') || lp === 'prod-1789798520429' ||
+        String(lic?.productTitle || '').toLowerCase().includes('تحریم شکن');
+      if (isShekanCp && isShekanLp) return true;
+
       return false;
     };
 
@@ -369,14 +405,14 @@ export default async function handler(req, res) {
     // 1. Look for EXACT match for THIS product
     const found = list.find((lic) => {
       if (!doesCredsMatch(lic)) return false;
-      return isMatchingProduct(lic.productId);
+      return isMatchingProduct(lic.productId, lic);
     });
 
     // 2. Check for Product Mismatch (Valid license exists, but for a DIFFERENT software)
     if (!found && cleanProd) {
       const crossProductLic = list.find((lic) => {
         if (!doesCredsMatch(lic)) return false;
-        return lic.productId && !isMatchingProduct(lic.productId);
+        return lic.productId && !isMatchingProduct(lic.productId, lic);
       });
 
       if (crossProductLic) {

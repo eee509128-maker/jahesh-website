@@ -30,7 +30,7 @@ interface AdminPanelProps {
   onClearAllOrders?: () => void;
   products: Product[];
   onAddNewProduct: (newProduct: Product) => void;
-  onUpdateProduct?: (product: Product) => void;
+  onUpdateProduct?: (product: Product, oldId?: string) => void;
   onDeleteProduct: (productId: string) => void;
   onToggleIncredible?: (product: Product) => void;
   onReorderProducts?: (orderedList: Product[]) => void;
@@ -928,6 +928,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Edit / New Product Form State
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [customProductId, setCustomProductId] = useState<string>('');
   const [newTitle, setNewTitle] = useState('');
   const [newBrand, setNewBrand] = useState('');
   
@@ -1344,6 +1345,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleStartNew = () => {
     setEditingProductId(null);
+    setCustomProductId('prod-' + Date.now());
     setNewTitle('');
     setNewBrand('');
     setIsCustomCategory(false);
@@ -1396,6 +1398,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleStartEdit = (prod: Product) => {
     setEditingProductId(prod.id);
+    setCustomProductId(prod.id);
     setNewTitle(prod.title);
     setNewBrand(prod.brand || '');
     setNewDisplayOrder(typeof prod.displayOrder === 'number' ? prod.displayOrder : (typeof prod.displayRank === 'number' ? prod.displayRank : ''));
@@ -1560,9 +1563,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       finalGuild = customGuildInput.trim() || undefined;
     }
 
+    const finalProductId = customProductId.trim() || editingProductId || ('prod-' + Date.now());
+
     const productData: Product = {
       ...(existingProduct || {}),
-      id: editingProductId || ('prod-' + Date.now()),
+      id: finalProductId,
       title: newTitle.trim(),
       category: finalCategory,
       brand: newBrand.trim() || undefined,
@@ -1629,11 +1634,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     };
 
     if (editingProductId && onUpdateProduct) {
-      onUpdateProduct(productData);
-      setFormSuccess('تغییرات محصول با موفقیت در دیتابیس ذخیره شد!');
+      onUpdateProduct(productData, editingProductId);
+      setFormSuccess(`تغییرات محصول «${productData.title}» با شناسه «${productData.id}» با موفقیت ذخیره شد!`);
     } else {
       onAddNewProduct(productData);
-      setFormSuccess(`محصول «${productData.title}» با قیمت ${formatPrice(priceNum)} در دیتابیس ثبت و منتشر شد!`);
+      setFormSuccess(`محصول «${productData.title}» با شناسه «${productData.id}» و قیمت ${formatPrice(priceNum)} در دیتابیس ثبت و منتشر شد!`);
     }
     
     setTimeout(() => {
@@ -2931,6 +2936,79 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               <form onSubmit={handleCreateProduct} className="space-y-4">
                 
+                {/* 0. PRODUCT ID & SOFTWARE LICENSE IDENTIFIER */}
+                <div className="p-3.5 bg-gradient-to-r from-[#170e30] via-[#100824] to-[#0a0518] border border-amber-500/40 rounded-2xl space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                      <KeyRound className="w-4 h-4 text-amber-400" />
+                      <span>شناسه محصول (Product ID) - اتصال به لایسنس و اپلیکیشن‌ها:</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setCustomProductId('prod-' + Date.now())}
+                      className="text-[11px] font-bold text-cyan-300 hover:text-white bg-cyan-950/70 border border-cyan-700/50 hover:bg-cyan-900/80 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>تولید شناسه جدید خودکار</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="مثلاً: prod-1790538341809 یا booksender یا pkg-amlak-jahesh"
+                      value={customProductId}
+                      onChange={(e) => setCustomProductId(e.target.value)}
+                      className="w-full bg-black/60 border border-amber-500/60 rounded-xl px-3.5 py-2 text-xs text-amber-200 font-mono focus:border-amber-400 focus:outline-none"
+                      required
+                    />
+                  </div>
+
+                  {/* Quick Preset Selector for Popular Apps */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
+                    <span className="text-slate-400 font-medium">شناسه‌های آماده اپ‌ها:</span>
+                    <button
+                      type="button"
+                      onClick={() => setCustomProductId('prod-1790538341809')}
+                      className="px-2 py-0.5 rounded-md bg-purple-900/50 hover:bg-purple-800 text-purple-200 border border-purple-700/50 text-[10px] font-mono cursor-pointer transition-colors"
+                    >
+                      📱 شنتیا (prod-1790538341809)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomProductId('prod-1791906359183')}
+                      className="px-2 py-0.5 rounded-md bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-700/50 text-[10px] font-mono cursor-pointer transition-colors"
+                    >
+                      📚 بوکسندر (prod-1791906359183)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomProductId('prod-1792056566188')}
+                      className="px-2 py-0.5 rounded-md bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-700/50 text-[10px] font-mono cursor-pointer transition-colors"
+                    >
+                      📚 بوکسندر جدید (prod-1792056566188)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomProductId('prod-1791831962863')}
+                      className="px-2 py-0.5 rounded-md bg-emerald-900/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/50 text-[10px] font-mono cursor-pointer transition-colors"
+                    >
+                      ⚡ پایشلاتوری (prod-1791831962863)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomProductId('pkg-amlak-jahesh')}
+                      className="px-2 py-0.5 rounded-md bg-amber-900/50 hover:bg-amber-800 text-amber-200 border border-amber-700/50 text-[10px] font-mono cursor-pointer transition-colors"
+                    >
+                      🏢 املاک جهش (pkg-amlak-jahesh)
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    💡 <strong className="text-amber-300">نکته بسیار مهم لایسنس:</strong> سیستم به طور خودکار این شناسه را می‌سازد، اما اگر قبلاً اپلیکیشنی ساخته‌اید (مانند بوکسندر یا شنتیا)، شناسه آن را در این کادر بنویسید تا لایسنس صادر شده دقیقاً با نرم‌افزار شما ست شده و خطای عدم تطابق شناسه محصول (Product Mismatch) ندهد.
+                  </p>
+                </div>
+
                 {/* 1. Title & Brand */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1 sm:col-span-2">
@@ -3722,12 +3800,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <Sparkles className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
                           <div className="leading-relaxed">
                             <span className="font-black text-amber-300">مدت زمان اشتراک کاملاً پویا بر اساس انتخاب خریدار: </span>
-                            نیازی به تعریف ثابت مدت لایسنس نیست. مشتری در هنگام خرید این محصول از سایت جهش‌کالا، مدت دلخواه خود را (۱ روز، ۷ روز، ۱ ماه، ۳ ماه، ۶ ماه، ۱ سال یا روزهای دلخواه) انتخاب نموده و سیستم به طور خودکار نام کاربری و رمز عبور اختصاصی را با همان مدت منحصراً برای همین محصول (<span className="text-white font-mono font-bold">{editingProductId || 'این کالا'}</span>) صادر می‌نماید.
+                            نیازی به تعریف ثابت مدت لایسنس نیست. مشتری در هنگام خرید این محصول از سایت جهش‌کالا، مدت دلخواه خود را (۱ روز، ۷ روز، ۱ ماه، ۳ ماه، ۶ ماه، ۱ سال یا روزهای دلخواه) انتخاب نموده و سیستم به طور خودکار نام کاربری و رمز عبور اختصاصی را با همان مدت منحصراً برای همین محصول (<span className="text-white font-mono font-bold">{customProductId || editingProductId || 'این کالا'}</span>) صادر می‌نماید.
                           </div>
                         </div>
 
                         {/* Configuration Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-right">
+                          <div>
+                            <label className="text-[11px] font-bold text-amber-300 block mb-1">
+                              شناسه اختصاصی محصول (Product ID):
+                            </label>
+                            <input
+                              type="text"
+                              value={customProductId}
+                              onChange={(e) => setCustomProductId(e.target.value)}
+                              placeholder="مثلاً: prod-1790538341809 یا booksender"
+                              className="w-full bg-[#180f33] border border-amber-400/80 rounded-xl px-3 py-2 text-xs text-amber-200 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400 font-bold"
+                            />
+                          </div>
+
                           <div>
                             <label className="text-[11px] font-bold text-slate-300 block mb-1">
                               نام اپلیکیشن در پرامپت هوش مصنوعی:
@@ -3790,7 +3881,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               onClick={() => {
                                 const promptText = buildAiAppPrompt(
                                   {
-                                    id: editingProductId || 'pkg-software',
+                                    id: customProductId.trim() || editingProductId || 'pkg-software',
                                     title: newTitle.trim() || 'نرم‌افزار جهش',
                                     aiAppName: aiAppName.trim() || newTitle.trim(),
                                     isSubscription: true,
@@ -3823,7 +3914,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               rows={8}
                               value={buildAiAppPrompt(
                                 {
-                                  id: editingProductId || 'pkg-software',
+                                  id: customProductId.trim() || editingProductId || 'pkg-software',
                                   title: newTitle.trim() || 'نرم‌افزار جهش',
                                   aiAppName: aiAppName.trim() || newTitle.trim(),
                                   isSubscription: true,
@@ -6018,15 +6109,50 @@ on public.users for delete using (true);`;
           {activeTab === 'backup-restore' && (
             <div className="space-y-6">
               <div className="bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-950 p-6 rounded-3xl border border-emerald-500/30 shadow-2xl">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40">
-                    <Download className="w-6 h-6" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40">
+                      <Download className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-white flex items-center gap-2">
+                        <span>پشتیبان‌گیری کامل صفر تا صد سایت جهش‌کالا (Full Backup)</span>
+                        <span className="text-[11px] bg-emerald-900/60 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-700/50">
+                          نسخه جامع
+                        </span>
+                      </h3>
+                      <p className="text-xs text-emerald-300/80 mt-0.5">
+                        پشتیبان‌گیری جامع شامل کلیه محصولات، بنرها، داشبورد تکنولوژی، سفارشات، رسیدهای پرداخت، لایسنس‌های نرم‌افزاری و کاربران.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-black text-white">پشتیبان‌گیری و بازیابی اطلاعات سایت</h3>
-                    <p className="text-xs text-emerald-300/80 mt-0.5">
-                      دریافت فایل پشتیبان کامل از تمامی محصولات، بنرها، سفارشات، کدهای تخفیف و کاربران، و بازیابی آن با یک کلیک.
-                    </p>
+                </div>
+
+                {/* Statistics Overview Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 my-4">
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">محصولات</span>
+                    <span className="text-base font-black text-amber-300 font-mono">{products.length}</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">بنرها</span>
+                    <span className="text-base font-black text-cyan-300 font-mono">{bannersList.length}</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">داشبورد فناوری</span>
+                    <span className="text-base font-black text-purple-300 font-mono">{toolsList.length}</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">سفارشات و رسیدها</span>
+                    <span className="text-base font-black text-emerald-300 font-mono">{orders.length}</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">کاربران</span>
+                    <span className="text-base font-black text-blue-300 font-mono">{usersList.length}</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">کدهای تخفیف</span>
+                    <span className="text-base font-black text-pink-300 font-mono">{coupons.length}</span>
                   </div>
                 </div>
 
@@ -6036,41 +6162,79 @@ on public.users for delete using (true);`;
                     <div>
                       <div className="flex items-center gap-2 text-white font-bold text-sm mb-2">
                         <FileText className="w-4 h-4 text-emerald-400" />
-                        <span>دانلود فایل پشتیبان (Backup)</span>
+                        <span>دانلود فایل پشتیبان کامل صفر تا صد (JSON)</span>
                       </div>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        با کلیک روی دکمه زیر، یک فایل JSON حاوی تمامی محصولات ({products.length} عدد)، بنرها ({bannersList.length} عدد)، سفارشات و اطلاعات سایت دانلود می‌شود تا در هر زمان خواستید از آن استفاده کنید.
+                        این بکاپ تمامی اطلاعات سایت را بدون کم و کاست استخراج می‌کند:
+                        محصولات، طرح‌های داشبورد تکنولوژی جهش، بنرهای اسلایدر، اطلاعات خریداران، رسیدهای تراکنش زیبال، لایسنس‌های صادره و کلیه کاربران ثبت‌نامی.
                       </p>
                     </div>
 
                     <button
-                      onClick={() => {
+                      type="button"
+                      onClick={async () => {
                         try {
-                          const backupData = {
-                            version: '1.0',
-                            timestamp: new Date().toISOString(),
-                            products,
-                            banners: bannersList,
-                            orders,
-                            coupons,
-                            users: usersList,
-                          };
-                          const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+                          let backupPayload: any = null;
+                          try {
+                            const res = await fetch('/api/backup-full');
+                            if (res.ok) {
+                              backupPayload = await res.json();
+                            }
+                          } catch (e) {
+                            console.warn('Backend full backup fetch notice:', e);
+                          }
+
+                          // If backend provided payload, ensure client-side modified tools/products are integrated
+                          if (!backupPayload || !backupPayload.data) {
+                            backupPayload = {
+                              system: 'JAHESH_KALA_PLATFORM',
+                              version: '2.5.0-full-backup',
+                              timestamp: new Date().toISOString(),
+                              exportDateFa: new Intl.DateTimeFormat('fa-IR', { dateStyle: 'full', timeStyle: 'medium', timeZone: 'Asia/Tehran' }).format(new Date()),
+                              siteUrl: 'https://jaheshit.ir',
+                              summary: {
+                                productsCount: products.length,
+                                bannersCount: bannersList.length,
+                                ordersCount: orders.length,
+                                toolsCount: toolsList.length,
+                                usersCount: usersList.length,
+                                couponsCount: coupons.length,
+                              },
+                              data: {
+                                products,
+                                banners: bannersList,
+                                orders,
+                                dashboardTools: toolsList,
+                                users: usersList,
+                                coupons,
+                              }
+                            };
+                          } else {
+                            // Merge client state with backend state for absolute freshness
+                            backupPayload.data.products = products.length > 0 ? products : backupPayload.data.products;
+                            backupPayload.data.banners = bannersList.length > 0 ? bannersList : backupPayload.data.banners;
+                            backupPayload.data.dashboardTools = toolsList.length > 0 ? toolsList : backupPayload.data.dashboardTools;
+                            backupPayload.data.users = usersList.length > 0 ? usersList : backupPayload.data.users;
+                            backupPayload.data.orders = orders.length > 0 ? orders : backupPayload.data.orders;
+                            backupPayload.data.coupons = coupons.length > 0 ? coupons : backupPayload.data.coupons;
+                          }
+
+                          const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupPayload, null, 2));
                           const downloadAnchor = document.createElement('a');
                           downloadAnchor.setAttribute('href', dataStr);
-                          downloadAnchor.setAttribute('download', `jahesh-backup-${new Date().toISOString().slice(0, 10)}.json`);
+                          downloadAnchor.setAttribute('download', `jahesh-full-backup-zero-to-hundred-${new Date().toISOString().slice(0, 10)}.json`);
                           document.body.appendChild(downloadAnchor);
                           downloadAnchor.click();
                           downloadAnchor.remove();
-                          alert('فایل پشتیبان سایت با موفقیت دانلود شد!');
+                          alert(`فایل پشتیبان کامل صفر تا صد با موفقیت دانلود شد!\n\nشامل:\n• ${backupPayload.data?.products?.length || products.length} محصول\n• ${backupPayload.data?.banners?.length || bannersList.length} بنر\n• ${backupPayload.data?.dashboardTools?.length || toolsList.length} طرح داشبورد فناوری\n• ${backupPayload.data?.orders?.length || orders.length} سفارش و رسید\n• ${backupPayload.data?.users?.length || usersList.length} کاربر`);
                         } catch (err: any) {
                           alert('خطا در ایجاد پشتیبان: ' + err.message);
                         }
                       }}
-                      className="mt-5 w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      className="mt-5 w-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
                       <Download className="w-4 h-4" />
-                      <span>دانلود فایل پشتیبان کامل (.json)</span>
+                      <span>دانلود فایل پشتیبان کامل صفر تا صد (.json)</span>
                     </button>
                   </div>
 
@@ -6082,14 +6246,14 @@ on public.users for delete using (true);`;
                         <span>بازیابی اطلاعات از فایل پشتیبان (Restore)</span>
                       </div>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        اگر اطلاعات سایت تغییر کرد یا ریست شد، فایل پشتیبان قبلی خود را انتخاب کنید تا تمامی محصولات، بنرها و اطلاعات به صورت آنی در سایت و دیتابیس ابری بازگردانی شوند.
+                        با انتخاب فایل پشتیبان، تمامی اطلاعات شامل محصولات، بنرها، طرح‌های داشبورد تکنولوژی، سفارشات، رسیدها و کاربران به طور کامل و آنی بازگردانی شده و روی هاست و دیتابیس ابری ذخیره خواهند شد.
                       </p>
                     </div>
 
                     <div className="mt-5">
                       <label className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer">
                         <Upload className="w-4 h-4" />
-                        <span>انتخاب و بارگذاری فایل پشتیبان</span>
+                        <span>انتخاب و بارگذاری فایل پشتیبان کامل</span>
                         <input
                           type="file"
                           accept=".json"
@@ -6104,22 +6268,49 @@ on public.users for delete using (true);`;
                                 if (!json || typeof json !== 'object') {
                                   throw new Error('فایل JSON نامعتبر است.');
                                 }
-                                if (confirm('آیا مطمئن هستید که می‌خواهید اطلاعات پشتیبان را روی سایت بارگذاری کنید؟ محصولات و بنرها جایگزین خواهند شد.')) {
-                                  if (Array.isArray(json.products) && json.products.length > 0) {
+                                if (confirm('آیا مطمئن هستید که می‌خواهید تمامی اطلاعات سایت (محصولات، بنرها، داشبورد فناوری، سفارشات و کاربران) از این فایل پشتیبان بازگردانی شوند؟')) {
+                                  // Send to full restore endpoint
+                                  try {
+                                    await fetch('/api/restore-full', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify(json),
+                                    });
+                                  } catch (e) {
+                                    console.warn('Backend restore-full notice:', e);
+                                  }
+
+                                  const payloadData = json.data || json;
+
+                                  // Restore products
+                                  if (Array.isArray(payloadData.products) && payloadData.products.length > 0) {
                                     await fetch('/api/products', {
                                       method: 'POST',
                                       headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify(json.products),
+                                      body: JSON.stringify(payloadData.products),
                                     });
                                   }
-                                  if (Array.isArray(json.banners) && json.banners.length > 0) {
+
+                                  // Restore banners
+                                  if (Array.isArray(payloadData.banners) && payloadData.banners.length > 0) {
                                     await fetch('/api/banners', {
                                       method: 'POST',
                                       headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify(json.banners),
+                                      body: JSON.stringify(payloadData.banners),
                                     });
                                   }
-                                  alert('اطلاعات با موفقیت بازیابی شد! صفحه به‌روزرسانی می‌شود.');
+
+                                  // Restore tools (داشبورد تکنولوژی جهش)
+                                  const toolsData = payloadData.dashboardTools || payloadData.tools;
+                                  if (Array.isArray(toolsData) && toolsData.length > 0) {
+                                    await fetch('/api/tools', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify(toolsData),
+                                    });
+                                  }
+
+                                  alert('تمامی بخش‌های سایت با موفقیت بازیابی شدند! صفحه به‌روزرسانی می‌شود.');
                                   window.location.reload();
                                 }
                               } catch (err: any) {
