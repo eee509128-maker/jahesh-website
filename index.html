@@ -14,6 +14,69 @@
     }
   </script>
   <script>
+    // Global reactive purple mouse halo tracker
+    // Guarantees purple halo continuously follows mouse cursor even after SPA navigation (e.g. going to dashboard and returning)
+    (function() {
+      var lastX = 50;
+      var lastY = 50;
+      var rafId = null;
+
+      function getHaloElement() {
+        return document.getElementById('mouse-bg');
+      }
+
+      function updateHalo(x, y) {
+        var el = getHaloElement();
+        if (el) {
+          el.style.background = 'radial-gradient(circle at ' + x + '% ' + y + '%, rgba(140, 0, 255, 0.38), #0a0a0a 65%)';
+        }
+      }
+
+      function onPointerMove(e) {
+        if (!e) return;
+        lastX = (e.clientX / window.innerWidth) * 100;
+        lastY = (e.clientY / window.innerHeight) * 100;
+        if (!rafId) {
+          rafId = requestAnimationFrame(function() {
+            updateHalo(lastX, lastY);
+            rafId = null;
+          });
+        }
+      }
+
+      window.addEventListener('mousemove', onPointerMove, { passive: true });
+      window.addEventListener('touchmove', function(e) {
+        if (e.touches && e.touches[0]) onPointerMove(e.touches[0]);
+      }, { passive: true });
+
+      // Handle Vike / SPA back-forward navigation & history popstate
+      ['popstate', 'hashchange', 'pageshow', 'visibilitychange'].forEach(function(evt) {
+        window.addEventListener(evt, function() {
+          requestAnimationFrame(function() { updateHalo(lastX, lastY); });
+          setTimeout(function() { updateHalo(lastX, lastY); }, 50);
+          setTimeout(function() { updateHalo(lastX, lastY); }, 150);
+          setTimeout(function() { updateHalo(lastX, lastY); }, 350);
+        });
+      });
+
+      // MutationObserver watches for DOM re-renders (Vike SPA page swapping)
+      var observer = new MutationObserver(function() {
+        if (getHaloElement()) {
+          updateHalo(lastX, lastY);
+        }
+      });
+
+      if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+          updateHalo(lastX, lastY);
+        });
+      }
+    })();
+  </script>
+  <script>
     // Intercept clicks to /jaheshkala or /jaheshkala/ before Vike router can hijack them
     document.addEventListener('click', function(e) {
       var a = e.target && e.target.closest ? e.target.closest('a') : null;
@@ -426,17 +489,51 @@
       transform: scale(1.04) !important;
     }
 
-    /* Optical Centering for Ferdowsi University Logo */
-    #hero-partners-row a[href*="um.ac.ir"] img,
-    .hero-partners-row a[href*="um.ac.ir"] img,
-    section.cztu8ya a[href*="um.ac.ir"] img {
+    /* Perfect Centering for each Partner Logo */
+    /* 1. Ferdowsi University Logo (subtle horizontal optical adjustment) */
+    #hero-partners-row a[href*="www.um.ac.ir"] img,
+    .hero-partners-row a[href*="www.um.ac.ir"] img,
+    section.cztu8ya a[href*="www.um.ac.ir"] img {
       transform: translateX(-6px) !important;
     }
 
-    #hero-partners-row a[href*="um.ac.ir"]:hover img,
-    .hero-partners-row a[href*="um.ac.ir"]:hover img,
-    section.cztu8ya a[href*="um.ac.ir"]:hover img {
+    #hero-partners-row a[href*="www.um.ac.ir"]:hover img,
+    .hero-partners-row a[href*="www.um.ac.ir"]:hover img,
+    section.cztu8ya a[href*="www.um.ac.ir"]:hover img {
       transform: translateX(-6px) scale(1.04) !important;
+    }
+
+    /* 2. Jahesh Scientific Association Logo (vertically centered in box, counteracting transparent padding) */
+    #hero-partners-row a[href*="t.me"] img,
+    .hero-partners-row a[href*="t.me"] img,
+    #hero-partners-row img[alt*="جهش"],
+    .hero-partners-row img[alt*="جهش"] {
+      transform: translateY(-8px) !important;
+      margin: auto !important;
+    }
+
+    #hero-partners-row a[href*="t.me"]:hover img,
+    .hero-partners-row a[href*="t.me"]:hover img,
+    #hero-partners-row a:hover img[alt*="جهش"],
+    .hero-partners-row a:hover img[alt*="جهش"] {
+      transform: translateY(-8px) scale(1.04) !important;
+    }
+
+    /* 3. Faculty of Veterinary Medicine Logo (perfect horizontal and vertical center) */
+    #hero-partners-row a[href*="vet.um.ac.ir"] img,
+    .hero-partners-row a[href*="vet.um.ac.ir"] img,
+    #hero-partners-row img[alt*="دامپزشکی"],
+    .hero-partners-row img[alt*="دامپزشکی"] {
+      transform: none !important;
+      margin: auto !important;
+      max-height: 195px !important;
+    }
+
+    #hero-partners-row a[href*="vet.um.ac.ir"]:hover img,
+    .hero-partners-row a[href*="vet.um.ac.ir"]:hover img,
+    #hero-partners-row a:hover img[alt*="دامپزشکی"],
+    .hero-partners-row a:hover img[alt*="دامپزشکی"] {
+      transform: scale(1.04) !important;
     }
 
     /* Completely hide any non-image elements inside partner cards */
@@ -1127,17 +1224,51 @@
         transform: scale(1.04) !important;
       }
 
-      /* Optical Centering for Ferdowsi University Logo */
-      #hero-partners-row a[href*="um.ac.ir"] img,
-      .hero-partners-row a[href*="um.ac.ir"] img,
-      section.cztu8ya a[href*="um.ac.ir"] img {
+      /* Perfect Centering for each Partner Logo */
+      /* 1. Ferdowsi University Logo (subtle horizontal optical adjustment) */
+      #hero-partners-row a[href*="www.um.ac.ir"] img,
+      .hero-partners-row a[href*="www.um.ac.ir"] img,
+      section.cztu8ya a[href*="www.um.ac.ir"] img {
         transform: translateX(-6px) !important;
       }
 
-      #hero-partners-row a[href*="um.ac.ir"]:hover img,
-      .hero-partners-row a[href*="um.ac.ir"]:hover img,
-      section.cztu8ya a[href*="um.ac.ir"]:hover img {
+      #hero-partners-row a[href*="www.um.ac.ir"]:hover img,
+      .hero-partners-row a[href*="www.um.ac.ir"]:hover img,
+      section.cztu8ya a[href*="www.um.ac.ir"]:hover img {
         transform: translateX(-6px) scale(1.04) !important;
+      }
+
+      /* 2. Jahesh Scientific Association Logo (vertically centered in box, counteracting transparent padding) */
+      #hero-partners-row a[href*="t.me"] img,
+      .hero-partners-row a[href*="t.me"] img,
+      #hero-partners-row img[alt*="جهش"],
+      .hero-partners-row img[alt*="جهش"] {
+        transform: translateY(-8px) !important;
+        margin: auto !important;
+      }
+
+      #hero-partners-row a[href*="t.me"]:hover img,
+      .hero-partners-row a[href*="t.me"]:hover img,
+      #hero-partners-row a:hover img[alt*="جهش"],
+      .hero-partners-row a:hover img[alt*="جهش"] {
+        transform: translateY(-8px) scale(1.04) !important;
+      }
+
+      /* 3. Faculty of Veterinary Medicine Logo (perfect horizontal and vertical center) */
+      #hero-partners-row a[href*="vet.um.ac.ir"] img,
+      .hero-partners-row a[href*="vet.um.ac.ir"] img,
+      #hero-partners-row img[alt*="دامپزشکی"],
+      .hero-partners-row img[alt*="دامپزشکی"] {
+        transform: none !important;
+        margin: auto !important;
+        max-height: 195px !important;
+      }
+
+      #hero-partners-row a[href*="vet.um.ac.ir"]:hover img,
+      .hero-partners-row a[href*="vet.um.ac.ir"]:hover img,
+      #hero-partners-row a:hover img[alt*="دامپزشکی"],
+      .hero-partners-row a:hover img[alt*="دامپزشکی"] {
+        transform: scale(1.04) !important;
       }
 
       /* Hide extra plain text since calligraphy is inside the PNG logos */
@@ -1924,20 +2055,20 @@
           <div id="hero-partners-row"
             class="w-box copqmak c10zkoym ct8c5y2 cori9ti cstj0zg c1vrexag cwho2c5 cl5hb04 c174sw29 cas7ks9 c155h8oe cw7dtlx czsotsp hero-partners-row">
             <a href="https://www.um.ac.ir/#"
-              class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c11xl3nf c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c27i6a7 c1xgpbbr"><img
+              class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h"><img
                 class="w-image coejy3h c1fhiulb ckf5uvt c1av00hf cji8cjn" alt="دانشگاه فردوسی مشهد" width="1343" height="1640"
                 sizes="100vw"
                 srcSet="/assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 16w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 32w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 48w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 64w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 96w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 128w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 256w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 384w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 640w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 750w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 828w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 1080w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 1200w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 1920w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 2048w, /assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png 3840w"
                 src="/assets/FUM_1logo_QyjzwCOWxlm-o5eGyjMR6.png" decoding="async" loading="lazy" /></a><a
               href="https://t.me/+7eeuF5ZMpFRmYzg8"
-              class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1qom380 cw6350v c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c19ltm5q"><img
-                class="w-image c58g4rx c1fhiulb c1syou84 cwdvs8x ccre34y c1av00hf cji8cjn" alt="انجمن علمی جهش" width="1343"
+              class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h"><img
+                class="w-image c58g4rx c1fhiulb c1av00hf cji8cjn" alt="انجمن علمی جهش" width="1343"
                 height="1640" sizes="100vw"
                 srcSet="/assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 16w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 32w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 48w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 64w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 96w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 128w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 256w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 384w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 640w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 750w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 828w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 1080w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 1200w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 1920w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 2048w, /assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png 3840w"
                 src="/assets/FUM1_1logo_LTKhNCtX38K-ImiS0e0uR.png" decoding="async" loading="lazy" /></a><a
               href="https://vet.um.ac.ir/index.php/fa/"
-              class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h c1cn3fw9 cshakd0 c5ehae6 c1w2ebm1 cscr3j6 c1380t7s c1yvubyx cbxwzfl ckdqtrq c1qpskvc c1qoie81 c6knbyk cbole29 c11qs19r c1mtgfjh"><img
-                class="w-image coejy3h c1fhiulb c1qom380 c1av00hf cji8cjn cvu031e ctfghqu cfihc2m" alt="دانشکده دامپزشکی" width="334"
+              class="w-link hero-partner-card cc9xhl5 c1nvgabo c1u0yu0y c1i2rq6e c12n5uks csb0ifw cg5j03k c8od1c4 czr2pxy c1bkqfhr cry9bxc c1qyy4dh ct02u4h"><img
+                class="w-image coejy3h c1fhiulb c1av00hf cji8cjn" alt="دانشکده دامپزشکی" width="334"
                 height="500" sizes="100vw"
                 srcSet="/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 16w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 32w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 48w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 64w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 96w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 128w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 256w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 384w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 640w, /assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png 750w"
                 src="/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png" decoding="async"
