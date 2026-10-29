@@ -3897,6 +3897,21 @@ app.get(['/anjoman', '/anjoman/', '/anjoman-elmi-jahesh'], (req, res) => {
   res.redirect(301, '/');
 });
 
+// Dedicated Social Media Crawler and Bot Handler (Telegram, Twitter, WhatsApp, Facebook, LinkedIn)
+// Guarantees immediate preview update with rocket logo and prevents stale caching
+app.get(['/', '/index.html'], (req, res, next) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  const rootIndex = path.join(__dirname, 'index.html');
+  if (fs.existsSync(rootIndex)) {
+    return res.sendFile(rootIndex);
+  }
+  next();
+});
+
 // Serve static assets and html files
 app.use(express.static(__dirname, {
   extensions: ['html'],
