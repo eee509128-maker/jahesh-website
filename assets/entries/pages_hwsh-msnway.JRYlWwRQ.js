@@ -51,15 +51,15 @@ c.jsx("section",{className:"ai-models-grid-section",children:
       c.jsx("div",{className:"ai-card-glow"}),
       c.jsxs("div",{children:[
         c.jsxs("div",{className:"ai-card-header",children:[c.jsx("div",{className:"ai-card-icon",children:"💡"}),c.jsx("span",{className:"ai-badge ai-badge-stable",children:"نسخه بهینه"})]}),
-        c.jsx("h3",{className:"ai-card-title",children:"جهش ۱.۲"}),
-        c.jsx("p",{className:"ai-card-desc",children:"محیط گفتگوی سبک و کارآمد با دسترسی مستقیم و آسان برای پاسخ‌های سریع."}),
+        c.jsx("h3",{className:"ai-card-title",children:"جهش ۲"}),
+        c.jsx("p",{className:"ai-card-desc",children:"سامانه هوشمند هوش مصنوعی جهش ۲ با قابلیت‌های پیشرفته مکالمه و پردازش."}),
         c.jsxs("ul",{className:"ai-card-features",children:[
           c.jsxs("li",{children:[c.jsx("span",{children:"✓"})," بارگذاری فوق‌العاده سبک و کم‌حجم"]}),
           c.jsxs("li",{children:[c.jsx("span",{children:"✓"})," دسترسی سریع بدون تاخیر"]}),
           c.jsxs("li",{children:[c.jsx("span",{children:"✓"})," محیط کاربری ساده و متمرکز"]})
         ]})
       ]}),
-      c.jsx("a",{href:"/ai",className:"ai-btn-launch",children:"ورود به جهش ۱.۲ ←"})
+      c.jsx("a",{href:"https://jahesh-2-six.vercel.app/",className:"ai-btn-launch",children:"ورود به جهش ۲ ←"})
     ]}),
     c.jsxs("div",{className:"ai-model-card",style:{"--card-accent-grad":"linear-gradient(90deg, #10b981, #06b6d4)","--card-glow-color":"rgba(16, 185, 129, 0.2)","--btn-grad":"linear-gradient(135deg, #10b981, #06b6d4)","--btn-shadow":"rgba(16, 185, 129, 0.45)","--icon-bg":"linear-gradient(135deg, #10b981, #06b6d4)"},children:[
       c.jsx("div",{className:"ai-card-glow"}),
