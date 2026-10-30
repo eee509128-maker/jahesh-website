@@ -10,14 +10,21 @@
   <!-- ۲. فروشگاه اینترنتی جهش کالا -->
   <url>
     <loc>https://jaheshit.ir/jaheshkala/</loc>
-    <lastmod>2026-10-09</lastmod>
+    <lastmod>2026-10-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
-  <!-- ۳. بیمارستان دانشکده دامپزشکی جهش -->
+  <!-- ۳. سامانه و پلتفرم هوش مصنوعی جهش ۲ -->
+  <url>
+    <loc>https://jaheshit.ir/hwsh-msnway/</loc>
+    <lastmod>2026-10-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <!-- ۴. بیمارستان دانشکده دامپزشکی جهش -->
   <url>
     <loc>https://jaheshit.ir/vet-hospital/</loc>
-    <lastmod>2026-10-09</lastmod>
+    <lastmod>2026-10-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>

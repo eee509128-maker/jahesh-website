@@ -3887,9 +3887,20 @@ app.get(['/jahesh-it', '/jahesh-it/', '/jahesh-it/*', '/it', '/it/', '/it/*', '/
   res.redirect(301, '/');
 });
 
-// 2. هوش مصنوعی جهش (Jahesh AI) -> باید مستقیماً برود به https://jahesh-2-six.vercel.app/
-app.get(['/ai', '/ai/', '/ai/*', '/ai-v13', '/ai-v13/', '/ai-v13/*', '/hwsh-msnway', '/hwsh-msnway/', '/hwsh-msnway/*', '/chat', '/chat/', '/chat/*'], (req, res) => {
-  res.redirect(301, 'https://jahesh-2-six.vercel.app/');
+// 2. هوش مصنوعی جهش (Jahesh AI) -> سرو صفحه اختصاصی و سئو هوش مصنوعی جهش ۲ با HTTP 200
+app.get(['/ai', '/ai/', '/ai-v13', '/ai-v13/', '/hwsh-msnway', '/hwsh-msnway/'], (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  const aiFile = path.join(__dirname, 'hwsh-msnway', 'index.html');
+  if (fs.existsSync(aiFile)) {
+    return res.sendFile(aiFile);
+  }
+  return res.redirect(302, 'https://jahesh-2-six.vercel.app/');
+});
+
+// مسیر ورود مستقیم به وب‌اپلیکیشن چت هوش مصنوعی
+app.get(['/chat', '/chat/', '/ai/app'], (req, res) => {
+  res.redirect(302, 'https://jahesh-2-six.vercel.app/');
 });
 
 // 3. انجمن علمی جهش (Jahesh Scientific Association alias)

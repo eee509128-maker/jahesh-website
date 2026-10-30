@@ -1,26 +1,277 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fa" dir="rtl">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>هوش مصنوعی جهش 2 | جهش ای تی</title>
-    <meta name="description" content="سامانه رسمی هوش مصنوعی جهش 2؛ جدیدترین نسل هوش مصنوعی جهش با قابلیت‌های پیشرفته پردازش، مکالمه و پاسخگویی سریع." />
-    <link rel="canonical" href="https://jaheshit.ir/hwsh-msnway/" />
-    <link rel="icon" type="image/png" href="/favicon-512x512.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta property="og:title" content="هوش مصنوعی جهش 2 | جهش ای تی" />
-    <meta property="og:description" content="سامانه رسمی هوش مصنوعی جهش 2؛ نسل جدید هوش مصنوعی جهش با امکانات فوق‌پیشرفته." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://jaheshit.ir/hwsh-msnway/" />
-    <meta property="og:image" content="https://jaheshit.ir/assets/jahesh-logo.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="هوش مصنوعی جهش 2 | جهش ای تی" />
-    <meta name="twitter:description" content="سامانه رسمی هوش مصنوعی جهش 2؛ نسل جدید هوش مصنوعی جهش با امکانات فوق‌پیشرفته." />
-    <meta name="twitter:image" content="https://jaheshit.ir/assets/jahesh-logo.png" />
-    <script type="module" crossorigin src="/assets/index-CB1tzPOZ.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Bvcy9ASu.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>هوش مصنوعی جهش | سامانه رسمی هوش مصنوعی جهش ۲</title>
+  <meta name="description" content="سامانه و پلتفرم رسمی هوش مصنوعی جهش (هوش مصنوعی جهش ۲)؛ نسل پیشرفته دستیار هوشمند، چت بلادرنگ فارسی، تولید محتوا، کدنویسی و تریاژ تشخیصی بدون فیلترشکن." />
+  <meta name="keywords" content="هوش مصنوعی جهش, هوش مصنوعی جهش ۲, هوش مصنوعی جهش 2, سامانه هوش مصنوعی جهش, چت جهش, هوش مصنوعی جهش ای تی, پلتفرم هوش مصنوعی جهش, jahesh ai" />
+  <meta name="author" content="جهش | جهش ای تی" />
+  <link rel="canonical" href="https://jaheshit.ir/hwsh-msnway/" />
+  
+  <!-- Favicon & Icons -->
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="image_src" href="https://jaheshit.ir/assets/jahesh-logo.png" />
+  
+  <!-- Open Graph -->
+  <meta property="og:url" content="https://jaheshit.ir/hwsh-msnway/" />
+  <meta property="og:site_name" content="جهش" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="هوش مصنوعی جهش | سامانه رسمی هوش مصنوعی جهش ۲" />
+  <meta property="og:description" content="سامانه و پلتفرم رسمی هوش مصنوعی جهش ۲؛ نسل جدید هوش مصنوعی ایرانی با قابلیت پردازش سریع، کدنویسی، نگارش و پاسخ به تمامی پرسش‌ها." />
+  <meta property="og:image" content="https://jaheshit.ir/assets/jahesh-logo.png" />
+  <meta property="og:image:secure_url" content="https://jaheshit.ir/assets/jahesh-logo.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="512" />
+  <meta property="og:image:height" content="512" />
+  <meta property="og:image:alt" content="لوگوی رسمی هوش مصنوعی جهش" />
+  
+  <!-- Twitter Cards -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="هوش مصنوعی جهش | سامانه رسمی هوش مصنوعی جهش ۲" />
+  <meta name="twitter:description" content="سامانه رسمی هوش مصنوعی جهش ۲؛ نسل جدید هوش مصنوعی ایرانی با امکانات فوق‌پیشرفته." />
+  <meta name="twitter:image" content="https://jaheshit.ir/assets/jahesh-logo.png" />
+
+  <!-- Fonts & Styles -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Vazirmatn', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              purple: '#8c00ff',
+              neon: '#a855f7',
+              dark: '#0a0a0f',
+              card: '#120f24',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Schema.org JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://jaheshit.ir/hwsh-msnway/#app",
+        "name": "هوش مصنوعی جهش (Jahesh AI 2)",
+        "alternateName": [
+          "هوش مصنوعی جهش",
+          "هوش مصنوعی جهش ۲",
+          "هوش مصنوعی جهش 2",
+          "سامانه هوش مصنوعی جهش",
+          "Jahesh AI",
+          "چت هوش مصنوعی جهش"
+        ],
+        "applicationCategory": "BusinessApplication, UtilitiesApplication",
+        "operatingSystem": "All, Web, Android, iOS, Windows",
+        "url": "https://jaheshit.ir/hwsh-msnway/",
+        "image": "https://jaheshit.ir/assets/jahesh-logo.png",
+        "description": "سامانه و پلتفرم هوش مصنوعی جهش ۲؛ دستیار هوشمند نسل جدید با قابلیت پردازش متن، مکالمه بلادرنگ، کدنویسی، پاسخ به سوالات تخصصی و تریاژ پزشکی.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "IRR"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "جهش (جهش ای تی)",
+          "url": "https://jaheshit.ir/"
+        }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://jaheshit.ir/hwsh-msnway/#webpage",
+        "url": "https://jaheshit.ir/hwsh-msnway/",
+        "name": "هوش مصنوعی جهش | سامانه رسمی هوش مصنوعی جهش ۲",
+        "description": "سامانه رسمی هوش مصنوعی جهش (هوش مصنوعی جهش ۲)؛ نسل پیشرفته دستیار هوشمند و گفتگوی آنلاین فارسی.",
+        "primaryImageOfPage": {
+          "@type": "ImageObject",
+          "url": "https://jaheshit.ir/assets/jahesh-logo.png",
+          "caption": "لوگوی رسمی هوش مصنوعی جهش"
+        },
+        "inLanguage": "fa-IR"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "هوش مصنوعی جهش چیست؟",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "هوش مصنوعی جهش (نسخه ۲) جدیدترین بستر هوش مصنوعی توسعه‌یافته توسط جهش ای تی است که قابلیت مکالمه طبیعی به زبان فارسی، تحلیل داده، حل مسائل برنامه‌نویسی و مشاوره هوشمند را فراهم می‌کند."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "چگونه وارد هوش مصنوعی جهش ۲ شویم؟",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "برای استفاده از هوش مصنوعی جهش ۲، کافی است روی دکمه ورود به سامانه هوش مصنوعی در نشانی https://jaheshit.ir/hwsh-msnway/ کلیک نمایید تا مستقیماً به محیط چت هوشمند منتقل شوید."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "آیا استفاده از هوش مصنوعی جهش نیاز به فیلترشکن دارد؟",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "خیر، سامانه هوش مصنوعی جهش کاملاً برای کاربران داخل کشور بهینه‌سازی شده و بدون نیاز به فیلترشکن با سرعت بسیار بالا در دسترس است."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body class="bg-[#080612] text-slate-100 font-sans selection:bg-purple-600 selection:text-white min-h-screen relative overflow-x-hidden">
+
+  <!-- Glow Background -->
+  <div class="fixed inset-0 pointer-events-none z-0">
+    <div class="absolute top-0 right-1/4 w-96 h-96 bg-purple-700/20 rounded-full blur-[120px]"></div>
+    <div class="absolute bottom-1/3 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[140px]"></div>
+  </div>
+
+  <!-- Navbar -->
+  <header class="relative z-50 border-b border-white/10 bg-black/40 backdrop-blur-md sticky top-0">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="/" class="flex items-center gap-3">
+          <img src="/assets/jahesh-logo.png" alt="لوگوی جهش" class="w-12 h-12 object-contain drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]" />
+          <div class="text-right">
+            <span class="block text-xl font-black tracking-tight text-white">هوش مصنوعی جهش</span>
+            <span class="block text-xs text-purple-400 font-medium">نسل دوم | Jahesh AI 2</span>
+          </div>
+        </a>
+      </div>
+      <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-300">
+        <a href="/" class="hover:text-white transition">صفحه اصلی جهش</a>
+        <a href="/jaheshkala/" class="hover:text-white transition">جهش کالا</a>
+        <a href="/vet-hospital/" class="hover:text-white transition">بیمارستان دامپزشکی جهش</a>
+        <a href="/abzar-jahesh/" class="hover:text-white transition">داشبورد فناوری</a>
+      </nav>
+      <div>
+        <a href="https://jahesh-2-six.vercel.app/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl shadow-[0_0_20px_rgba(140,0,255,0.4)] transition transform hover:-translate-y-0.5">
+          <span>ورود به هوش مصنوعی</span>
+          <svg class="w-4 h-4 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="relative z-10 max-w-5xl mx-auto px-4 pt-12 pb-24 text-center">
+    
+    <!-- Badge -->
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-purple-500/30 bg-purple-900/30 backdrop-blur-md mb-8">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span class="text-xs font-semibold text-purple-300">نسخه جدید: هوش مصنوعی جهش ۲ فعال شد</span>
+    </div>
+
+    <!-- Main Headings for Exact SEO Matching -->
+    <h1 class="text-4xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-100 to-slate-400 mb-6 leading-tight">
+      هوش مصنوعی جهش
+    </h1>
+    <h2 class="text-xl sm:text-2xl font-bold text-purple-300 mb-6">
+      سامانه و پلتفرم پیشرفته هوش مصنوعی جهش ۲ (دستیار هوشمند ایرانی)
+    </h2>
+    <p class="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed mb-10">
+      هوش مصنوعی جهش ۲ با معماری مدرن زبانی، پاسخگویی بلادرنگ به زبان فارسی، تحلیل داده‌های تخصصی و حل مسائل برنامه‌نویسی را به صورت کاملاً سریع و بدون فیلترشکن در اختیار شما می‌گذارد.
+    </p>
+
+    <!-- CTAs -->
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+      <a href="https://jahesh-2-six.vercel.app/" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-lg px-8 py-4 rounded-2xl shadow-[0_0_30px_rgba(140,0,255,0.6)] transition transform hover:scale-105">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        <span>ورود به چت هوش مصنوعی جهش ۲</span>
+      </a>
+      <a href="/" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/15 font-bold text-base px-6 py-4 rounded-2xl transition">
+        <span>بازگشت به سایت اصلی جهش</span>
+      </a>
+    </div>
+
+    <!-- Feature Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-right mb-20">
+      <div class="p-6 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md hover:border-purple-500/50 transition">
+        <div class="w-12 h-12 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-4">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-2">مکالمه طبیعی فارسی</h3>
+        <p class="text-sm text-slate-400 leading-relaxed">
+          درک عمیق واژگان و نگارش زبان فارسی، تولید مقالات علمی، نامه‌نگاری‌های اداری و محتوای شبکه‌های اجتماعی.
+        </p>
+      </div>
+
+      <div class="p-6 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md hover:border-purple-500/50 transition">
+        <div class="w-12 h-12 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-4">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-2">کدنویسی و توسعه نرم‌افزار</h3>
+        <p class="text-sm text-slate-400 leading-relaxed">
+          تولید و عیب‌یابی کدهای پایتون، جاوااسکریپت، ری‌اکت، پرس‌وجوهای پایگاه داده و پیکربندی سرورها.
+        </p>
+      </div>
+
+      <div class="p-6 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md hover:border-purple-500/50 transition">
+        <div class="w-12 h-12 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-4">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-2">سرعت بالا و بدون فیلتر</h3>
+        <p class="text-sm text-slate-400 leading-relaxed">
+          اتصال مستقیم بدون نیاز به VPN، پایداری شبانه‌روزی و دسترس‌پذیری بر بستر شبکه ملی و بین‌المللی.
+        </p>
+      </div>
+    </div>
+
+    <!-- FAQ Accordion / Box -->
+    <div class="max-w-3xl mx-auto text-right border-t border-white/10 pt-12">
+      <h3 class="text-2xl font-black text-white text-center mb-8">سوالات متداول درباره هوش مصنوعی جهش</h3>
+      <div class="space-y-4">
+        <div class="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+          <h4 class="text-base font-bold text-purple-300 mb-2">هوش مصنوعی جهش چیست؟</h4>
+          <p class="text-sm text-slate-300 leading-relaxed">
+            هوش مصنوعی جهش (جهش ۲) سامانه هوشمند ارائه شده توسط مجموعه جهش ای تی است که برای برطرف کردن نیازهای پژوهشی، تولید محتوا، کدنویسی و پاسخ به سوالات فارسی طراحی شده است.
+          </p>
+        </div>
+        <div class="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+          <h4 class="text-base font-bold text-purple-300 mb-2">آیا هوش مصنوعی جهش ۲ رایگان است؟</h4>
+          <p class="text-sm text-slate-300 leading-relaxed">
+            بله، کاربران گرامی می‌توانند به صورت مستقیم و رایگان وارد محیط سامانه هوش مصنوعی جهش ۲ شده و با آن گفتگو نمایند.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="relative z-10 border-t border-white/10 bg-black/60 py-8 text-center text-sm text-slate-400">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p>© ۱۴۰۵ کلیه حقوق برای سامانه جهش (جهش ای تی) محفوظ است.</p>
+      <div class="flex items-center gap-4 text-xs">
+        <a href="/" class="hover:text-white">صفحه اصلی جهش</a>
+        <span>•</span>
+        <a href="/jaheshkala/" class="hover:text-white">جهش کالا</a>
+        <span>•</span>
+        <a href="/drbarh-anjmn/" class="hover:text-white">درباره انجمن علمی جهش</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
 </html>
