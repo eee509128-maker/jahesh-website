@@ -6,7 +6,8 @@ import appAuthHandler from './api/app-auth.js';
 import {
   findProductByIdentifier,
   renderProductHtml,
-  generateProductsSitemapXml
+  generateProductsSitemapXml,
+  generateMasterSitemapXml
 } from './api/product-seo.js';
 import {
   readVetDepartments,
@@ -3456,27 +3457,8 @@ app.post(['/api/zibal-request', '/api/vet/zibal-request', '/vet-hospital/api/zib
     }
 
     if (data && data.result === 100 && data.trackId) {
-      // Auto-save pending order directly to server orders disk
-      if (req.body?.orderData) {
-        try {
-          const currentOrders = readOrdersFromDisk();
-          const pOrder = { ...req.body.orderData };
-          pOrder.trackingCode = String(data.trackId);
-          pOrder.zibalTrackId = String(data.trackId);
-          pOrder.status = pOrder.status || 'در حال بررسی';
-          pOrder.createdAt = pOrder.createdAt || new Date().toISOString();
-          const pIdx = currentOrders.findIndex((o) => o.id === pOrder.id);
-          if (pIdx >= 0) {
-            currentOrders[pIdx] = { ...currentOrders[pIdx], ...pOrder };
-          } else {
-            currentOrders.unshift(pOrder);
-          }
-          writeOrdersToDisk(currentOrders);
-          console.log(`[Orders] Auto-saved pending order ${pOrder.id} with trackId ${data.trackId}`);
-        } catch (saveErr) {
-          console.warn('[Orders] Could not auto-save pending order on request:', saveErr);
-        }
-      }
+      // NOTE: Unpaid pending orders are NOT saved to disk here.
+      // Orders are ONLY saved to orders.json and database when bank payment is verified successfully.
 
       // Auto-save pending vet hospital appointment
       if (req.body?.appointmentData) {
@@ -3924,6 +3906,18 @@ app.get([
     console.error('Error rendering product SEO page:', err);
   }
   next();
+});
+
+// Master Sitemap (Includes All Core Ecosystem Pages + All 60+ Dynamic Products)
+app.get(['/sitemap.xml', '/sitemap_index.xml'], (req, res) => {
+  const host = req.get('host') || '';
+  const origin = (host && !host.includes('localhost') && !host.includes('127.0.0.1'))
+    ? req.protocol + '://' + host
+    : 'https://jaheshit.ir';
+  const xml = generateMasterSitemapXml(origin);
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+  res.send(xml);
 });
 
 // Dynamic Products Sitemap

@@ -160,13 +160,31 @@ export function findProductByIdentifier(rawId) {
     const divar = all.find((p) => p.id === 'tool_2');
     if (divar) return divar;
   }
+  if (target === 'boxsender' || target === 'booksender' || target === 'بوکسندر' || target === 'جهش-بوکسندر') {
+    const box = all.find((p) => p.title.includes('بوکسندر'));
+    if (box) return box;
+  }
+  if (target === 'payesh' || target === 'payeshlatori' || target === 'پایشلاتوری') {
+    const payesh = all.find((p) => p.title.includes('پایشلاتوری'));
+    if (payesh) return payesh;
+  }
   if (target === 'marketing' || target === 'مارکتینگ') {
     const mkt = all.find((p) => p.title.includes('مارکتینگ'));
     if (mkt) return mkt;
   }
 
-  // 3. Partial Title Match
-  const byTitle = all.find((p) => p.title.toLowerCase().includes(target));
+  // 3. Universal slug / title match (supports future products automatically)
+  const cleanTargetWords = target.replace(/[-_]+/g, ' ').trim();
+  const byTitle = all.find((p) => {
+    const t = p.title.toLowerCase();
+    const slug = t.replace(/\s+/g, '-');
+    return (
+      t.includes(target) ||
+      t.includes(cleanTargetWords) ||
+      slug.includes(target) ||
+      (p.downloadUrl && p.downloadUrl.toLowerCase().includes(target))
+    );
+  });
   if (byTitle) return byTitle;
 
   return null;
@@ -579,9 +597,72 @@ export function renderProductHtml(product, origin = 'https://jaheshit.ir') {
 </html>`;
 }
 
+export function generateMasterSitemapXml(origin = 'https://jaheshit.ir') {
+  const products = getAllProducts();
+  const dateStr = new Date().toISOString().split('T')[0];
+
+  const primaryPages = [
+    { loc: `${origin}/`, priority: '1.0', changefreq: 'daily' },
+    { loc: `${origin}/jaheshkala/`, priority: '1.0', changefreq: 'daily' },
+    { loc: `${origin}/hwsh-msnway/`, priority: '1.0', changefreq: 'daily' },
+    { loc: `${origin}/vet-hospital/`, priority: '1.0', changefreq: 'daily' },
+    { loc: `${origin}/drbarh-anjmn/`, priority: '0.95', changefreq: 'weekly' },
+    { loc: `${origin}/abzar-jahesh/`, priority: '0.85', changefreq: 'weekly' },
+    { loc: `${origin}/akhbar/`, priority: '0.80', changefreq: 'daily' },
+    { loc: `${origin}/llms.txt`, priority: '0.75', changefreq: 'weekly' },
+  ];
+
+  const pageUrls = primaryPages.map(p => `  <url>
+    <loc>${p.loc}</loc>
+    <lastmod>${dateStr}</lastmod>
+    <changefreq>${p.changefreq}</changefreq>
+    <priority>${p.priority}</priority>
+  </url>`).join('\n');
+
+  const productUrls = products.map((p) => {
+    const loc = `${origin}/jaheshkala/product/${encodeURIComponent(p.id)}`;
+    const mod = p.updatedAt ? p.updatedAt.split('T')[0] : dateStr;
+    return `  <url>
+    <loc>${loc}</loc>
+    <lastmod>${mod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>`;
+  }).join('\n');
+
+  const friendlySlugs = [
+    `${origin}/jaheshkala/product/boxsender`,
+    `${origin}/jaheshkala/product/shantia`
+  ].map(loc => `  <url>
+    <loc>${loc}</loc>
+    <lastmod>${dateStr}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>`).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- ۱. صفحات اصلی اکوسیستم جهش -->
+${pageUrls}
+  <!-- ۲. کلیه محصولات و پکیج‌های فروشگاه اینترنتی جهش کالا (تولید پویا برای گوگل) -->
+${friendlySlugs}
+${productUrls}
+</urlset>`;
+}
+
 export function generateProductsSitemapXml(origin = 'https://jaheshit.ir') {
   const products = getAllProducts();
   const dateStr = new Date().toISOString().split('T')[0];
+
+  const friendlySlugs = [
+    `${origin}/jaheshkala/product/boxsender`,
+    `${origin}/jaheshkala/product/shantia`
+  ].map(loc => `  <url>
+    <loc>${loc}</loc>
+    <lastmod>${dateStr}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>`).join('\n');
 
   const urls = products.map((p) => {
     const loc = `${origin}/jaheshkala/product/${encodeURIComponent(p.id)}`;
@@ -596,6 +677,8 @@ export function generateProductsSitemapXml(origin = 'https://jaheshit.ir') {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${friendlySlugs}
 ${urls}
 </urlset>`;
 }
+
