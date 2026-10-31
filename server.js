@@ -4,6 +4,11 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import appAuthHandler from './api/app-auth.js';
 import {
+  findProductByIdentifier,
+  renderProductHtml,
+  generateProductsSitemapXml
+} from './api/product-seo.js';
+import {
   readVetDepartments,
   readVetProfessors,
   writeVetProfessors,
@@ -3849,6 +3854,15 @@ app.get(['/vet-hospital', '/vet-hospital/*'], (req, res, next) => {
 const jaheshkalaDir = path.join(__dirname, 'jaheshkala');
 app.use('/jaheshkala', express.static(jaheshkalaDir));
 app.get(['/jaheshkala', '/jaheshkala/*'], (req, res, next) => {
+  // Allow product SEO routes to pass through to the product SEO handler
+  if (
+    req.path.startsWith('/jaheshkala/product/') ||
+    req.path.startsWith('/jaheshkala/item/') ||
+    req.path.startsWith('/jaheshkala/tool/') ||
+    req.path.startsWith('/jaheshkala/p/')
+  ) {
+    return next();
+  }
   if (path.extname(req.path)) {
     return next();
   }
@@ -3881,14 +3895,63 @@ app.get('/jaheshkala', (req, res) => {
   res.redirect(301, '/jaheshkala/');
 });
 
+// ==========================================
+// Dynamic Product SEO System for Jaheshkala
+// Gives every product its own dedicated Google ranking page with Schema.org & full keywords
+// ==========================================
+app.get([
+  '/jaheshkala/product/:id',
+  '/jaheshkala/item/:id',
+  '/jaheshkala/tool/:id',
+  '/jaheshkala/p/:id',
+  '/product/:id',
+  '/kala/:id'
+], (req, res, next) => {
+  try {
+    const rawId = req.params.id;
+    const product = findProductByIdentifier(rawId);
+    if (product) {
+      const host = req.get('host') || '';
+      const origin = (host && !host.includes('localhost') && !host.includes('127.0.0.1'))
+        ? req.protocol + '://' + host
+        : 'https://jaheshit.ir';
+      const html = renderProductHtml(product, origin);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+      return res.send(html);
+    }
+  } catch (err) {
+    console.error('Error rendering product SEO page:', err);
+  }
+  next();
+});
+
+// Dynamic Products Sitemap
+app.get(['/sitemap-products.xml', '/jaheshkala/sitemap-products.xml'], (req, res) => {
+  const host = req.get('host') || '';
+  const origin = (host && !host.includes('localhost') && !host.includes('127.0.0.1'))
+    ? req.protocol + '://' + host
+    : 'https://jaheshit.ir';
+  const xml = generateProductsSitemapXml(origin);
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+  res.send(xml);
+});
+
 // Dedicated routes for the 5 Pillars of Jahesh Ecosystem
 // 1. جهش ای تی (Jahesh IT) -> باید مستقیماً برود به سایت اصلی https://jaheshit.ir/
 app.get(['/jahesh-it', '/jahesh-it/', '/jahesh-it/*', '/it', '/it/', '/it/*', '/jaheshit', '/jaheshit/', '/jaheshit/*'], (req, res) => {
   res.redirect(301, '/');
 });
 
-// 2. هوش مصنوعی جهش (Jahesh AI) -> سرو صفحه اختصاصی و سئو هوش مصنوعی جهش ۲ با HTTP 200
-app.get(['/ai', '/ai/', '/ai-v13', '/ai-v13/', '/hwsh-msnway', '/hwsh-msnway/'], (req, res) => {
+// 2. هدایت قطعی ۳۰۱ برای آدرس‌های قدیمی هوش مصنوعی (/ai) به آدرس رسمی (/hwsh-msnway/)
+// این کار باعث می‌شود گوگل آدرس تکراری «هوش مصنوعی | جهش آی تی» را از نتایج سرچ حذف کرده و با هوش مصنوعی جهش ادغام کند
+app.get(['/ai', '/ai/', '/ai-v13', '/ai-v13/'], (req, res) => {
+  res.redirect(301, '/hwsh-msnway/');
+});
+
+// صفحه رسمی و رتبه اول هوش مصنوعی جهش ۲ با HTTP 200
+app.get(['/hwsh-msnway', '/hwsh-msnway/'], (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
   const aiFile = path.join(__dirname, 'hwsh-msnway', 'index.html');

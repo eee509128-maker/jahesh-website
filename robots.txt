@@ -48,5 +48,6 @@ User-agent: Bingbot
 Allow: /
 
 Sitemap: https://jaheshit.ir/sitemap.xml
+Sitemap: https://jaheshit.ir/sitemap-products.xml
 Sitemap: https://jaheshit.ir/llms.txt
 Sitemap: https://jaheshit.ir/llms-full.txt
