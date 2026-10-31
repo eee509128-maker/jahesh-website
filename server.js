@@ -3966,8 +3966,8 @@ app.get(['/chat', '/chat/', '/ai/app'], (req, res) => {
   res.redirect(302, 'https://jahesh-2-six.vercel.app/');
 });
 
-// 3. انجمن علمی جهش (Jahesh Scientific Association alias)
-app.get(['/anjoman', '/anjoman/', '/anjoman-elmi-jahesh'], (req, res) => {
+// 3. انجمن علمی جهش (Jahesh Scientific Association alias) -> ریدایرکت ۳۰۱ قطعی به صفحه اصلی
+app.get(['/anjoman', '/anjoman/', '/anjoman-elmi-jahesh', '/drbarh-anjmn', '/drbarh-anjmn/', '/drbarh-anjmn/*'], (req, res) => {
   res.redirect(301, '/');
 });
 
