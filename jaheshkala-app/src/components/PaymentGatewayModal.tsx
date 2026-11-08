@@ -36,6 +36,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
   onCloseAll,
   cartItems,
   currentUser,
+  onPaymentSuccess,
   appliedCoupon,
   zibalMerchant,
 }) => {

@@ -74,7 +74,7 @@ export async function compressImageFile(
 }
 
 // Default reliable fallback SVG placeholder for products if any image fails to load
-export const getFallbackProductImage = (title: string, category: string = 'کالای دیجیتال') => {
+export const getFallbackProductImage = (title: string = 'محصول جهش‌کالا', category: string = 'کالای دیجیتال') => {
   const safeTitle = (title || 'محصول جهش‌کالا').slice(0, 30);
   const safeCat = (category || 'جهش‌کالا').slice(0, 20);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">

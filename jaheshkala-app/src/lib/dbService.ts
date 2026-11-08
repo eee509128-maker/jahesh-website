@@ -1,10 +1,11 @@
 import { supabase } from './supabase';
 import { db } from './firebase';
 import { doc, setDoc, getDocs, getDoc, collection, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { Product, Order, User, Coupon, BannerSlide, DashboardTool } from '../types';
+import { Product, Order, User, Coupon, BannerSlide, DashboardTool, UserChat, PaymentLanding } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { RESTORED_ZIBAL_ORDERS } from '../data/restoredOrders';
 import { areSameUser, normalizePhone, normalizeUsername, mergeUserRecords, isMasterAdminUser } from './userUtils';
+import { getFallbackProductImage } from './imageUtils';
 
 
 // Safe wrapper for safeSetLocalStorage to handle QuotaExceededError without ever losing or corrupting images
@@ -1346,7 +1347,7 @@ export const fetchOrdersFromDb = async (): Promise<Order[]> => {
   const allOrdersMap = new Map<string, Order>();
   const addOrderToMap = (o: Order) => {
     if (!o || (!o.id && !o.trackingCode) || isDeleted(o)) return;
-    const key = o.id || o.trackingCode;
+    const key = String(o.id || o.trackingCode);
     const existing = allOrdersMap.get(key);
     if (!existing) {
       allOrdersMap.set(key, o);
@@ -1681,8 +1682,10 @@ export const deleteOrderFromDb = async (orderId: string): Promise<boolean> => {
   // 6. Delete from Supabase orders table
   try {
     for (const key of allKeys) {
-      await supabase.from('orders').delete().eq('id', key).catch(() => {});
-      await supabase.from('orders').delete().eq('tracking_code', key).catch(() => {});
+      try {
+        await supabase.from('orders').delete().eq('id', key);
+        await supabase.from('orders').delete().eq('tracking_code', key);
+      } catch {}
     }
   } catch (err) {
     console.warn('Supabase orders table delete notice:', err);
@@ -3129,6 +3132,94 @@ export const uploadToolImage = async (base64Data: string): Promise<string> => {
     console.warn('Upload tool image server error, using data uri:', e);
   }
   return base64Data;
+};
+
+// ==========================================
+// توابع مدیریت لندینگ‌ها و درگاه‌های پرداخت هوشمند هوش مصنوعی
+// ==========================================
+
+export const getPaymentLandingsFromDb = async (): Promise<PaymentLanding[]> => {
+  try {
+    const res = await fetch('/api/payment-landings');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.landings)) {
+        safeSetLocalStorage('jahesh_payment_landings', JSON.stringify(data.landings));
+        return data.landings;
+      }
+    }
+  } catch (err) {
+    console.warn('Fetch payment landings server notice:', err);
+  }
+
+  // Fallback to local storage
+  try {
+    const cached = localStorage.getItem('jahesh_payment_landings');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+
+  return [];
+};
+
+export const savePaymentLandingToDb = async (landing: Partial<PaymentLanding>): Promise<PaymentLanding | null> => {
+  try {
+    const res = await fetch('/api/payment-landings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(landing)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.landing) {
+        return data.landing;
+      }
+    }
+  } catch (err) {
+    console.error('Save payment landing error:', err);
+  }
+  return null;
+};
+
+export const deletePaymentLandingFromDb = async (id: string): Promise<boolean> => {
+  try {
+    const res = await fetch(`/api/payment-landings/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return Boolean(data && data.success);
+    }
+  } catch (err) {
+    console.error('Delete payment landing error:', err);
+  }
+  return false;
+};
+
+export const generateAiPaymentLanding = async (payload: {
+  title: string;
+  amount: number;
+  description?: string;
+  theme?: string;
+  sellerName?: string;
+  merchant?: string;
+  buyerName?: string;
+  buyerPhone?: string;
+  featuresHint?: string;
+}): Promise<any> => {
+  const res = await fetch('/api/payment-landings/generate-ai', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'خطا در ارتباط با هوش مصنوعی برای ساخت لندینگ.');
+  }
+  const data = await res.json();
+  return data.aiContent;
 };
 
 

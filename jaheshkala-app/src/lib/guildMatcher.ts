@@ -235,7 +235,7 @@ export function isProductMatchingSearchQuery(product: Product, query: string): b
     pBrand.includes(qNorm) ||
     pCategory.includes(qNorm) ||
     pGuild.includes(qNorm) ||
-    pTargetGuilds.some((tg) => tg.includes(qNorm)) ||
+    pTargetGuilds.some((tg: string) => tg.includes(qNorm)) ||
     pPain.includes(qNorm) ||
     pFeatures.some((f) => f.includes(qNorm)) ||
     pTags.some((t) => t.includes(qNorm))
@@ -252,7 +252,7 @@ export function isProductMatchingSearchQuery(product: Product, query: string): b
       pBrand.includes(token) ||
       pCategory.includes(token) ||
       pGuild.includes(token) ||
-      pTargetGuilds.some((tg) => tg.includes(token)) ||
+      pTargetGuilds.some((tg: string) => tg.includes(token)) ||
       pPain.includes(token) ||
       pFeatures.some((f) => f.includes(token)) ||
       pTags.some((t) => t.includes(token))

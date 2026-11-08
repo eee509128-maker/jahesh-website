@@ -18,12 +18,12 @@ export interface Product {
   badge?: string;
   isPopular?: boolean;
   isGolden?: boolean;
-  rating: number;
-  reviewsCount: number;
-  deliveryDays: string;
-  shortDescription: string;
-  fullDescription: string;
-  features: string[];
+  rating?: number;
+  reviewsCount?: number;
+  deliveryDays?: string;
+  shortDescription?: string;
+  fullDescription?: string;
+  features?: string[];
   includedGifts?: string[];
   image: string;
   imagePosition?: string; // e.g. 'center', 'top', 'bottom', 'left', 'right'
@@ -59,6 +59,10 @@ export interface Product {
   appDownloadUrl?: string; // آلیاس لینک دانلود برنامه
   appVersion?: string; // نسخه اپلیکیشن (مثلاً: v1.0.0)
   appFileSize?: string; // حجم فایل نصبی (مثلاً: 25 مگابایت)
+  inStock?: boolean; // موجودی کالا
+  description?: string; // توضیحات تکمیلی
+  subscriptionDays?: number; // تعداد روزهای اشتراک پیش‌فرض
+  tags?: string[]; // برچسب‌های محصول
   updatedAt?: string; // ISO date timestamp for conflict resolution and persistent updates
 }
 
@@ -97,6 +101,7 @@ export interface User {
   guild?: string; // صنف و شغل کاربر (مثلاً: املاک و مستغلات، پزشکی، رستوران و...)
   customGuild?: string; // در صورت انتخاب سایر مشاغل
   createdAt: string;
+  updatedAt?: string;
   timestamp?: number; // Exact millisecond timestamp for sorting newest users first
 }
 
@@ -133,7 +138,7 @@ export interface BannerSlide {
   title: string;
   subtitle: string;
   cta: string;
-  actionType: 'incredible' | 'category' | 'link' | 'all' | 'product';
+  actionType: 'incredible' | 'category' | 'link' | 'all' | 'product' | 'package' | string;
   actionTarget?: string; // Target URL, Category name, or Product ID
   gradient?: string;
   overlayOpacity?: number;
@@ -163,6 +168,7 @@ export interface BannerSlide {
 }
 
 export interface AmlakSubscriptionLicense {
+  id?: string;
   username: string;
   password: string;
   licenseKey: string;
@@ -199,12 +205,12 @@ export interface AppSubscriptionLicense {
 
 export interface Order {
   id: string;
-  trackingCode: string;
-  paymentRefId: string;
+  trackingCode?: string;
+  paymentRefId?: string;
   userId: string;
   customerName: string;
   customerPhone: string;
-  customerEmail: string;
+  customerEmail?: string;
   shippingAddress?: string;
   requestedDomain?: string;
   clientNotes?: string;
@@ -213,6 +219,7 @@ export interface Order {
   discountAmount?: number;
   appliedCouponCode?: string;
   status: OrderStatus;
+  statusUpdatedAt?: string;
   paymentGateway: 'زیبال (Zibal)' | 'شاپرک' | 'تست پرداخت' | string;
   date: string;
   createdAt?: string; // ISO timestamp for exact sorting
@@ -222,6 +229,8 @@ export interface Order {
   paidAt?: string; // زمان پرداخت ثبت شده در درگاه
   acceptedTerms: boolean;
   adminNotes?: string;
+  isSubscription?: boolean;
+  subscriptionDays?: number;
   amlakLicense?: AmlakSubscriptionLicense;
   appLicense?: AppSubscriptionLicense;
 }
@@ -273,4 +282,37 @@ export interface DashboardTool {
   cardClickable?: boolean;
   targetBlank?: boolean;
   customBadgeColor?: string;
+}
+
+export type PaymentLandingTheme = 'neon-purple' | 'gold-luxury' | 'cyber-dark' | 'emerald-green' | 'sunset-crimson';
+
+export interface PaymentLandingFaqItem {
+  question: string;
+  answer: string;
+}
+
+export interface PaymentLanding {
+  id: string;
+  title: string;
+  amount: number; // in Tomans
+  merchant: string;
+  sellerName?: string;
+  description?: string;
+  theme?: PaymentLandingTheme | string;
+  buyerName?: string;
+  buyerPhone?: string;
+  features?: string[];
+  guarantees?: string[];
+  faq?: PaymentLandingFaqItem[];
+  headline?: string;
+  subheadline?: string;
+  badge?: string;
+  valueProposition?: string;
+  ctaButtonText?: string;
+  accentGlowColor?: string;
+  metaDescription?: string;
+  viewsCount?: number;
+  paymentsCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }

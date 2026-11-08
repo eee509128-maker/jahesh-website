@@ -10,10 +10,11 @@ import {
   ChevronRight, ChevronLeft, Gift, Monitor, Smartphone, Type, Palette, BarChart3, TrendingUp, Filter, ArrowUpDown,
   Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown,
   KeyRound,
-  Zap
+  Zap,
+  Star
 } from 'lucide-react';
-import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool, AppSubscriptionLicense } from '../types';
-import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank } from '../lib/dbService';
+import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool, AppSubscriptionLicense, PaymentLanding, PaymentLandingTheme } from '../types';
+import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank, getPaymentLandingsFromDb, savePaymentLandingToDb, deletePaymentLandingFromDb, generateAiPaymentLanding } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
@@ -90,7 +91,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onOpenAmlakApp,
   onGrantUserLicense,
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'integrations' | 'users' | 'chats' | 'dashboard-tools' | 'backup-restore'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'payment-links' | 'integrations' | 'users' | 'chats' | 'dashboard-tools' | 'backup-restore'>('orders');
+
+  // ==========================================
+  // AI Smart Payment Landings & Custom Gateways State
+  // ==========================================
+  const [paymentLandings, setPaymentLandings] = useState<PaymentLanding[]>([]);
+  const [landingsLoading, setLandingsLoading] = useState(false);
+  const [landingTopic, setLandingTopic] = useState('');
+  const [landingAmount, setLandingAmount] = useState<string>('250000');
+  const [landingMerchant, setLandingMerchant] = useState('6a9db4410df8756c31ea5d00');
+  const [landingSellerName, setLandingSellerName] = useState('جهش آی‌تی');
+  const [landingBuyerName, setLandingBuyerName] = useState('');
+  const [landingBuyerPhone, setLandingBuyerPhone] = useState('');
+  const [landingDescription, setLandingDescription] = useState('');
+  const [landingFeaturesHint, setLandingFeaturesHint] = useState('');
+  const [landingTheme, setLandingTheme] = useState<PaymentLandingTheme>('neon-purple');
+  const [isGeneratingLanding, setIsGeneratingLanding] = useState(false);
+  const [landingActionMessage, setLandingActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [copiedLandingId, setCopiedLandingId] = useState<string | null>(null);
+  const [previewLanding, setPreviewLanding] = useState<PaymentLanding | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [landingSearchQuery, setLandingSearchQuery] = useState('');
+  const [landingDeleteConfirmId, setLandingDeleteConfirmId] = useState<string | null>(null);
 
   // ==========================================
   // Dashboard Tools Management State
@@ -316,7 +339,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [bannerSubtitle, setBannerSubtitle] = useState('');
   const [bannerBadge, setBannerBadge] = useState('');
   const [bannerCta, setBannerCta] = useState('مشاهده تخفیف‌های شگفت‌انگیز');
-  const [bannerActionType, setBannerActionType] = useState<'incredible' | 'category' | 'link' | 'all' | 'product'>('incredible');
+  const [bannerActionType, setBannerActionType] = useState<'incredible' | 'category' | 'link' | 'all' | 'product' | 'package' | string>('incredible');
   const [bannerActionTarget, setBannerActionTarget] = useState('');
   const [bannerProductSearch, setBannerProductSearch] = useState('');
   const [bannerGradient, setBannerGradient] = useState('from-[#3b1261] via-[#220d3d] to-[#0d071a]');
@@ -440,6 +463,179 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       handleRefreshUsersList();
     }
   }, [isOpen, activeTab]);
+
+  const refreshPaymentLandings = async () => {
+    setLandingsLoading(true);
+    try {
+      const list = await getPaymentLandingsFromDb();
+      setPaymentLandings(list);
+    } catch (err) {
+      console.warn('Error loading payment landings:', err);
+    } finally {
+      setLandingsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (isOpen && (activeTab === 'payment-links' || paymentLandings.length === 0)) {
+      refreshPaymentLandings();
+    }
+  }, [isOpen, activeTab]);
+
+  const handleGenerateAiLanding = async () => {
+    if (!landingTopic.trim()) {
+      setLandingActionMessage({ type: 'error', text: 'لطفاً موضوع یا عنوان محصول را وارد فرمایید.' });
+      setTimeout(() => setLandingActionMessage(null), 4000);
+      return;
+    }
+    const safeAmount = Number(landingAmount);
+    if (!safeAmount || safeAmount < 1000) {
+      setLandingActionMessage({ type: 'error', text: 'حداقل مبلغ پرداخت معتبر ۱,۰۰۰ تومان است.' });
+      setTimeout(() => setLandingActionMessage(null), 4000);
+      return;
+    }
+
+    setIsGeneratingLanding(true);
+    setLandingActionMessage(null);
+
+    try {
+      const aiContent = await generateAiPaymentLanding({
+        title: landingTopic.trim(),
+        amount: safeAmount,
+        description: landingDescription.trim(),
+        theme: landingTheme,
+        sellerName: landingSellerName.trim() || 'جهش آی‌تی',
+        merchant: landingMerchant.trim() || '6a9db4410df8756c31ea5d00',
+        buyerName: landingBuyerName.trim(),
+        buyerPhone: landingBuyerPhone.trim(),
+        featuresHint: landingFeaturesHint.trim()
+      });
+
+      const newLandingPayload: Partial<PaymentLanding> = {
+        title: landingTopic.trim(),
+        amount: safeAmount,
+        merchant: landingMerchant.trim() || '6a9db4410df8756c31ea5d00',
+        sellerName: landingSellerName.trim() || 'جهش آی‌تی',
+        buyerName: landingBuyerName.trim(),
+        buyerPhone: landingBuyerPhone.trim(),
+        description: landingDescription.trim(),
+        theme: landingTheme,
+        headline: aiContent.headline || landingTopic.trim(),
+        subheadline: aiContent.subheadline || '',
+        badge: aiContent.badge || 'درگاه رسمی شاپرک',
+        features: aiContent.features || [],
+        guarantees: aiContent.guarantees || [],
+        faq: aiContent.faq || [],
+        valueProposition: aiContent.valueProposition || '',
+        ctaButtonText: aiContent.ctaButtonText || 'پرداخت آنلاین و ثبت نهایی',
+        accentGlowColor: aiContent.accentGlowColor || '#8c00ff',
+        metaDescription: aiContent.metaDescription || '',
+      };
+
+      const saved = await savePaymentLandingToDb(newLandingPayload);
+      if (saved) {
+        setPaymentLandings((prev) => [saved, ...prev.filter((p) => p.id !== saved.id)]);
+        setPreviewLanding(saved);
+        setLandingActionMessage({
+          type: 'success',
+          text: `🎉 لندینگ پیج پرداخت با موفقیت توسط هوش مصنوعی طراحی و منتشر شد!`
+        });
+      } else {
+        await refreshPaymentLandings();
+        setLandingActionMessage({
+          type: 'success',
+          text: 'صفحه فرود و درگاه پرداخت با موفقیت ثبت گردید.'
+        });
+      }
+    } catch (err: any) {
+      console.error('Error generating AI payment landing:', err);
+      setLandingActionMessage({
+        type: 'error',
+        text: err?.message || 'خطا در برقراری ارتباط با هوش مصنوعی برای تولید لندینگ.'
+      });
+    } finally {
+      setIsGeneratingLanding(false);
+      setTimeout(() => setLandingActionMessage(null), 6000);
+    }
+  };
+
+  const handleSaveLandingManual = async () => {
+    if (!landingTopic.trim()) {
+      setLandingActionMessage({ type: 'error', text: 'لطفاً موضوع یا عنوان محصول را وارد فرمایید.' });
+      setTimeout(() => setLandingActionMessage(null), 4000);
+      return;
+    }
+    const safeAmount = Number(landingAmount);
+    if (!safeAmount || safeAmount < 1000) {
+      setLandingActionMessage({ type: 'error', text: 'حداقل مبلغ پرداخت معتبر ۱,۰۰۰ تومان است.' });
+      setTimeout(() => setLandingActionMessage(null), 4000);
+      return;
+    }
+
+    try {
+      const saved = await savePaymentLandingToDb({
+        title: landingTopic.trim(),
+        amount: safeAmount,
+        merchant: landingMerchant.trim() || '6a9db4410df8756c31ea5d00',
+        sellerName: landingSellerName.trim() || 'جهش آی‌تی',
+        buyerName: landingBuyerName.trim(),
+        buyerPhone: landingBuyerPhone.trim(),
+        description: landingDescription.trim(),
+        theme: landingTheme,
+        headline: `پرداخت اختصاصی ${landingTopic.trim()}`,
+        subheadline: landingDescription.trim() || 'سفارش شما با بالاترین ضریب امنیت و تایید آنی در شبکه بانکی شاپرک انجام می‌شود.',
+        badge: 'درگاه رسمی شاپرک | زیبال',
+        features: [
+          'تسویه آنی و صدور کد رهگیری معتبر بانکی',
+          'پشتیبانی مستقیم و پاسخگویی ۲۴ ساعته',
+          'رمزنگاری پیشرفته امنیتی SSL 256-bit',
+          'امکان پرداخت با کلیه کارت‌های عضو شبکه شتاب',
+          'ضمانت اصالت خدمات و رضایت مشتری'
+        ],
+        guarantees: ['امنیت ۱۰۰٪ تایید شده شاپرک', 'پشتیبانی ۲۴/۷ جهش', 'صدور فیش رسمی آنلاین'],
+        ctaButtonText: `پرداخت امن شاپرک (${safeAmount.toLocaleString('fa-IR')} تومان)`
+      });
+
+      if (saved) {
+        setPaymentLandings((prev) => [saved, ...prev.filter((p) => p.id !== saved.id)]);
+        setPreviewLanding(saved);
+        setLandingActionMessage({
+          type: 'success',
+          text: 'درگاه پرداخت و لندینگ پیج با موفقیت ذخیره شد.'
+        });
+      }
+    } catch (err: any) {
+      setLandingActionMessage({ type: 'error', text: err?.message || 'خطا در ثبت لندینگ.' });
+    } finally {
+      setTimeout(() => setLandingActionMessage(null), 5000);
+    }
+  };
+
+  const handleDeleteLanding = async (id: string) => {
+    try {
+      const ok = await deletePaymentLandingFromDb(id);
+      if (ok) {
+        setPaymentLandings((prev) => prev.filter((p) => p.id !== id));
+        if (previewLanding?.id === id) setPreviewLanding(null);
+        setLandingDeleteConfirmId(null);
+        setLandingActionMessage({ type: 'success', text: 'لندینگ درگاه با موفقیت حذف گردید.' });
+      }
+    } catch (err: any) {
+      setLandingActionMessage({ type: 'error', text: 'خطا در حذف درگاه پرداخت.' });
+    } finally {
+      setTimeout(() => setLandingActionMessage(null), 4000);
+    }
+  };
+
+  const handleCopyLandingUrl = (id: string) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://jaheshit.ir';
+    const fullUrl = `${origin}/pay/${id}`;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(fullUrl);
+      setCopiedLandingId(id);
+      setTimeout(() => setCopiedLandingId(null), 3000);
+    }
+  };
 
   const mainContentRef = React.useRef<HTMLDivElement>(null);
   const [showScrollTop, setShowScrollTop] = React.useState(false);
@@ -659,8 +855,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const newBanner: BannerSlide = {
       id: editingBannerId || `banner_${Date.now()}`,
       title: bannerTitle.trim(),
-      subtitle: bannerSubtitle.trim() || undefined,
-      badge: bannerBadge.trim() || undefined,
+      subtitle: bannerSubtitle.trim() || '',
+      badge: bannerBadge.trim() || '',
       cta: bannerCta.trim() || 'مشاهده تخفیف‌های شگفت‌انگیز',
       actionType: bannerActionType,
       actionTarget: bannerActionTarget.trim() || undefined,
@@ -1864,6 +2060,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span>داشبورد تکنولوژی جهش</span>
               <span className="bg-cyan-950 text-cyan-300 border border-cyan-700/50 text-[10px] px-2 py-0.5 rounded-full font-mono">
                 {toolsList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('payment-links')}
+              className={`pb-2.5 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                activeTab === 'payment-links'
+                  ? 'border-purple-400 text-purple-300 font-black shadow-xs'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <CreditCard className="w-4 h-4 text-purple-400" />
+              <span>درگاه پرداخت هوشمند AI</span>
+              <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm shadow-purple-500/30">
+                <Sparkles className="w-3 h-3 text-amber-300 animate-pulse" />
+                <span>{paymentLandings.length}</span>
               </span>
             </button>
 
@@ -5966,6 +6178,565 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   )}
                 </div>
               </div>
+
+            </div>
+          )}
+
+          {/* TAB: AI PAYMENT LANDINGS & SMART GATEWAYS */}
+          {activeTab === 'payment-links' && (
+            <div className="max-w-5xl mx-auto space-y-6">
+              
+              {/* Action Message Alert */}
+              {landingActionMessage && (
+                <div className={`p-4 rounded-2xl flex items-center justify-between text-xs font-bold transition-all shadow-lg animate-in fade-in duration-200 ${
+                  landingActionMessage.type === 'success'
+                    ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 shadow-emerald-900/30'
+                    : 'bg-rose-950/90 text-rose-300 border border-rose-500/50 shadow-rose-900/30'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    {landingActionMessage.type === 'success' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                    )}
+                    <span>{landingActionMessage.text}</span>
+                  </div>
+                  <button onClick={() => setLandingActionMessage(null)} className="text-slate-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Header Hero Card */}
+              <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#1b0d38] via-[#120826] to-[#0a0518] border border-purple-500/40 shadow-2xl">
+                <div className="absolute -top-24 -left-24 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+                <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div className="space-y-2 max-w-2xl">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/40 text-[11px] font-extrabold text-purple-300 backdrop-blur-md">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+                      <span>تولید صفحه فرود و درگاه اختصاصی با هوش مصنوعی (Gemini 3.8 Flash)</span>
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                      ساخت لینک درگاه پرداخت هوشمند و صفحه فرود گرافیکی
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                      کافیست موضوع محصول و مبلغ را مشخص کنید؛ هوش مصنوعی یک صفحه اختصاصی شگفت‌انگیز با جلوه‌های گرافیکی مدرن، افکت‌های سه‌بعدی و یک <span className="text-purple-300 font-bold underline decoration-purple-400">دکمه تعاملی واکنش‌دهنده به موقعیت موس</span> می‌سازد که با کلیک روی آن، کاربر مستقیماً به درگاه پرداخت شاپرک با مرچنت شما هدایت می‌شود.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 w-full sm:w-auto">
+                    <div className="p-3 rounded-2xl bg-black/50 border border-purple-500/30 text-right text-xs">
+                      <div className="text-[11px] text-slate-400 font-semibold mb-1">کد مرچنت درگاه فعال:</div>
+                      <div className="font-mono text-emerald-400 font-bold text-xs select-all">6a9db4410df8756c31ea5d00</div>
+                      <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span>متصل به شاپرک و زیبال</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Section */}
+              <div className="p-6 sm:p-7 rounded-3xl bg-[#120a28]/90 border border-purple-900/50 backdrop-blur-xl shadow-xl space-y-5">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-2 text-sm font-extrabold text-purple-300">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>مشخصات محصول و درگاه مورد نظر</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    تمامی فیلدها قابلیت سفارشی‌سازی دارند
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Topic / Title */}
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      موضوع یا عنوان خرید / محصول <span className="text-rose-400">*</span>:
+                    </label>
+                    <input
+                      type="text"
+                      value={landingTopic}
+                      onChange={(e) => setLandingTopic(e.target.value)}
+                      placeholder="مثال: طراحی وب‌سایت فروشگاهی اختصاصی جهش | اشتراک سالانه سامانه املاک VIP"
+                      className="w-full bg-black/60 border border-purple-500/40 focus:border-purple-400 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition"
+                    />
+                    {/* Quick suggestion chips */}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      <span className="text-[10px] text-slate-400 self-center">پیشنهادات سریع:</span>
+                      {[
+                        'پکیج طراحی وب‌سایت شرکتی جهش',
+                        'مشاوره تخصصی و استقرار هوش مصنوعی',
+                        'لایسنس سالانه نرم‌افزار مدیریت املاک VIP',
+                        'کارت ویزیت هوشمند NFC اختصاصی',
+                        'طراحی اپلیکیشن موبایل اختصاصی'
+                      ].map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => setLandingTopic(chip)}
+                          className="text-[10px] bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-700/40 rounded-lg px-2.5 py-1 transition"
+                        >
+                          + {chip}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Amount in Tomans */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      مبلغ قابل پرداخت به تومان <span className="text-rose-400">*</span>:
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1000"
+                        step="10000"
+                        value={landingAmount}
+                        onChange={(e) => setLandingAmount(e.target.value)}
+                        placeholder="250000"
+                        className="w-full bg-black/60 border border-purple-500/40 focus:border-purple-400 rounded-2xl px-4 py-3 text-xs sm:text-sm text-amber-300 font-bold placeholder-slate-500 outline-none transition font-mono"
+                      />
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        تومان
+                      </span>
+                    </div>
+                    {/* Live formatting */}
+                    <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+                      <span>معادل به حروف: <strong className="text-amber-400">{Number(landingAmount || 0).toLocaleString('fa-IR')} تومان</strong></span>
+                      <span className="font-mono text-slate-400">({(Number(landingAmount || 0) * 10).toLocaleString('fa-IR')} ریال)</span>
+                    </div>
+                  </div>
+
+                  {/* Merchant ID */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      کد مرچنت درگاه زیبال (Zibal Merchant):
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={landingMerchant}
+                        onChange={(e) => setLandingMerchant(e.target.value)}
+                        placeholder="6a9db4410df8756c31ea5d00"
+                        className="flex-1 bg-black/60 border border-emerald-500/40 focus:border-emerald-400 rounded-2xl px-4 py-3 text-xs text-emerald-300 font-mono outline-none transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setLandingMerchant('6a9db4410df8756c31ea5d00')}
+                        className="px-3 py-2 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 rounded-2xl text-xs font-bold transition shrink-0"
+                        title="تنظیم به مرچنت پیش‌فرض کاربر"
+                      >
+                        پیش‌فرض
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Seller / Brand Name */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      نام برند یا فروشنده:
+                    </label>
+                    <input
+                      type="text"
+                      value={landingSellerName}
+                      onChange={(e) => setLandingSellerName(e.target.value)}
+                      placeholder="جهش آی‌تی"
+                      className="w-full bg-black/60 border border-purple-500/40 focus:border-purple-400 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition"
+                    />
+                  </div>
+
+                  {/* Theme Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      تم و استایل گرافیکی صفحه:
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {[
+                        { id: 'neon-purple', label: 'نئون بنفش جهش', dot: '#a855f7' },
+                        { id: 'gold-luxury', label: 'طلایی لوکس', dot: '#f59e0b' },
+                        { id: 'cyber-dark', label: 'سایبرپانک تیره', dot: '#06b6d4' },
+                        { id: 'emerald-green', label: 'زمردی شاپرک', dot: '#10b981' },
+                        { id: 'sunset-crimson', label: 'یاقوتی پرانرژی', dot: '#f43f5e' }
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setLandingTheme(t.id as PaymentLandingTheme)}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition ${
+                            landingTheme === t.id
+                              ? 'bg-purple-900/60 border-purple-400 text-white shadow-md'
+                              : 'bg-black/40 border-white/10 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: t.dot }}></span>
+                          <span className="truncate">{t.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Optional Buyer Name */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      نام خریدار خاص (اختیاری جهت لینک شخصی):
+                    </label>
+                    <input
+                      type="text"
+                      value={landingBuyerName}
+                      onChange={(e) => setLandingBuyerName(e.target.value)}
+                      placeholder="مثال: آقای مهندس حسینی"
+                      className="w-full bg-black/60 border border-purple-500/40 focus:border-purple-400 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition"
+                    />
+                  </div>
+
+                  {/* Optional Buyer Phone */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      شماره موبایل خریدار (جهت پیامک خودکار شاپرک):
+                    </label>
+                    <input
+                      type="tel"
+                      dir="ltr"
+                      value={landingBuyerPhone}
+                      onChange={(e) => setLandingBuyerPhone(e.target.value)}
+                      placeholder="09152331974"
+                      className="w-full bg-black/60 border border-purple-500/40 focus:border-purple-400 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition text-right"
+                    />
+                  </div>
+
+                  {/* Description / Notes */}
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      توضیحات تکمیلی یا یادداشت سفارش (جهت نگارش حرفه‌ای توسط هوش مصنوعی):
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={landingDescription}
+                      onChange={(e) => setLandingDescription(e.target.value)}
+                      placeholder="مثلاً: شامل ۱ سال هاست نامحدود، گواهی امنیتی SSL، پشتیبانی ۲۴ ساعته و آموزش پنل مدیریت جهش."
+                      className="w-full bg-black/60 border border-purple-500/40 focus:border-purple-400 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Submit Actions */}
+                <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>لندینگ بلافاصله در آدرس دامنه شما در دسترس عموم قرار می‌گیرد.</span>
+                  </div>
+
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      disabled={isGeneratingLanding}
+                      onClick={handleSaveLandingManual}
+                      className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition flex items-center justify-center gap-2 w-full sm:w-auto"
+                    >
+                      <span>ذخیره سریع بدون هوش مصنوعی</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isGeneratingLanding}
+                      onClick={handleGenerateAiLanding}
+                      className="px-7 py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm shadow-xl shadow-purple-600/40 transition flex items-center justify-center gap-2.5 w-full sm:w-auto relative overflow-hidden group"
+                    >
+                      {isGeneratingLanding ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                          <span>هوش مصنوعی در حال طراحی سایت و دکمه...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 text-amber-300 group-hover:rotate-12 transition-transform" />
+                          <span>✨ ساخت لندینگ و درگاه پرداخت با هوش مصنوعی</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Active Payment Links List */}
+              <div className="p-6 sm:p-7 rounded-3xl bg-[#120a28]/90 border border-purple-900/50 backdrop-blur-xl shadow-xl space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-white">
+                        درگاه‌ها و صفحات فرود فعال ساخته شده
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        مجموع {paymentLandings.length} لینک پرداخت رسمی شاپرک ثبت شده
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={landingSearchQuery}
+                        onChange={(e) => setLandingSearchQuery(e.target.value)}
+                        placeholder="جستجو در لینک‌ها..."
+                        className="bg-black/50 border border-white/10 rounded-xl pr-8 pl-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-purple-500 w-48"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={refreshPaymentLandings}
+                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+                      title="تازه‌سازی لیست"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${landingsLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cards List */}
+                {paymentLandings.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 bg-black/30 rounded-2xl border border-dashed border-purple-900/50 space-y-3">
+                    <CreditCard className="w-12 h-12 text-purple-400/50 mx-auto" />
+                    <div className="text-sm font-bold text-slate-300">هنوز هیچ لینک پرداختی ساخته نشده است</div>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      از فرم بالا استفاده کنید تا هوش مصنوعی بلافاصله صفحه فرود و لینک اختصاصی شاپرک را برای شما تولید کند.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3.5">
+                    {paymentLandings
+                      .filter((l) =>
+                        !landingSearchQuery ||
+                        l.title?.toLowerCase().includes(landingSearchQuery.toLowerCase()) ||
+                        l.id?.toLowerCase().includes(landingSearchQuery.toLowerCase())
+                      )
+                      .map((landing) => {
+                        const amountTomans = Number(landing.amount) || 0;
+                        const isCopied = copiedLandingId === landing.id;
+                        const publicUrl = typeof window !== 'undefined'
+                          ? `${window.location.origin}/pay/${landing.id}`
+                          : `https://jaheshit.ir/pay/${landing.id}`;
+
+                        return (
+                          <div
+                            key={landing.id}
+                            className="p-5 rounded-2xl bg-black/40 border border-purple-900/40 hover:border-purple-500/50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 group"
+                          >
+                            {/* Left/Main Details */}
+                            <div className="space-y-2 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-extrabold text-sm sm:text-base text-white">
+                                  {landing.title}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold">
+                                  {landing.badge || 'درگاه رسمی شاپرک'}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-black/60 text-slate-400 font-mono">
+                                  شناسه: {landing.id}
+                                </span>
+                              </div>
+
+                              <p className="text-xs text-slate-400 line-clamp-1">
+                                {landing.subheadline || landing.description || 'درگاه پرداخت اینترنتی با تاییدیه آنی بانکی'}
+                              </p>
+
+                              {/* Price and Merchant info */}
+                              <div className="flex flex-wrap items-center gap-4 text-xs">
+                                <div className="flex items-center gap-1.5 text-amber-400 font-black">
+                                  <span>مبلغ:</span>
+                                  <span className="text-base">{amountTomans.toLocaleString('fa-IR')}</span>
+                                  <span>تومان</span>
+                                </div>
+                                <span className="text-slate-600">•</span>
+                                <div className="text-slate-400 text-[11px] flex items-center gap-1">
+                                  <span>مرچنت:</span>
+                                  <span className="font-mono text-emerald-400">{landing.merchant || '6a9db4410df8756c31ea5d00'}</span>
+                                </div>
+                                <span className="text-slate-600">•</span>
+                                <div className="text-[11px] text-slate-400 flex items-center gap-3">
+                                  <span>👁️ {landing.viewsCount || 0} بازدید</span>
+                                  <span className="text-emerald-400 font-bold">💳 {landing.paymentsCount || 0} پرداخت موفق</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Public Link Box & Actions */}
+                            <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                              {/* Copy Link Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleCopyLandingUrl(landing.id)}
+                                className={`px-4 py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition ${
+                                  isCopied
+                                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/30'
+                                    : 'bg-purple-950/70 hover:bg-purple-900 text-purple-200 border-purple-700/50'
+                                }`}
+                                title="کپی آدرس مستقیم درگاه پرداخت"
+                              >
+                                {isCopied ? (
+                                  <>
+                                    <Check className="w-4 h-4 text-white" />
+                                    <span>لینک کپی شد!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-4 h-4 text-purple-300" />
+                                    <span>کپی لینک</span>
+                                  </>
+                                )}
+                              </button>
+
+                              {/* Preview in Modal Button */}
+                              <button
+                                type="button"
+                                onClick={() => setPreviewLanding(landing)}
+                                className="px-4 py-2.5 rounded-xl bg-indigo-950/70 hover:bg-indigo-900 text-indigo-200 border border-indigo-700/50 text-xs font-bold flex items-center justify-center gap-2 transition"
+                                title="پیش‌نمایش زنده و تست دکمه موس"
+                              >
+                                <Eye className="w-4 h-4 text-indigo-300" />
+                                <span>پیش‌نمایش زنده</span>
+                              </button>
+
+                              {/* Open in New Tab */}
+                              <a
+                                href={`/pay/${landing.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition flex items-center justify-center"
+                                title="باز کردن در صفحه جداگانه"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+
+                              {/* Delete */}
+                              {landingDeleteConfirmId === landing.id ? (
+                                <div className="flex items-center gap-1 bg-rose-950/90 border border-rose-500/50 p-1 rounded-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteLanding(landing.id)}
+                                    className="px-2 py-1 bg-rose-600 text-white text-[10px] font-bold rounded-lg hover:bg-rose-500"
+                                  >
+                                    تایید
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setLandingDeleteConfirmId(null)}
+                                    className="px-2 py-1 text-slate-300 text-[10px] hover:text-white"
+                                  >
+                                    انصراف
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setLandingDeleteConfirmId(landing.id)}
+                                  className="p-2.5 rounded-xl bg-white/5 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 transition flex items-center justify-center"
+                                  title="حذف درگاه پرداخت"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
+              {/* Live Interactive Preview Modal */}
+              {previewLanding && (
+                <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+                  <div className="w-full max-w-5xl bg-[#0c061a] border border-purple-500/40 rounded-3xl shadow-2xl flex flex-col h-[90vh] overflow-hidden">
+                    {/* Modal Top Bar */}
+                    <div className="px-5 py-4 border-b border-white/10 bg-black/60 flex items-center justify-between gap-3 shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300">
+                          <Eye className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white flex items-center gap-2">
+                            <span>پیش‌نمایش زنده صفحه فرود پرداخت:</span>
+                            <span className="text-purple-300 font-black">{previewLanding.title}</span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                            <span>مبلغ: {Number(previewLanding.amount).toLocaleString('fa-IR')} تومان</span>
+                            <span>•</span>
+                            <span className="text-emerald-400">حرکت موس روی کارت و دکمه را امتحان کنید!</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Device Switcher and Actions */}
+                      <div className="flex items-center gap-2">
+                        <div className="hidden sm:flex items-center bg-black/50 border border-white/10 rounded-xl p-1 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewDevice('desktop')}
+                            className={`px-3 py-1 rounded-lg font-bold transition ${
+                              previewDevice === 'desktop' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            دسکتاپ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewDevice('mobile')}
+                            className={`px-3 py-1 rounded-lg font-bold transition ${
+                              previewDevice === 'mobile' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            موبایل
+                          </button>
+                        </div>
+
+                        <a
+                          href={`/pay/${previewLanding.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold flex items-center gap-1.5 transition"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>باز کردن در تب جدید</span>
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={() => setPreviewLanding(null)}
+                          className="p-2 rounded-xl bg-white/10 hover:bg-rose-900/50 text-slate-400 hover:text-white transition"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Modal Iframe Body */}
+                    <div className="flex-1 bg-black p-2 flex items-center justify-center overflow-auto">
+                      <div
+                        className={`transition-all duration-300 h-full bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-white/10 ${
+                          previewDevice === 'mobile' ? 'w-[390px] max-w-full' : 'w-full'
+                        }`}
+                      >
+                        <iframe
+                          src={`/pay/${previewLanding.id}`}
+                          title={previewLanding.title}
+                          className="w-full h-full border-0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
             </div>
           )}

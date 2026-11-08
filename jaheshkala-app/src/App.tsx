@@ -39,7 +39,7 @@ import {
   ZIBAL_DEFAULT_MERCHANT,
 } from './lib/zibalService';
 import { hasAmlakInItems, generateAmlakLicense, saveAmlakLicenseLocally, syncAmlakLicenseWithServer, isAmlakProduct } from './lib/amlakLicenseService';
-import { hasAiAppInItems, generateAppLicense, registerAppLicenseOnServer, checkLicenseStatus, saveAppLicenseLocally, parseSubscriptionDays } from './lib/appLicenseService';
+import { hasAiAppInItems, isAiAppProduct, generateAppLicense, registerAppLicenseOnServer, checkLicenseStatus, saveAppLicenseLocally, parseSubscriptionDays } from './lib/appLicenseService';
 import { AppSubscriptionLicense } from './types';
 import { AppLicenseModal } from './components/AppLicenseModal';
 import { isProductMatchingCategoryOrGuild, isProductMatchingSearchQuery } from './lib/guildMatcher';
@@ -1010,13 +1010,14 @@ export default function App() {
 
   // Admin Instant Free Purchase directly from Admin Panel product list
   const handleAdminInstantPurchase = async (product: Product, quantity: number = 1) => {
-    const adminUser = currentUser || {
+    const adminUser: User = currentUser || {
       id: 'admin-jahesh',
       username: 'jahesh',
       fullName: 'مدیر فروشگاه جهش‌کالا',
       phone: '09152331974',
       email: 'jahesh1395@gmail.com',
       role: 'admin' as const,
+      createdAt: new Date().toISOString(),
     };
 
     const orderId = 'JAHESH-ADM-' + Math.floor(10000 + Math.random() * 90000).toString();
@@ -1186,13 +1187,14 @@ export default function App() {
 
   // Admin Free Checkout from Cart (completely bypasses Zibal gateway)
   const handleAdminCartFreeCheckout = async (appliedCoupon?: { code: string; discountPercent: number; discountAmount: number }) => {
-    const adminUser = currentUser || {
+    const adminUser: User = currentUser || {
       id: 'admin-jahesh',
       username: 'jahesh',
       fullName: 'مدیر فروشگاه جهش‌کالا',
       phone: '09152331974',
       email: 'jahesh1395@gmail.com',
       role: 'admin' as const,
+      createdAt: new Date().toISOString(),
     };
 
     const safeItems = Array.isArray(cartItems)

@@ -26,6 +26,11 @@ import {
   performAiVeterinaryTriage,
   saveBase64ImageToVetUploads
 } from './api/vet-hospital.js';
+import {
+  generateLandingContentWithAi,
+  renderPaymentLandingHtml,
+  renderPaymentVerifyHtml
+} from './api/payment-landing-generator.js';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getFirestore,
@@ -68,6 +73,29 @@ if (!fs.existsSync(DATA_DIR)) {
 const BANNERS_FILE = path.join(DATA_DIR, 'banners.json');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
 const DELETED_PRODUCTS_FILE = path.join(DATA_DIR, 'deleted_products.json');
+const PAYMENT_LANDINGS_FILE = path.join(DATA_DIR, 'payment_landings.json');
+
+function readPaymentLandingsFromDisk() {
+  try {
+    if (fs.existsSync(PAYMENT_LANDINGS_FILE)) {
+      const raw = fs.readFileSync(PAYMENT_LANDINGS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error('Error reading payment_landings.json:', e);
+  }
+  return [];
+}
+
+function writePaymentLandingsToDisk(landings) {
+  if (!Array.isArray(landings)) return;
+  try {
+    fs.writeFileSync(PAYMENT_LANDINGS_FILE, JSON.stringify(landings, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('writePaymentLandingsToDisk notice:', e);
+  }
+}
 
 let productsVersion = Date.now();
 
@@ -289,6 +317,17 @@ try {
       console.log(`[Server Firestore] Real-time merged ${mergedAppts.length} appointments`);
     }
   }, (err) => console.warn('[Server Firestore] appointments listener notice:', err));
+
+  // ۷. شنود لندینگ‌پیج‌ها و لینک‌های اختصاصی پرداخت هوشمند
+  onSnapshot(doc(serverDb, 'settings', 'payment_landings'), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && Array.isArray(data.landings) && data.landings.length > 0) {
+        writePaymentLandingsToDisk(data.landings);
+        console.log(`[Server Firestore] Real-time synced ${data.landings.length} payment landings`);
+      }
+    }
+  }, (err) => console.warn('[Server Firestore] payment_landings listener notice:', err));
 } catch (e) {
   console.warn('[Server Firestore] listener init error:', e);
 }
@@ -347,6 +386,16 @@ async function bootSyncFirestoreCloud() {
     if (cloudProducts.length > 0) {
       writeProductsToDisk(cloudProducts);
       console.log(`[Server Firestore Boot] Loaded & persisted ${cloudProducts.length} cloud products to disk`);
+    }
+
+    // ۴. دریافت لندینگ‌های پرداخت هوشمند ابری
+    const plSnap = await getDoc(doc(serverDb, 'settings', 'payment_landings'));
+    if (plSnap.exists()) {
+      const plData = plSnap.data();
+      if (plData && Array.isArray(plData.landings) && plData.landings.length > 0) {
+        writePaymentLandingsToDisk(plData.landings);
+        console.log(`[Server Firestore Boot] Loaded ${plData.landings.length} payment landings`);
+      }
     }
   } catch (err) {
     console.warn('[Server Firestore Boot] Sync notice:', err.message);
@@ -3930,6 +3979,289 @@ app.get(['/sitemap-products.xml', '/jaheshkala/sitemap-products.xml'], (req, res
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
   res.send(xml);
+});
+
+// ==========================================
+// سامانه‌ی لینک‌های درگاه پرداخت هوشمند و صفحات فرود گرافیکی هوش مصنوعی
+// ==========================================
+
+// دریافت لیست تمام لندینگ‌های پرداخت ذخیره‌شده
+app.get('/api/payment-landings', (_req, res) => {
+  try {
+    const landings = readPaymentLandingsFromDisk();
+    return res.json({ success: true, landings });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// دریافت اطلاعات یک لندینگ پرداخت خاص
+app.get('/api/payment-landings/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const landings = readPaymentLandingsFromDisk();
+    const item = landings.find((l) => l.id === id || l.slug === id);
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'لندینگ پیج پرداخت یافت نشد.' });
+    }
+    return res.json({ success: true, landing: item });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// تولید هوشمند محتوای مارکتینگ، تیترها و تم صفحه توسط مدل جمنای هوش مصنوعی
+app.post('/api/payment-landings/generate-ai', async (req, res) => {
+  try {
+    const {
+      title,
+      amount,
+      description,
+      theme,
+      sellerName,
+      merchant,
+      buyerPhone,
+      buyerName,
+      featuresHint
+    } = req.body || {};
+
+    if (!title || !String(title).trim()) {
+      return res.status(400).json({ success: false, error: 'موضوع یا عنوان محصول الزامی است.' });
+    }
+
+    const aiContent = await generateLandingContentWithAi({
+      title: String(title).trim(),
+      amount: Number(amount) || 50000,
+      description: description || '',
+      theme: theme || 'neon-purple',
+      sellerName: sellerName || 'جهش آی‌تی',
+      merchant: merchant || '6a9db4410df8756c31ea5d00',
+      buyerPhone: buyerPhone || '',
+      buyerName: buyerName || '',
+      featuresHint: featuresHint || ''
+    });
+
+    return res.json({ success: true, aiContent });
+  } catch (err) {
+    console.error('Error generating AI payment landing:', err);
+    return res.status(500).json({ success: false, error: err.message || 'خطا در تولید محتوای هوش مصنوعی.' });
+  }
+});
+
+// ذخیره یا ویرایش لندینگ پرداخت (همگام‌سازی فوری دیسک و فایربیس ابری)
+app.post('/api/payment-landings', async (req, res) => {
+  try {
+    const landingData = req.body;
+    if (!landingData || !landingData.title) {
+      return res.status(400).json({ success: false, error: 'اطلاعات لندینگ پرداخت ناقص است.' });
+    }
+
+    const currentLandings = readPaymentLandingsFromDisk();
+    const id = landingData.id || ('pay_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6));
+    const now = new Date().toISOString();
+
+    const newLanding = {
+      id,
+      title: String(landingData.title).trim(),
+      amount: Math.round(Number(landingData.amount)) || 50000,
+      merchant: (landingData.merchant && String(landingData.merchant).trim()) || '6a9db4410df8756c31ea5d00',
+      sellerName: (landingData.sellerName && String(landingData.sellerName).trim()) || 'جهش آی‌تی',
+      description: landingData.description || '',
+      theme: landingData.theme || 'neon-purple',
+      buyerPhone: landingData.buyerPhone || '',
+      buyerName: landingData.buyerName || '',
+      features: Array.isArray(landingData.features) ? landingData.features : [],
+      guarantees: Array.isArray(landingData.guarantees) ? landingData.guarantees : [],
+      faq: Array.isArray(landingData.faq) ? landingData.faq : [],
+      headline: landingData.headline || landingData.title,
+      subheadline: landingData.subheadline || '',
+      badge: landingData.badge || 'درگاه رسمی شاپرک',
+      valueProposition: landingData.valueProposition || '',
+      ctaButtonText: landingData.ctaButtonText || 'پرداخت آنلاین و نهایی‌سازی سفارش',
+      accentGlowColor: landingData.accentGlowColor || '#8c00ff',
+      metaDescription: landingData.metaDescription || '',
+      viewsCount: landingData.viewsCount || 0,
+      paymentsCount: landingData.paymentsCount || 0,
+      createdAt: landingData.createdAt || now,
+      updatedAt: now
+    };
+
+    const existingIdx = currentLandings.findIndex((l) => l.id === id);
+    if (existingIdx >= 0) {
+      currentLandings[existingIdx] = { ...currentLandings[existingIdx], ...newLanding, updatedAt: now };
+    } else {
+      currentLandings.unshift(newLanding);
+    }
+
+    writePaymentLandingsToDisk(currentLandings);
+
+    setDoc(doc(serverDb, 'settings', 'payment_landings'), { landings: currentLandings, updatedAt: now }, { merge: true })
+      .catch((fbErr) => console.warn('[Server Firestore] payment_landings sync notice:', fbErr.message));
+
+    return res.json({ success: true, landing: newLanding, message: 'لندینگ درگاه پرداخت با موفقیت ثبت شد.' });
+  } catch (err) {
+    console.error('Error saving payment landing:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// حذف یک لندینگ پرداخت
+app.delete('/api/payment-landings/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    let currentLandings = readPaymentLandingsFromDisk();
+    const beforeCount = currentLandings.length;
+    currentLandings = currentLandings.filter((l) => l.id !== id);
+
+    if (currentLandings.length !== beforeCount) {
+      writePaymentLandingsToDisk(currentLandings);
+      setDoc(doc(serverDb, 'settings', 'payment_landings'), { landings: currentLandings, updatedAt: new Date().toISOString() }, { merge: true })
+        .catch((fbErr) => console.warn('[Server Firestore] payment_landings delete notice:', fbErr.message));
+    }
+
+    return res.json({ success: true, message: 'لندینگ پرداخت با موفقیت حذف شد.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// صفحه تاییدیه و صدور فیش رسمی شاپرک (کال‌بک پس از پرداخت در زیبال)
+app.get(['/pay/verify', '/p/verify'], async (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  try {
+    const { trackId, success, status, landingId, orderId } = req.query;
+    const targetLandingId = landingId || orderId;
+
+    const landings = readPaymentLandingsFromDisk();
+    const landing = landings.find((l) => l.id === targetLandingId);
+
+    const isSuccessParam = String(success) === '1' || String(status) === '2';
+
+    if (!trackId || !isSuccessParam) {
+      const html = renderPaymentVerifyHtml({
+        isSuccess: false,
+        trackId: trackId || '—',
+        refNumber: '—',
+        cardNumber: '—',
+        amountTomans: landing?.amount || 0,
+        paidAtFa: new Date().toLocaleDateString('fa-IR'),
+        orderId: targetLandingId || '',
+        message: 'تراکنش توسط کاربر لغو گردید یا در اتصال به شاپرک خطایی رخ داد.',
+        landing
+      });
+      return res.send(html);
+    }
+
+    const merchant = landing?.merchant || process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
+    const verifyPayload = {
+      merchant,
+      trackId: Number(trackId)
+    };
+
+    let verifyData = null;
+    try {
+      const verifyUrl = getZibalUrl('/verify');
+      const zRes = await fetch(verifyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(verifyPayload)
+      });
+      verifyData = await zRes.json();
+    } catch (netErr) {
+      console.warn('[Pay Verify] Network error contacting Zibal:', netErr.message);
+    }
+
+    const isVerified = verifyData && (verifyData.result === 100 || verifyData.result === 201);
+
+    if (isVerified) {
+      const refNumber = verifyData.refNumber ? String(verifyData.refNumber) : String(trackId);
+      const paidAtFa = verifyData.paidAt
+        ? new Date(verifyData.paidAt).toLocaleDateString('fa-IR') + ' ' + new Date(verifyData.paidAt).toLocaleTimeString('fa-IR')
+        : new Date().toLocaleDateString('fa-IR') + ' ' + new Date().toLocaleTimeString('fa-IR');
+
+      if (landing) {
+        landing.paymentsCount = (landing.paymentsCount || 0) + 1;
+        landing.updatedAt = new Date().toISOString();
+        writePaymentLandingsToDisk(landings);
+        setDoc(doc(serverDb, 'settings', 'payment_landings'), { landings, updatedAt: landing.updatedAt }, { merge: true })
+          .catch(() => {});
+      }
+
+      const html = renderPaymentVerifyHtml({
+        isSuccess: true,
+        trackId: String(trackId),
+        refNumber,
+        cardNumber: verifyData.cardNumber || 'کارت شتاب',
+        amountTomans: verifyData.amount ? Math.round(verifyData.amount / 10) : (landing?.amount || 0),
+        paidAtFa,
+        orderId: targetLandingId || '',
+        message: 'پرداخت شما با موفقیت در شاپرک تایید و رسید رسمی صادر گردید.',
+        landing
+      });
+      return res.send(html);
+    } else {
+      const html = renderPaymentVerifyHtml({
+        isSuccess: false,
+        trackId: String(trackId),
+        refNumber: '—',
+        cardNumber: '—',
+        amountTomans: landing?.amount || 0,
+        paidAtFa: new Date().toLocaleDateString('fa-IR'),
+        orderId: targetLandingId || '',
+        message: verifyData?.message || 'تأییدیه نهایی توسط شاپرک یا زیبال صادر نگردید.',
+        landing
+      });
+      return res.send(html);
+    }
+  } catch (err) {
+    console.error('Error in /pay/verify route:', err);
+    return res.status(500).send('خطای سرور در تایید پرداخت.');
+  }
+});
+
+// صفحه فرود عمومی گرافیکی اختصاصی برای هر پرداخت (/pay/:id و /p/:id)
+app.get(['/pay/:id', '/p/:id'], (req, res) => {
+  try {
+    const { id } = req.params;
+    const landings = readPaymentLandingsFromDisk();
+    const landing = landings.find((l) => l.id === id || l.slug === id);
+
+    if (!landing) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(404).send(`<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8"><title>صفحه پرداخت یافت نشد | جهش</title>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>*{font-family:'Vazirmatn',sans-serif;}</style>
+</head>
+<body class="bg-[#080514] text-white min-h-screen flex items-center justify-center p-4">
+  <div class="max-w-md w-full bg-[#120b26]/90 border border-purple-500/30 rounded-3xl p-8 text-center backdrop-blur-xl">
+    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-3xl">⚠️</div>
+    <h1 class="text-2xl font-black mb-3">لینک پرداخت یافت نشد</h1>
+    <p class="text-slate-300 text-sm mb-6">این درگاه ممکن است منقضی یا حذف شده باشد. لطفاً از صحت آدرس اطمینان حاصل کنید.</p>
+    <a href="/jaheshkala/" class="inline-block px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition">ورود به جهش‌کالا</a>
+  </div>
+</body>
+</html>`);
+    }
+
+    landing.viewsCount = (landing.viewsCount || 0) + 1;
+    writePaymentLandingsToDisk(landings);
+
+    const host = req.get('host') || 'jaheshit.ir';
+    const protocol = req.protocol || 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    const html = renderPaymentLandingHtml(landing, baseUrl);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.send(html);
+  } catch (err) {
+    console.error('Error rendering payment landing page:', err);
+    return res.status(500).send('خطا در بارگذاری صفحه پرداخت.');
+  }
 });
 
 // Dedicated routes for the 5 Pillars of Jahesh Ecosystem
