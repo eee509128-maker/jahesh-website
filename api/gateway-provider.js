@@ -12,6 +12,7 @@ if (!fs.existsSync(DATA_DIR)) {
 
 export const CUSTOM_MERCHANTS_FILE = path.join(DATA_DIR, 'custom_merchants.json');
 export const GATEWAY_TRANSACTIONS_FILE = path.join(DATA_DIR, 'gateway_transactions.json');
+export const GATEWAY_SETTINGS_FILE = path.join(DATA_DIR, 'gateway_settings.json');
 
 /**
  * Generate Secure Unique Merchant Code (e.g. JAHESH_MID_8f1a2b3c)
@@ -97,6 +98,39 @@ export function writeGatewayTransactionsToDisk(txs) {
 }
 
 /**
+ * Read Gateway Settings from Disk (including Master Admin Sheba and Multiplexing config)
+ */
+export function readGatewaySettingsFromDisk() {
+  try {
+    if (fs.existsSync(GATEWAY_SETTINGS_FILE)) {
+      const raw = fs.readFileSync(GATEWAY_SETTINGS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch (e) {
+    console.error('Error reading gateway_settings.json:', e);
+  }
+  return {
+    masterAdminSheba: '',
+    isMultiplexingEnabled: true,
+    defaultFeePercent: 5,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Write Gateway Settings to Disk
+ */
+export function writeGatewaySettingsToDisk(settings) {
+  if (!settings || typeof settings !== 'object') return;
+  try {
+    fs.writeFileSync(GATEWAY_SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('writeGatewaySettingsToDisk notice:', e);
+  }
+}
+
+/**
  * Render Jahesh Pay Branded Checkout Page for External Client Websites
  * Renders on jaheshit.ir domain with security badges, client website attribution,
  * and mouse-reactive payment initiation button!
@@ -112,8 +146,16 @@ export function renderJaheshGatewayCheckoutHtml(transaction, merchant, baseUrl =
     customerMobile
   } = transaction;
 
-  const websiteTitle = merchant?.title || 'پذیرنده جهش‌پی';
-  const websiteUrl = merchant?.websiteUrl || '#';
+  let websiteTitle = merchant?.title || transaction.merchantTitle || 'پذیرنده جهش‌پی';
+  let websiteUrl = merchant?.websiteUrl || transaction.merchantWebsite || transaction.clientWebsiteUrl || '#';
+  const isBasa = websiteTitle.includes('باسا') || (websiteUrl && websiteUrl.toLowerCase().includes('basa')) || (merchant?.merchantCode && merchant.merchantCode.includes('CA238DDA17B7607'));
+  if (isBasa) {
+    websiteUrl = 'https://basalaboratory.ir/';
+  }
+  let cancelUrl = isBasa ? 'https://basalaboratory.ir/' : (websiteUrl || '#');
+  if (!cancelUrl || cancelUrl === '#') {
+    cancelUrl = 'https://basalaboratory.ir/';
+  }
   const amountFormatted = Number(amountInTomans || 0).toLocaleString('fa-IR');
   const amountRialsFormatted = Number(amountInRials || (amountInTomans * 10) || 0).toLocaleString('fa-IR');
 
@@ -240,12 +282,10 @@ export function renderJaheshGatewayCheckoutHtml(transaction, merchant, baseUrl =
       </div>
 
       <div class="flex items-center gap-3 text-xs">
-        <div class="hidden sm:flex items-center gap-1.5 text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 rounded-full font-bold">
+        <div class="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 rounded-full font-bold">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
           <span>تایید شده در شاپرک</span>
         </div>
-        <span class="text-slate-500">|</span>
-        <a href="tel:09152331974" class="text-slate-400 hover:text-white transition text-[11px]">پشتیبانی: ۰۹۱۵۲۳۳۱۹۷۴</a>
       </div>
     </div>
   </header>
@@ -341,9 +381,9 @@ export function renderJaheshGatewayCheckoutHtml(transaction, merchant, baseUrl =
 
       <!-- Cancel / Return Link -->
       <div class="mt-6 pt-5 border-t border-white/10 text-center">
-        <a href="${escapeHtml(transaction.callbackUrl || websiteUrl)}?trackId=${encodeURIComponent(trackId)}&success=0&status=cancel" class="text-xs text-slate-400 hover:text-rose-400 transition flex items-center justify-center gap-1">
+        <a href="${escapeHtml(cancelUrl)}" class="text-xs text-slate-400 hover:text-rose-400 transition inline-flex items-center justify-center gap-1.5 py-1 px-3 rounded-lg hover:bg-white/5">
           <span>انصراف از پرداخت و بازگشت به سایت ${escapeHtml(websiteTitle)}</span>
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+          <svg class="w-3.5 h-3.5 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
         </a>
       </div>
 
@@ -458,9 +498,16 @@ export function renderJaheshGatewayCheckoutHtml(transaction, merchant, baseUrl =
  * Render Gateway Return & Receipt Page after Shaparak Payment
  */
 export function renderJaheshGatewayReturnHtml(transaction, merchant, isSuccess, details = {}) {
-  const websiteTitle = merchant?.title || 'سایت پذیرنده';
-  const websiteUrl = merchant?.websiteUrl || '#';
-  const clientCallback = transaction.callbackUrl || websiteUrl;
+  let websiteTitle = merchant?.title || transaction.merchantTitle || 'سایت پذیرنده';
+  let websiteUrl = merchant?.websiteUrl || transaction.merchantWebsite || transaction.clientWebsiteUrl || '#';
+  const isBasa = websiteTitle.includes('باسا') || (websiteUrl && websiteUrl.toLowerCase().includes('basa')) || (merchant?.merchantCode && merchant.merchantCode.includes('CA238DDA17B7607'));
+  if (isBasa) {
+    websiteUrl = 'https://basalaboratory.ir/';
+  }
+  let clientCallback = transaction.callbackUrl || websiteUrl;
+  if (isBasa && (!transaction.callbackUrl || transaction.callbackUrl.includes('localhost') || transaction.callbackUrl.includes('test') || transaction.callbackUrl.includes('jaheshit.ir'))) {
+    clientCallback = 'https://basalaboratory.ir/';
+  }
 
   const sep = clientCallback.includes('?') ? '&' : '?';
   const finalRedirectUrl = `${clientCallback}${sep}trackId=${encodeURIComponent(transaction.trackId)}&success=${isSuccess ? 1 : 0}&status=${isSuccess ? 2 : -1}&refNumber=${encodeURIComponent(details.refNumber || transaction.refNumber || '')}&orderId=${encodeURIComponent(transaction.orderId || '')}&amount=${encodeURIComponent(transaction.amountInTomans || 0)}`;
@@ -574,7 +621,7 @@ export function renderJaheshGatewayReturnHtml(transaction, merchant, isSuccess, 
   </main>
 
   <footer class="border-t border-white/10 bg-black/50 py-4 text-center text-xs text-slate-400">
-    سامانه درگاه پرداخت واسط جهش پی | پشتیبانی: ۰۹۱۵۲۳۳۱۹۷۴
+    سامانه درگاه پرداخت واسط جهش پی | تحت نظارت شاپرک و بانک مرکزی جمهوری اسلامی ایران
   </footer>
 
   <script>

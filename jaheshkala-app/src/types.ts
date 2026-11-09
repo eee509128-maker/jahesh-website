@@ -360,3 +360,10 @@ export interface GatewayTransaction {
   verifiedAt?: string;
   errorMessage?: string;
 }
+
+export interface GatewaySettings {
+  masterAdminSheba: string;
+  isMultiplexingEnabled: boolean;
+  defaultFeePercent: number;
+  updatedAt?: string;
+}

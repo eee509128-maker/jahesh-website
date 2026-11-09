@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Globe, Sparkles, Clock, Code2, Zap, Copy, Check, Eye, EyeOff, ShieldCheck,
   ArrowRight, RefreshCw, Plus, Edit3, Trash2, CheckCircle2, AlertCircle, X,
   ExternalLink, Search, Phone, Mail, CreditCard, ToggleLeft, ToggleRight,
-  HelpCircle, Server, Terminal, ArrowDownRight, Layers, Tag
+  HelpCircle, Server, Terminal, ArrowDownRight, Layers, Tag, Percent, Calculator, CheckSquare
 } from 'lucide-react';
-import { CustomMerchant, GatewayTransaction } from '../types';
+import { CustomMerchant, GatewayTransaction, GatewaySettings } from '../types';
+import { fetchGatewaySettingsFromDb, saveGatewaySettingsToDb } from '../lib/dbService';
 
 interface MerchantFacilitatorViewProps {
   customMerchants: CustomMerchant[];
@@ -30,10 +31,81 @@ export const MerchantFacilitatorView: React.FC<MerchantFacilitatorViewProps> = (
   onRefreshTransactions,
   zibalMerchant = '6a9db4410df8756c31ea5d00'
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'merchants' | 'transactions' | 'docs'>('merchants');
+  const [activeSubTab, setActiveSubTab] = useState<'merchants' | 'multiplexing' | 'transactions' | 'docs'>('merchants');
+
+  // Multiplexing / Gateway Settings State
+  const [gatewaySettings, setGatewaySettings] = useState<GatewaySettings>({
+    masterAdminSheba: '',
+    isMultiplexingEnabled: true,
+    defaultFeePercent: 5
+  });
+  const [adminShebaInput, setAdminShebaInput] = useState('');
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [basaShebaInput, setBasaShebaInput] = useState('');
+  const [isSavingBasaSheba, setIsSavingBasaSheba] = useState(false);
 
   // Merchant action message
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const basaMerchant = customMerchants.find(m => m.title?.includes('باسا') || m.websiteUrl?.includes('basa'));
+
+  useEffect(() => {
+    fetchGatewaySettingsFromDb().then(st => {
+      if (st) {
+        setGatewaySettings(st);
+        setAdminShebaInput(st.masterAdminSheba || '');
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (basaMerchant) {
+      const currentSheba = (basaMerchant as any).shebaNumber || basaMerchant.sheba || '';
+      if (currentSheba) {
+        setBasaShebaInput(currentSheba);
+      }
+    }
+  }, [basaMerchant]);
+
+  const handleSaveGatewaySettings = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSavingSettings(true);
+    try {
+      const updated = await saveGatewaySettingsToDb({
+        masterAdminSheba: adminShebaInput.trim(),
+        isMultiplexingEnabled: gatewaySettings.isMultiplexingEnabled,
+        defaultFeePercent: Number(gatewaySettings.defaultFeePercent) || 5
+      });
+      if (updated) {
+        setGatewaySettings(updated);
+        showMessage('success', 'تنظیمات تسهیم و شماره شبای اختصاصی شما با موفقیت ذخیره گردید.');
+      }
+    } catch (err: any) {
+      showMessage('error', err?.message || 'خطا در ذخیره تنظیمات.');
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const handleSaveBasaSheba = async () => {
+    if (!basaMerchant) return;
+    setIsSavingBasaSheba(true);
+    try {
+      const updated = await onSaveMerchant({
+        ...basaMerchant,
+        sheba: basaShebaInput.trim(),
+        feePercent: 5
+      });
+      if (updated) {
+        showMessage('success', 'شماره شبای آزمایشگاه دامپزشکی باسا با موفقیت به‌روزرسانی شد.');
+        onRefreshMerchants();
+      }
+    } catch (err: any) {
+      showMessage('error', err?.message || 'خطا در ثبت شبای باسا.');
+    } finally {
+      setIsSavingBasaSheba(false);
+    }
+  };
 
   // Form State
   const [editingMerchant, setEditingMerchant] = useState<CustomMerchant | null>(null);
@@ -322,6 +394,22 @@ export const MerchantFacilitatorView: React.FC<MerchantFacilitatorViewProps> = (
             <span>پذیرندگان و درگاه‌های فعال</span>
             <span className="bg-cyan-500/30 text-cyan-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
               {customMerchants.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('multiplexing')}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+              activeSubTab === 'multiplexing'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white shadow-lg shadow-purple-900/50'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Percent className="w-4 h-4 text-amber-300" />
+            <span>تنظیمات تسهیم و سهم ۵٪ (Multiplexing)</span>
+            <span className="bg-amber-500/30 text-amber-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
+              تسهیم باسا
             </span>
           </button>
 
@@ -895,6 +983,294 @@ export const MerchantFacilitatorView: React.FC<MerchantFacilitatorViewProps> = (
                 })}
               </div>
             )}
+          </div>
+
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* SUBTAB: MULTIPLEXING & PROFIT SHARING (5% / 95% SPLIT) */}
+      {/* ======================================================== */}
+      {activeSubTab === 'multiplexing' && (
+        <div className="space-y-6">
+
+          {/* Hero Banner for Multiplexing */}
+          <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#1b0d38] via-[#110724] to-[#070312] border border-amber-500/40 shadow-2xl">
+            <div className="absolute -top-24 -left-24 w-72 h-72 bg-amber-600/15 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-[11px] font-extrabold text-amber-300 backdrop-blur-md">
+                  <Percent className="w-3.5 h-3.5 text-amber-300" />
+                  <span>سامانه هوشمند تسهیم درگاه شاپرک و زیبال (Automated Profit Sharing)</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                  تسهیم خودکار وجوه: ۵٪ سهم مدیریت جهش و ۹۵٪ سهم شرکت باسا
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  با این سیستم، هر تراکنشی که در سایت آزمایشگاه دامپزشکی باسا یا سایر پذیرندگان انجام شود، هم‌زمان با پرداخت مشتری به صورت خودکار تفکیک می‌شود: 
+                  <span className="text-amber-300 font-bold mx-1">۵ درصد</span> سهم شما به حساب اختصاصی‌تان و 
+                  <span className="text-cyan-300 font-bold mx-1">۹۵ درصد</span> مابقی مستقیماً به شماره شبای شرکت باسا واریز خواهد شد.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto">
+                <div className="p-3.5 rounded-2xl bg-black/60 border border-amber-500/30 text-right text-xs">
+                  <div className="text-[11px] text-slate-400 font-semibold mb-1">وضعیت ماژول تسهیم:</div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="text-emerald-400 font-black">فعال و آماده ارسال به شاپرک</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1 font-mono">
+                    مرچنت متصل: {zibalMerchant}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Master Admin Sheba Form Card */}
+          <div className="p-6 sm:p-7 rounded-3xl bg-[#120a28]/90 border border-amber-500/30 backdrop-blur-xl shadow-xl space-y-5">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2.5 text-sm font-extrabold text-amber-300">
+                <CreditCard className="w-4 h-4 text-amber-400" />
+                <span>۱. ثبت شماره شبای حساب اختصاصی شما (جهت دریافت ۵٪ سهم سود / کارمزد)</span>
+              </div>
+              <span className="text-[11px] text-emerald-400 font-bold bg-emerald-950/70 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                حساب اصلی تسویه
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveGatewaySettings} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    شماره شبای ۲۴ رقمی حساب شخصی شما (با پیشوند IR):
+                  </label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={adminShebaInput}
+                    onChange={(e) => setAdminShebaInput(e.target.value.toUpperCase())}
+                    placeholder="IR120170000000123456789012"
+                    className="w-full bg-black/70 border border-amber-500/40 focus:border-amber-400 rounded-2xl px-4 py-3 text-sm text-amber-300 font-mono tracking-wider outline-none transition"
+                  />
+                  <span className="block text-[11px] text-slate-400 mt-1">
+                    ۵٪ از مبالغ هر تراکنش وب‌سایت باسا به این حساب واریز می‌گردد.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    درصد سهم کارمزد مدیریت جهش (%):
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={gatewaySettings.defaultFeePercent || 5}
+                    onChange={(e) => setGatewaySettings(prev => ({ ...prev, defaultFeePercent: Number(e.target.value) || 5 }))}
+                    className="w-full bg-black/70 border border-amber-500/40 focus:border-amber-400 rounded-2xl px-4 py-3 text-sm text-white font-mono outline-none transition"
+                  />
+                  <span className="block text-[11px] text-slate-400 mt-1">
+                    درصد سهم شما (پیش‌فرض ۵ درصد)
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={gatewaySettings.isMultiplexingEnabled}
+                    onChange={(e) => setGatewaySettings(prev => ({ ...prev, isMultiplexingEnabled: e.target.checked }))}
+                    className="rounded accent-amber-500 w-4 h-4"
+                  />
+                  <span>فعال بودن تفکیک و تسهیم خودکار تراکنش‌ها در سوییچ درگاه</span>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isSavingSettings}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-xs shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2 transition disabled:opacity-50"
+                >
+                  <Check className="w-4 h-4 text-black" />
+                  <span>{isSavingSettings ? 'در حال ذخیره‌سازی...' : 'ذخیره شماره شبا و فعال‌سازی تسهیم'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Basa Laboratory Multiplexing Card */}
+          <div className="p-6 sm:p-7 rounded-3xl bg-gradient-to-br from-[#100828] to-[#070314] border border-cyan-500/40 backdrop-blur-xl shadow-xl space-y-5">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm font-extrabold text-cyan-300">
+                  <Globe className="w-4 h-4 text-cyan-400" />
+                  <span>۲. تنظیمات تسهیم درگاه اختصاصی «آزمایشگاه دامپزشکی باسا»</span>
+                </div>
+                <div className="text-xs text-slate-400 font-mono">
+                  دامنه: <a href="https://basalaboratory.ir/" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">https://basalaboratory.ir/</a>
+                  {' • '}
+                  کد مرچنت: <span className="text-amber-300">{basaMerchant?.merchantCode || 'JAHESH_MID_CA238DDA17B7607'}</span>
+                </div>
+              </div>
+              <span className="text-xs font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-500/30 px-3 py-1 rounded-full">
+                آماده تسهیم
+              </span>
+            </div>
+
+            {/* Visual Ratio Bar */}
+            <div className="space-y-2 bg-black/60 p-4 rounded-2xl border border-white/10">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-amber-300 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                  <span>سهم حساب شما (کارمزد جهش): ۵٪</span>
+                </span>
+                <span className="text-cyan-300 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                  <span>سهم حساب شرکت باسا: ۹۵٪</span>
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full h-4 bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
+                <div style={{ width: '5%' }} className="h-full bg-gradient-to-r from-amber-500 to-amber-400" title="۵٪ سهم شما"></div>
+                <div style={{ width: '95%' }} className="h-full bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600" title="۹۵٪ سهم شرکت باسا"></div>
+              </div>
+
+              <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1">
+                <span>واریز به شبای شخصی شما: {adminShebaInput ? `${adminShebaInput.slice(0, 10)}...` : '⚠️ شماره شبای خود را در کادر بالا وارد کنید'}</span>
+                <span>واریز به شبای باسا: {basaShebaInput ? `${basaShebaInput.slice(0, 10)}...` : '⚠️ شماره شبای شرکت باسا را وارد کنید'}</span>
+              </div>
+            </div>
+
+            {/* Basa Sheba Input Form */}
+            <div className="p-4 rounded-2xl bg-black/40 border border-cyan-500/30 space-y-3">
+              <label className="block text-xs font-bold text-slate-300">
+                شماره شبای حساب بانکی شرکت «آزمایشگاه دامپزشکی باسا» (جهت واریز ۹۵٪ مبالغ):
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={basaShebaInput}
+                  onChange={(e) => setBasaShebaInput(e.target.value.toUpperCase())}
+                  placeholder="IR..."
+                  className="flex-1 bg-black/80 border border-cyan-500/40 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-cyan-300 font-mono tracking-wider outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveBasaSheba}
+                  disabled={isSavingBasaSheba}
+                  className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isSavingBasaSheba ? 'در حال ثبت...' : 'ذخیره شبای باسا'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Example Calculations Table */}
+            <div className="p-4 rounded-2xl bg-black/50 border border-white/5 space-y-2">
+              <div className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Calculator className="w-4 h-4 text-amber-400" />
+                <span>نمونه محاسبات تسهیم ۵٪ و ۹۵٪ در تراکنش‌های واقعی باسا:</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
+                  <div className="text-slate-400">تراکنش ۱,۰۰۰,۰۰۰ تومانی:</div>
+                  <div className="text-amber-300 font-mono font-bold">سهم شما: ۵۰,۰۰۰ تومان</div>
+                  <div className="text-cyan-300 font-mono font-bold">سهم باسا: ۹۵۰,۰۰۰ تومان</div>
+                </div>
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
+                  <div className="text-slate-400">تراکنش ۵۰۰,۰۰۰ تومانی:</div>
+                  <div className="text-amber-300 font-mono font-bold">سهم شما: ۲۵,۰۰۰ تومان</div>
+                  <div className="text-cyan-300 font-mono font-bold">سهم باسا: ۴۷۵,۰۰۰ تومان</div>
+                </div>
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
+                  <div className="text-slate-400">تراکنش ۱۰۰,۰۰۰ تومانی:</div>
+                  <div className="text-amber-300 font-mono font-bold">سهم شما: ۵,۰۰۰ تومان</div>
+                  <div className="text-cyan-300 font-mono font-bold">سهم باسا: ۹۵,۰۰۰ تومان</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* EXACT STEP-BY-STEP GUIDE: "دقیق بگو چیکار کنم" */}
+          <div className="p-6 sm:p-7 rounded-3xl bg-[#0c051a] border border-purple-500/40 backdrop-blur-xl shadow-2xl space-y-5">
+            <div className="flex items-center gap-2 text-base font-black text-amber-300 border-b border-white/10 pb-3">
+              <HelpCircle className="w-5 h-5 text-amber-400" />
+              <span>راهنمای دقیق و گام‌به‌گام: چگونه تسهیم را در پنل زیبال و جهش تکمیل کنیم؟</span>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              برای اینکه شاپرک اجازه دهد مبالغ تراکنش به دو حساب مختلف (حساب شما و حساب باسا) واریز شود، کافیست این ۴ گام بسیار ساده را دنبال فرمایید:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Step 1 */}
+              <div className="p-4 rounded-2xl bg-black/60 border border-white/10 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-amber-500 text-black flex items-center justify-center text-xs font-black">
+                    ۱
+                  </div>
+                  <h4 className="text-xs font-bold text-white">ورود به پنل کاربری زیبال</h4>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  وارد سایت زیبال به آدرس <a href="https://panel.zibal.ir" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline font-mono">panel.zibal.ir</a> با حساب کاربری درگاه خود شوید.
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="p-4 rounded-2xl bg-black/60 border border-white/10 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-cyan-500 text-black flex items-center justify-center text-xs font-black">
+                    ۲
+                  </div>
+                  <h4 className="text-xs font-bold text-white">ثبت هر دو شماره شبا در زیبال</h4>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  از منوی سمت راست وارد <strong>«حساب‌های بانکی»</strong> شوید. شماره شبای خودتان و شماره شبای شرکت باسا را اضافه کنید تا وضعیت هر دو به رنگ سبز (تایید شده توسط شاپرک) درآید.
+                </p>
+              </div>
+
+              {/* Step 3 */}
+              <div className="p-4 rounded-2xl bg-black/60 border border-white/10 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-purple-500 text-white flex items-center justify-center text-xs font-black">
+                    ۳
+                  </div>
+                  <h4 className="text-xs font-bold text-white">تعریف قرارداد تسهیم در پنل زیبال (اختیاری ولی تضمینی)</h4>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  در منوی زیبال، روی <strong>«درگاه‌های پرداخت»</strong> کلیک کرده، درگاه مرچنت جهش را انتخاب و وارد تب <strong>«تسهیم (قرارداد تسهیم)»</strong> شوید. یک قرارداد با فرمول ۵٪ به شبای خودتان و ۹۵٪ به شبای باسا ثبت کنید.
+                </p>
+              </div>
+
+              {/* Step 4 */}
+              <div className="p-4 rounded-2xl bg-black/60 border border-white/10 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-xs font-black">
+                    ۴
+                  </div>
+                  <h4 className="text-xs font-bold text-white">ثبت شباها در همین پنل مدیریت جهش</h4>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  در همین تب بالا، شماره شبای خودتان و شبای باسا را وارد و دکمه ذخیره را بزنید. سیستم جهش از این لحظه در وب‌سرویس درگاه، پارامتر رسمی <code className="text-cyan-300 font-mono">multiplexingInfos</code> را برای زیبال می‌فرستد تا تفکیک مبالغ در لحظه پرداخت در شاپرک اعمال شود.
+                </p>
+              </div>
+
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                <strong>نکته فنی هوشمند:</strong> سرور جهش دارای سیستم هوشمند Fallback است؛ چنانچه شبای باسا در پنل زیبال هنوز در انتظار استعلام بانکی باشد، تراکنش مشتری متوقف نشده و پرداخت مستقیماً انجام می‌گیرد تا کسب‌وکار متوقف نشود.
+              </span>
+            </div>
           </div>
 
         </div>

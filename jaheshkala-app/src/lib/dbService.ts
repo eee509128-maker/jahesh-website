@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { db } from './firebase';
 import { doc, setDoc, getDocs, getDoc, collection, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { Product, Order, User, Coupon, BannerSlide, DashboardTool, UserChat, PaymentLanding, CustomMerchant, GatewayTransaction } from '../types';
+import { Product, Order, User, Coupon, BannerSlide, DashboardTool, UserChat, PaymentLanding, CustomMerchant, GatewayTransaction, GatewaySettings } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { RESTORED_ZIBAL_ORDERS } from '../data/restoredOrders';
 import { areSameUser, normalizePhone, normalizeUsername, mergeUserRecords, isMasterAdminUser } from './userUtils';
@@ -3288,6 +3288,40 @@ export const fetchGatewayTransactionsFromDb = async (): Promise<GatewayTransacti
     console.error('Fetch gateway transactions error:', err);
   }
   return [];
+};
+
+export const fetchGatewaySettingsFromDb = async (): Promise<GatewaySettings> => {
+  try {
+    const res = await fetch('/api/gateway-settings');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.settings) return data.settings;
+    }
+  } catch (err) {
+    console.error('Fetch gateway settings error:', err);
+  }
+  return {
+    masterAdminSheba: '',
+    isMultiplexingEnabled: true,
+    defaultFeePercent: 5
+  };
+};
+
+export const saveGatewaySettingsToDb = async (settings: Partial<GatewaySettings>): Promise<GatewaySettings | null> => {
+  try {
+    const res = await fetch('/api/gateway-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.settings) return data.settings;
+    }
+  } catch (err) {
+    console.error('Save gateway settings error:', err);
+  }
+  return null;
 };
 
 

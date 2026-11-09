@@ -486,10 +486,6 @@ export function renderPaymentLandingHtml(landing, currentUrl = '') {
         <div class="hidden sm:flex items-center gap-2 text-xs font-bold text-slate-300 bg-white/5 border border-white/10 px-3.5 py-1.5 rounded-full backdrop-blur-md">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span>درگاه فعال زیبال: ${merchant.slice(0, 10)}...</span>
-        </div>
-        <a href="tel:09152331974" class="text-xs font-bold text-purple-300 hover:text-white transition px-3 py-1.5 rounded-lg border border-purple-500/20 bg-purple-950/30">
-          پشتیبانی: ۰۹۱۵۲۳۳۱۹۷۴
-        </a>
       </div>
     </div>
   </header>

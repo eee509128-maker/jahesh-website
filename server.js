@@ -36,6 +36,8 @@ import {
   writeCustomMerchantsToDisk,
   readGatewayTransactionsFromDisk,
   writeGatewayTransactionsToDisk,
+  readGatewaySettingsFromDisk,
+  writeGatewaySettingsToDisk,
   generateMerchantCode,
   generateApiKey,
   generateGatewayTrackId,
@@ -361,6 +363,17 @@ try {
       }
     }
   }, (err) => console.warn('[Server Firestore] gateway_transactions listener notice:', err));
+
+  // ۱۰. شنود تنظیمات تسهیم و شبای مدیر درگاه واسط
+  onSnapshot(doc(serverDb, 'settings', 'gateway_settings'), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && typeof data === 'object') {
+        writeGatewaySettingsToDisk(data);
+        console.log('[Server Firestore] Real-time synced gateway settings (Multiplexing)');
+      }
+    }
+  }, (err) => console.warn('[Server Firestore] gateway_settings listener notice:', err));
 } catch (e) {
   console.warn('[Server Firestore] listener init error:', e);
 }
@@ -448,6 +461,16 @@ async function bootSyncFirestoreCloud() {
       if (gtData && Array.isArray(gtData.transactions) && gtData.transactions.length > 0) {
         writeGatewayTransactionsToDisk(gtData.transactions);
         console.log(`[Server Firestore Boot] Loaded ${gtData.transactions.length} gateway transactions`);
+      }
+    }
+
+    // ۷. دریافت تنظیمات تسهیم و شبای مدیر درگاه واسط
+    const gsSnap = await getDoc(doc(serverDb, 'settings', 'gateway_settings'));
+    if (gsSnap.exists()) {
+      const gsData = gsSnap.data();
+      if (gsData && typeof gsData === 'object') {
+        writeGatewaySettingsToDisk(gsData);
+        console.log('[Server Firestore Boot] Loaded gateway settings (Multiplexing admin Sheba)');
       }
     }
   } catch (err) {
@@ -4414,6 +4437,38 @@ app.get('/api/gateway-transactions', (_req, res) => {
   }
 });
 
+// دریافت تنظیمات تسهیم و شبای مدیریت
+app.get('/api/gateway-settings', (_req, res) => {
+  try {
+    const settings = readGatewaySettingsFromDisk();
+    return res.json({ success: true, settings });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ذخیره تنظیمات تسهیم و شبای مدیریت جهش
+app.post('/api/gateway-settings', (req, res) => {
+  try {
+    const { masterAdminSheba, isMultiplexingEnabled, defaultFeePercent } = req.body || {};
+    const current = readGatewaySettingsFromDisk();
+    const updated = {
+      ...current,
+      masterAdminSheba: typeof masterAdminSheba === 'string' ? masterAdminSheba.trim() : (current.masterAdminSheba || ''),
+      isMultiplexingEnabled: typeof isMultiplexingEnabled === 'boolean' ? isMultiplexingEnabled : (current.isMultiplexingEnabled !== false),
+      defaultFeePercent: typeof defaultFeePercent === 'number' ? defaultFeePercent : (current.defaultFeePercent || 5),
+      updatedAt: new Date().toISOString()
+    };
+    writeGatewaySettingsToDisk(updated);
+    setDoc(doc(serverDb, 'settings', 'gateway_settings'), updated, { merge: true })
+      .catch((err) => console.warn('[Server Firestore] gateway_settings save notice:', err.message));
+
+    return res.json({ success: true, settings: updated });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ==========================================
 // وب‌سرویس عمومی REST API درگاه جهش پی برای اتصال سایت‌های دیگر
 // ==========================================
@@ -4610,6 +4665,10 @@ app.post('/api/pg/start-shaparak', async (req, res) => {
     const ZIBAL_MERCHANT = process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
     const callbackUrl = `${baseUrl}/pg/callback?sessionTrackId=${encodeURIComponent(tx.trackId)}`;
 
+    const merchants = readCustomMerchantsFromDisk();
+    const merchant = merchants.find((m) => m.id === tx.merchantId || m.merchantCode === tx.merchantCode);
+    const settings = readGatewaySettingsFromDisk();
+
     const zibalPayload = {
       merchant: ZIBAL_MERCHANT,
       amount: tx.amountInRials,
@@ -4619,6 +4678,37 @@ app.post('/api/pg/start-shaparak', async (req, res) => {
     };
     if (tx.customerMobile) {
       zibalPayload.mobile = String(tx.customerMobile);
+    }
+
+    // بررسی و اعمال سیستم تسهیم (Multiplexing): ۵٪ سهم مدیریت و ۹۵٪ سهم شرکت باسا / کارفرما
+    const feePercent = merchant && typeof merchant.feePercent === 'number' ? merchant.feePercent : (settings.defaultFeePercent || 5);
+    const masterAdminSheba = (settings.masterAdminSheba || '').trim();
+    const clientSheba = (merchant?.shebaNumber || merchant?.sheba || '').trim();
+
+    if (settings.isMultiplexingEnabled !== false && feePercent > 0 && masterAdminSheba && clientSheba) {
+      const totalRials = Number(tx.amountInRials);
+      const adminAmountRials = Math.round(totalRials * (feePercent / 100));
+      const clientAmountRials = totalRials - adminAmountRials;
+
+      zibalPayload.multiplexingInfos = [
+        {
+          bankAccount: masterAdminSheba.replace(/\s+/g, ''),
+          amount: adminAmountRials
+        },
+        {
+          bankAccount: clientSheba.replace(/\s+/g, ''),
+          amount: clientAmountRials
+        }
+      ];
+
+      tx.multiplexing = {
+        feePercent,
+        adminAmountRials,
+        clientAmountRials,
+        masterAdminSheba,
+        clientSheba
+      };
+      console.log(`[Jahesh Pay Multiplexing] Configured split for ${tx.orderId}: ${feePercent}% (${adminAmountRials} Rls) -> ${masterAdminSheba}, ${100 - feePercent}% (${clientAmountRials} Rls) -> ${clientSheba}`);
     }
 
     const requestUrl = getZibalUrl('/request');
@@ -4635,6 +4725,28 @@ app.post('/api/pg/start-shaparak', async (req, res) => {
     } catch (networkErr) {
       console.warn('[Jahesh Pay] Direct Zibal request notice:', networkErr.message);
       data = { result: -2, message: networkErr.message };
+    }
+
+    // در صورتی که شماره شبای وارد شده در پنل زیبال هنوز در انتظار تایید شاپرک باشد (کد 108 یا 109)
+    // سیستم با حذف موقت multiplexingInfos تراکنش را ایجاد می‌کند تا پرداخت مشتری مسدود نشود
+    if (data && (data.result === 108 || data.result === 109) && zibalPayload.multiplexingInfos) {
+      console.warn(`[Jahesh Pay Multiplexing] Zibal returned error ${data.result} (${data.message}) for Sheba. Retrying directly so payment is not blocked.`);
+      const fallbackPayload = { ...zibalPayload };
+      delete fallbackPayload.multiplexingInfos;
+      try {
+        const retryRes = await fetch(requestUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fallbackPayload)
+        });
+        const retryData = await retryRes.json().catch(() => null);
+        if (retryData && retryData.result === 100 && retryData.trackId) {
+          data = retryData;
+          tx.multiplexingNotice = 'تسهیم خودکار به دلیل عدم تایید نهایی شبا در پنل زیبال موقتاً بای‌پس شد و تراکنش مستقیم ایجاد گردید.';
+        }
+      } catch (retryErr) {
+        console.warn('[Jahesh Pay Multiplexing] Fallback retry error:', retryErr);
+      }
     }
 
     if (!data || data.result !== 100 || !data.trackId) {
