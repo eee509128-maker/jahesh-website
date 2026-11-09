@@ -47,5 +47,11 @@ service cloud.firestore {
     match /media_cache/{mediaId} {
       allow read, write: if true;
     }
+    match /custom_merchants/{merchantId} {
+      allow read, write: if true;
+    }
+    match /gateway_transactions/{txId} {
+      allow read, write: if true;
+    }
   }
 }

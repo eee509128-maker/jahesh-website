@@ -548,12 +548,12 @@ export function renderPaymentLandingHtml(landing, currentUrl = '') {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <div>
             <label class="block text-xs font-bold text-slate-300 mb-1.5">نام و نام‌خانوادگی پرداخت‌کننده:</label>
-            <input type="text" id="buyerName" value="${escapeHtml(customerName)}" placeholder="مثال: عرفان مقدم"
+            <input type="text" id="buyerName" value="${escapeHtml(customerName)}" placeholder="مثال: خانم سارا محمدی"
                    class="w-full bg-black/50 border border-white/15 focus:border-purple-400 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 outline-none transition">
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره موبایل (جهت دریافت پیامک رسید شاپرک):</label>
-            <input type="tel" id="buyerPhone" value="${escapeHtml(customerPhone)}" placeholder="مثال: ۰۹۱۵۲۳۳۱۹۷۴" dir="ltr"
+            <input type="tel" id="buyerPhone" value="${escapeHtml(customerPhone)}" placeholder="مثال: ۰۹۱۲۳۴۵۶۷۸۹" dir="ltr"
                    class="w-full bg-black/50 border border-white/15 focus:border-purple-400 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 outline-none transition text-right">
           </div>
         </div>

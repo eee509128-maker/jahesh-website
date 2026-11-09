@@ -151,6 +151,48 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "patientPhone"]
+    },
+    "CustomMerchant": {
+      "title": "CustomMerchant",
+      "description": "External client merchant accounts for payment gateway facilitation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchantCode": { "type": "string" },
+        "apiKey": { "type": "string" },
+        "title": { "type": "string" },
+        "websiteUrl": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "shebaNumber": { "type": "string" },
+        "feePercent": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "totalTransactions": { "type": "number" },
+        "totalVolumeTomans": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "merchantCode", "title"]
+    },
+    "GatewayTransaction": {
+      "title": "GatewayTransaction",
+      "description": "Payment transactions processed through Jahesh Pay gateway for external websites",
+      "type": "object",
+      "properties": {
+        "trackId": { "type": "string" },
+        "merchantId": { "type": "string" },
+        "merchantCode": { "type": "string" },
+        "merchantTitle": { "type": "string" },
+        "amountInTomans": { "type": "number" },
+        "orderId": { "type": "string" },
+        "callbackUrl": { "type": "string" },
+        "status": { "type": "string" },
+        "refNumber": { "type": "string" },
+        "cardNumber": { "type": "string" },
+        "paidAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["trackId", "merchantCode", "amountInTomans"]
     }
   },
   "firestore": {
@@ -189,6 +231,14 @@
     "/vet_appointments/{appId}": {
       "schema": "VetAppointment",
       "description": "Store veterinary appointments"
+    },
+    "/custom_merchants/{merchantId}": {
+      "schema": "CustomMerchant",
+      "description": "Store issued merchant terminals for external clients"
+    },
+    "/gateway_transactions/{txId}": {
+      "schema": "GatewayTransaction",
+      "description": "Store payment transactions for external client sites"
     }
   }
 }

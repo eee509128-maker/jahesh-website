@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { db } from './firebase';
 import { doc, setDoc, getDocs, getDoc, collection, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { Product, Order, User, Coupon, BannerSlide, DashboardTool, UserChat, PaymentLanding } from '../types';
+import { Product, Order, User, Coupon, BannerSlide, DashboardTool, UserChat, PaymentLanding, CustomMerchant, GatewayTransaction } from '../types';
 import { INITIAL_PRODUCTS, INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
 import { RESTORED_ZIBAL_ORDERS } from '../data/restoredOrders';
 import { areSameUser, normalizePhone, normalizeUsername, mergeUserRecords, isMasterAdminUser } from './userUtils';
@@ -3220,6 +3220,74 @@ export const generateAiPaymentLanding = async (payload: {
   }
   const data = await res.json();
   return data.aiContent;
+};
+
+// ==========================================
+// Custom Merchant Facilitator & Gateway Provider
+// ==========================================
+
+export const fetchCustomMerchantsFromDb = async (): Promise<CustomMerchant[]> => {
+  try {
+    const res = await fetch('/api/custom-merchants');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.merchants)) {
+        return data.merchants;
+      }
+    }
+  } catch (err) {
+    console.error('Fetch custom merchants error:', err);
+  }
+  return [];
+};
+
+export const saveCustomMerchantToDb = async (merchant: Partial<CustomMerchant>): Promise<CustomMerchant | null> => {
+  try {
+    const res = await fetch('/api/custom-merchants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(merchant)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.merchant) {
+        return data.merchant;
+      }
+    }
+  } catch (err) {
+    console.error('Save custom merchant error:', err);
+  }
+  return null;
+};
+
+export const deleteCustomMerchantFromDb = async (id: string): Promise<boolean> => {
+  try {
+    const res = await fetch(`/api/custom-merchants/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return Boolean(data && data.success);
+    }
+  } catch (err) {
+    console.error('Delete custom merchant error:', err);
+  }
+  return false;
+};
+
+export const fetchGatewayTransactionsFromDb = async (): Promise<GatewayTransaction[]> => {
+  try {
+    const res = await fetch('/api/gateway-transactions');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.transactions)) {
+        return data.transactions;
+      }
+    }
+  } catch (err) {
+    console.error('Fetch gateway transactions error:', err);
+  }
+  return [];
 };
 
 

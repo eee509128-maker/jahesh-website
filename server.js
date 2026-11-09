@@ -31,6 +31,17 @@ import {
   renderPaymentLandingHtml,
   renderPaymentVerifyHtml
 } from './api/payment-landing-generator.js';
+import {
+  readCustomMerchantsFromDisk,
+  writeCustomMerchantsToDisk,
+  readGatewayTransactionsFromDisk,
+  writeGatewayTransactionsToDisk,
+  generateMerchantCode,
+  generateApiKey,
+  generateGatewayTrackId,
+  renderJaheshGatewayCheckoutHtml,
+  renderJaheshGatewayReturnHtml
+} from './api/gateway-provider.js';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getFirestore,
@@ -328,6 +339,28 @@ try {
       }
     }
   }, (err) => console.warn('[Server Firestore] payment_landings listener notice:', err));
+
+  // ۸. شنود مرچنت‌های سفارشی و درگاه‌های واسط کارفرمایان
+  onSnapshot(doc(serverDb, 'settings', 'custom_merchants'), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && Array.isArray(data.merchants) && data.merchants.length > 0) {
+        writeCustomMerchantsToDisk(data.merchants);
+        console.log(`[Server Firestore] Real-time synced ${data.merchants.length} custom merchants`);
+      }
+    }
+  }, (err) => console.warn('[Server Firestore] custom_merchants listener notice:', err));
+
+  // ۹. شنود تراکنش‌های درگاه واسط کارفرمایان
+  onSnapshot(doc(serverDb, 'settings', 'gateway_transactions'), (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && Array.isArray(data.transactions) && data.transactions.length > 0) {
+        writeGatewayTransactionsToDisk(data.transactions);
+        console.log(`[Server Firestore] Real-time synced ${data.transactions.length} gateway transactions`);
+      }
+    }
+  }, (err) => console.warn('[Server Firestore] gateway_transactions listener notice:', err));
 } catch (e) {
   console.warn('[Server Firestore] listener init error:', e);
 }
@@ -395,6 +428,26 @@ async function bootSyncFirestoreCloud() {
       if (plData && Array.isArray(plData.landings) && plData.landings.length > 0) {
         writePaymentLandingsToDisk(plData.landings);
         console.log(`[Server Firestore Boot] Loaded ${plData.landings.length} payment landings`);
+      }
+    }
+
+    // ۵. دریافت مرچنت‌های واسط کارفرمایان ابری
+    const cmSnap = await getDoc(doc(serverDb, 'settings', 'custom_merchants'));
+    if (cmSnap.exists()) {
+      const cmData = cmSnap.data();
+      if (cmData && Array.isArray(cmData.merchants) && cmData.merchants.length > 0) {
+        writeCustomMerchantsToDisk(cmData.merchants);
+        console.log(`[Server Firestore Boot] Loaded ${cmData.merchants.length} custom merchants`);
+      }
+    }
+
+    // ۶. دریافت تراکنش‌های درگاه واسط ابری
+    const gtSnap = await getDoc(doc(serverDb, 'settings', 'gateway_transactions'));
+    if (gtSnap.exists()) {
+      const gtData = gtSnap.data();
+      if (gtData && Array.isArray(gtData.transactions) && gtData.transactions.length > 0) {
+        writeGatewayTransactionsToDisk(gtData.transactions);
+        console.log(`[Server Firestore Boot] Loaded ${gtData.transactions.length} gateway transactions`);
       }
     }
   } catch (err) {
@@ -4261,6 +4314,544 @@ app.get(['/pay/:id', '/p/:id'], (req, res) => {
   } catch (err) {
     console.error('Error rendering payment landing page:', err);
     return res.status(500).send('خطا در بارگذاری صفحه پرداخت.');
+  }
+});
+
+// ==========================================
+// سامانه‌ی ارائه‌دهنده درگاه پرداخت واسط جهش پی به سایت‌های دیگر (Merchant Provider)
+// ==========================================
+
+// دریافت لیست تمام مرچنت‌های صادر شده برای کارفرمایان
+app.get('/api/custom-merchants', (_req, res) => {
+  try {
+    const merchants = readCustomMerchantsFromDisk();
+    return res.json({ success: true, merchants });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ثبت یا ویرایش مرچنت کارفرما
+app.post('/api/custom-merchants', async (req, res) => {
+  try {
+    const payload = req.body || {};
+    if (!payload.title || !String(payload.title).trim()) {
+      return res.status(400).json({ success: false, error: 'نام وب‌سایت یا پذیرنده الزامی است.' });
+    }
+
+    const currentMerchants = readCustomMerchantsFromDisk();
+    const id = payload.id || ('jh_m_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6));
+    const now = new Date().toISOString();
+
+    const merchantCode = (payload.merchantCode && String(payload.merchantCode).trim()) || generateMerchantCode();
+    const apiKey = (payload.apiKey && String(payload.apiKey).trim()) || generateApiKey();
+
+    const newMerchant = {
+      id,
+      merchantCode,
+      apiKey,
+      title: String(payload.title).trim(),
+      websiteUrl: String(payload.websiteUrl || '').trim() || 'https://example.com',
+      ownerName: String(payload.ownerName || 'کارفرمای محترم').trim(),
+      phone: String(payload.phone || '').trim(),
+      shebaNumber: String(payload.shebaNumber || '').trim(),
+      settlementPeriod: payload.settlementPeriod || 'daily',
+      feePercent: typeof payload.feePercent === 'number' ? payload.feePercent : 0,
+      isActive: payload.isActive !== false,
+      totalTransactions: Number(payload.totalTransactions) || 0,
+      totalVolumeTomans: Number(payload.totalVolumeTomans) || 0,
+      createdAt: payload.createdAt || now,
+      updatedAt: now,
+      notes: payload.notes || ''
+    };
+
+    const idx = currentMerchants.findIndex((m) => m.id === id || m.merchantCode === merchantCode);
+    if (idx >= 0) {
+      currentMerchants[idx] = { ...currentMerchants[idx], ...newMerchant, updatedAt: now };
+    } else {
+      currentMerchants.unshift(newMerchant);
+    }
+
+    writeCustomMerchantsToDisk(currentMerchants);
+
+    setDoc(doc(serverDb, 'settings', 'custom_merchants'), { merchants: currentMerchants, updatedAt: now }, { merge: true })
+      .catch((fbErr) => console.warn('[Server Firestore] custom_merchants sync notice:', fbErr.message));
+
+    return res.json({ success: true, merchant: newMerchant, message: 'کد مرچنت درگاه با موفقیت صادر و فعال شد.' });
+  } catch (err) {
+    console.error('Error saving custom merchant:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// حذف مرچنت کارفرما
+app.delete('/api/custom-merchants/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    let currentMerchants = readCustomMerchantsFromDisk();
+    const beforeCount = currentMerchants.length;
+    currentMerchants = currentMerchants.filter((m) => m.id !== id && m.merchantCode !== id);
+
+    if (currentMerchants.length !== beforeCount) {
+      writeCustomMerchantsToDisk(currentMerchants);
+      setDoc(doc(serverDb, 'settings', 'custom_merchants'), { merchants: currentMerchants, updatedAt: new Date().toISOString() }, { merge: true })
+        .catch((fbErr) => console.warn('[Server Firestore] custom_merchants delete notice:', fbErr.message));
+    }
+
+    return res.json({ success: true, message: 'مرچنت درگاه با موفقیت حذف شد.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// دریافت تمام تراکنش‌های درگاه واسط کارفرمایان
+app.get('/api/gateway-transactions', (_req, res) => {
+  try {
+    const txs = readGatewayTransactionsFromDisk();
+    return res.json({ success: true, transactions: txs });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// وب‌سرویس عمومی REST API درگاه جهش پی برای اتصال سایت‌های دیگر
+// ==========================================
+
+// ۱. ایجاد تراکنش پرداخت برای سایت کارفرما (Payment Request Endpoint)
+app.post(['/api/pg/request', '/api/gateway/request', '/api/pg/v1/request'], async (req, res) => {
+  try {
+    const {
+      merchant,
+      amount,
+      amountInTomans,
+      amountInRials,
+      callbackUrl,
+      orderId,
+      description,
+      mobile,
+      name,
+      email
+    } = req.body || {};
+
+    if (!merchant || !String(merchant).trim()) {
+      return res.status(400).json({
+        success: false,
+        result: -1,
+        error: 'کد مرچنت (merchant) الزامی است.'
+      });
+    }
+
+    const cleanMerchant = String(merchant).trim();
+    const merchants = readCustomMerchantsFromDisk();
+    const targetMerchant = merchants.find(
+      (m) => m.merchantCode === cleanMerchant || m.id === cleanMerchant || m.apiKey === cleanMerchant
+    );
+
+    if (!targetMerchant) {
+      return res.status(400).json({
+        success: false,
+        result: -2,
+        error: 'کد مرچنت ارسالی در سیستم جهش پی یافت نشد.'
+      });
+    }
+
+    if (targetMerchant.isActive === false) {
+      return res.status(403).json({
+        success: false,
+        result: -3,
+        error: 'این درگاه پرداخت در حال حاضر غیرفعال یا مسدود است.'
+      });
+    }
+
+    if (!callbackUrl || !String(callbackUrl).trim()) {
+      return res.status(400).json({
+        success: false,
+        result: -4,
+        error: 'آدرس بازگشت (callbackUrl) الزامی است.'
+      });
+    }
+
+    let finalTomans = 0;
+    if (amountInTomans) {
+      finalTomans = Math.round(Number(amountInTomans));
+    } else if (amount) {
+      const num = Number(amount);
+      if (num > 10000000) {
+        finalTomans = Math.round(num / 10);
+      } else {
+        finalTomans = Math.round(num);
+      }
+    } else if (amountInRials) {
+      finalTomans = Math.round(Number(amountInRials) / 10);
+    }
+
+    if (!finalTomans || isNaN(finalTomans) || finalTomans < 1000) {
+      return res.status(400).json({
+        success: false,
+        result: -5,
+        error: 'حداقل مبلغ پرداخت معتبر ۱,۰۰۰ تومان (۱۰,۰۰۰ ریال) است.'
+      });
+    }
+
+    const finalRials = finalTomans * 10;
+    const trackId = generateGatewayTrackId();
+    const now = new Date().toISOString();
+
+    const host = req.get('host') || 'jaheshit.ir';
+    const protocol = req.protocol || 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    const newTx = {
+      trackId,
+      merchantId: targetMerchant.id,
+      merchantCode: targetMerchant.merchantCode,
+      merchantTitle: targetMerchant.title,
+      merchantWebsite: targetMerchant.websiteUrl,
+      amountInTomans: finalTomans,
+      amountInRials: finalRials,
+      orderId: String(orderId || trackId),
+      callbackUrl: String(callbackUrl).trim(),
+      description: description || `پرداخت سفارش ${orderId || trackId} در ${targetMerchant.title}`,
+      customerName: name || '',
+      customerMobile: mobile || '',
+      customerEmail: email || '',
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now
+    };
+
+    const currentTxs = readGatewayTransactionsFromDisk();
+    currentTxs.unshift(newTx);
+    writeGatewayTransactionsToDisk(currentTxs);
+
+    setDoc(doc(serverDb, 'settings', 'gateway_transactions'), { transactions: currentTxs, updatedAt: now }, { merge: true })
+      .catch((err) => console.warn('[Server Firestore] gateway_transactions sync notice:', err.message));
+
+    const paymentUrl = `${baseUrl}/pg/pay/${trackId}`;
+
+    return res.json({
+      success: true,
+      result: 100,
+      trackId,
+      paymentUrl,
+      directGatewayUrl: paymentUrl,
+      message: 'درخواست درگاه پرداخت با موفقیت ثبت شد.'
+    });
+  } catch (err) {
+    console.error('Error in /api/pg/request:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Internal Server Error' });
+  }
+});
+
+// ۲. صفحه فرود گرافیکی پرداخت روی دامنه جهش برای مشتریان سایت کارفرما
+app.get(['/pg/pay/:trackId', '/gateway/pay/:trackId'], (req, res) => {
+  try {
+    const { trackId } = req.params;
+    const txs = readGatewayTransactionsFromDisk();
+    const tx = txs.find((t) => t.trackId === trackId);
+
+    if (!tx) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(404).send(`<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8"><title>تراکنش یافت نشد | جهش پی</title>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>*{font-family:'Vazirmatn',sans-serif;}</style>
+</head>
+<body class="bg-[#070414] text-white min-h-screen flex items-center justify-center p-4">
+  <div class="max-w-md w-full bg-[#110a26]/90 border border-purple-500/30 rounded-3xl p-8 text-center backdrop-blur-xl">
+    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-3xl">⚠️</div>
+    <h1 class="text-xl font-black mb-3">شناسه تراکنش نامعتبر است</h1>
+    <p class="text-slate-300 text-xs mb-6">این تراکنش ممکن است منقضی شده باشد. لطفاً به سایت مبدأ بازگشته و مجدداً تلاش فرمایید.</p>
+    <a href="/" class="inline-block px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition">صفحه اصلی جهش</a>
+  </div>
+</body>
+</html>`);
+    }
+
+    const merchants = readCustomMerchantsFromDisk();
+    const merchant = merchants.find((m) => m.id === tx.merchantId || m.merchantCode === tx.merchantCode);
+
+    const host = req.get('host') || 'jaheshit.ir';
+    const protocol = req.protocol || 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    const html = renderJaheshGatewayCheckoutHtml(tx, merchant, baseUrl);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.send(html);
+  } catch (err) {
+    console.error('Error rendering gateway checkout page:', err);
+    return res.status(500).send('خطا در بارگذاری صفحه پرداخت.');
+  }
+});
+
+// ۳. شروع فرآیند شاپرک از روی صفحه پرداخت جهش پی (با مرچنت رسمی جهش در زیبال)
+app.post('/api/pg/start-shaparak', async (req, res) => {
+  try {
+    const { trackId } = req.body || {};
+    if (!trackId) {
+      return res.status(400).json({ success: false, error: 'شناسه تراکنش ارسال نشده است.' });
+    }
+
+    const txs = readGatewayTransactionsFromDisk();
+    const tx = txs.find((t) => t.trackId === trackId);
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'تراکنش یافت نشد.' });
+    }
+
+    const host = req.get('host') || 'jaheshit.ir';
+    const protocol = req.protocol || 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    const ZIBAL_MERCHANT = process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
+    const callbackUrl = `${baseUrl}/pg/callback?sessionTrackId=${encodeURIComponent(tx.trackId)}`;
+
+    const zibalPayload = {
+      merchant: ZIBAL_MERCHANT,
+      amount: tx.amountInRials,
+      callbackUrl,
+      description: `پرداخت سفارش ${tx.orderId} در ${tx.merchantTitle}`,
+      orderId: tx.trackId,
+    };
+    if (tx.customerMobile) {
+      zibalPayload.mobile = String(tx.customerMobile);
+    }
+
+    const requestUrl = getZibalUrl('/request');
+    let zibalRes;
+    let data;
+
+    try {
+      zibalRes = await fetch(requestUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(zibalPayload)
+      });
+      data = await zibalRes.json();
+    } catch (networkErr) {
+      console.warn('[Jahesh Pay] Direct Zibal request notice:', networkErr.message);
+      data = { result: -2, message: networkErr.message };
+    }
+
+    if (!data || data.result !== 100 || !data.trackId) {
+      try {
+        const valTownUrl = 'https://erfanmogaddam--d91a5504c02211f1849a1607ee4eb77e.web.val.run/request';
+        const valRes = await fetch(valTownUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(zibalPayload)
+        });
+        const valData = await valRes.json().catch(() => null);
+        if (valData && valData.trackId) {
+          data = valData;
+        }
+      } catch (valErr) {
+        console.warn('[Jahesh Pay] Proxy fallback notice:', valErr);
+      }
+    }
+
+    if (data && data.result === 100 && data.trackId) {
+      tx.zibalTrackId = String(data.trackId);
+      tx.updatedAt = new Date().toISOString();
+      writeGatewayTransactionsToDisk(txs);
+
+      const paymentUrl = `https://gateway.zibal.ir/start/${data.trackId}`;
+      return res.json({
+        success: true,
+        result: 100,
+        paymentUrl,
+        trackId: tx.trackId
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        result: data ? data.result : -1,
+        message: data?.message || 'خطا در ارتباط با درگاه شاپرک زیبال.'
+      });
+    }
+  } catch (err) {
+    console.error('Error in /api/pg/start-shaparak:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ۴. بازگشت از شاپرک به جهش پی و سپس بازگشت به سایت پذیرنده (Shaparak Callback)
+app.get('/pg/callback', async (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  try {
+    const { trackId, success, status, sessionTrackId } = req.query;
+
+    const txs = readGatewayTransactionsFromDisk();
+    const tx = txs.find((t) => t.trackId === sessionTrackId || (trackId && t.zibalTrackId === String(trackId)));
+
+    if (!tx) {
+      return res.status(404).send('شناسه تراکنش جهش پی یافت نشد.');
+    }
+
+    const merchants = readCustomMerchantsFromDisk();
+    const merchant = merchants.find((m) => m.id === tx.merchantId || m.merchantCode === tx.merchantCode);
+
+    const isSuccessParam = String(success) === '1' || String(status) === '2';
+
+    if (!trackId || !isSuccessParam) {
+      tx.status = 'cancelled';
+      tx.updatedAt = new Date().toISOString();
+      writeGatewayTransactionsToDisk(txs);
+
+      const html = renderJaheshGatewayReturnHtml(tx, merchant, false, {
+        message: 'پرداخت توسط کاربر لغو گردید یا در اتصال به شاپرک خطایی رخ داد.'
+      });
+      return res.send(html);
+    }
+
+    // بررسی و تایید در زیبال
+    const ZIBAL_MERCHANT = process.env.ZIBAL_MERCHANT || '6a9db4410df8756c31ea5d00';
+    const verifyPayload = {
+      merchant: ZIBAL_MERCHANT,
+      trackId: Number(trackId)
+    };
+
+    let verifyData = null;
+    try {
+      const verifyUrl = getZibalUrl('/verify');
+      const zRes = await fetch(verifyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(verifyPayload)
+      });
+      verifyData = await zRes.json();
+    } catch (netErr) {
+      console.warn('[Jahesh Pay Callback] Zibal verify error:', netErr.message);
+    }
+
+    const isVerified = verifyData && (verifyData.result === 100 || verifyData.result === 201);
+
+    if (isVerified) {
+      const refNumber = verifyData.refNumber ? String(verifyData.refNumber) : String(trackId);
+      const paidAt = verifyData.paidAt || new Date().toISOString();
+
+      tx.status = 'paid';
+      tx.refNumber = refNumber;
+      tx.cardNumber = verifyData.cardNumber || '';
+      tx.paidAt = paidAt;
+      tx.updatedAt = new Date().toISOString();
+
+      // افزایش آمار تراکنش و مبالغ برای پذیرنده
+      if (merchant) {
+        merchant.totalTransactions = (merchant.totalTransactions || 0) + 1;
+        merchant.totalVolumeTomans = (merchant.totalVolumeTomans || 0) + tx.amountInTomans;
+        merchant.updatedAt = new Date().toISOString();
+        writeCustomMerchantsToDisk(merchants);
+        setDoc(doc(serverDb, 'settings', 'custom_merchants'), { merchants, updatedAt: merchant.updatedAt }, { merge: true })
+          .catch(() => {});
+      }
+
+      writeGatewayTransactionsToDisk(txs);
+      setDoc(doc(serverDb, 'settings', 'gateway_transactions'), { transactions: txs, updatedAt: tx.updatedAt }, { merge: true })
+        .catch(() => {});
+
+      const html = renderJaheshGatewayReturnHtml(tx, merchant, true, {
+        refNumber,
+        cardNumber: verifyData.cardNumber
+      });
+      return res.send(html);
+    } else {
+      tx.status = 'failed';
+      tx.updatedAt = new Date().toISOString();
+      writeGatewayTransactionsToDisk(txs);
+
+      const html = renderJaheshGatewayReturnHtml(tx, merchant, false, {
+        message: verifyData?.message || 'تأییدیه تراکنش توسط شاپرک صادر نگردید.'
+      });
+      return res.send(html);
+    }
+  } catch (err) {
+    console.error('Error in /pg/callback:', err);
+    return res.status(500).send('خطای سرور در پردازش بازگشت از درگاه پرداخت.');
+  }
+});
+
+// ۵. متد وب‌سرویس تأیید تراکنش برای بک‌اند سایت کارفرما (Payment Verify Endpoint)
+app.post(['/api/pg/verify', '/api/gateway/verify', '/api/pg/v1/verify'], (req, res) => {
+  try {
+    const { merchant, trackId } = req.body || {};
+
+    if (!merchant || !trackId) {
+      return res.status(400).json({
+        success: false,
+        result: -1,
+        message: 'کد مرچنت (merchant) و شناسه تراکنش (trackId) الزامی هستند.'
+      });
+    }
+
+    const cleanMerchant = String(merchant).trim();
+    const cleanTrackId = String(trackId).trim();
+
+    const txs = readGatewayTransactionsFromDisk();
+    const tx = txs.find((t) => t.trackId === cleanTrackId || t.zibalTrackId === cleanTrackId);
+
+    if (!tx) {
+      return res.status(404).json({
+        success: false,
+        result: -2,
+        message: 'تراکنشی با این شناسه یافت نشد.'
+      });
+    }
+
+    if (tx.merchantCode !== cleanMerchant && tx.merchantId !== cleanMerchant) {
+      return res.status(403).json({
+        success: false,
+        result: -3,
+        message: 'کد مرچنت ارسالی با پذیرنده این تراکنش همخوانی ندارد.'
+      });
+    }
+
+    if (tx.status === 'paid') {
+      tx.verifiedByClientAt = new Date().toISOString();
+      writeGatewayTransactionsToDisk(txs);
+
+      return res.json({
+        success: true,
+        result: 100,
+        status: 1,
+        trackId: tx.trackId,
+        refNumber: tx.refNumber || tx.trackId,
+        cardNumber: tx.cardNumber || '',
+        amount: tx.amountInTomans,
+        amountInRials: tx.amountInRials,
+        orderId: tx.orderId,
+        paidAt: tx.paidAt,
+        message: 'پرداخت با موفقیت تأیید شد.'
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        result: -4,
+        status: 0,
+        message: tx.status === 'pending' ? 'تراکنش هنوز تکمیل و پرداخت نشده است.' : 'تراکنش لغو شده یا ناموفق است.'
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ۶. استعلام وضعیت تراکنش
+app.get('/api/pg/inquiry/:trackId', (req, res) => {
+  try {
+    const { trackId } = req.params;
+    const txs = readGatewayTransactionsFromDisk();
+    const tx = txs.find((t) => t.trackId === trackId || t.zibalTrackId === trackId);
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'تراکنش یافت نشد.' });
+    }
+    return res.json({ success: true, transaction: tx });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

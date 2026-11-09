@@ -316,3 +316,47 @@ export interface PaymentLanding {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface CustomMerchant {
+  id: string;
+  merchantCode: string;
+  apiKey?: string;
+  title: string;
+  websiteUrl: string;
+  ownerName: string;
+  phone: string;
+  email?: string;
+  sheba?: string;
+  feePercent: number;
+  settlementPeriod?: string;
+  status: 'active' | 'suspended' | 'pending';
+  totalTransactions?: number;
+  totalVolume?: number; // Tomans
+  notes?: string;
+  allowedCallbackDomains?: string[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface GatewayTransaction {
+  id: string;
+  trackId: string;
+  merchantCode: string;
+  merchantTitle?: string;
+  clientWebsiteUrl?: string;
+  amount: number; // Tomans
+  description?: string;
+  orderId: string;
+  clientCallbackUrl: string;
+  mobile?: string;
+  nationalCode?: string;
+  payerName?: string;
+  cardPanMasked?: string;
+  refNumber?: string;
+  zibalTrackId?: string;
+  status: 'INITIATED' | 'PENDING_BANK' | 'PAID' | 'FAILED' | 'VERIFIED' | 'CANCELLED';
+  createdAt: string;
+  paidAt?: string;
+  verifiedAt?: string;
+  errorMessage?: string;
+}

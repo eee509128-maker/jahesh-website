@@ -1,0 +1,38 @@
+[
+  {
+    "id": "jh_m_radin_academy",
+    "merchantCode": "JAHESH_MID_A84B9C21",
+    "apiKey": "jh_sec_9f8a2b3c4d5e6f7a",
+    "title": "آکادمی آموزش آنلاین رادین",
+    "websiteUrl": "https://radin-academy.ir",
+    "ownerName": "خانم مهندس حسینی",
+    "phone": "09121234567",
+    "shebaNumber": "IR540120000000001234567890",
+    "settlementPeriod": "daily",
+    "feePercent": 0,
+    "isActive": true,
+    "totalTransactions": 6,
+    "totalVolumeTomans": 2750000,
+    "createdAt": "2026-11-01T08:00:00.000Z",
+    "updatedAt": "2026-11-09T10:00:00.000Z",
+    "notes": "درگاه آموزشی دوره‌های هوش مصنوعی و طراحی وب"
+  },
+  {
+    "id": "jh_m_digimode_store",
+    "merchantCode": "JAHESH_MID_7D2E5F11",
+    "apiKey": "jh_sec_1a2b3c4d5e6f7890",
+    "title": "فروشگاه آنلاین دیجی‌مد",
+    "websiteUrl": "https://digimode-shop.ir",
+    "ownerName": "خانم دکتر رضایی",
+    "phone": "09351112233",
+    "shebaNumber": "IR820170000000009876543210",
+    "settlementPeriod": "instant",
+    "feePercent": 1,
+    "isActive": true,
+    "totalTransactions": 14,
+    "totalVolumeTomans": 8420000,
+    "createdAt": "2026-11-03T11:30:00.000Z",
+    "updatedAt": "2026-11-09T12:00:00.000Z",
+    "notes": "پذیرنده فروشگاهی پوشاک و اکسسوری"
+  }
+]

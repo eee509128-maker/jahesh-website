@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ImageCropperModal } from './ImageCropperModal';
+import { MerchantFacilitatorView } from './MerchantFacilitatorView';
 import {
   Crop,
   ShieldCheck, Package, ShoppingCart, PlusCircle, Trash2, Edit3, CheckCircle2,
@@ -11,10 +12,12 @@ import {
   Cpu, Link2, Globe, Wrench, CheckSquare, RotateCcw, ChevronUp, ChevronDown, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown,
   KeyRound,
   Zap,
-  Star
+  Star,
+  EyeOff,
+  Terminal
 } from 'lucide-react';
-import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool, AppSubscriptionLicense, PaymentLanding, PaymentLandingTheme } from '../types';
-import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank, getPaymentLandingsFromDb, savePaymentLandingToDb, deletePaymentLandingFromDb, generateAiPaymentLanding } from '../lib/dbService';
+import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool, AppSubscriptionLicense, PaymentLanding, PaymentLandingTheme, CustomMerchant, GatewayTransaction } from '../types';
+import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank, getPaymentLandingsFromDb, savePaymentLandingToDb, deletePaymentLandingFromDb, generateAiPaymentLanding, fetchCustomMerchantsFromDb, saveCustomMerchantToDb, deleteCustomMerchantFromDb, fetchGatewayTransactionsFromDb } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
@@ -114,6 +117,50 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [landingSearchQuery, setLandingSearchQuery] = useState('');
   const [landingDeleteConfirmId, setLandingDeleteConfirmId] = useState<string | null>(null);
+
+  // ==========================================
+  // Merchant Facilitator & Gateway Provider State
+  // ==========================================
+  const [paymentSubTab, setPaymentSubTab] = useState<'landings' | 'merchants' | 'docs' | 'transactions'>('merchants');
+  const [customMerchants, setCustomMerchants] = useState<CustomMerchant[]>([]);
+  const [merchantsLoading, setMerchantsLoading] = useState(false);
+  const [merchantSearchQuery, setMerchantSearchQuery] = useState('');
+  const [merchantActionMessage, setMerchantActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [copiedMerchantCode, setCopiedMerchantCode] = useState<string | null>(null);
+  const [copiedApiKey, setCopiedApiKey] = useState<string | null>(null);
+  const [revealedApiKeyId, setRevealedApiKeyId] = useState<string | null>(null);
+
+  // Create / Edit Merchant Form State
+  const [newMerchantTitle, setNewMerchantTitle] = useState('');
+  const [newMerchantWebsite, setNewMerchantWebsite] = useState('');
+  const [newMerchantOwner, setNewMerchantOwner] = useState('');
+  const [newMerchantPhone, setNewMerchantPhone] = useState('');
+  const [newMerchantEmail, setNewMerchantEmail] = useState('');
+  const [newMerchantSheba, setNewMerchantSheba] = useState('');
+  const [newMerchantFee, setNewMerchantFee] = useState<number>(1);
+  const [newMerchantNotes, setNewMerchantNotes] = useState('');
+  const [isSavingMerchant, setIsSavingMerchant] = useState(false);
+  const [editingMerchant, setEditingMerchant] = useState<CustomMerchant | null>(null);
+  const [deleteMerchantConfirmId, setDeleteMerchantConfirmId] = useState<string | null>(null);
+
+  // Gateway Transactions State
+  const [gatewayTransactions, setGatewayTransactions] = useState<GatewayTransaction[]>([]);
+  const [gatewayTxsLoading, setGatewayTxsLoading] = useState(false);
+  const [gatewayTxSearchQuery, setGatewayTxSearchQuery] = useState('');
+
+  // Simulator Test State
+  const [simMerchantCode, setSimMerchantCode] = useState('');
+  const [simAmount, setSimAmount] = useState('50000');
+  const [simOrderId, setSimOrderId] = useState(`ORD-${Date.now().toString().slice(-5)}`);
+  const [simCustomerMobile, setSimCustomerMobile] = useState('09123456789');
+  const [simCustomerName, setSimCustomerName] = useState('خانم سارا محمدی');
+  const [simCallbackUrl, setSimCallbackUrl] = useState('https://jaheshit.ir/test-client-callback');
+  const [simLoading, setSimLoading] = useState(false);
+  const [simResult, setSimResult] = useState<any>(null);
+
+  // Active Code Snippet in Docs
+  const [docsCodeTab, setDocsCodeTab] = useState<'curl' | 'php' | 'js' | 'node' | 'wordpress'>('curl');
+  const [copiedDocCode, setCopiedDocCode] = useState<string | null>(null);
 
   // ==========================================
   // Dashboard Tools Management State
@@ -476,11 +523,221 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const refreshCustomMerchants = async () => {
+    setMerchantsLoading(true);
+    try {
+      const list = await fetchCustomMerchantsFromDb();
+      setCustomMerchants(list);
+    } catch (err) {
+      console.warn('Error loading custom merchants:', err);
+    } finally {
+      setMerchantsLoading(false);
+    }
+  };
+
+  const refreshGatewayTransactions = async () => {
+    setGatewayTxsLoading(true);
+    try {
+      const list = await fetchGatewayTransactionsFromDb();
+      setGatewayTransactions(list);
+    } catch (err) {
+      console.warn('Error loading gateway transactions:', err);
+    } finally {
+      setGatewayTxsLoading(false);
+    }
+  };
+
   React.useEffect(() => {
-    if (isOpen && (activeTab === 'payment-links' || paymentLandings.length === 0)) {
+    if (isOpen && activeTab === 'payment-links') {
       refreshPaymentLandings();
+      refreshCustomMerchants();
+      refreshGatewayTransactions();
     }
   }, [isOpen, activeTab]);
+
+  const handleSaveMerchant = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newMerchantTitle.trim()) {
+      setMerchantActionMessage({ type: 'error', text: 'لطفاً نام وب‌سایت یا کسب‌وکار کارفرما را وارد فرمایید.' });
+      setTimeout(() => setMerchantActionMessage(null), 4000);
+      return;
+    }
+    if (!newMerchantWebsite.trim()) {
+      setMerchantActionMessage({ type: 'error', text: 'لطفاً آدرس دامنه وب‌سایت کارفرما را وارد فرمایید.' });
+      setTimeout(() => setMerchantActionMessage(null), 4000);
+      return;
+    }
+    if (!newMerchantOwner.trim()) {
+      setMerchantActionMessage({ type: 'error', text: 'لطفاً نام مدیر یا کارفرما را وارد نمایید.' });
+      setTimeout(() => setMerchantActionMessage(null), 4000);
+      return;
+    }
+
+    setIsSavingMerchant(true);
+    setMerchantActionMessage(null);
+
+    try {
+      const payload: Partial<CustomMerchant> = {
+        id: editingMerchant?.id,
+        merchantCode: editingMerchant?.merchantCode,
+        apiKey: editingMerchant?.apiKey,
+        title: newMerchantTitle.trim(),
+        websiteUrl: newMerchantWebsite.trim(),
+        ownerName: newMerchantOwner.trim(),
+        phone: newMerchantPhone.trim() || '09123456789',
+        email: newMerchantEmail.trim(),
+        sheba: newMerchantSheba.trim(),
+        feePercent: Number(newMerchantFee) || 1,
+        notes: newMerchantNotes.trim(),
+        status: editingMerchant?.status || 'active'
+      };
+
+      const saved = await saveCustomMerchantToDb(payload);
+      if (saved) {
+        setMerchantActionMessage({
+          type: 'success',
+          text: editingMerchant
+            ? `اطلاعات درگاه کارفرما "${saved.title}" با موفقیت به‌روزرسانی شد.`
+            : `درگاه اختصاصی و کد مرچنت جدید برای "${saved.title}" با موفقیت صادر شد!`
+        });
+        setEditingMerchant(null);
+        setNewMerchantTitle('');
+        setNewMerchantWebsite('');
+        setNewMerchantOwner('');
+        setNewMerchantPhone('');
+        setNewMerchantEmail('');
+        setNewMerchantSheba('');
+        setNewMerchantFee(1);
+        setNewMerchantNotes('');
+        await refreshCustomMerchants();
+      } else {
+        setMerchantActionMessage({ type: 'error', text: 'خطا در ذخیره‌سازی اطلاعات درگاه کارفرما.' });
+      }
+    } catch (err: any) {
+      setMerchantActionMessage({ type: 'error', text: err?.message || 'خطا در ارتباط با سرور.' });
+    } finally {
+      setIsSavingMerchant(false);
+      setTimeout(() => setMerchantActionMessage(null), 5000);
+    }
+  };
+
+  const handleToggleMerchantStatus = async (merchant: CustomMerchant) => {
+    const nextStatus = merchant.status === 'active' ? 'suspended' : 'active';
+    try {
+      const updated = await saveCustomMerchantToDb({
+        ...merchant,
+        status: nextStatus
+      });
+      if (updated) {
+        setCustomMerchants(prev => prev.map(m => m.id === merchant.id ? updated : m));
+        setMerchantActionMessage({
+          type: 'success',
+          text: `وضعیت درگاه "${merchant.title}" به ${nextStatus === 'active' ? 'فعال' : 'مسدود شده'} تغییر یافت.`
+        });
+        setTimeout(() => setMerchantActionMessage(null), 4000);
+      }
+    } catch (err) {
+      console.error('Toggle status error:', err);
+    }
+  };
+
+  const handleDeleteMerchant = async (merchantId: string) => {
+    try {
+      const success = await deleteCustomMerchantFromDb(merchantId);
+      if (success) {
+        setCustomMerchants(prev => prev.filter(m => m.id !== merchantId));
+        setDeleteMerchantConfirmId(null);
+        setMerchantActionMessage({ type: 'success', text: 'درگاه کارفرما با موفقیت حذف گردید.' });
+        setTimeout(() => setMerchantActionMessage(null), 4000);
+      }
+    } catch (err) {
+      console.error('Delete merchant error:', err);
+    }
+  };
+
+  const handleRunSimulator = async () => {
+    if (!simMerchantCode.trim()) {
+      alert('لطفاً ابتدا یک کد مرچنت انتخاب فرمایید.');
+      return;
+    }
+    const safeAmount = Number(simAmount);
+    if (!safeAmount || safeAmount < 1000) {
+      alert('حداقل مبلغ تستی ۱,۰۰۰ تومان است.');
+      return;
+    }
+
+    setSimLoading(true);
+    setSimResult(null);
+
+    try {
+      const res = await fetch('/api/pg/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant: simMerchantCode.trim(),
+          amount: safeAmount,
+          orderId: simOrderId.trim() || `ORD-${Date.now()}`,
+          callbackUrl: simCallbackUrl.trim() || 'https://jaheshit.ir',
+          description: `تست درگاه پرداخت شبیه‌ساز جهش - خریدار: ${simCustomerName}`,
+          mobile: simCustomerMobile.trim() || '09123456789',
+          name: simCustomerName.trim()
+        })
+      });
+      const data = await res.json();
+      setSimResult(data);
+      if (data && data.success && data.paymentUrl) {
+        refreshGatewayTransactions();
+      }
+    } catch (err: any) {
+      setSimResult({ success: false, message: err?.message || 'خطا در ارسال درخواست به درگاه جهش.' });
+    } finally {
+      setSimLoading(false);
+    }
+  };
+
+  const handleStartEditMerchant = (merchant: CustomMerchant) => {
+    setEditingMerchant(merchant);
+    setNewMerchantTitle(merchant.title);
+    setNewMerchantWebsite(merchant.websiteUrl);
+    setNewMerchantOwner(merchant.ownerName);
+    setNewMerchantPhone(merchant.phone);
+    setNewMerchantEmail(merchant.email || '');
+    setNewMerchantSheba(merchant.sheba || '');
+    setNewMerchantFee(merchant.feePercent ?? 1);
+    setNewMerchantNotes(merchant.notes || '');
+    // Scroll to form smoothly
+    const formElem = document.getElementById('merchant-form-section');
+    if (formElem) {
+      formElem.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleCancelEditMerchant = () => {
+    setEditingMerchant(null);
+    setNewMerchantTitle('');
+    setNewMerchantWebsite('');
+    setNewMerchantOwner('');
+    setNewMerchantPhone('');
+    setNewMerchantEmail('');
+    setNewMerchantSheba('');
+    setNewMerchantFee(1);
+    setNewMerchantNotes('');
+  };
+
+  const handleCheckInquiry = async (trackId: string) => {
+    try {
+      const res = await fetch(`/api/pg/inquiry/${encodeURIComponent(trackId)}`);
+      const data = await res.json();
+      if (data && data.success) {
+        alert(`استعلام وضعیت تراکنش درگاه جهش:\nکد پیگیری: ${data.trackId}\nوضعیت: ${data.status}\nمبلغ: ${Number(data.amount).toLocaleString('fa-IR')} تومان\nشماره مرجع شاپرک: ${data.refNumber || 'ثبت نشده'}`);
+      } else {
+        alert(`نتیجه استعلام: ${data.message || 'اطلاعاتی یافت نشد'}`);
+      }
+      refreshGatewayTransactions();
+    } catch (err: any) {
+      alert(`خطا در استعلام وضعیت: ${err?.message || 'نامشخص'}`);
+    }
+  };
 
   const handleGenerateAiLanding = async () => {
     if (!landingTopic.trim()) {
@@ -2072,10 +2329,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <CreditCard className="w-4 h-4 text-purple-400" />
-              <span>درگاه پرداخت هوشمند AI</span>
+              <span>ارائه درگاه پرداخت و لندینگ AI</span>
               <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm shadow-purple-500/30">
                 <Sparkles className="w-3 h-3 text-amber-300 animate-pulse" />
-                <span>{paymentLandings.length}</span>
+                <span>{paymentLandings.length + customMerchants.length}</span>
               </span>
             </button>
 
@@ -6186,29 +6443,98 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {activeTab === 'payment-links' && (
             <div className="max-w-5xl mx-auto space-y-6">
               
-              {/* Action Message Alert */}
-              {landingActionMessage && (
-                <div className={`p-4 rounded-2xl flex items-center justify-between text-xs font-bold transition-all shadow-lg animate-in fade-in duration-200 ${
-                  landingActionMessage.type === 'success'
-                    ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 shadow-emerald-900/30'
-                    : 'bg-rose-950/90 text-rose-300 border border-rose-500/50 shadow-rose-900/30'
-                }`}>
-                  <div className="flex items-center gap-2.5">
-                    {landingActionMessage.type === 'success' ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-                    )}
-                    <span>{landingActionMessage.text}</span>
-                  </div>
-                  <button onClick={() => setLandingActionMessage(null)} className="text-slate-400 hover:text-white">
-                    <X className="w-4 h-4" />
+              {/* PRIMARY SUBTABS: 1) Merchant Facilitator (ارائه درگاه به دیگران) | 2) AI Landings (لینک‌های پرداخت هوشمند AI) */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-2 rounded-2xl bg-black/60 border border-purple-500/30 backdrop-blur-xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentSubTab('merchants')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+                      paymentSubTab === 'merchants'
+                        ? 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-cyan-950/50'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <Globe className="w-4 h-4 text-cyan-300" />
+                    <span>ارائه درگاه پرداخت به کارفرمایان (صدور کد مرچنت)</span>
+                    <span className="bg-cyan-500/30 text-cyan-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      {customMerchants.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentSubTab('landings')}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+                      paymentSubTab === 'landings'
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 text-white shadow-lg shadow-purple-950/50'
+                        : 'text-slate-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    <span>لینک‌های پرداخت مستقیم و صفحه فرود هوشمند AI</span>
+                    <span className="bg-purple-500/30 text-purple-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      {paymentLandings.length}
+                    </span>
                   </button>
                 </div>
+
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/40 border border-emerald-500/30 text-[11px] text-emerald-300 font-mono">
+                  <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>مرچنت پایه شاپرک: {zibalMerchant || '6a9db4410df8756c31ea5d00'}</span>
+                </div>
+              </div>
+
+              {/* SUBTAB 1: MERCHANT FACILITATOR */}
+              {paymentSubTab === 'merchants' && (
+                <MerchantFacilitatorView
+                  customMerchants={customMerchants}
+                  merchantsLoading={merchantsLoading}
+                  onRefreshMerchants={refreshCustomMerchants}
+                  onSaveMerchant={async (payload) => {
+                    const saved = await saveCustomMerchantToDb(payload);
+                    if (saved) await refreshCustomMerchants();
+                    return saved;
+                  }}
+                  onDeleteMerchant={async (id) => {
+                    const success = await deleteCustomMerchantFromDb(id);
+                    if (success) await refreshCustomMerchants();
+                    return success;
+                  }}
+                  gatewayTransactions={gatewayTransactions}
+                  gatewayTxsLoading={gatewayTxsLoading}
+                  onRefreshTransactions={refreshGatewayTransactions}
+                  zibalMerchant={zibalMerchant || '6a9db4410df8756c31ea5d00'}
+                />
               )}
 
-              {/* Header Hero Card */}
-              <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#1b0d38] via-[#120826] to-[#0a0518] border border-purple-500/40 shadow-2xl">
+              {/* SUBTAB 2: AI PAYMENT LANDINGS */}
+              {paymentSubTab === 'landings' && (
+                <div className="space-y-6">
+
+                  {/* Action Message Alert */}
+                  {landingActionMessage && (
+                    <div className={`p-4 rounded-2xl flex items-center justify-between text-xs font-bold transition-all shadow-lg animate-in fade-in duration-200 ${
+                      landingActionMessage.type === 'success'
+                        ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 shadow-emerald-900/30'
+                        : 'bg-rose-950/90 text-rose-300 border border-rose-500/50 shadow-rose-900/30'
+                    }`}>
+                      <div className="flex items-center gap-2.5">
+                        {landingActionMessage.type === 'success' ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                        )}
+                        <span>{landingActionMessage.text}</span>
+                      </div>
+                      <button onClick={() => setLandingActionMessage(null)} className="text-slate-400 hover:text-white">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Header Hero Card */}
+                  <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#1b0d38] via-[#120826] to-[#0a0518] border border-purple-500/40 shadow-2xl">
                 <div className="absolute -top-24 -left-24 w-72 h-72 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
                 <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -6390,7 +6716,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       type="text"
                       value={landingBuyerName}
                       onChange={(e) => setLandingBuyerName(e.target.value)}
-                      placeholder="مثال: آقای مهندس حسینی"
+                      placeholder="مثال: خانم سارا محمدی"
                       className="w-full bg-black/60 border border-purple-500/40 focus:border-purple-400 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition"
                     />
                   </div>
@@ -6405,7 +6731,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       dir="ltr"
                       value={landingBuyerPhone}
                       onChange={(e) => setLandingBuyerPhone(e.target.value)}
-                      placeholder="09152331974"
+                      placeholder="09123456789"
                       className="w-full bg-black/60 border border-purple-500/40 focus:border-purple-400 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition text-right"
                     />
                   </div>
@@ -6735,6 +7061,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
                 </div>
               )}
 
