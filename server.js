@@ -44,17 +44,33 @@ import {
   renderJaheshGatewayCheckoutHtml,
   renderJaheshGatewayReturnHtml
 } from './api/gateway-provider.js';
-import { initializeApp, getApps } from 'firebase/app';
-import {
-  getFirestore,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  deleteDoc,
-  collection,
-  onSnapshot
-} from 'firebase/firestore';
+let initializeApp = () => ({});
+let getApps = () => [];
+let getFirestore = () => ({});
+let doc = () => ({});
+let getDoc = async () => ({ exists: () => false, data: () => null });
+let getDocs = async () => ({ empty: true, forEach: () => {} });
+let setDoc = async () => {};
+let deleteDoc = async () => {};
+let collection = () => ({});
+let onSnapshot = () => () => {};
+
+try {
+  const fbApp = await import('firebase/app');
+  const fbFs = await import('firebase/firestore');
+  initializeApp = fbApp.initializeApp;
+  getApps = fbApp.getApps;
+  getFirestore = fbFs.getFirestore;
+  doc = fbFs.doc;
+  getDoc = fbFs.getDoc;
+  getDocs = fbFs.getDocs;
+  setDoc = fbFs.setDoc;
+  deleteDoc = fbFs.deleteDoc;
+  collection = fbFs.collection;
+  onSnapshot = fbFs.onSnapshot;
+} catch (e) {
+  // Graceful fallback to persistent JSON storage
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,8 +89,13 @@ const firebaseConfig = {
   authDomain: 'tranquil-keyword-5ggh3.firebaseapp.com'
 };
 
-const serverFirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig, 'vet-cloud-server');
-const serverDb = getFirestore(serverFirebaseApp, 'ai-studio-jaheshwebsite-13126c61-5143-4f84-b87e-dcc220de14bc');
+let serverDb = {};
+try {
+  const serverFirebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig, 'vet-cloud-server');
+  serverDb = getFirestore(serverFirebaseApp, 'ai-studio-jaheshwebsite-13126c61-5143-4f84-b87e-dcc220de14bc');
+} catch (e) {
+  serverDb = {};
+}
 
 // ==========================================
 // مسیرهای دائمی فایل‌های داده و متدهای همگام‌سازی ابری فایربیس
