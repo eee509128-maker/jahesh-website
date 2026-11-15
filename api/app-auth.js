@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, collection, getDocs, doc, setDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: "tranquil-keyword-5ggh3",
@@ -9,22 +11,8 @@ const firebaseConfig = {
   firestoreDatabaseId: "ai-studio-jaheshwebsite-13126c61-5143-4f84-b87e-dcc220de14bc",
 };
 
-let db = null;
-let firestoreOps = null;
-
-async function getFirestoreClient() {
-  if (db && firestoreOps) return { db, ...firestoreOps };
-  try {
-    const { initializeApp, getApps } = await import('firebase/app');
-    const { getFirestore, collection, getDocs, doc, setDoc } = await import('firebase/firestore');
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-    firestoreOps = { collection, getDocs, doc, setDoc };
-    return { db, ...firestoreOps };
-  } catch (e) {
-    return null;
-  }
-}
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 const LICENSES_FILE = path.join(process.cwd(), 'data', 'app_licenses.json');
 const ALT_LICENSES_FILE = path.join(process.cwd(), 'data', 'licenses.json');
@@ -88,64 +76,58 @@ export async function readAllLicenses(forceFresh = false) {
 
   // 1. Fetch from live Firestore 'licenses' collection
   try {
-    const fsClient = await getFirestoreClient();
-    if (fsClient) {
-      const licSnap = await fsClient.getDocs(fsClient.collection(fsClient.db, 'licenses'));
-      licSnap.forEach((d) => {
-        const data = d.data();
-        if (data && (data.username || data.licenseKey)) {
-          const item = {
-            id: d.id || data.id,
-            ...data,
-          };
-          const key = String(item.licenseKey || item.id || `${item.username}_${item.productId || ''}`).toLowerCase();
-          if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            all.push(item);
-          }
+    const licSnap = await getDocs(collection(db, 'licenses'));
+    licSnap.forEach((d) => {
+      const data = d.data();
+      if (data && (data.username || data.licenseKey)) {
+        const item = {
+          id: d.id || data.id,
+          ...data,
+        };
+        const key = String(item.licenseKey || item.id || `${item.username}_${item.productId || ''}`).toLowerCase();
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          all.push(item);
         }
-      });
-    }
+      }
+    });
   } catch (e) {
     console.warn('[app-auth] Firestore licenses read notice:', e.message);
   }
 
   // 2. Fetch from live Firestore 'orders' collection (scan for amlakLicense & appLicense)
   try {
-    const fsClient = await getFirestoreClient();
-    if (fsClient) {
-      const orderSnap = await fsClient.getDocs(fsClient.collection(fsClient.db, 'orders'));
-      orderSnap.forEach((d) => {
-        const order = d.data();
-        if (!order) return;
-        const attached = [order.appLicense, order.amlakLicense, order.softwareLicense].filter(Boolean);
-        for (const lic of attached) {
-          if (lic && (lic.username || lic.licenseKey)) {
-            const key = String(lic.licenseKey || lic.id || `order_${order.id}_${lic.username}`).toLowerCase();
-            if (!seenKeys.has(key)) {
-              seenKeys.add(key);
-              const safeDays = Number(lic.days) || 30;
-              all.push({
-                id: lic.id || `lic-${lic.licenseKey || order.id}`,
-                username: lic.username,
-                password: lic.password,
-                licenseKey: lic.licenseKey,
-                productId: lic.productId || 'pkg-amlak-jahesh',
-                productTitle: lic.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع جهش',
-                appName: lic.appName || 'سامانه هوشمند جهش',
-                buyerName: lic.buyerName || order.customerName || 'کاربر جهش',
-                phone: lic.phone || order.customerPhone || '',
-                days: safeDays,
-                startDate: lic.startDate || order.createdAt || new Date().toISOString(),
-                expiresAt: lic.expiresAt || new Date(Date.now() + safeDays * 86400000).toISOString(),
-                status: lic.status || 'active',
-                orderId: order.id,
-              });
-            }
+    const orderSnap = await getDocs(collection(db, 'orders'));
+    orderSnap.forEach((d) => {
+      const order = d.data();
+      if (!order) return;
+      const attached = [order.appLicense, order.amlakLicense, order.softwareLicense].filter(Boolean);
+      for (const lic of attached) {
+        if (lic && (lic.username || lic.licenseKey)) {
+          const key = String(lic.licenseKey || lic.id || `order_${order.id}_${lic.username}`).toLowerCase();
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            const safeDays = Number(lic.days) || 30;
+            all.push({
+              id: lic.id || `lic-${lic.licenseKey || order.id}`,
+              username: lic.username,
+              password: lic.password,
+              licenseKey: lic.licenseKey,
+              productId: lic.productId || 'pkg-amlak-jahesh',
+              productTitle: lic.productTitle || order.items?.[0]?.product?.title || 'نرم‌افزار جامع جهش',
+              appName: lic.appName || 'سامانه هوشمند جهش',
+              buyerName: lic.buyerName || order.customerName || 'کاربر جهش',
+              phone: lic.phone || order.customerPhone || '',
+              days: safeDays,
+              startDate: lic.startDate || order.createdAt || new Date().toISOString(),
+              expiresAt: lic.expiresAt || new Date(Date.now() + safeDays * 86400000).toISOString(),
+              status: lic.status || 'active',
+              orderId: order.id,
+            });
           }
         }
-      });
-    }
+      }
+    });
   } catch (e) {
     console.warn('[app-auth] Firestore orders read notice:', e.message);
   }
@@ -220,10 +202,7 @@ export default async function handler(req, res) {
       };
 
       try {
-        const fsClient = await getFirestoreClient();
-        if (fsClient) {
-          await fsClient.setDoc(fsClient.doc(fsClient.db, 'licenses', String(licId)), cleanLicense, { merge: true });
-        }
+        await setDoc(doc(db, 'licenses', String(licId)), cleanLicense, { merge: true });
       } catch (err) {
         console.warn('[app-auth] Error saving license to Firestore:', err.message);
       }
