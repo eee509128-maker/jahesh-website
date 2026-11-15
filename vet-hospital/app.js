@@ -508,6 +508,16 @@ let state = {
   authModalOpen: false,
   myAppointmentsModalOpen: false,
   adminModalOpen: false,
+  petHealthModalOpen: false,
+  petHealthData: {
+    species: "dog-small",
+    name: "",
+    years: 2,
+    months: 0,
+    weight: 6,
+    neutered: "yes",
+    result: null
+  },
   editDoctorModalOpen: false,
   editingDoctor: null,
   editUserModalOpen: false,
@@ -612,6 +622,19 @@ window.setVetTab = function(tab) {
   state.mobileMenuOpen = false;
   window.scrollTo({ top: 0, behavior: "smooth" });
   renderApp();
+};
+
+window.copyAppointmentDetails = function(trackingCode, date, doctor) {
+  const text = 'نوبت بیمارستان دانشکده دامپزشکی جهش (دانشگاه فردوسی مشهد)\nکد پیگیری: ' + (trackingCode || '') + '\nزمان مراجعه: ' + (date || '') + '\nپزشک معالج: ' + (doctor || '');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      alert('مشخصات نوبت در کلیپ‌بورد کپی شد ✓');
+    }).catch(function() {
+      prompt('مشخصات نوبت:', text);
+    });
+  } else {
+    prompt('مشخصات نوبت:', text);
+  }
 };
 
 window.toggleMobileMenu = function() {
@@ -1747,6 +1770,161 @@ window.closeInvoiceModal = function() {
   renderApp();
 };
 
+window.openPetHealthCalculatorModal = function() {
+  state.petHealthModalOpen = true;
+  if (!state.petHealthData.result) {
+    calculatePetHealthLogic();
+  }
+  renderApp();
+};
+
+window.closePetHealthCalculatorModal = function() {
+  state.petHealthModalOpen = false;
+  renderApp();
+};
+
+function calculatePetHealthLogic() {
+  const d = state.petHealthData;
+  const totalYears = (parseFloat(d.years) || 0) + (parseFloat(d.months) || 0) / 12;
+  const species = d.species || 'dog-small';
+
+  let humanAge = 0;
+  let lifeStage = '';
+  let lifeStageColor = 'text-emerald-400';
+  let lifeStageBadge = 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300';
+  let lifeStageDesc = '';
+
+  if (species === 'cat') {
+    if (totalYears <= 1) humanAge = Math.round(totalYears * 15);
+    else if (totalYears <= 2) humanAge = Math.round(15 + (totalYears - 1) * 9);
+    else humanAge = Math.round(24 + (totalYears - 2) * 4);
+  } else if (species === 'dog-small') {
+    if (totalYears <= 1) humanAge = Math.round(totalYears * 15);
+    else if (totalYears <= 2) humanAge = Math.round(15 + (totalYears - 1) * 9);
+    else humanAge = Math.round(24 + (totalYears - 2) * 4);
+  } else if (species === 'dog-medium') {
+    if (totalYears <= 1) humanAge = Math.round(totalYears * 15);
+    else if (totalYears <= 2) humanAge = Math.round(15 + (totalYears - 1) * 9);
+    else humanAge = Math.round(24 + (totalYears - 2) * 5);
+  } else if (species === 'dog-large') {
+    if (totalYears <= 1) humanAge = Math.round(totalYears * 14);
+    else if (totalYears <= 2) humanAge = Math.round(14 + (totalYears - 1) * 8);
+    else humanAge = Math.round(22 + (totalYears - 2) * 7.5);
+  } else if (species === 'rabbit') {
+    if (totalYears <= 1) humanAge = Math.round(totalYears * 21);
+    else if (totalYears <= 2) humanAge = Math.round(21 + (totalYears - 1) * 6);
+    else humanAge = Math.round(27 + (totalYears - 2) * 7);
+  } else if (species === 'bird') {
+    if (totalYears <= 1) humanAge = Math.round(totalYears * 18);
+    else humanAge = Math.round(18 + (totalYears - 1) * 5);
+  }
+  humanAge = Math.max(1, humanAge || 1);
+
+  if (humanAge < 18) {
+    lifeStage = 'توله / نوزاد (Puppy / Kitten)';
+    lifeStageColor = 'text-cyan-400';
+    lifeStageBadge = 'bg-cyan-950/80 border-cyan-500/40 text-cyan-300';
+    lifeStageDesc = 'دوره حیاتی رشد اسکلتی، تکامل سیستم ایمنی و تکمیل دوزهای اولیه واکسیناسیون چندگانه و درمان‌های ضدانگلی.';
+  } else if (humanAge <= 35) {
+    lifeStage = 'جوان پرانرژی (Junior / Young Adult)';
+    lifeStageColor = 'text-emerald-400';
+    lifeStageBadge = 'bg-emerald-950/80 border-emerald-500/40 text-emerald-300';
+    lifeStageDesc = 'بالاترین سطح فعالیت بدنی؛ نیاز به رژیم غذایی پروتئینی باکیفیت و چکاپ سالانه سلامت دندان و یادآور واکسن.';
+  } else if (humanAge <= 55) {
+    lifeStage = 'بالغ و جاافتاده (Mature Adult)';
+    lifeStageColor = 'text-amber-400';
+    lifeStageBadge = 'bg-amber-950/80 border-amber-500/40 text-amber-300';
+    lifeStageDesc = 'کنترل وزن، جلوگیری از چاقی، پایش فشار خون، سلامت لثه و غربالگری دوره‌ای دستگاه ادراری و کلیوی.';
+  } else if (humanAge <= 75) {
+    lifeStage = 'میانسال و سالمند (Senior)';
+    lifeStageColor = 'text-orange-400';
+    lifeStageBadge = 'bg-orange-950/80 border-orange-500/40 text-orange-300';
+    lifeStageDesc = 'پایش آرتروز مفاصل، آزمایش بیوشیمی کامل خون (آنزیم‌های کبد ALT و کراتینین کلیه) هر ۶ ماه یکبار در بیمارستان دانشکده.';
+  } else {
+    lifeStage = 'کهنسال تحت پایش (Geriatric)';
+    lifeStageColor = 'text-rose-400';
+    lifeStageBadge = 'bg-rose-950/80 border-rose-500/40 text-rose-300';
+    lifeStageDesc = 'مراقبت‌های تسکینی و محافظت از کلیه، قلب و بینایی. ویزیت‌های منظم در کلینیک داخلی دامپزشکی دانشگاه.';
+  }
+
+  let vaccines = [];
+  if (species.startsWith('dog')) {
+    vaccines = [
+      { name: 'واکسن چندگانه (DHPPi/L)', desc: 'پیشگیری از پاروویروس، دیستمپر، هپاتیت عفونی، پاراآنفولانزا و لپتوسپیروز', timing: totalYears < 1 ? 'دوزهای ۶، ۹ و ۱۲ هفتگی' : 'یادآور سالانه (الزامی)', status: 'ضروری' },
+      { name: 'واکسن هاری (Rabies)', desc: 'پیشگیری از بیماری مشترک و خطرناک هاری (پروتکل رسمی سازمان دامپزشکی کشور)', timing: 'از ۱۲ هفتگی، سپس هر سال یکبار', status: 'الزامی قانونی' },
+      { name: 'درمان ضدانگل روده‌ای', desc: 'قرص خوراکی ترکیبی پرازی‌کوانتل/پیرانتل جهت پیشگیری از کیست هیداتیک و کرم‌ها', timing: 'هر ۳ ماه یک‌بار به طور منظم', status: 'دوره‌ای' },
+      { name: 'پیشگیری از کک و کنه', desc: 'قطره یا قلاده ضد انگل خارجی (به ویژه در فصل بهار و تابستان)', timing: 'ماهانه یا فصلی', status: 'توصیه‌شده' }
+    ];
+  } else if (species === 'cat') {
+    vaccines = [
+      { name: 'واکسن سه‌گانه RCP (Tricat)', desc: 'پیشگیری از پن‌لوکوپنی (طاعون گربه)، رینوتراکئیت ویروسی و کالیسی‌ویروس', timing: totalYears < 1 ? 'دوز اول ۸ هفتگی، دوز دوم ۱۲ هفتگی' : 'یادآور سالانه (الزامی)', status: 'ضروری' },
+      { name: 'واکسن هاری (Rabies)', desc: 'پیشگیری از هاری طبق استانداردهای بهداشت جهانی دامپزشکی', timing: 'از سن ۳ ماهگی، سپس تکرار سالانه', status: 'الزامی قانونی' },
+      { name: 'ضدانگل داخلی و خارجی', desc: 'قرص ضدانگل خوراکی + پایش و قطره پشت گردنی ضدانگل', timing: 'هر ۳ ماه یک‌بار', status: 'دوره‌ای' },
+      { name: 'تست تشخیصی لوسمی و نقص ایمنی (FeLV/FIV)', desc: 'کیت سریع سرولوژی پیش از واکسیناسیون اختصاصی', timing: 'در صورت سابقه تماس با گربه‌های خیابانی', status: 'تشخیصی' }
+    ];
+  } else if (species === 'rabbit') {
+    vaccines = [
+      { name: 'واکسن بیماری هموراژیک ویروسی (RHDV)', desc: 'پیشگیری از بیماری کشنده خونریزی ویروسی خرگوش', timing: 'از سن ۲ ماهگی، تکرار سالانه', status: 'ضروری' },
+      { name: 'معاینه سایش دندان‌های آسیاب و پیشین', desc: 'جلوگیری از مال‌اکلوژن و بدشکلی کشنده دندان‌های خرگوش', timing: 'هر ۶ ماه در کلینیک تخصصی', status: 'مراقبتی' },
+      { name: 'انگل‌زدایی و پایش دستگاه گوارش', desc: 'پیشگیری از استاز گوارشی و انسداد روده با رژیم فیبر بالا (یونجه تیموتی)', timing: 'پایش مداوم', status: 'تغذیه‌ای' }
+    ];
+  } else if (species === 'bird') {
+    vaccines = [
+      { name: 'واکسیناسیون نیوکاسل و آنفولانزا', desc: 'طبق ضوابط و تاییدیه کلینیک تخصصی پرندگان و طیور دانشگاه', timing: 'بر اساس سن و گونه پرنده', status: 'تخصصی' },
+      { name: 'آزمایش میکروسکوپی مدفوع (Wet Mount & Flotation)', desc: 'بررسی کوکسیدیوز، ژیاردیا، مگاباکتر و کرم‌های گوارشی', timing: 'هر ۶ ماه یکبار', status: 'پایش دوره‌ای' },
+      { name: 'سوهان‌کاری و اصلاح منقار و ناخن‌ها', desc: 'انجام تحت نظر متخصص کلینیک پرندگان جهت جلوگیری از خونریزی عروقی', timing: 'در صورت رشد نامتعارف', status: 'خدمات بالینی' }
+    ];
+  }
+
+  state.petHealthData.result = {
+    totalYears: Math.round(totalYears * 10) / 10,
+    humanAge,
+    lifeStage,
+    lifeStageColor,
+    lifeStageBadge,
+    lifeStageDesc,
+    vaccines,
+    speciesLabel: {
+      'dog-small': 'سگ نژاد کوچک (<۱۰ کیلو)',
+      'dog-medium': 'سگ نژاد متوسط (۱۰-۲۵ کیلو)',
+      'dog-large': 'سگ نژاد بزرگ (>۲۵ کیلو)',
+      'cat': 'گربه خانگی',
+      'rabbit': 'خرگوش و جوندگان',
+      'bird': 'پرندگان زینتی'
+    }[species] || species
+  };
+}
+
+window.handlePetHealthFormSubmit = function(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const form = document.getElementById('pet-health-calc-form');
+  if (form) {
+    state.petHealthData.species = form.species ? form.species.value : 'dog-small';
+    state.petHealthData.name = form.petName ? form.petName.value.trim() : '';
+    state.petHealthData.years = parseInt(form.years ? form.years.value : 2, 10) || 0;
+    state.petHealthData.months = parseInt(form.months ? form.months.value : 0, 10) || 0;
+    state.petHealthData.weight = parseFloat(form.weight ? form.weight.value : 6) || 0;
+    state.petHealthData.neutered = form.neutered ? form.neutered.value : 'yes';
+  }
+  calculatePetHealthLogic();
+  renderApp();
+};
+
+window.bookFromHealthCalculator = function() {
+  const sp = state.petHealthData.species || 'dog-small';
+  const animalName = state.petHealthData.name || '';
+  closePetHealthCalculatorModal();
+  const deptId = sp.includes('bird') ? 'poultry' : 'internal-small';
+  openBookingModal(null, deptId);
+  setTimeout(() => {
+    const nameInput = document.getElementById('booking-animal-name');
+    if (nameInput && animalName) {
+      nameInput.value = animalName;
+      state.bookingForm.animalName = animalName;
+    }
+  }, 100);
+};
+
 window.logoutUser = function() {
   state.currentUser = null;
   localStorage.removeItem("vet_user");
@@ -1820,6 +1998,10 @@ function renderHeader() {
             <span>تریاژ هوش مصنوعی</span>
           </button>
           <button onclick="setVetTab('track')" class="transition-colors pb-1 ${state.activeTab === 'track' ? 'text-emerald-400 border-b-2 border-emerald-400 font-bold' : 'hover:text-white'}">پیگیری نوبت</button>
+          <button onclick="openPetHealthCalculatorModal()" class="transition-colors pb-1 flex items-center gap-1.5 text-teal-300 hover:text-white font-medium">
+            <span>💉</span>
+            <span>سن و واکسیناسیون پت</span>
+          </button>
         </nav>
 
         <!-- دکمه‌های ورود و وب‌سایت اصلی جهش -->
@@ -1878,6 +2060,7 @@ function renderHeader() {
             <button onclick="setVetTab('professors')" class="p-2.5 rounded-xl bg-slate-800 text-right text-white">👨‍⚕️ اساتید هیئت علمی</button>
             <button onclick="setVetTab('triage')" class="p-2.5 rounded-xl bg-slate-800 text-right text-emerald-400">✨ تریاژ هوش مصنوعی</button>
             <button onclick="setVetTab('track')" class="p-2.5 rounded-xl bg-slate-800 text-right text-white">🔍 پیگیری نوبت</button>
+            <button onclick="openPetHealthCalculatorModal()" class="p-2.5 rounded-xl bg-teal-950/80 border border-teal-500/30 text-right text-teal-300">💉 سن و واکسن پت</button>
             ${isAdminUser ? `
               <button onclick="openAdminModal()" class="p-2.5 rounded-xl bg-amber-950 text-right text-amber-300">⚙️ پنل مدیریت</button>
             ` : `
@@ -1966,6 +2149,34 @@ function renderHomeSection() {
         </div>
       </div>
     </div>
+
+    <!-- بخش ابزار هوشمند سن زیستی و واکسیناسیون پت -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 relative z-20">
+      <div class="bg-gradient-to-r from-emerald-950/80 via-slate-900 to-teal-950/80 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-6 text-right">
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/30 shrink-0">
+            🐾
+          </div>
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-900/60 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold mb-1">
+              <span>ابزار تخصصی و کاربردی</span>
+              <span>•</span>
+              <span>استاندارد AAHA & WSAVA</span>
+            </div>
+            <h3 class="text-lg sm:text-xl font-black text-white">سامانه هوشمند سن زیستی و جدول واکسیناسیون حیوانات</h3>
+            <p class="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
+              سن واقعی سگ و گربه شما معادل چند سال انسانی است؟ برنامه رسمی واکسن‌های ضروری، درمان‌های ضدانگلی و چکاپ دوره‌ای را به رایگان و دقیق دریافت نمایید.
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 shrink-0 w-full sm:w-auto">
+          <button onclick="openPetHealthCalculatorModal()" class="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm px-7 py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 cursor-pointer">
+            <span>💉 محاسبه سن زیستی و واکسن پت</span>
+            <span>←</span>
+          </button>
+        </div>
+      </div>
+    </section>
 
     <!-- دپارتمان‌ها -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -2219,19 +2430,70 @@ function renderTrackSection() {
       </div>
 
       ${r ? `
-        <div class="bg-slate-800/90 border border-slate-700/80 p-6 rounded-3xl space-y-4">
-          <div class="flex items-center justify-between border-b border-slate-700 pb-3">
-            <span class="text-xs text-slate-400">کد رهگیری:</span>
-            <span class="text-sm font-black text-emerald-400 font-mono">${r.trackingCode}</span>
+        <div id="vet-appointment-pass" class="bg-gradient-to-b from-slate-800/95 to-slate-900/95 border-2 border-emerald-500/40 p-6 sm:p-8 rounded-3xl shadow-2xl relative overflow-hidden space-y-5 text-right">
+          
+          <!-- Hospital Header on Pass -->
+          <div class="flex items-center justify-between border-b border-slate-700/80 pb-4">
+            <div class="flex items-center gap-3">
+              <img src="/assets/Veterina1ry-Faculty-Logo-01_1gX3LveJ8TMSinQMH2DDD.png" alt="لوگو" class="w-12 h-12 object-contain" />
+              <div>
+                <h3 class="text-base font-black text-white">برگه الکترونیک پذیرش و نوبت ویزیت</h3>
+                <p class="text-xs text-emerald-400 font-bold">بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد</p>
+              </div>
+            </div>
+            <div class="text-left font-mono">
+              <span class="text-[11px] text-slate-400 block">شناسه پیگیری نوبت:</span>
+              <span class="text-base font-black text-emerald-400 tracking-wider">${r.trackingCode}</span>
+            </div>
           </div>
-          <div class="grid grid-cols-2 gap-3 text-xs">
-            <div><span class="text-slate-400">سرپرست:</span> <strong class="text-white">${r.clientName}</strong></div>
-            <div><span class="text-slate-400">بیمار:</span> <strong class="text-white">${r.animalName} (${r.animalType})</strong></div>
-            <div><span class="text-slate-400">دپارتمان:</span> <strong class="text-white">${r.departmentName}</strong></div>
-            <div><span class="text-slate-400">پزشک:</span> <strong class="text-white">${r.professorName}</strong></div>
-            <div><span class="text-slate-400">زمان مراجعه:</span> <strong class="text-emerald-400">${r.appointmentDate}</strong></div>
-            <div><span class="text-slate-400">وضعیت پرداخت:</span> <strong class="text-emerald-400">${r.paymentStatus === 'paid' ? 'پرداخت موفق زیپال' : 'در انتظار پرداخت'}</strong></div>
+
+          <!-- Appointment Core Details Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-900/70 p-4 rounded-2xl border border-slate-800">
+            <div class="flex justify-between py-1 border-b border-slate-800 sm:border-0"><span class="text-slate-400">نام سرپرست:</span> <strong class="text-white font-bold text-sm">${r.clientName}</strong></div>
+            <div class="flex justify-between py-1 border-b border-slate-800 sm:border-0"><span class="text-slate-400">شماره تماس:</span> <strong class="text-white font-mono">${r.clientPhone || 'ثبت شده'}</strong></div>
+            <div class="flex justify-between py-1 border-b border-slate-800 sm:border-0"><span class="text-slate-400">مشخصات بیمار:</span> <strong class="text-emerald-300 font-bold">${r.animalName} (${r.animalType} - ${r.animalBreed || 'معمولی'})</strong></div>
+            <div class="flex justify-between py-1 border-b border-slate-800 sm:border-0"><span class="text-slate-400">دپارتمان تخصصی:</span> <strong class="text-white">${r.departmentName}</strong></div>
+            <div class="flex justify-between py-1 border-b border-slate-800 sm:border-0"><span class="text-slate-400">پزشک معالج / استاد:</span> <strong class="text-emerald-400 font-bold text-sm">${r.professorName}</strong></div>
+            <div class="flex justify-between py-1 border-b border-slate-800 sm:border-0"><span class="text-slate-400">تاریخ و سانس مراجعه:</span> <strong class="text-amber-300 font-bold font-mono">${r.appointmentDate}</strong></div>
+            <div class="flex justify-between py-1"><span class="text-slate-400">وضعیت پذیرش:</span> <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">تایید شده رسمی</span></div>
+            <div class="flex justify-between py-1"><span class="text-slate-400">وضعیت مالی:</span> <strong class="${r.paymentStatus === 'paid' ? 'text-emerald-400' : 'text-amber-400'} font-bold">${r.paymentStatus === 'paid' ? 'پرداخت موفق شاپرک / زیپال ✓' : 'پرداخت در محل پذیرش'}</strong></div>
           </div>
+
+          <!-- Simulated High-Tech Medical Barcode -->
+          <div class="bg-white/5 p-3 rounded-xl border border-white/10 flex flex-col items-center justify-center">
+            <div class="flex items-center gap-1 h-8 opacity-80">
+              <span class="w-1 h-full bg-emerald-400"></span>
+              <span class="w-2 h-full bg-emerald-400"></span>
+              <span class="w-0.5 h-full bg-emerald-400"></span>
+              <span class="w-1.5 h-full bg-emerald-400"></span>
+              <span class="w-3 h-full bg-emerald-400"></span>
+              <span class="w-1 h-full bg-emerald-400"></span>
+              <span class="w-0.5 h-full bg-emerald-400"></span>
+              <span class="w-2 h-full bg-emerald-400"></span>
+              <span class="w-1.5 h-full bg-emerald-400"></span>
+              <span class="w-3 h-full bg-emerald-400"></span>
+              <span class="w-0.5 h-full bg-emerald-400"></span>
+              <span class="w-2 h-full bg-emerald-400"></span>
+              <span class="w-1 h-full bg-emerald-400"></span>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono mt-1 tracking-widest">${r.trackingCode}</span>
+          </div>
+
+          <!-- Actions Bar: Print & Navigate -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-700 no-print">
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="window.print()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition shadow-lg shadow-emerald-900/40 cursor-pointer">
+                <span>🖨️ چاپ فاکتور و کارت نوبت</span>
+              </button>
+              <button type="button" onclick="copyAppointmentDetails('${r.trackingCode}', '${r.appointmentDate}', '${r.professorName}')" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-xs transition cursor-pointer">
+                <span>📋 کپی مشخصات نوبت</span>
+              </button>
+            </div>
+            <a href="https://maps.google.com/?q=دانشکده+دامپزشکی+دانشگاه+فردوسی+مشهد" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 font-bold">
+              <span>📍 مسیریابی تا بیمارستان روی نقشه ←</span>
+            </a>
+          </div>
+
         </div>
       ` : ''}
     </section>
@@ -3405,6 +3667,150 @@ function renderDoctorModal() {
   `;
 }
 
+function renderPetHealthCalculatorModal() {
+  if (!state.petHealthModalOpen) return '';
+  const d = state.petHealthData;
+  const res = d.result;
+
+  return `
+    <div id="pet-health-calc-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto text-right">
+      <div class="bg-slate-900 border border-emerald-500/40 w-full max-w-3xl rounded-3xl p-5 sm:p-8 shadow-2xl relative my-auto">
+        <!-- Close button -->
+        <button onclick="closePetHealthCalculatorModal()" class="absolute top-5 left-5 text-slate-400 hover:text-white text-xl cursor-pointer">✕</button>
+
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/30">
+            🩺
+          </div>
+          <div>
+            <h3 class="text-lg sm:text-xl font-black text-white">محاسبه سن زیستی و برنامه واکسیناسیون تخصصی پت</h3>
+            <p class="text-xs text-emerald-400 font-bold">بیمارستان دانشکده دامپزشکی دانشگاه فردوسی مشهد</p>
+          </div>
+        </div>
+
+        <!-- Calculator Form -->
+        <form id="pet-health-calc-form" onsubmit="handlePetHealthFormSubmit(event)" class="bg-slate-800/70 border border-slate-700/80 p-4 sm:p-5 rounded-2xl mb-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">گونه / نژاد حیوان:</label>
+              <select name="species" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-emerald-500 outline-none">
+                <option value="dog-small" ${d.species === 'dog-small' ? 'selected' : ''}>سگ نژاد کوچک (زیر ۱۰ کیلو)</option>
+                <option value="dog-medium" ${d.species === 'dog-medium' ? 'selected' : ''}>سگ نژاد متوسط (۱۰ تا ۲۵ کیلو)</option>
+                <option value="dog-large" ${d.species === 'dog-large' ? 'selected' : ''}>سگ نژاد بزرگ (بالای ۲۵ کیلو)</option>
+                <option value="cat" ${d.species === 'cat' ? 'selected' : ''}>گربه (همه نژادها)</option>
+                <option value="rabbit" ${d.species === 'rabbit' ? 'selected' : ''}>خرگوش و جوندگان خانگی</option>
+                <option value="bird" ${d.species === 'bird' ? 'selected' : ''}>پرندگان زینتی و طوطی‌سانان</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">نام پت (اختیاری):</label>
+              <input type="text" name="petName" value="${d.name || ''}" placeholder="مثال: لوسی، تدی، فندق" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-emerald-500 outline-none placeholder:text-slate-500" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">سن فعلی (سال و ماه):</label>
+              <div class="grid grid-cols-2 gap-2">
+                <input type="number" name="years" min="0" max="25" value="${d.years}" placeholder="سال" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-emerald-500 outline-none" />
+                <input type="number" name="months" min="0" max="11" value="${d.months}" placeholder="ماه" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-emerald-500 outline-none" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">وزن تقریبی (کیلوگرم):</label>
+              <input type="number" step="0.1" name="weight" min="0.1" max="120" value="${d.weight}" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-emerald-500 outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">وضعیت عقیم‌سازی:</label>
+              <select name="neutered" class="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-emerald-500 outline-none">
+                <option value="yes" ${d.neutered === 'yes' ? 'selected' : ''}>عقیم شده است ✓</option>
+                <option value="no" ${d.neutered === 'no' ? 'selected' : ''}>عقیم نشده است</option>
+              </select>
+            </div>
+
+            <div class="flex items-end">
+              <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs py-3 rounded-xl transition shadow-lg shadow-emerald-600/30 cursor-pointer">
+                ⚡ محاسبه سن زیستی و برنامه واکسن
+              </button>
+            </div>
+          </div>
+        </form>
+
+        ${res ? `
+          <!-- Results Presentation -->
+          <div id="pet-health-results-container" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-2xl text-center">
+                <div class="text-xs text-slate-400 font-bold mb-1">سن تقویمی پت</div>
+                <div class="text-2xl font-black text-white">${res.totalYears} <span class="text-xs text-slate-400 font-normal">سال</span></div>
+                <div class="text-[11px] text-slate-400 mt-1">${res.speciesLabel}</div>
+              </div>
+
+              <div class="bg-gradient-to-b from-emerald-950/80 to-slate-900 border border-emerald-500/50 p-4 rounded-2xl text-center shadow-lg">
+                <div class="text-xs text-emerald-300 font-bold mb-1">معادل سن زیستی انسان</div>
+                <div class="text-3xl font-black text-emerald-400">${res.humanAge} <span class="text-xs text-emerald-300 font-normal">سال انسانی</span></div>
+                <div class="text-[11px] text-emerald-300 mt-1">استاندارد جهانی WSAVA</div>
+              </div>
+
+              <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-2xl text-center">
+                <div class="text-xs text-slate-400 font-bold mb-1">مرحله زیستی (Life Stage)</div>
+                <div class="text-sm font-black ${res.lifeStageColor} mt-1">${res.lifeStage}</div>
+                <div class="text-[11px] text-slate-400 mt-1">نیاز به پایش دوره‌ای</div>
+              </div>
+            </div>
+
+            <!-- Life Stage Description -->
+            <div class="bg-slate-800/50 border border-slate-700/60 p-3.5 rounded-2xl text-xs text-slate-300 leading-relaxed">
+              <strong class="text-white">ارزیابی بالینی مرحله ${res.lifeStage}:</strong> ${res.lifeStageDesc}
+            </div>
+
+            <!-- Vaccines Table -->
+            <div class="bg-slate-800/70 border border-slate-700/80 rounded-2xl overflow-hidden">
+              <div class="px-4 py-2.5 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
+                <span class="text-xs font-black text-white">جدول واکسیناسیون و محافظت ایمنی</span>
+                <span class="text-[11px] text-emerald-400 font-bold">بیمارستان دانشکده دامپزشکی فردوسی</span>
+              </div>
+              <div class="divide-y divide-slate-700/60">
+                ${res.vaccines.map(v => `
+                  <div class="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <strong class="text-white">${v.name}</strong>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full ${v.status === 'الزامی قانونی' ? 'bg-rose-950 text-rose-300 border border-rose-500/40' : 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'}">${v.status}</span>
+                      </div>
+                      <p class="text-slate-400 text-[11px] mt-0.5">${v.desc}</p>
+                    </div>
+                    <div class="sm:text-left shrink-0">
+                      <span class="text-slate-300 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700/60 font-mono text-[11px]">${v.timing}</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              <div class="text-xs text-slate-400">
+                برای رزرو نوبت واکسیناسیون با اساتید هیئت علمی یا صدور شناسنامه بهداشتی:
+              </div>
+              <div class="flex items-center gap-2 w-full sm:w-auto">
+                <button onclick="window.print()" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs border border-slate-700 cursor-pointer">
+                  🖨️ چاپ پرونده سلامت
+                </button>
+                <button onclick="bookFromHealthCalculator()" class="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md shadow-emerald-600/30 cursor-pointer">
+                  📅 رزرو نوبت واکسیناسیون ←
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
+      </div>
+    </div>
+  `;
+}
+
 function renderDeptModal() {
   if (!state.deptModalOpen || !state.activeDeptDetails) return "";
   const d = state.activeDeptDetails;
@@ -3626,6 +4032,7 @@ function renderApp() {
       ${renderBookingModal()}
       ${renderDoctorModal()}
       ${renderDeptModal()}
+      ${renderPetHealthCalculatorModal()}
       ${renderInvoiceModal()}
       ${renderAuthModal()}
       ${renderMyAppointmentsModal()}
