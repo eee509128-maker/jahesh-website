@@ -49,7 +49,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-5 animate-in fade-in duration-200">
-      <div className="w-full max-w-3xl bg-[#0f0924] border border-purple-800/80 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-3xl bg-[#0f0924] border border-purple-800/80 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92dvh]">
         
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-purple-800/50 bg-[#160b33]">

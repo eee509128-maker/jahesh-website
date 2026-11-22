@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { User as UserType, Order } from '../types';
 import { X, UserIcon, Phone, Clock, ShoppingCart, ShieldCheck } from 'lucide-react';
 
@@ -39,9 +39,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     return false;
   });
 
+  // Body scroll lock on open
+  useEffect(() => {
+    if (!isOpen) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [isOpen]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-[#140c2e] border border-purple-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-[#140c2e] border border-purple-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90dvh] sm:max-h-[88vh]">
         {/* Header */}
         <div className="bg-[#1a1139] p-4 flex items-center justify-between border-b border-purple-900/60">
           <div className="flex items-center gap-3">

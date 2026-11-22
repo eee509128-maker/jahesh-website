@@ -9346,7 +9346,7 @@ on public.users for delete using (true);`;
             }}
           >
             <div
-              className="bg-[#100826] border-2 border-amber-400/80 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl shadow-amber-500/20 text-white flex flex-col max-h-[92vh] animate-in zoom-in-95"
+              className="bg-[#100826] border-2 border-amber-400/80 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl shadow-amber-500/20 text-white flex flex-col max-h-[92dvh] animate-in zoom-in-95"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}

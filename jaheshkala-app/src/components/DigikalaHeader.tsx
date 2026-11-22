@@ -351,7 +351,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
                 />
 
                 <div
-                  className="fixed top-24 sm:top-full right-3 sm:right-0 left-3 sm:left-auto sm:mt-2 sm:w-96 md:w-[420px] max-w-[95vw] bg-white dark:bg-[#150d30] border border-purple-200 dark:border-purple-700 rounded-2xl shadow-2xl p-3 space-y-2.5 z-50 animate-in fade-in flex flex-col max-h-[82vh] sm:max-h-[500px]"
+                  className="fixed top-24 sm:top-full right-3 sm:right-0 left-3 sm:left-auto sm:mt-2 sm:w-96 md:w-[420px] max-w-[95vw] bg-white dark:bg-[#150d30] border border-purple-200 dark:border-purple-700 rounded-2xl shadow-2xl p-3 space-y-2.5 z-50 animate-in fade-in flex flex-col max-h-[82dvh] sm:max-h-[500px]"
                 >
                   <div className="px-1 pb-2 text-[11px] font-bold text-purple-950 dark:text-amber-300 border-b border-purple-100 dark:border-purple-900/60 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -380,7 +380,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
                       value={headerGuildSearch}
                       onChange={(e) => setHeaderGuildSearch(e.target.value)}
                       placeholder="جستجوی صنف (املاک، وب، پزشکی، غذا، طلا، خودرو...)"
-                      className="w-full bg-purple-50/70 dark:bg-black/50 border border-purple-200 dark:border-purple-800 rounded-xl pr-8 pl-8 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                      className="w-full bg-purple-50/70 dark:bg-black/50 border border-purple-200 dark:border-purple-800 rounded-xl pr-8 pl-8 py-1.5 text-base sm:text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
                     />
                     {headerGuildSearch && (
                       <button

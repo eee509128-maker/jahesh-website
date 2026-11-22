@@ -17,6 +17,15 @@ export const TermsModal: React.FC<TermsModalProps> = ({
 }) => {
   useEffect(() => {
     if (!isOpen) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
@@ -30,14 +39,14 @@ export const TermsModal: React.FC<TermsModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in cursor-default"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in cursor-default"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="relative w-full max-w-3xl bg-[#120c29] border border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-8 max-h-[88vh] flex flex-col">
+      <div className="relative w-full max-w-3xl bg-[#120c29] border border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-8 max-h-[90dvh] sm:max-h-[88vh] flex flex-col">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-purple-900/50 bg-[#170e34]">

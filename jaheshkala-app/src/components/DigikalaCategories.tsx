@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Layers, Flame, Percent, Sparkles, Tag, ShoppingBag, Globe, Code,
   Laptop, Smartphone, Headphones, Watch, Shirt, Coffee, BookOpen,
@@ -80,6 +80,16 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
   const showAllGuildsModal = isGuildsModalOpen !== undefined ? isGuildsModalOpen : internalShowModal;
   const setShowAllGuildsModal = onToggleGuildsModal || setInternalShowModal;
   const [modalSearchQuery, setModalSearchQuery] = useState('');
+
+  // Lock body scroll when guilds modal is open
+  useEffect(() => {
+    if (!showAllGuildsModal) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [showAllGuildsModal]);
 
   // Check if selected category is a specific guild
   const isGuildSelected = selectedCategory && selectedCategory !== 'شگفت‌انگیز' && selectedCategory !== 'پرفروش';
@@ -257,7 +267,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
             }
           }}
         >
-          <div className="relative bg-white dark:bg-[#150e33] border border-purple-200 dark:border-purple-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] my-auto animate-in zoom-in-95 duration-150">
+          <div className="relative bg-white dark:bg-[#150e33] border border-purple-200 dark:border-purple-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88dvh] sm:max-h-[85vh] my-auto animate-in zoom-in-95 duration-150">
             
             {/* Modal Header */}
             <div className="p-4 bg-purple-50 dark:bg-[#1a1139] border-b border-purple-200 dark:border-purple-900 flex items-center justify-between">
@@ -292,7 +302,7 @@ export const DigikalaCategories: React.FC<DigikalaCategoriesProps> = ({
                   value={modalSearchQuery}
                   onChange={(e) => setModalSearchQuery(e.target.value)}
                   placeholder="جستجو در بین اصناف (املاک، طراحی سایت، پزشکی، رستوران، پوشاک، طلا، خودرو...)"
-                  className="w-full bg-white dark:bg-black/60 border border-purple-200 dark:border-purple-800 rounded-xl pr-9 pl-4 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 shadow-xs"
+                  className="w-full bg-white dark:bg-black/60 border border-purple-200 dark:border-purple-800 rounded-xl pr-9 pl-4 py-2 text-base sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 shadow-xs"
                 />
               </div>
             </div>

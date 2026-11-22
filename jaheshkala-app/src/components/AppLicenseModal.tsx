@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   KeyRound,
@@ -35,6 +35,16 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
   const [showPassword, setShowPassword] = useState(true);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
+  // Body scroll lock on open
+  useEffect(() => {
+    if (!isOpen) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [isOpen]);
+
   if (!isOpen || !license) return null;
 
   const effectiveLicenseDownloadUrl = license.downloadUrl || (license as any).appDownloadUrl || (license.productId === 'prod-1790538341809' || license.productTitle?.includes('شنتیا') || license.appName?.includes('شنتیا') ? '/uploads/apps/shantia.apk' : undefined);
@@ -62,7 +72,7 @@ export const AppLicenseModal: React.FC<AppLicenseModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-xl max-h-[92vh] flex flex-col bg-gradient-to-b from-[#180f33] via-[#100824] to-[#0a0518] border-2 border-amber-400/80 rounded-3xl shadow-[0_0_50px_rgba(251,191,36,0.25)] overflow-hidden text-right text-slate-100">
+      <div className="relative w-full max-w-xl max-h-[92dvh] flex flex-col bg-gradient-to-b from-[#180f33] via-[#100824] to-[#0a0518] border-2 border-amber-400/80 rounded-3xl shadow-[0_0_50px_rgba(251,191,36,0.25)] overflow-hidden text-right text-slate-100">
         
         {/* Glowing Top Ambient Header (Fixed) */}
         <div className="relative shrink-0 px-5 sm:px-6 py-4 sm:py-5 border-b border-purple-800/60 bg-gradient-to-r from-amber-500/20 via-purple-900/40 to-indigo-900/30">

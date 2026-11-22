@@ -43,6 +43,16 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Body scroll lock on open
+  useEffect(() => {
+    if (!isOpen) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [isOpen]);
+
   // Close on Escape key press and handle pageshow BF cache
   useEffect(() => {
     if (!isOpen) return;
@@ -253,7 +263,7 @@ export const PaymentGatewayModal: React.FC<PaymentGatewayModalProps> = ({
         }
       }}
     >
-      <div className="relative w-full max-w-xl bg-[#0e0a22] border border-purple-700/70 rounded-3xl shadow-2xl overflow-hidden my-2 sm:my-4 max-h-[94vh] flex flex-col">
+      <div className="relative w-full max-w-xl bg-[#0e0a22] border border-purple-700/70 rounded-3xl shadow-2xl overflow-hidden my-2 sm:my-4 max-h-[94dvh] flex flex-col">
         
         {/* Top Header - Shaparak & Zibal Trust Indicators */}
         <div className="bg-gradient-to-r from-[#180e3b] via-[#241352] to-[#180e3b] p-4 sm:p-5 border-b border-purple-900/60 flex items-center justify-between shrink-0">

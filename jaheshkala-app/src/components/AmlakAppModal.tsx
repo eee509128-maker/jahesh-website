@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ExternalLink, ShieldCheck, Sparkles, Building2, RotateCw, Loader2, Lock } from 'lucide-react';
 import { User } from '../types';
 
@@ -15,6 +15,16 @@ export const AmlakAppModal: React.FC<AmlakAppModalProps> = ({
 }) => {
   const [iframeKey, setIframeKey] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Body scroll lock on open
+  useEffect(() => {
+    if (!isOpen) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -54,7 +64,7 @@ export const AmlakAppModal: React.FC<AmlakAppModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-6xl h-[92vh] bg-[#0f0a21] border border-amber-500/40 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="relative w-full max-w-6xl h-[92dvh] bg-[#0f0a21] border border-amber-500/40 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
         
         {/* Top Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[#170e33] border-b border-purple-900/60">

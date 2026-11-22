@@ -344,7 +344,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     placeholder="example.ir"
                     value={preferredDomain}
                     onChange={(e) => setPreferredDomain(e.target.value)}
-                    className="w-full bg-black/50 border border-purple-800 rounded-xl px-3 py-2 text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    className="w-full bg-black/50 border border-purple-800 rounded-xl px-3 py-2 text-base sm:text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400"
                   />
                 </div>
               )}
@@ -644,7 +644,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         </div>
 
         {/* Modal Bottom Footer with Price & Add to Cart */}
-        <div className="px-6 py-4 bg-white dark:bg-[#140d30] border-t border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+        <div className="px-3.5 sm:px-6 py-3 sm:py-4 bg-white dark:bg-[#140d30] border-t border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 shadow-lg">
           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
             <div className="text-right">
               <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">
