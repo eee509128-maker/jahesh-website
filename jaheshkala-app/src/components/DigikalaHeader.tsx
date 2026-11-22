@@ -305,7 +305,7 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="جستجو در بین تمامی کالاها و خدمات..."
-            className="w-full bg-transparent py-2 px-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none text-right font-medium"
+            className="w-full bg-transparent py-2 px-2 text-base sm:text-xs text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none text-right font-medium"
           />
           {searchQuery && (
             <button

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ImageCropperModal } from './ImageCropperModal';
 import { MerchantFacilitatorView } from './MerchantFacilitatorView';
 import {
@@ -17,7 +17,7 @@ import {
   Terminal
 } from 'lucide-react';
 import { Order, Product, OrderStatus, Coupon, User, ChatMessage, UserChat, BannerSlide, SubscriptionPlan, DashboardTool, AppSubscriptionLicense, PaymentLanding, PaymentLandingTheme, CustomMerchant, GatewayTransaction } from '../types';
-import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank, getPaymentLandingsFromDb, savePaymentLandingToDb, deletePaymentLandingFromDb, generateAiPaymentLanding, fetchCustomMerchantsFromDb, saveCustomMerchantToDb, deleteCustomMerchantFromDb, fetchGatewayTransactionsFromDb } from '../lib/dbService';
+import { fetchChatsFromDb, saveChatToDb, subscribeToChatsFromDb, fetchOrdersFromDb, saveOrderToDb, fetchBannersFromDb, saveBannerToDb, saveAllBannersToDb, deleteBannerFromDb, uploadBannerImage, uploadProductImage, parseOrderTimestamp, sortUsersNewestFirst, fetchToolsFromDb, saveToolToDb, saveAllToolsToDb, deleteToolFromDb, uploadToolImage, saveAllProductsOrderToDb, sortProductsByRank, getPaymentLandingsFromDb, savePaymentLandingToDb, deletePaymentLandingFromDb, generateAiPaymentLanding, fetchCustomMerchantsFromDb, saveCustomMerchantToDb, deleteCustomMerchantFromDb, fetchGatewayTransactionsFromDb, fetchAllUsersFromDb } from '../lib/dbService';
 import { getPendingOrder } from '../lib/zibalService';
 import { compressImageFile, getFallbackProductImage } from '../lib/imageUtils';
 import { INITIAL_BANNERS, INITIAL_TOOLS } from '../data/initialData';
@@ -485,7 +485,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleRefreshUsersList = async () => {
     setIsRefreshingUsers(true);
     try {
-      const { fetchAllUsersFromDb } = await import('../lib/dbService');
       const fresh = await fetchAllUsersFromDb();
       if (fresh && Array.isArray(fresh)) {
         if (typeof window !== 'undefined') {
@@ -2127,11 +2126,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }, 3000);
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-in fade-in overflow-hidden">
-      <div className="relative w-full max-w-6xl bg-[#0f0924] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden h-[90vh] max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-6xl bg-[#0f0924] border border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden h-[90dvh] max-h-[90dvh] flex flex-col">
         
         {/* Top Header */}
         <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4 border-b border-purple-900/60 bg-[#150d32]">
@@ -6983,7 +6991,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {/* Live Interactive Preview Modal */}
               {previewLanding && (
                 <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
-                  <div className="w-full max-w-5xl bg-[#0c061a] border border-purple-500/40 rounded-3xl shadow-2xl flex flex-col h-[90vh] overflow-hidden">
+                  <div className="w-full max-w-5xl bg-[#0c061a] border border-purple-500/40 rounded-3xl shadow-2xl flex flex-col h-[90dvh] overflow-hidden">
                     {/* Modal Top Bar */}
                     <div className="px-5 py-4 border-b border-white/10 bg-black/60 flex items-center justify-between gap-3 shrink-0">
                       <div className="flex items-center gap-3">
@@ -9064,7 +9072,7 @@ on public.users for delete using (true);`;
         {/* MODAL: ADD / EDIT DASHBOARD TOOL DIALOG */}
         {(isCreatingNewTool || editingTool) && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in">
-            <div className="relative w-full max-w-3xl bg-[#120a2e] border-2 border-cyan-500/70 rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col text-right">
+            <div className="relative w-full max-w-3xl bg-[#120a2e] border-2 border-cyan-500/70 rounded-3xl shadow-2xl overflow-hidden max-h-[92dvh] flex flex-col text-right">
               {/* Modal Header */}
               <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-purple-900/80 bg-[#190d3a] shrink-0">
                 <div className="flex items-center gap-3">
@@ -9736,7 +9744,7 @@ on public.users for delete using (true);`;
             dir="rtl"
           >
             <div
-              className="bg-[#12082b] border-2 border-emerald-400/90 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl shadow-emerald-500/25 text-white flex flex-col max-h-[92vh] animate-in zoom-in-95"
+              className="bg-[#12082b] border-2 border-emerald-400/90 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl shadow-emerald-500/25 text-white flex flex-col max-h-[92dvh] animate-in zoom-in-95"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}

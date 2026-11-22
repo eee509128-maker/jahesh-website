@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Sparkles, ShoppingBag, Zap, Check, Clock } from 'lucide-react';
 import { Product } from '../types';
 
@@ -25,6 +25,14 @@ export const SubscriptionDurationModal: React.FC<SubscriptionDurationModalProps>
   const pricePerDay = product.pricePerDay || 250000;
   const totalPrice = subscriptionDays * pricePerDay;
 
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
+
   const handleConfirmAction = (instant: boolean) => {
     onConfirm(product, subscriptionDays, instant);
   };
@@ -32,7 +40,7 @@ export const SubscriptionDurationModal: React.FC<SubscriptionDurationModalProps>
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div 
-        className="bg-slate-900 border-2 border-amber-400/80 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl shadow-amber-500/20 text-white flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+        className="bg-slate-900 border-2 border-amber-400/80 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl shadow-amber-500/20 text-white flex flex-col max-h-[92dvh] animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -9,7 +9,7 @@ import {
   Coins, Dumbbell, Truck, BookOpen, Layers
 } from 'lucide-react';
 import { User as UserType } from '../types';
-import { registerUserInDb, findUserInDb } from '../lib/dbService';
+import { registerUserInDb, findUserInDb, checkUsernameAvailability, checkPhoneAvailability } from '../lib/dbService';
 import { AntiBotGuard } from '../security/antiBot';
 import { IRANIAN_GUILDS, GuildItem } from '../data/guildsData';
 
@@ -85,6 +85,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [usernameMessage, setUsernameMessage] = useState<string>('');
 
+  // Body scroll lock on open
+  useEffect(() => {
+    if (!isOpen) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [isOpen]);
+
   // Debounced live username availability check
   useEffect(() => {
     if (!isRegisterMode) {
@@ -103,7 +113,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setUsernameStatus('checking');
     const timer = setTimeout(async () => {
       try {
-        const { checkUsernameAvailability } = await import('../lib/dbService');
         const res = await checkUsernameAvailability(clean);
         if (!res.available) {
           setUsernameStatus('taken');
@@ -251,8 +260,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
 
         // Check if username or phone already exists in system across all devices
-        const { checkUsernameAvailability, checkPhoneAvailability } = await import('../lib/dbService');
-        
         const usernameCheck = await checkUsernameAvailability(cleanUsername);
         if (!usernameCheck.available) {
           setErrorMsg('نام کاربری توسط فرد دیگری استفاده شده');
@@ -336,7 +343,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     >
       {/* Modal Container: Protected max height and safe viewport bounds */}
       <div 
-        className="relative bg-white dark:bg-[#140c2e] border border-purple-200 dark:border-purple-800 rounded-2xl sm:rounded-3xl w-full max-w-lg shadow-2xl text-right flex flex-col max-h-[88vh] my-auto overflow-hidden"
+        className="relative bg-white dark:bg-[#140c2e] border border-purple-200 dark:border-purple-800 rounded-2xl sm:rounded-3xl w-full max-w-lg shadow-2xl text-right flex flex-col max-h-[90dvh] sm:max-h-[88vh] my-auto overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -481,7 +488,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           value={guildSearchQuery}
                           onChange={(e) => setGuildSearchQuery(e.target.value)}
                           placeholder="جستجوی سریع صنف (مثلاً: املاک، پزشکی، رستوران، خودرو، وب، پوشاک...)"
-                          className="w-full bg-purple-50/70 dark:bg-black/50 border border-purple-200 dark:border-purple-800 rounded-lg pr-9 pl-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500"
+                          className="w-full bg-purple-50/70 dark:bg-black/50 border border-purple-200 dark:border-purple-800 rounded-lg pr-9 pl-3 py-1.5 text-base sm:text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500"
                         />
                       </div>
 
@@ -557,7 +564,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         value={customGuildName}
                         onChange={(e) => setCustomGuildName(e.target.value)}
                         placeholder="مثلاً: کارگاه نجاری، تدریس کنکور، صنایع دستی، تولید سفال..."
-                        className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-right"
+                        className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800 rounded-lg px-3 py-1.5 text-base sm:text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-right"
                       />
                     </div>
                   )}
@@ -576,7 +583,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     placeholder="مثال: عرفان مقدم"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-right shadow-xs"
+                    className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3.5 py-2 text-base sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-right shadow-xs"
                     required
                   />
                 </div>
@@ -595,7 +602,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     placeholder="09123456789"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-left font-mono shadow-xs"
+                    className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3.5 py-2 text-base sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-left font-mono shadow-xs"
                     required
                   />
                 </div>
@@ -630,7 +637,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     placeholder="erfan_123"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className={`w-full bg-white dark:bg-black/50 border rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none text-left font-mono shadow-xs transition-colors ${
+                    className={`w-full bg-white dark:bg-black/50 border rounded-xl px-3.5 py-2 text-base sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none text-left font-mono shadow-xs transition-colors ${
                       usernameStatus === 'taken'
                         ? 'border-rose-500 focus:border-rose-600 focus:ring-1 focus:ring-rose-500/30'
                         : usernameStatus === 'available'
@@ -666,7 +673,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="نام کاربری یا 0912..."
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-right shadow-xs"
+                  className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3.5 py-2 text-base sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-right shadow-xs"
                   required
                 />
               </div>
@@ -685,7 +692,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 placeholder="حداقل ۶ کاراکتر"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-left font-mono shadow-xs"
+                className="w-full bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3.5 py-2 text-base sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-purple-500 text-left font-mono shadow-xs"
                 required
               />
             </div>
@@ -719,7 +726,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   placeholder="پاسخ"
                   value={captchaInput}
                   onChange={(e) => setCaptchaInput(e.target.value)}
-                  className="flex-1 bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800 rounded-lg px-3 py-1.5 text-sm text-center text-slate-900 dark:text-white focus:outline-none focus:border-purple-600 dark:focus:border-amber-400 font-mono shadow-xs"
+                  className="flex-1 bg-white dark:bg-black/50 border border-purple-300 dark:border-purple-800 rounded-lg px-3 py-1.5 text-base sm:text-sm text-center text-slate-900 dark:text-white focus:outline-none focus:border-purple-600 dark:focus:border-amber-400 font-mono shadow-xs"
                   required
                 />
               </div>

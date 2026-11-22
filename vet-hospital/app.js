@@ -1864,7 +1864,7 @@ function renderHeader() {
             <span>←</span>
           </a>
 
-          <button onclick="toggleMobileMenu()" aria-label="منوی سایت" class="lg:hidden p-1.5 sm:p-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl shrink-0 flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9">
+          <button onclick="toggleMobileMenu()" aria-label="منوی سایت" class="lg:hidden p-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl shrink-0 flex items-center justify-center w-11 h-11 text-lg active:scale-95 transition-all">
             ☰
           </button>
         </div>

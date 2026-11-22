@@ -40,6 +40,17 @@ export const CartModal: React.FC<CartModalProps> = ({
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPercent: number; discountAmount: number } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
+  const [termsError, setTermsError] = useState(false);
+
+  // Body scroll lock on open
+  useEffect(() => {
+    if (!isOpen) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [isOpen]);
 
   // Handle Escape key
   useEffect(() => {
@@ -176,9 +187,10 @@ export const CartModal: React.FC<CartModalProps> = ({
       return;
     }
     if (!termsAccepted) {
-      alert('لطفاً جهت ادامه، ابتدا تیک مطالعه و پذیرش قوانین و مقررات تیم جهش را بزنید.');
+      setTermsError(true);
       return;
     }
+    setTermsError(false);
     onProceedToPayment(appliedCoupon || undefined);
   };
 
@@ -191,7 +203,7 @@ export const CartModal: React.FC<CartModalProps> = ({
         }
       }}
     >
-      <div className="relative w-full max-w-2xl bg-white dark:bg-[#110b27] border border-purple-200 dark:border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-6 max-h-[92vh] flex flex-col">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-[#110b27] border border-purple-200 dark:border-purple-800/80 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-6 max-h-[92dvh] flex flex-col">
         
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-purple-200 dark:border-purple-900/50 bg-purple-50/70 dark:bg-[#160d33]">
@@ -412,7 +424,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                           placeholder="نام انتخابی شما مثل: mycompany.ir"
                           value={item.requestedDomain || ''}
                           onChange={(e) => onUpdateDomain(prod.id, e.target.value)}
-                          className="w-full bg-white dark:bg-black/60 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono placeholder:text-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors shadow-sm"
+                          className="w-full bg-white dark:bg-black/60 border border-purple-300 dark:border-purple-800/80 rounded-xl px-3 py-2 text-base sm:text-xs text-slate-900 dark:text-white font-mono placeholder:text-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors shadow-sm"
                         />
                         <p className="text-[10px] text-slate-600 dark:text-slate-400 font-medium">
                           * این دامنه پس از پرداخت توسط تیم جهش با مالکیت رسمی شما ثبت خواهد شد.
@@ -430,7 +442,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                         placeholder="امکانات خاص مدنظرتان یا رنگ و طرح دلخواه را اینجا بنویسید..."
                         value={item.clientNotes || ''}
                         onChange={(e) => onUpdateNotes(prod.id, e.target.value)}
-                        className="w-full bg-white dark:bg-black/40 border border-purple-200 dark:border-purple-900/60 hover:border-purple-400 dark:hover:border-purple-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder-slate-500 focus:outline-none transition-colors shadow-sm"
+                        className="w-full bg-white dark:bg-black/40 border border-purple-200 dark:border-purple-900/60 hover:border-purple-400 dark:hover:border-purple-700 focus:border-purple-500 rounded-xl px-3.5 py-2 text-base sm:text-xs text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder-slate-500 focus:outline-none transition-colors shadow-sm"
                       />
                     </div>
                   </div>
@@ -477,7 +489,7 @@ export const CartModal: React.FC<CartModalProps> = ({
                           setCouponInput(e.target.value);
                           setCouponError('');
                         }}
-                        className="w-full bg-white dark:bg-black/60 border border-purple-300 dark:border-purple-800/80 focus:border-purple-600 dark:focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-xs text-right text-purple-950 dark:text-amber-300 placeholder:text-slate-400 focus:outline-none transition-colors shadow-sm"
+                        className="w-full bg-white dark:bg-black/60 border border-purple-300 dark:border-purple-800/80 focus:border-purple-600 dark:focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-base sm:text-xs text-right text-purple-950 dark:text-amber-300 placeholder:text-slate-400 focus:outline-none transition-colors shadow-sm"
                       />
                     </div>
                     <button
@@ -531,7 +543,10 @@ export const CartModal: React.FC<CartModalProps> = ({
                     id="terms-checkbox"
                     type="checkbox"
                     checked={termsAccepted}
-                    onChange={onToggleTerms}
+                    onChange={() => {
+                      if (termsError) setTermsError(false);
+                      onToggleTerms();
+                    }}
                     className="w-5 h-5 rounded-md border-purple-400 text-purple-600 focus:ring-purple-500 bg-white dark:bg-[#0e0a22] mt-0.5 cursor-pointer"
                   />
                   <div className="flex-1 text-xs">
@@ -551,6 +566,13 @@ export const CartModal: React.FC<CartModalProps> = ({
                     <span>مطالعه متن قوانین</span>
                   </button>
                 </div>
+
+                {termsError && !termsAccepted && (
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 p-2.5 rounded-xl border border-rose-300 dark:border-rose-800/80 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                    <span>لطفاً جهت ادامه، ابتدا تیک مطالعه و پذیرش قوانین و مقررات تیم جهش را بزنید.</span>
+                  </div>
+                )}
               </div>
 
             </div>

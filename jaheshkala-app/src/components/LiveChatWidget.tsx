@@ -704,7 +704,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSend();
                 }}
-                className="w-full bg-transparent py-2.5 px-3.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none text-right font-medium"
+                className="w-full bg-transparent py-2.5 px-3.5 text-base sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none text-right font-medium"
               />
             </div>
 
