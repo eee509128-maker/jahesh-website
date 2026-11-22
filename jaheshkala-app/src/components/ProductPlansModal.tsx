@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Sparkles, Check, ShoppingBag, Zap, ShieldCheck, Star, ListChecks, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
 import { Product, SubscriptionPlan } from '../types';
 
@@ -29,14 +29,6 @@ export const ProductPlansModal: React.FC<ProductPlansModalProps> = ({
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) || defaultPlan;
 
-  useEffect(() => {
-    const orig = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = orig;
-    };
-  }, []);
-
   const handleConfirmAction = (instant: boolean) => {
     if (!selectedPlan) return;
     if (onConfirmPlan) {
@@ -54,7 +46,7 @@ export const ProductPlansModal: React.FC<ProductPlansModalProps> = ({
       }}
     >
       <div
-        className="relative bg-[#0b0618] border border-amber-500/40 rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl shadow-amber-500/10 text-white flex flex-col max-h-[94dvh] animate-in zoom-in-95 duration-200 my-auto"
+        className="relative bg-[#0b0618] border border-amber-500/40 rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl shadow-amber-500/10 text-white flex flex-col max-h-[94vh] animate-in zoom-in-95 duration-200 my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Section */}

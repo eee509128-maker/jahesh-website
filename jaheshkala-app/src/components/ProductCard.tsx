@@ -181,10 +181,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 if (onInstantBuy) onInstantBuy(product);
                 else onAddToCart(product);
               }}
-              className="col-span-7 sm:col-span-6 flex items-center justify-center gap-1 h-10 sm:h-8.5 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs sm:text-xs font-black transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
+              className="col-span-7 sm:col-span-6 flex items-center justify-center gap-1 h-8 sm:h-8.5 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-[10px] sm:text-xs font-black transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
               title="خرید سریع و اتصال مستقیم به پرداخت"
             >
-              <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950 shrink-0" />
+              <Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-slate-950 text-slate-950 shrink-0" />
               <span className="font-black">خرید فوری</span>
             </button>
 
@@ -192,10 +192,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <button
               id={`add-to-cart-${product.id}`}
               onClick={() => onAddToCart(product)}
-              className="col-span-5 sm:col-span-4 flex items-center justify-center gap-1 h-10 sm:h-8.5 px-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/90 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-700/60 text-purple-900 hover:text-purple-950 dark:text-purple-200 dark:hover:text-white text-xs sm:text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
+              className="col-span-5 sm:col-span-4 flex items-center justify-center gap-1 h-8 sm:h-8.5 px-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-950/90 dark:hover:bg-purple-900 border border-purple-300 dark:border-purple-700/60 text-purple-900 hover:text-purple-950 dark:text-purple-200 dark:hover:text-white text-[10px] sm:text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
               title="افزودن کالا به سبد خرید"
             >
-              <ShoppingBag className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+              <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
               <span className="hidden sm:inline">سبد خرید</span>
               <span className="sm:hidden">سبد</span>
             </button>

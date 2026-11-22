@@ -22,8 +22,8 @@ export const IntegrationGuideModal: React.FC<IntegrationGuideModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-[#110b27] border border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-6 max-h-[90dvh] flex flex-col">
-
+      <div className="relative w-full max-w-4xl bg-[#110b27] border border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-6 max-h-[90vh] flex flex-col">
+        
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-purple-900/50 bg-[#160d33]">
           <div className="flex items-center gap-3">
@@ -48,7 +48,7 @@ export const IntegrationGuideModal: React.FC<IntegrationGuideModalProps> = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6 text-right text-xs text-slate-300">
-
+          
           <div className="bg-purple-950/40 border border-purple-800/50 p-4 rounded-2xl flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <p className="text-purple-200 leading-relaxed">
@@ -58,7 +58,7 @@ export const IntegrationGuideModal: React.FC<IntegrationGuideModalProps> = ({
 
           {/* Platforms Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
+            
             {/* 1. Zibal WebApp */}
             <div className="bg-[#170f35] border border-emerald-500/40 rounded-2xl p-4 space-y-2.5">
               <div className="flex items-center justify-between">
@@ -170,7 +170,7 @@ export const IntegrationGuideModal: React.FC<IntegrationGuideModalProps> = ({
           <div className="p-4 bg-amber-950/20 border border-amber-500/30 rounded-2xl space-y-1">
             <h5 className="font-bold text-amber-300 text-xs">اطلاعات ورود ادمین شما:</h5>
             <p className="text-slate-300 text-xs">
-              نام کاربری: <code className="bg-black/60 px-2 py-0.5 rounded font-mono text-white">jahesh</code> |
+              نام کاربری: <code className="bg-black/60 px-2 py-0.5 rounded font-mono text-white">jahesh</code> | 
               رمز عبور: <code className="bg-black/60 px-2 py-0.5 rounded font-mono text-white">jahesh1395</code>
             </p>
           </div>

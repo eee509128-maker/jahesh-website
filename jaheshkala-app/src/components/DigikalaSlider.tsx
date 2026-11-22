@@ -115,8 +115,8 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Aspect Ratio Container: 16/9 on mobile for optimal text legibility & breathing room, 21/9 on desktop */}
-      <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] overflow-hidden">
+      {/* Aspect Ratio Container: True 21/9 horizontal banner identically matching across Mobile, Tablet, and Desktop */}
+      <div className="relative w-full aspect-[21/9] overflow-hidden">
         {slides.map((slide, index) => {
           const isActive = index === currentSlide;
           const BadgeIcon = getBadgeIcon(slide.badge || '');
@@ -174,7 +174,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
               )}
 
               {/* Persian Banner Content Container */}
-              <div className="absolute inset-0 z-20 p-3 sm:p-6 md:p-8 flex flex-col justify-between text-right pointer-events-none">
+              <div className="absolute inset-0 z-20 p-2.5 sm:p-6 md:p-8 flex flex-col justify-between text-right pointer-events-none">
                 {/* Top Badge */}
                 <div>
                   {!slide.hideTextOverlay && slide.badge && (
@@ -220,12 +220,12 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
                             : ''
                         } ${
                           slide.titleFontSize === 'sm'
-                            ? 'text-xs sm:text-lg md:text-xl lg:text-2xl'
+                            ? 'text-[10px] sm:text-lg md:text-xl lg:text-2xl'
                             : slide.titleFontSize === 'md'
-                            ? 'text-sm sm:text-xl md:text-2xl lg:text-3xl'
+                            ? 'text-[11px] sm:text-xl md:text-2xl lg:text-3xl'
                             : slide.titleFontSize === 'xl'
-                            ? 'text-base sm:text-2xl md:text-3xl lg:text-5xl'
-                            : 'text-sm sm:text-xl md:text-2xl lg:text-4xl' // 'lg' (default standard)
+                            ? 'text-[13px] sm:text-2xl md:text-3xl lg:text-5xl'
+                            : 'text-[12px] sm:text-xl md:text-2xl lg:text-4xl' // 'lg' (default standard)
                         }`}
                         style={{ color: slide.titleColor || '#ffffff' }}
                       >
@@ -245,10 +245,10 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
                             : 'line-clamp-1 sm:line-clamp-2'
                         } ${
                           slide.subtitleFontSize === 'sm'
-                            ? 'text-[10px] sm:text-xs md:text-sm'
+                            ? 'text-[7.5px] sm:text-xs md:text-sm'
                             : slide.subtitleFontSize === 'lg'
-                            ? 'text-xs sm:text-sm md:text-base'
-                            : 'text-[11px] sm:text-xs md:text-sm' // 'md' (default standard)
+                            ? 'text-[9.5px] sm:text-sm md:text-base'
+                            : 'text-[8.5px] sm:text-xs md:text-sm' // 'md' (default standard)
                         }`}
                         style={{ color: slide.subtitleColor || 'rgba(226, 232, 240, 0.95)' }}
                       >

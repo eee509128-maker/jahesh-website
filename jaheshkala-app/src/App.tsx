@@ -31,10 +31,6 @@ import {
   subscribeToBannersRealtime,
   sortProductsByRank,
   saveAllProductsOrderToDb,
-  fetchAllUsersFromDb,
-  deleteUserFromDb,
-  updateUserInDb,
-  registerUserInDb,
 } from './lib/dbService';
 import {
   verifyZibalPayment,
@@ -571,6 +567,7 @@ export default function App() {
         }
         
         // Load users list once
+        const { fetchAllUsersFromDb } = await import('./lib/dbService');
         if (fetchAllUsersFromDb) {
           const allUsers = await fetchAllUsersFromDb();
           if (isMounted && allUsers) {
@@ -686,6 +683,7 @@ export default function App() {
         if (!activeUser) return;
         if (isMasterAdminUser(activeUser)) return;
 
+        const { fetchAllUsersFromDb } = await import('./lib/dbService');
         const freshUsers = await fetchAllUsersFromDb();
         if (!isMounted || !freshUsers || freshUsers.length === 0) return;
 
@@ -1449,6 +1447,7 @@ export default function App() {
   // User Management Actions
   const handleDeleteUser = async (userId: string) => {
     setUsersList((prev) => prev.filter((u) => u.id !== userId));
+    const { deleteUserFromDb } = await import('./lib/dbService');
     await deleteUserFromDb(userId);
     showToast('کاربر با موفقیت حذف شد.');
   };
@@ -1476,6 +1475,7 @@ export default function App() {
     }
 
     // 3. Persist across multi-layered storage (Local, Server, Supabase)
+    const { updateUserInDb, fetchAllUsersFromDb } = await import('./lib/dbService');
     await updateUserInDb(updatedUser);
 
     // 4. Refetch all users to make sure state is 100% in sync without reverting the role
@@ -1497,6 +1497,7 @@ export default function App() {
 
   const handleAddNewUser = async (newUser: User, initialPass: string = '123456') => {
     setUsersList((prev) => [newUser, ...prev]);
+    const { registerUserInDb } = await import('./lib/dbService');
     await registerUserInDb(newUser, initialPass);
     showToast(`کاربر جدید (${newUser.fullName}) با موفقیت ایجاد شد.`);
   };

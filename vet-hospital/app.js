@@ -1864,7 +1864,7 @@ function renderHeader() {
             <span>←</span>
           </a>
 
-          <button onclick="toggleMobileMenu()" aria-label="منوی سایت" class="lg:hidden p-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl shrink-0 flex items-center justify-center w-11 h-11 text-lg active:scale-95 transition-all">
+          <button onclick="toggleMobileMenu()" aria-label="منوی سایت" class="lg:hidden p-1.5 sm:p-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl shrink-0 flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9">
             ☰
           </button>
         </div>
@@ -2091,7 +2091,7 @@ function renderProfessorsSection() {
 
       <div class="bg-slate-800/80 border border-slate-700/80 p-4 rounded-2xl mb-8 flex flex-wrap items-center justify-between gap-4">
         <div class="flex-1 min-w-[240px]">
-          <input type="text" placeholder="جستجوی نام استاد، تخصص، جراحی، ارتوپدی..." value="${state.searchQuery}" oninput="handleProfessorSearch(this.value)" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs px-4 py-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+          <input type="text" placeholder="جستجوی نام استاد، تخصص، جراحی، ارتوپدی..." value="${state.searchQuery}" oninput="handleProfessorSearch(this.value)" class="w-full bg-slate-900 border border-slate-700 text-white text-xs px-4 py-3 rounded-xl focus:outline-none focus:border-emerald-500" />
         </div>
 
         <button onclick="openAuthModal('register')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-3 rounded-xl transition-all">
@@ -2152,13 +2152,13 @@ function renderTriageSection() {
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-300 mb-2">نژاد و سن</label>
-              <input type="text" placeholder="مثال: پرشین، ۳ ساله" value="${f.animalBreed}" oninput="state.triageForm.animalBreed=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+              <input type="text" placeholder="مثال: پرشین، ۳ ساله" value="${f.animalBreed}" oninput="state.triageForm.animalBreed=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
             </div>
           </div>
 
           <div>
             <label class="block text-xs font-bold text-slate-300 mb-2">شرح حال بالینی و علائم بیمار *</label>
-            <textarea required rows="4" placeholder="بی‌حالی شدید، لنگش در پای عقب، استفراغ، بی‌اشتهایی یا علائم مشکوک..." oninput="state.triageForm.symptoms=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3.5 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.symptoms}</textarea>
+            <textarea required rows="4" placeholder="بی‌حالی شدید، لنگش در پای عقب، استفراغ، بی‌اشتهایی یا علائم مشکوک..." oninput="state.triageForm.symptoms=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3.5 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.symptoms}</textarea>
           </div>
 
           <div class="text-center pt-2">
@@ -2205,7 +2205,7 @@ function renderTrackSection() {
 
       <div class="bg-slate-800/90 border border-slate-700/80 p-6 rounded-3xl mb-8">
         <form onsubmit="handleTrackAppointment(event)" class="flex flex-col sm:flex-row gap-3">
-          <input required type="text" placeholder="کد رهگیری (مثال: VET-849201) یا شماره همراه..." value="${state.trackQuery}" oninput="state.trackQuery=this.value" class="flex-1 bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3.5 rounded-xl focus:outline-none focus:border-emerald-500 font-mono" />
+          <input required type="text" placeholder="کد رهگیری (مثال: VET-849201) یا شماره همراه..." value="${state.trackQuery}" oninput="state.trackQuery=this.value" class="flex-1 bg-slate-900 border border-slate-700 text-white text-xs p-3.5 rounded-xl focus:outline-none focus:border-emerald-500 font-mono" />
           <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-6 py-3.5 rounded-xl transition-all">
             استعلام نوبت
           </button>
@@ -2269,7 +2269,7 @@ function renderBookingModal() {
 
   return `
     <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
-      <div class="bg-[#0f172a] border border-slate-700/90 w-full max-w-2xl rounded-3xl p-5 sm:p-7 shadow-2xl relative max-h-[92dvh] overflow-y-auto custom-scrollbar text-right">
+      <div class="bg-[#0f172a] border border-slate-700/90 w-full max-w-2xl rounded-3xl p-5 sm:p-7 shadow-2xl relative max-h-[92vh] overflow-y-auto custom-scrollbar text-right">
         
         <!-- هدر کاملاً تفکیک‌شده، مدرن و حرفه‌ای -->
         <div class="border-b border-slate-800 pb-4 mb-6">
@@ -2325,21 +2325,21 @@ function renderBookingModal() {
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">نام بیمار *</label>
-                <input required type="text" placeholder="مثال: بارفی، لئو..." value="${f.animalName || ''}" oninput="state.bookingForm.animalName=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                <input required type="text" placeholder="مثال: بارفی، لئو..." value="${f.animalName || ''}" oninput="state.bookingForm.animalName=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">نژاد</label>
-                <input type="text" placeholder="مثال: ژرمن، پرشین..." value="${f.animalBreed || ''}" oninput="state.bookingForm.animalBreed=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                <input type="text" placeholder="مثال: ژرمن، پرشین..." value="${f.animalBreed || ''}" oninput="state.bookingForm.animalBreed=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">سن و جنسیت</label>
-                <input type="text" placeholder="مثال: ۲ سال / نر" value="${f.animalAge || ''}" oninput="state.bookingForm.animalAge=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                <input type="text" placeholder="مثال: ۲ سال / نر" value="${f.animalAge || ''}" oninput="state.bookingForm.animalAge=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
               </div>
             </div>
 
             <div>
               <label class="block text-xs font-bold text-slate-300 mb-1.5">شرح حال بالینی و علائم بیماری (ارزیابی هوشمند توسط هوش مصنوعی) *</label>
-              <textarea required rows="3" placeholder="مثال: بیمار دچار لنگش شدید پای راست عقب شده و هنگام راه رفتن ناله می‌کند، از پله بالا نمی‌رود و بی‌حال است..." oninput="state.bookingForm.symptoms=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.symptoms || ''}</textarea>
+              <textarea required rows="3" placeholder="مثال: بیمار دچار لنگش شدید پای راست عقب شده و هنگام راه رفتن ناله می‌کند، از پله بالا نمی‌رود و بی‌حال است..." oninput="state.bookingForm.symptoms=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.symptoms || ''}</textarea>
             </div>
 
             <div class="flex items-center justify-between pt-3 border-t border-slate-800">
@@ -2522,11 +2522,11 @@ function renderBookingModal() {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">نام و نام خانوادگی سرپرست *</label>
-                <input required type="text" placeholder="مثال: علی رضایی" value="${f.clientName || ''}" oninput="state.bookingForm.clientName=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                <input required type="text" placeholder="مثال: علی رضایی" value="${f.clientName || ''}" oninput="state.bookingForm.clientName=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره تلفن همراه (پیامک نوبت و فاکتور) *</label>
-                <input required type="tel" placeholder="0912xxxxxxx" value="${f.clientPhone || ''}" oninput="state.bookingForm.clientPhone=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
+                <input required type="tel" placeholder="0912xxxxxxx" value="${f.clientPhone || ''}" oninput="state.bookingForm.clientPhone=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
               </div>
             </div>
 
@@ -2574,7 +2574,7 @@ function renderAuthModal() {
   const f = state.authForm;
   return `
     <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
-      <div class="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[90dvh] overflow-y-auto custom-scrollbar">
+      <div class="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[90vh] overflow-y-auto custom-scrollbar">
         <button onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center absolute top-5 left-5 transition-all cursor-pointer border border-slate-700">✕</button>
 
         <h3 class="text-lg font-black text-white mb-1">
@@ -2615,28 +2615,28 @@ function renderAuthModal() {
 
             <div>
               <label class="block text-xs font-bold text-slate-300 mb-1.5">نام و نام خانوادگی *</label>
-              <input required name="name" id="auth_name" type="text" placeholder="مثال: دکتر علیرضا محمدی" value="${f.name || ''}" oninput="state.authForm.name=this.value" onchange="state.authForm.name=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+              <input required name="name" id="auth_name" type="text" placeholder="مثال: دکتر علیرضا محمدی" value="${f.name || ''}" oninput="state.authForm.name=this.value" onchange="state.authForm.name=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">نام کاربری دلخواه (جهت ورود) *</label>
-                <input required name="username" id="auth_username" type="text" placeholder="مثال: dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" onchange="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+                <input required name="username" id="auth_username" type="text" placeholder="مثال: dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" onchange="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">رمز عبور *</label>
-                <input required name="password" id="auth_password" type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" onchange="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+                <input required name="password" id="auth_password" type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" onchange="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
               </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">شماره همراه *</label>
-                <input required name="phone" id="auth_phone" type="tel" placeholder="0912xxxxxxx" value="${f.phone || ''}" oninput="state.authForm.phone=this.value" onchange="state.authForm.phone=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
+                <input required name="phone" id="auth_phone" type="tel" placeholder="0912xxxxxxx" value="${f.phone || ''}" oninput="state.authForm.phone=this.value" onchange="state.authForm.phone=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-300 mb-1.5">پست الکترونیک (ایمیل)</label>
-                <input name="email" id="auth_email" type="email" placeholder="name@domain.com" value="${f.email || ''}" oninput="state.authForm.email=this.value" onchange="state.authForm.email=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+                <input name="email" id="auth_email" type="email" placeholder="name@domain.com" value="${f.email || ''}" oninput="state.authForm.email=this.value" onchange="state.authForm.email=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
               </div>
             </div>
 
@@ -2685,11 +2685,11 @@ function renderAuthModal() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">${f.role === 'doctor' ? 'شماره نظام دامپزشکی *' : 'شماره دانشجویی / نظام *'}</label>
-                    <input required name="medicalCouncilNo" id="auth_med_no" type="text" placeholder="18450" value="${f.medicalCouncilNo || ''}" oninput="state.authForm.medicalCouncilNo=this.value" onchange="state.authForm.medicalCouncilNo=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
+                    <input required name="medicalCouncilNo" id="auth_med_no" type="text" placeholder="18450" value="${f.medicalCouncilNo || ''}" oninput="state.authForm.medicalCouncilNo=this.value" onchange="state.authForm.medicalCouncilNo=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl font-mono focus:outline-none focus:border-emerald-500" />
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">دپارتمان تخصصی *</label>
-                    <select name="departmentId" id="auth_dept_id" onchange="state.authForm.departmentId=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
+                    <select name="departmentId" id="auth_dept_id" onchange="state.authForm.departmentId=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
                       ${state.departments.map(d => `<option value="${d.id}" ${f.departmentId === d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
                     </select>
                   </div>
@@ -2698,13 +2698,13 @@ function renderAuthModal() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">مرتبه علمی</label>
-                    <select name="academicRank" id="auth_academic_rank" onchange="state.authForm.academicRank=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
+                    <select name="academicRank" id="auth_academic_rank" onchange="state.authForm.academicRank=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500">
                       ${['استاد تمام (پروفسور)', 'دانشیار', 'استادیار', 'رزیدنت ارشد تخصصی', 'دانشجوی دکتری تخصصی (PhD)'].map(r => `<option value="${r}" ${f.academicRank === r ? 'selected' : ''}>${r}</option>`).join('')}
                     </select>
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">حیطه فوق‌تخصصی / فیلد کاری</label>
-                    <input name="subSpecialty" id="auth_sub_spec" type="text" placeholder="مثال: جراحی ارتوپدی و ستون فقرات" value="${f.subSpecialty || ''}" oninput="state.authForm.subSpecialty=this.value" onchange="state.authForm.subSpecialty=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="subSpecialty" id="auth_sub_spec" type="text" placeholder="مثال: جراحی ارتوپدی و ستون فقرات" value="${f.subSpecialty || ''}" oninput="state.authForm.subSpecialty=this.value" onchange="state.authForm.subSpecialty=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                 </div>
 
@@ -2712,11 +2712,11 @@ function renderAuthModal() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">روزهای حضور در کلینیک</label>
-                    <input name="workDays" id="auth_work_days" type="text" placeholder="شنبه، یکشنبه، سه‌شنبه..." value="${Array.isArray(f.workDays) ? f.workDays.join('، ') : (f.workDays || 'شنبه، دوشنبه، چهارشنبه')}" oninput="state.authForm.workDays=this.value.split(/[،,]/).map(s=>s.trim()).filter(Boolean)" onchange="state.authForm.workDays=this.value.split(/[،,]/).map(s=>s.trim()).filter(Boolean)" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="workDays" id="auth_work_days" type="text" placeholder="شنبه، یکشنبه، سه‌شنبه..." value="${Array.isArray(f.workDays) ? f.workDays.join('، ') : (f.workDays || 'شنبه، دوشنبه، چهارشنبه')}" oninput="state.authForm.workDays=this.value.split(/[،,]/).map(s=>s.trim()).filter(Boolean)" onchange="state.authForm.workDays=this.value.split(/[،,]/).map(s=>s.trim()).filter(Boolean)" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">ساعات و شیفت ویزیت</label>
-                    <input name="workHours" id="auth_work_hours" type="text" placeholder="۰۹:۰۰ الی ۱۳:۰۰" value="${f.workHours || '۰۹:۰۰ الی ۱۳:۰۰'}" oninput="state.authForm.workHours=this.value" onchange="state.authForm.workHours=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="workHours" id="auth_work_hours" type="text" placeholder="۰۹:۰۰ الی ۱۳:۰۰" value="${f.workHours || '۰۹:۰۰ الی ۱۳:۰۰'}" oninput="state.authForm.workHours=this.value" onchange="state.authForm.workHours=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                 </div>
 
@@ -2724,17 +2724,17 @@ function renderAuthModal() {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">تعرفه ویزیت حضوری اختصاصی (تومان)</label>
-                    <input name="visitFee" id="auth_visit_fee" type="number" step="10000" placeholder="450000" value="${f.visitFee || 450000}" oninput="state.authForm.visitFee=Number(this.value)" onchange="state.authForm.visitFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="visitFee" id="auth_visit_fee" type="number" step="10000" placeholder="450000" value="${f.visitFee || 450000}" oninput="state.authForm.visitFee=Number(this.value)" onchange="state.authForm.visitFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">تعرفه مشاوره آنلاین اختصاصی (تومان)</label>
-                    <input name="onlineConsultFee" id="auth_online_fee" type="number" step="10000" placeholder="300000" value="${f.onlineConsultFee || 300000}" oninput="state.authForm.onlineConsultFee=Number(this.value)" onchange="state.authForm.onlineConsultFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-base sm:text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
+                    <input name="onlineConsultFee" id="auth_online_fee" type="number" step="10000" placeholder="300000" value="${f.onlineConsultFee || 300000}" oninput="state.authForm.onlineConsultFee=Number(this.value)" onchange="state.authForm.onlineConsultFee=Number(this.value)" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-bold text-xs p-3 rounded-xl focus:outline-none focus:border-emerald-500" />
                   </div>
                 </div>
 
                 <div>
                   <label class="block text-xs font-bold text-slate-300 mb-1.5">بیوگرافی و رزومه علمی</label>
-                  <textarea name="bio" id="auth_bio" rows="2" placeholder="عضو هیئت علمی و پژوهشگر حوزه بالینی دامپزشکی..." oninput="state.authForm.bio=this.value" onchange="state.authForm.bio=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-base sm:text-xs p-3 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.bio || ''}</textarea>
+                  <textarea name="bio" id="auth_bio" rows="2" placeholder="عضو هیئت علمی و پژوهشگر حوزه بالینی دامپزشکی..." oninput="state.authForm.bio=this.value" onchange="state.authForm.bio=this.value" class="w-full bg-slate-900 border border-slate-700 text-white text-xs p-3 rounded-xl leading-relaxed focus:outline-none focus:border-emerald-500">${f.bio || ''}</textarea>
                 </div>
               </div>
             ` : ''}
@@ -2742,12 +2742,12 @@ function renderAuthModal() {
             <!-- فرم ورود با نام کاربری / ایمیل و رمز عبور -->
             <div>
               <label class="block text-xs font-bold text-slate-300 mb-1.5">نام کاربری یا ایمیل *</label>
-              <input required name="username" id="login_username" type="text" placeholder="مثال: jahesh1395@gmail.com یا dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" onchange="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+              <input required name="username" id="login_username" type="text" placeholder="مثال: jahesh1395@gmail.com یا dr_mohammadi" value="${f.username || ''}" oninput="state.authForm.username=this.value" onchange="state.authForm.username=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
             </div>
 
             <div>
               <label class="block text-xs font-bold text-slate-300 mb-1.5">رمز عبور *</label>
-              <input required name="password" id="login_password" type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" onchange="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
+              <input required name="password" id="login_password" type="password" placeholder="••••••••" value="${f.password || ''}" oninput="state.authForm.password=this.value" onchange="state.authForm.password=this.value" class="w-full bg-slate-800 border border-slate-700 text-white text-xs p-3.5 rounded-xl font-mono focus:outline-none focus:border-emerald-500 text-left" />
             </div>
           `}
 
@@ -2831,7 +2831,7 @@ function renderAdminModal() {
 
   return `
     <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4">
-      <div class="bg-[#0f172a] border border-amber-500/50 w-full max-w-6xl rounded-3xl p-5 sm:p-7 shadow-2xl relative text-right max-h-[94dvh] flex flex-col">
+      <div class="bg-[#0f172a] border border-amber-500/50 w-full max-w-6xl rounded-3xl p-5 sm:p-7 shadow-2xl relative text-right max-h-[94vh] flex flex-col">
         
         <!-- هدر پنل مدیریت اختصاصی بیمارستان -->
         <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4 shrink-0">
@@ -2929,7 +2929,7 @@ function renderAdminModal() {
 
                 <!-- باکس جستجو و دکمه افزودن -->
                 <div class="flex items-center gap-2 flex-1 min-w-[260px] justify-end">
-                  <input type="text" placeholder="جستجوی نام استاد، کد نظام، دپارتمان، تلفن..." value="${state.adminSearchTerm}" oninput="setAdminSearchTerm(this.value)" class="w-full max-w-xs bg-slate-800 border border-slate-700 text-white text-base sm:text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500" />
+                  <input type="text" placeholder="جستجوی نام استاد، کد نظام، دپارتمان، تلفن..." value="${state.adminSearchTerm}" oninput="setAdminSearchTerm(this.value)" class="w-full max-w-xs bg-slate-800 border border-slate-700 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500" />
                   <button onclick="openAuthModal('register')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-md cursor-pointer whitespace-nowrap flex items-center gap-1">
                     <span>+</span>
                     <span>ثبت پزشک/دانشجو</span>
@@ -3041,7 +3041,7 @@ function renderAdminModal() {
                 </div>
 
                 <div class="flex-1 min-w-[240px] max-w-sm">
-                  <input type="text" placeholder="جستجوی نام، نام کاربری، شماره همراه یا ایمیل..." value="${state.adminSearchTerm}" oninput="setAdminSearchTerm(this.value)" class="w-full bg-slate-800 border border-slate-700 text-white text-base sm:text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500" />
+                  <input type="text" placeholder="جستجوی نام، نام کاربری، شماره همراه یا ایمیل..." value="${state.adminSearchTerm}" oninput="setAdminSearchTerm(this.value)" class="w-full bg-slate-800 border border-slate-700 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-emerald-500" />
                 </div>
               </div>
 
@@ -3161,7 +3161,7 @@ function renderEditDoctorModal() {
   const d = state.editingDoctor;
   return `
     <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
-      <div class="bg-slate-900 border border-indigo-500/50 w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[92dvh] overflow-y-auto custom-scrollbar">
+      <div class="bg-slate-900 border border-indigo-500/50 w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[92vh] overflow-y-auto custom-scrollbar">
         <button onclick="closeEditDoctorModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center absolute top-5 left-5 transition-all cursor-pointer border border-slate-700">✕</button>
 
         <div class="flex items-center gap-3 border-b border-slate-800 pb-4 mb-5">
@@ -3477,7 +3477,7 @@ function renderMyAppointmentsModal() {
 
   return `
     <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[88dvh] overflow-y-auto custom-scrollbar">
+      <div class="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative text-right max-h-[85vh] overflow-y-auto custom-scrollbar">
         <button onclick="closeMyAppointmentsModal()" class="absolute top-5 left-5 text-slate-400 hover:text-white text-lg">✕</button>
         <h3 class="text-lg font-black text-white mb-2">نوبت‌های رزرو شده من</h3>
         <p class="text-xs text-slate-400 mb-6">لیست نوبت‌های فعال در بیمارستان</p>

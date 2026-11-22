@@ -107,16 +107,6 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
     }
   }, [messages, isAiThinking, isOpen]);
 
-  // Lock body scroll on mobile when chat is open
-  useEffect(() => {
-    if (!isOpen) return;
-    const orig = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = orig;
-    };
-  }, [isOpen]);
-
   // Sync with DB and listen for Admin replies
   useEffect(() => {
     let unsubscribeChat: (() => void) | null = null;
@@ -714,7 +704,7 @@ export const LiveChatWidget: React.FC<{ currentUser: UserType | null }> = ({ cur
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSend();
                 }}
-                className="w-full bg-transparent py-2.5 px-3.5 text-base sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none text-right font-medium"
+                className="w-full bg-transparent py-2.5 px-3.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none text-right font-medium"
               />
             </div>
 

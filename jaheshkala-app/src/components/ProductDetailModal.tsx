@@ -54,15 +54,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   useEffect(() => {
     if (!product) return;
-    const orig = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = orig;
-    };
-  }, [product]);
-
-  useEffect(() => {
-    if (!product) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
@@ -126,7 +117,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         }
       }}
     >
-      <div className="relative w-full max-w-4xl bg-[#110b28] border border-purple-800/70 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-8 max-h-[92dvh] flex flex-col">
+      <div className="relative w-full max-w-4xl bg-[#110b28] border border-purple-800/70 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-8 max-h-[92vh] flex flex-col">
         
         {/* Modal Top Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-purple-900/50 bg-[#150d32]">
@@ -344,7 +335,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     placeholder="example.ir"
                     value={preferredDomain}
                     onChange={(e) => setPreferredDomain(e.target.value)}
-                    className="w-full bg-black/50 border border-purple-800 rounded-xl px-3 py-2 text-base sm:text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    className="w-full bg-black/50 border border-purple-800 rounded-xl px-3 py-2 text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400"
                   />
                 </div>
               )}
@@ -644,7 +635,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         </div>
 
         {/* Modal Bottom Footer with Price & Add to Cart */}
-        <div className="px-3.5 sm:px-6 py-3 sm:py-4 bg-white dark:bg-[#140d30] border-t border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 shadow-lg">
+        <div className="px-6 py-4 bg-white dark:bg-[#140d30] border-t border-purple-200 dark:border-purple-900/50 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
             <div className="text-right">
               <span className="text-xs text-slate-500 dark:text-slate-400 block font-medium">

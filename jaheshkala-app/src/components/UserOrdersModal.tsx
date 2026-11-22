@@ -67,16 +67,6 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
     }
   });
 
-  // Body scroll lock on open
-  useEffect(() => {
-    if (!isOpen) return;
-    const orig = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = orig;
-    };
-  }, [isOpen]);
-
   // Keep internal list in sync with parent orders
   useEffect(() => {
     setCurrentOrders(initialOrders);
@@ -290,8 +280,8 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-3xl bg-white dark:bg-[#110b27] border border-slate-200 dark:border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-3 sm:my-6 max-h-[90dvh] sm:max-h-[88vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+      <div className="relative w-full max-w-3xl bg-white dark:bg-[#110b27] border border-slate-200 dark:border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-6 max-h-[88vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-purple-900/50 bg-slate-50 dark:bg-[#160d33]">
           <div className="flex items-center gap-2.5">
@@ -337,7 +327,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
               } catch {}
             }}
             placeholder="جستجوی سفارش با شماره موبایل، نام یا کد رهگیری (مثلاً 09881234345)..."
-            className="w-full bg-transparent text-base sm:text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
+            className="w-full bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
           />
           {manualPhoneSearch && (
             <button

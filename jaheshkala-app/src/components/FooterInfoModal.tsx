@@ -28,16 +28,6 @@ export const FooterInfoModal: React.FC<FooterInfoModalProps> = ({
     }
   }, [initialTopicId, isOpen]);
 
-  // Body scroll lock on open
-  useEffect(() => {
-    if (!isOpen) return;
-    const orig = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = orig;
-    };
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
   const currentTopic = FOOTER_TOPICS.find((t) => t.id === selectedTopicId) || FOOTER_TOPICS[0];
@@ -53,7 +43,7 @@ export const FooterInfoModal: React.FC<FooterInfoModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
-      <div className="relative w-full max-w-5xl bg-white dark:bg-[#110b2a] border border-purple-200 dark:border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-4 max-h-[90dvh] sm:max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-5xl bg-white dark:bg-[#110b2a] border border-purple-200 dark:border-purple-800/80 rounded-3xl shadow-2xl overflow-hidden my-4 max-h-[90vh] flex flex-col">
         
         {/* Modal Top Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-purple-200 dark:border-purple-900/60 bg-purple-50 dark:bg-[#160d36]">
