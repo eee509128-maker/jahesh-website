@@ -2534,7 +2534,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div className="max-w-[280px] font-medium text-xs space-y-1">
                               {(order.items || []).map((i, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-white font-bold">{i.product.title}</span>
+                                  <span className="text-white font-bold">{i.product?.title || 'محصول ثبت‌شده'}</span>
                                   {i.selectedPlan && (
                                     <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40 shadow-xs">
                                       تعرفه: {i.selectedPlan.name}
@@ -8864,8 +8864,10 @@ on public.users for delete using (true);`;
                       const cleanItemTitle = item.product?.title?.trim().toLowerCase();
                       const live = products?.find(
                         (p) =>
-                          (p.id && item.product?.id && p.id === item.product.id) ||
-                          (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
+                          p && (
+                            (p.id && item.product?.id && p.id === item.product.id) ||
+                            (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
+                          )
                       );
                       const prodImg = live?.image || item.product?.image;
                       const unitPrice = item.selectedPlan?.price !== undefined
@@ -9679,7 +9681,7 @@ on public.users for delete using (true);`;
                           کاربر: <strong className="text-white">{grantSelectedUser.fullName || grantSelectedUser.username}</strong> ({grantSelectedUser.phone})
                         </div>
                         <div>
-                          محصول: <strong className="text-amber-300">{grantSelectedProduct.title}</strong>
+                          محصول: <strong className="text-amber-300">{grantSelectedProduct?.title || 'محصول'}</strong>
                         </div>
                         <div>
                           مدت اعتبار: <strong className="text-white font-mono">{safeDays === 1 ? '۲۴ ساعت کامل (۱ روز)' : `${safeDays} روز`}</strong>
@@ -9764,7 +9766,7 @@ on public.users for delete using (true);`;
                 <div className="bg-black/40 p-3 rounded-2xl border border-purple-800/50 flex items-center justify-between">
                   <div>
                     <span className="text-[10px] text-slate-400 block font-bold">محصول اختصاص‌یافته:</span>
-                    <span className="font-bold text-amber-300 text-xs sm:text-sm">{grantSuccessDialog.product.title}</span>
+                    <span className="font-bold text-amber-300 text-xs sm:text-sm">{grantSuccessDialog.product?.title || 'محصول'}</span>
                   </div>
                   <div className="text-left">
                     <span className="text-[10px] text-slate-400 block font-bold">مدت زمان اعتبار:</span>
@@ -9880,14 +9882,14 @@ on public.users for delete using (true);`;
                 {/* Download URL button */}
                 {(grantSuccessDialog.license?.downloadUrl || grantSuccessDialog.product.downloadUrl || (grantSuccessDialog.product as any)?.appDownloadUrl) && (
                   <a
-                    href={grantSuccessDialog.license?.downloadUrl || grantSuccessDialog.product.downloadUrl || (grantSuccessDialog.product as any)?.appDownloadUrl}
+                    href={grantSuccessDialog.license?.downloadUrl || grantSuccessDialog.product?.downloadUrl || (grantSuccessDialog.product as any)?.appDownloadUrl}
                     download
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer no-underline"
                   >
                     <Download className="w-4 h-4" />
-                    <span>دانلود فایل نصبی اپلیکیشن ({grantSuccessDialog.product.title})</span>
+                    <span>دانلود فایل نصبی اپلیکیشن ({grantSuccessDialog.product?.title || 'اپلیکیشن'})</span>
                   </a>
                 )}
 

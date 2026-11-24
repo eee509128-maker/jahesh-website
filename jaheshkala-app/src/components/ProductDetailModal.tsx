@@ -65,7 +65,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!product) return null;
 
-  const rawDownloadUrl = product.downloadUrl || (product as any).appDownloadUrl || (product.id === 'prod-1790538341809' || product.title?.includes('شنتیا') ? '/uploads/apps/shantia.apk' : undefined);
+  const safeTitle = product.title || 'محصول جهش‌کالا';
+  const safeCategory = product.category || 'کالای دیجیتال';
+
+  const rawDownloadUrl = product.downloadUrl || (product as any).appDownloadUrl || (product.id === 'prod-1790538341809' || safeTitle.includes('شنتیا') ? '/uploads/apps/shantia.apk' : undefined);
   const effectiveDownloadUrl = rawDownloadUrl
     ? (rawDownloadUrl.startsWith('http://') || rawDownloadUrl.startsWith('https://') || rawDownloadUrl.startsWith('/')
         ? rawDownloadUrl

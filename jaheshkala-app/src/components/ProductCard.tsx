@@ -16,6 +16,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onInstantBuy,
   onViewDetails,
 }) => {
+  if (!product) return null;
+
+  const safeTitle = product.title || 'محصول جهش‌کالا';
+  const safeCategory = product.category || 'کالای دیجیتال';
   const distinctGallery = (product.gallery || []).filter(
     (g) => g && typeof g === 'string' && g.trim() !== '' && g.trim() !== product.image
   );
@@ -26,7 +30,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <div
-      id={`product-card-${product.id}`}
+      id={`product-card-${product.id || 'default'}`}
       className="group rounded-2xl overflow-hidden bg-white dark:bg-[#130d2a] border border-purple-200 dark:border-purple-900/40 hover:border-purple-400 dark:hover:border-purple-600/70 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col justify-between p-2.5 sm:p-3.5 h-full w-full select-none"
     >
       {/* Top Image area with badges */}
@@ -37,9 +41,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {displayImage ? (
           <img
             src={displayImage}
-            alt={product.title}
+            alt={safeTitle}
             onError={(e) => {
-              (e.target as HTMLImageElement).src = getFallbackProductImage(product.title, product.category);
+              (e.target as HTMLImageElement).src = getFallbackProductImage(safeTitle, safeCategory);
             }}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
@@ -47,7 +51,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-gradient-to-br from-purple-950/40 via-purple-900/20 to-indigo-950/40 border border-purple-500/20">
             <Package className="w-9 h-9 text-purple-400/60 mb-1" />
-            <span className="text-[11px] font-bold text-purple-300/80 line-clamp-1">{product.category}</span>
+            <span className="text-[11px] font-bold text-purple-300/80 line-clamp-1">{safeCategory}</span>
             <span className="text-[9px] text-slate-400 mt-0.5">جهش‌کالا</span>
           </div>
         )}
@@ -55,7 +59,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Digikala-style Top Badges */}
         <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 flex flex-col gap-1 items-start z-10">
-          {(product.downloadUrl || (product as any).appDownloadUrl || (product.id === 'prod-1790538341809' || product.title?.includes('شنتیا'))) && (
+          {(product.downloadUrl || (product as any).appDownloadUrl || (product.id === 'prod-1790538341809' || safeTitle.includes('شنتیا'))) && (
             <span className="text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 flex items-center gap-1 shadow-md">
               <Download className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
               <span>دانلود اپلیکیشن</span>
@@ -115,9 +119,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <h4
             onClick={() => onViewDetails(product)}
             className="text-xs sm:text-sm font-bold sm:font-black text-slate-900 dark:text-white hover:text-purple-700 dark:hover:text-amber-300 transition-colors cursor-pointer line-clamp-2 leading-snug w-full"
-            title={product.title}
+            title={safeTitle}
           >
-            {product.title}
+            {safeTitle}
           </h4>
         </div>
 

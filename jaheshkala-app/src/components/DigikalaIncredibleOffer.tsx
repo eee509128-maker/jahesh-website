@@ -236,9 +236,9 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
             <div className="sm:col-span-4 relative rounded-xl overflow-hidden bg-purple-950/40 border border-purple-800/40 h-48 sm:h-60">
               <img
                 src={activeProduct.image}
-                alt={activeProduct.title}
+                alt={activeProduct.title || 'پیشنهاد شگفت‌انگیز'}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = getFallbackProductImage(activeProduct.title, activeProduct.category);
+                  (e.target as HTMLImageElement).src = getFallbackProductImage(activeProduct.title || '', activeProduct.category || '');
                 }}
                 className="w-full h-full object-cover"
               />
@@ -256,7 +256,7 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
               
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded-md font-medium">
-                  {activeProduct.category}
+                  {activeProduct.category || 'کالای دیجیتال'}
                 </span>
                 {activeProduct.brand && (
                   <span className="text-slate-400">برند: <strong className="text-white">{activeProduct.brand}</strong></span>
@@ -264,7 +264,7 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
                 <span className="text-slate-500">•</span>
                 <span className="flex items-center gap-1 text-amber-400 font-bold">
                   <Star className="w-3.5 h-3.5 fill-amber-400" />
-                  {activeProduct.rating}
+                  {activeProduct.rating ?? 5}
                 </span>
               </div>
 
@@ -272,7 +272,7 @@ export const DigikalaIncredibleOffer: React.FC<DigikalaIncredibleOfferProps> = (
                 onClick={() => onViewDetails(activeProduct)}
                 className="text-base sm:text-lg font-black text-white hover:text-amber-300 cursor-pointer transition-colors leading-snug"
               >
-                {activeProduct.title}
+                {activeProduct.title || 'پیشنهاد شگفت‌انگیز'}
               </h4>
 
               <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">

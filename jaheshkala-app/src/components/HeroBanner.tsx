@@ -23,9 +23,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
       {/* Ambient background glows */}
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none -z-0"></div>
       <div className="absolute top-12 left-1/4 w-80 h-80 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none -z-0"></div>
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        
+
         {/* Top Announcement Chip */}
         <div className="flex justify-center mb-6">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-950/80 border border-purple-600/40 text-purple-200 text-xs shadow-inner">
@@ -46,7 +46,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
           </h1>
 
           <p className="text-slate-300 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-8">
-            سامانه تخصصی فروش پکیج‌های توسعه وب، سئو و هوش مصنوعی تیم مهندسی انجمن علمی جهش. 
+            سامانه تخصصی فروش پکیج‌های توسعه وب، سئو و هوش مصنوعی تیم مهندسی انجمن علمی جهش.
             تحویل سریع ۵ روزه، اتصال به درگاه زیبال و تضمین رشد واقعی کسب‌وکار شما.
           </p>
 
@@ -119,11 +119,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
           <div className="flex items-center justify-center flex-wrap gap-2 pt-2">
             <button
               onClick={() => onSelectCategory('همه')}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                selectedCategory === 'همه'
-                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50 border border-purple-400/50'
-                  : 'bg-[#140e2b] text-slate-300 hover:bg-purple-950/60 border border-purple-900/40'
-              }`}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${selectedCategory === 'همه'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50 border border-purple-400/50'
+                : 'bg-[#140e2b] text-slate-300 hover:bg-purple-950/60 border border-purple-900/40'
+                }`}
             >
               همه خدمات جهش
             </button>
@@ -131,11 +130,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
               <button
                 key={category}
                 onClick={() => onSelectCategory(category)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  selectedCategory === category
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50 border border-purple-400/50'
-                    : 'bg-[#140e2b] text-slate-300 hover:bg-purple-950/60 border border-purple-900/40'
-                }`}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${selectedCategory === category
+                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50 border border-purple-400/50'
+                  : 'bg-[#140e2b] text-slate-300 hover:bg-purple-950/60 border border-purple-900/40'
+                  }`}
               >
                 {category}
               </button>

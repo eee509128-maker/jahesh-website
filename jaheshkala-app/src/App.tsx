@@ -217,11 +217,16 @@ export default function App() {
         if (Array.isArray(parsed)) {
           return parsed
             .filter((item) => item && item.product && typeof item.product === 'object')
-            .map((item) => ({
-              ...item,
-              product: sanitizeProduct(item.product),
-              quantity: typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1,
-            }));
+            .map((item) => {
+              const cleanedProduct = sanitizeProduct(item.product);
+              if (!cleanedProduct) return null;
+              return {
+                ...item,
+                product: cleanedProduct,
+                quantity: typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1,
+              };
+            })
+            .filter((item): item is CartItem => item !== null && Boolean(item.product));
         }
       }
       return [];
@@ -1588,7 +1593,7 @@ export default function App() {
 
   // Banner-to-product direct linking: Opens product modal and scrolls to view
   const handleBannerSelectProduct = (productId: string) => {
-    const prod = products.find((p) => p.id === productId || p.title === productId);
+    const prod = products.find((p) => p && (p.id === productId || p.title === productId));
     if (prod) {
       setSelectedCategory('');
       setSearchQuery('');
@@ -1600,25 +1605,27 @@ export default function App() {
   };
 
   // Dynamically resolve product details (e.g. edited price, title, image) inside the cart
-  const resolvedCartItems = cartItems.map((item) => {
-    const latestProd = products.find((p) => p.id === item.product?.id);
-    if (latestProd) {
-      const isSub = latestProd.isSubscription || latestProd.id === 'pkg-amlak-jahesh' || latestProd.category === 'اشتراک نرم‌افزار';
-      const days = item.subscriptionDays || item.product?.subscriptionDays || 1;
-      const price = isSub ? (latestProd.pricePerDay || 250000) * days : latestProd.price;
-      return {
-        ...item,
-        subscriptionDays: isSub ? days : undefined,
-        product: {
-          ...item.product,
-          ...latestProd, // override with the latest details including updated price
-          price,
+  const resolvedCartItems = cartItems
+    .filter((item) => item && item.product)
+    .map((item) => {
+      const latestProd = products.find((p) => p && p.id === item.product?.id);
+      if (latestProd) {
+        const isSub = latestProd.isSubscription || latestProd.id === 'pkg-amlak-jahesh' || latestProd.category === 'اشتراک نرم‌افزار';
+        const days = item.subscriptionDays || item.product?.subscriptionDays || 1;
+        const price = isSub ? (latestProd.pricePerDay || 250000) * days : latestProd.price;
+        return {
+          ...item,
           subscriptionDays: isSub ? days : undefined,
-        },
-      };
-    }
-    return item;
-  });
+          product: {
+            ...item.product,
+            ...latestProd, // override with the latest details including updated price
+            price,
+            subscriptionDays: isSub ? days : undefined,
+          },
+        };
+      }
+      return item;
+    });
 
   return (
     <div className={`min-h-screen flex flex-col font-['Vazirmatn',sans-serif] transition-colors duration-200 ${theme === 'light' ? 'theme-light bg-[#fbf9ff] text-slate-800' : 'theme-dark bg-[#0b0819] text-slate-100'}`}>

@@ -136,7 +136,7 @@ export const CartModal: React.FC<CartModalProps> = ({
         discountAmount: calcDiscount,
       });
       setCouponSuccess(
-        `کد تخفیف اختصاصی محصول «${matchedProductItem.product.title}» با ${discountPercent}% تخفیف اعمال شد!`
+        `کد تخفیف اختصاصی محصول «${matchedProductItem.product?.title || 'محصول'}» با ${discountPercent}% تخفیف اعمال شد!`
       );
       return;
     }

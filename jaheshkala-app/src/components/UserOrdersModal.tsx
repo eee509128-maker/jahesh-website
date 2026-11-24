@@ -268,13 +268,15 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
     return 1; // در حال بررسی
   };
 
-  const getResolvedProduct = (itemProduct: Product) => {
-    if (!itemProduct) return itemProduct;
+  const getResolvedProduct = (itemProduct?: Product | null) => {
+    if (!itemProduct) return null;
     const cleanItemTitle = itemProduct.title?.trim().toLowerCase();
     const live = (products || []).find(
       (p) =>
-        (p.id && itemProduct.id && p.id === itemProduct.id) ||
-        (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
+        p && (
+          (p.id && itemProduct.id && p.id === itemProduct.id) ||
+          (cleanItemTitle && p.title && p.title.trim().toLowerCase() === cleanItemTitle)
+        )
     );
     return live ? { ...itemProduct, ...live } : itemProduct;
   };
@@ -498,8 +500,13 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                   {/* Items in order */}
                   <div className="space-y-2">
                     {(order.items || []).map((item, idx) => {
-                      const prod = getResolvedProduct(item.product);
+                      const prod = getResolvedProduct(item.product) || item.product || null;
+                      const prodTitle = prod?.title || 'محصول جهش‌کالا';
                       const prodImg = prod?.image || item.product?.image;
+                      const prodCategory = prod?.category || '';
+                      const unitPrice = item.selectedPlan?.price !== undefined
+                        ? Number(item.selectedPlan.price)
+                        : (Number(prod?.price) || 0);
 
                       return (
                         <div
@@ -511,7 +518,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                               {prodImg ? (
                                 <img
                                   src={prodImg}
-                                  alt={prod.title}
+                                  alt={prodTitle}
                                   className="w-full h-full object-contain"
                                 />
                               ) : (
@@ -520,7 +527,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                             </div>
                             <div className="space-y-0.5">
                               <span className="text-slate-900 dark:text-white font-bold text-xs sm:text-sm block line-clamp-1">
-                                {prod.title}
+                                {prodTitle}
                                 {item.selectedPlan ? ` (${item.selectedPlan.name})` : ''}
                               </span>
                               <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
@@ -530,17 +537,17 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                                     <span>•</span>
                                     <span className="text-amber-700 dark:text-amber-300 font-bold">تعرفه {item.selectedPlan.name}</span>
                                   </>
-                                ) : prod.category ? (
+                                ) : prodCategory ? (
                                   <>
                                     <span>•</span>
-                                    <span className="text-purple-700 dark:text-purple-400 font-bold">{prod.category}</span>
+                                    <span className="text-purple-700 dark:text-purple-400 font-bold">{prodCategory}</span>
                                   </>
                                 ) : null}
                               </div>
                             </div>
                           </div>
                           <span className="text-purple-900 dark:text-amber-300 font-black text-xs sm:text-sm shrink-0">
-                            {formatPrice((item.selectedPlan?.price !== undefined ? item.selectedPlan.price : prod.price) * item.quantity)}
+                            {formatPrice(unitPrice * (item.quantity || 1))}
                           </span>
                         </div>
                       );
@@ -870,8 +877,12 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
               <span className="text-xs font-bold text-purple-800 dark:text-purple-300 block">اقلام فاکتور:</span>
               <div className="max-h-48 overflow-y-auto space-y-1.5 text-xs">
                 {(invoiceOrder.items || []).map((item, idx) => {
-                  const prod = getResolvedProduct(item.product);
+                  const prod = getResolvedProduct(item.product) || item.product || null;
+                  const prodTitle = prod?.title || 'محصول جهش‌کالا';
                   const prodImg = prod?.image || item.product?.image;
+                  const unitPrice = item.selectedPlan?.price !== undefined
+                    ? Number(item.selectedPlan.price)
+                    : (Number(prod?.price) || 0);
 
                   return (
                     <div
@@ -881,14 +892,14 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-lg bg-white dark:bg-black/60 border border-slate-200 dark:border-purple-800/50 overflow-hidden flex items-center justify-center shrink-0 p-0.5">
                           {prodImg ? (
-                            <img src={prodImg} alt={prod.title} className="w-full h-full object-contain" />
+                            <img src={prodImg} alt={prodTitle} className="w-full h-full object-contain" />
                           ) : (
                             <Package className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                           )}
                         </div>
                         <div className="text-right">
                           <span className="font-bold text-slate-900 dark:text-white block text-xs">
-                            {prod.title}
+                            {prodTitle}
                           </span>
                           <span className="text-[10px] text-slate-500 dark:text-slate-400">
                             تعداد: {item.quantity} عدد
@@ -896,7 +907,7 @@ export const UserOrdersModal: React.FC<UserOrdersModalProps> = ({
                         </div>
                       </div>
                       <span className="font-bold text-purple-900 dark:text-amber-300 text-xs">
-                        {formatPrice(prod.price * item.quantity)}
+                        {formatPrice(unitPrice * (item.quantity || 1))}
                       </span>
                     </div>
                   );

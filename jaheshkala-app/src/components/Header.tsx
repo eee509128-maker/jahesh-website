@@ -26,7 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-[#0f0c20]/95 backdrop-blur-md border-b border-purple-900/40">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        
+
         {/* Brand Logo & Name */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-purple-600/20">
@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Buttons: Cart & Auth */}
         <div className="flex items-center gap-3">
-          
+
           {/* Cart Button */}
           <button
             id="header-cart-btn"

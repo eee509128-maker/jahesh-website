@@ -376,18 +376,20 @@ export function cleanProductItem(p: any): Product | null {
 // Function to sort products by displayOrder / displayRank ascending
 export const sortProductsByRank = (productsList: Product[]): Product[] => {
   if (!Array.isArray(productsList)) return [];
-  return [...productsList].sort((a, b) => {
-    const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
-    const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
-    if (orderA !== orderB) {
-      return orderA - orderB;
-    }
-    // If rank is identical or default, sort golden items first
-    if (Boolean(a.isGolden) !== Boolean(b.isGolden)) {
-      return a.isGolden ? -1 : 1;
-    }
-    return 0;
-  });
+  return [...productsList]
+    .filter((p): p is Product => Boolean(p && typeof p === 'object'))
+    .sort((a, b) => {
+      const orderA = typeof a.displayOrder === 'number' ? a.displayOrder : (typeof a.displayRank === 'number' ? a.displayRank : 9999);
+      const orderB = typeof b.displayOrder === 'number' ? b.displayOrder : (typeof b.displayRank === 'number' ? b.displayRank : 9999);
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      // If rank is identical or default, sort golden items first
+      if (Boolean(a.isGolden) !== Boolean(b.isGolden)) {
+        return a.isGolden ? -1 : 1;
+      }
+      return 0;
+    });
 };
 
 // BroadcastChannel for instant (0ms) cross-tab product synchronization

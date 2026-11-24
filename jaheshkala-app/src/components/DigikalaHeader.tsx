@@ -112,17 +112,18 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
     return '💼';
   };
 
-  const guildCategories = IRANIAN_GUILDS.map((g) => ({
-    title: g.shortName,
-    fullName: g.name,
-    icon: getGuildEmoji(g.shortName),
-    desc: g.description,
-    value: g.shortName,
+  const guildCategories = (IRANIAN_GUILDS || []).filter(Boolean).map((g) => ({
+    title: g.shortName || '',
+    fullName: g.name || '',
+    icon: getGuildEmoji(g.shortName || ''),
+    desc: g.description || '',
+    value: g.shortName || '',
     keywords: g.suggestedKeywords || [],
   }));
 
-  const dynamicCategories = productCategories
-    .filter((catName) => !guildCategories.some((g) => g.value === catName || g.title === catName))
+  const dynamicCategories = (productCategories || [])
+    .filter(Boolean)
+    .filter((catName) => !guildCategories.some((g) => g && (g.value === catName || g.title === catName)))
     .map((catName) => ({
       title: catName,
       fullName: catName,
@@ -136,16 +137,16 @@ export const DigikalaHeader: React.FC<DigikalaHeaderProps> = ({
     ...baseCategories.map((b) => ({ ...b, fullName: b.title, keywords: [] })),
     ...guildCategories,
     ...dynamicCategories,
-  ];
+  ].filter((c) => Boolean(c && c.title));
 
   const filteredCategories = allCategories.filter((cat) => {
     if (!headerGuildSearch.trim()) return true;
     const q = headerGuildSearch.trim().toLowerCase();
     return (
-      cat.title.toLowerCase().includes(q) ||
-      cat.fullName.toLowerCase().includes(q) ||
-      cat.desc.toLowerCase().includes(q) ||
-      (cat.keywords && cat.keywords.some((k: string) => k.toLowerCase().includes(q)))
+      (cat?.title && cat.title.toLowerCase().includes(q)) ||
+      (cat?.fullName && cat.fullName.toLowerCase().includes(q)) ||
+      (cat?.desc && cat.desc.toLowerCase().includes(q)) ||
+      (cat?.keywords && cat.keywords.some((k: string) => k && k.toLowerCase().includes(q)))
     );
   });
 

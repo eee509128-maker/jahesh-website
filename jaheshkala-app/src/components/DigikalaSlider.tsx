@@ -117,7 +117,8 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
     >
       {/* Aspect Ratio Container: True 21/9 horizontal banner identically matching across Mobile, Tablet, and Desktop */}
       <div className="relative w-full aspect-[21/9] overflow-hidden">
-        {slides.map((slide, index) => {
+        {slides.filter(Boolean).map((slide, index) => {
+          if (!slide) return null;
           const isActive = index === currentSlide;
           const BadgeIcon = getBadgeIcon(slide.badge || '');
 
@@ -146,7 +147,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
               {/* Full Banner Image respecting chosen Fit Mode */}
               <img
                 src={slide.image}
-                alt={slide.title}
+                alt={slide.title || 'بنر جهش‌کالا'}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
                     'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1600&q=80';
@@ -230,7 +231,7 @@ export const DigikalaSlider: React.FC<DigikalaSliderProps> = ({
                         style={{ color: slide.titleColor || '#ffffff' }}
                       >
                         {renderFormattedBannerTitle(
-                          slide.title,
+                          slide.title || '',
                           slide.highlightText,
                           slide.highlightColor,
                           slide.titleColor
