@@ -82,7 +82,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onToggleCoupon,
   zibalMerchant,
   onUpdateZibalMerchant,
-  usersList = [],
+  usersList: initialUsersListProp = [],
   onDeleteUser,
   onUpdateUser,
   onAddNewUser,
@@ -95,6 +95,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onGrantUserLicense,
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'new-product' | 'banners' | 'coupons' | 'payment-links' | 'integrations' | 'users' | 'chats' | 'dashboard-tools' | 'backup-restore'>('orders');
+
+  // Dedicated Users State for instant reactive multi-device synchronization
+  const [usersList, setUsersList] = useState<User[]>(initialUsersListProp || []);
+
+  React.useEffect(() => {
+    if (initialUsersListProp && initialUsersListProp.length > 0) {
+      setUsersList(initialUsersListProp);
+    }
+  }, [initialUsersListProp]);
 
   // ==========================================
   // AI Smart Payment Landings & Custom Gateways State
@@ -481,6 +490,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
 
   const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
+  const [isRefreshingChats, setIsRefreshingChats] = useState(false);
 
   const handleRefreshUsersList = async () => {
     setIsRefreshingUsers(true);
@@ -488,6 +498,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const { fetchAllUsersFromDb } = await import('../lib/dbService');
       const fresh = await fetchAllUsersFromDb();
       if (fresh && Array.isArray(fresh)) {
+        setUsersList(fresh);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: fresh }));
         }
@@ -505,9 +516,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleRefreshChats = async () => {
+    setIsRefreshingChats(true);
+    try {
+      const data = await fetchChatsFromDb();
+      if (data && Array.isArray(data) && data.length > 0) {
+        setChats(data);
+        setUserActionMessage(`چت‌های پشتیبانی با موفقیت همگام‌سازی شد (${data.length} گفتگو)`);
+      }
+    } catch (err) {
+      console.warn('Error refreshing chats:', err);
+    } finally {
+      setTimeout(() => {
+        setIsRefreshingChats(false);
+      }, 500);
+      setTimeout(() => {
+        setUserActionMessage('');
+      }, 4000);
+    }
+  };
+
   React.useEffect(() => {
-    if (isOpen && activeTab === 'users') {
-      handleRefreshUsersList();
+    if (isOpen) {
+      if (activeTab === 'users') {
+        handleRefreshUsersList();
+      } else if (activeTab === 'chats') {
+        handleRefreshChats();
+      }
     }
   }, [isOpen, activeTab]);
 
@@ -965,14 +1000,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       loadBanners();
       loadTools();
 
-      // Real-time Firestore Chat Sync: instantly receives messages & human escalation
+      // Real-time Cloud Chat Sync: instantly receives messages & human escalation
       const unsubscribeChats = subscribeToChatsFromDb((liveChats) => {
-        setChats(liveChats);
-        setSelectedChat((currentSelected) => {
-          if (!currentSelected) return currentSelected;
-          const fresh = liveChats.find((c) => c.userId === currentSelected.userId);
-          return fresh || currentSelected;
-        });
+        if (liveChats && Array.isArray(liveChats) && liveChats.length > 0) {
+          setChats(liveChats);
+          setSelectedChat((currentSelected) => {
+            if (!currentSelected) return currentSelected;
+            const fresh = liveChats.find((c) => c.userId === currentSelected.userId);
+            return fresh || currentSelected;
+          });
+        }
       });
 
       const handleChatsUpdated = () => {
@@ -1674,6 +1711,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newProductCouponPercent, setNewProductCouponPercent] = useState('');
 
   const [formSuccess, setFormSuccess] = useState('');
+  const [formError, setFormError] = useState('');
 
   // Image Upload Handlers
   const handleMainImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1846,6 +1884,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewProductCouponPercent('');
     setNewDisplayOrder('');
     setFormSuccess('');
+    setFormError('');
     setActiveTab('new-product');
   };
 
@@ -1931,6 +1970,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewProductCouponCode(prod.couponCode || '');
     setNewProductCouponPercent(prod.couponDiscountPercent ? prod.couponDiscountPercent.toString() : '');
     setFormSuccess('');
+    setFormError('');
     setActiveTab('new-product');
   };
 
@@ -1973,7 +2013,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim() || !newPrice.trim()) return;
+    if (!newTitle.trim()) {
+      setFormError('لطفاً عنوان کالا یا محصول را وارد نمایید.');
+      return;
+    }
+    if (!newPrice.trim()) {
+      setFormError('لطفاً قیمت کالا یا محصول را وارد نمایید.');
+      return;
+    }
+    setFormError('');
 
     const finalCategory = isCustomCategory
       ? (customCategoryName.trim() || 'عمومی')
@@ -3396,9 +3444,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 )}
               </div>
 
+              {formError && (
+                <div className="p-3.5 rounded-2xl bg-rose-950/60 border border-rose-500/60 text-xs text-rose-300 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               {formSuccess && (
                 <div className="p-3.5 rounded-2xl bg-emerald-950/50 border border-emerald-500/50 text-xs text-emerald-300 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>{formSuccess}</span>
                 </div>
               )}
@@ -3425,11 +3480,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
-                      placeholder="مثلاً: prod-1790538341809 یا booksender یا pkg-amlak-jahesh"
+                      placeholder="مثلاً: prod-1790538341809 یا booksender یا pkg-amlak-jahesh (اختیاری - خودکار ساخته می‌شود)"
                       value={customProductId}
                       onChange={(e) => setCustomProductId(e.target.value)}
                       className="w-full bg-black/60 border border-amber-500/60 rounded-xl px-3.5 py-2 text-xs text-amber-200 font-mono focus:border-amber-400 focus:outline-none"
-                      required
                     />
                   </div>
 
@@ -8014,15 +8068,32 @@ on public.users for delete using (true);`;
             <div className="flex h-[500px] gap-4 bg-[#130b2e] rounded-2xl border border-purple-900/40 p-4 overflow-hidden">
               {/* Chat List */}
               <div className="w-1/3 border-l border-purple-900/50 pl-4 flex flex-col h-full overflow-hidden">
-                <h3 className="text-sm font-bold text-white mb-4">گفتگوها</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white">گفتگوها</h3>
+                    <span className="text-[10px] bg-purple-900/80 text-purple-200 px-2 py-0.5 rounded-full font-mono">
+                      {chats.length}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRefreshChats}
+                    disabled={isRefreshingChats}
+                    className="flex items-center gap-1 bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-[10px] px-2.5 py-1 rounded-xl border border-purple-700/50 transition-all cursor-pointer disabled:opacity-50"
+                    title="بروزرسانی زنده چت‌ها از سرور و پایگاه ابری"
+                  >
+                    <RefreshCw className={`w-3 h-3 text-purple-300 ${isRefreshingChats ? 'animate-spin' : ''}`} />
+                    <span>{isRefreshingChats ? 'در حال دریافت...' : 'بروزرسانی'}</span>
+                  </button>
+                </div>
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                   {[...chats].sort((a, b) => {
                     // Highest priority: chats needing human support
                     if (a.needsHumanSupport !== b.needsHumanSupport) return a.needsHumanSupport ? -1 : 1;
                     if (a.isReadByAdmin !== b.isReadByAdmin) return a.isReadByAdmin ? 1 : -1;
-                    return a.isReadByAdmin 
-                      ? new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime() // newest read first
-                      : new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime(); // oldest unread first
+                    const timeA = new Date(a.lastUpdated || 0).getTime();
+                    const timeB = new Date(b.lastUpdated || 0).getTime();
+                    return timeB - timeA;
                   }).map(chat => (
                     <button
                       key={chat.userId}

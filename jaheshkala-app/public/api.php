@@ -54,6 +54,56 @@ function writeJsonFile($filePath, $data) {
     return true;
 }
 
+// Helper: Auto-sync customer from order into users.json
+function syncCustomerFromOrder($order, $usersFile) {
+    if (!is_array($order)) return;
+    $custPhone = isset($order['customerPhone']) ? (string)$order['customerPhone'] : (isset($order['customer_phone']) ? (string)$order['customer_phone'] : '');
+    $custName  = isset($order['customerName']) ? (string)$order['customerName'] : (isset($order['customer_name']) ? (string)$order['customer_name'] : '');
+    $custUser  = isset($order['userId']) ? (string)$order['userId'] : (isset($order['user_id']) ? (string)$order['user_id'] : '');
+    $custEmail = isset($order['customerEmail']) ? (string)$order['customerEmail'] : (isset($order['customer_email']) ? (string)$order['customer_email'] : '');
+    $orderDate = isset($order['date']) ? (string)$order['date'] : (isset($order['createdAt']) ? (string)$order['createdAt'] : date('c'));
+
+    if (empty($custPhone) && empty($custName) && empty($custUser)) {
+        return;
+    }
+
+    $cleanPhone = preg_replace('/[^0-9]/', '', $custPhone);
+    $cleanUser = !empty($custUser) ? strtolower(trim($custUser, "@ \t\n\r\0\x0B")) : (!empty($cleanPhone) ? $cleanPhone : strtolower(trim($custName)));
+
+    $users = readJsonFile($usersFile, []);
+    $foundIdx = -1;
+    foreach ($users as $uIdx => $u) {
+        $uPhone = isset($u['phone']) ? preg_replace('/[^0-9]/', '', (string)$u['phone']) : '';
+        $uUname = isset($u['username']) ? strtolower(trim($u['username'], "@ \t\n\r\0\x0B")) : '';
+        $uId = isset($u['id']) ? (string)$u['id'] : '';
+        if ((!empty($cleanPhone) && strlen($cleanPhone) >= 10 && $uPhone === $cleanPhone) ||
+            (!empty($cleanUser) && $uUname === $cleanUser) ||
+            (!empty($custUser) && $uId === $custUser)) {
+            $foundIdx = $uIdx;
+            break;
+        }
+    }
+
+    $custRecord = [
+        'id' => !empty($custUser) ? $custUser : (!empty($cleanPhone) ? "usr-$cleanPhone" : "usr-" . time()),
+        'fullName' => !empty($custName) ? $custName : (!empty($custUser) ? $custUser : 'کاربر جهش‌کالا'),
+        'phone' => !empty($cleanPhone) ? $cleanPhone : '',
+        'email' => !empty($custEmail) ? $custEmail : '',
+        'username' => !empty($cleanUser) ? $cleanUser : (!empty($cleanPhone) ? $cleanPhone : 'user_' . time()),
+        'role' => 'user',
+        'guild' => 'طراحی سایت، وب، اپلیکیشن و فناوری',
+        'createdAt' => (strpos($orderDate, '۱۴۰') !== false) ? trim(explode('ساعت', $orderDate)[0]) : date('c'),
+        'timestamp' => time() * 1000
+    ];
+
+    if ($foundIdx >= 0) {
+        $users[$foundIdx] = array_merge($custRecord, $users[$foundIdx]);
+    } else {
+        array_unshift($users, $custRecord);
+    }
+    writeJsonFile($usersFile, $users);
+}
+
 // Parse input body
 $inputRaw = file_get_contents('php://input');
 $inputData = json_decode($inputRaw, true) ?: [];
@@ -382,6 +432,9 @@ switch ($action) {
                     }));
                     writeJsonFile($ordersFile, $orders);
 
+                // Auto-sync customer into users.json so every customer automatically appears in Admin Users List
+                syncCustomerFromOrder($incoming, $usersFile);
+
                     // Add to persistent tombstone blacklist
                     $deletedOrders = array_values(array_unique(array_merge($deletedOrders, $allKeys)));
                     writeJsonFile($deletedOrdersFile, $deletedOrders);
@@ -409,6 +462,9 @@ switch ($action) {
 
                 $orders = [];
                 writeJsonFile($ordersFile, $orders);
+
+                // Auto-sync customer into users.json so every customer automatically appears in Admin Users List
+                syncCustomerFromOrder($incoming, $usersFile);
                 echo json_encode(['success' => true, 'count' => 0, 'orders' => []]);
                 exit;
             }
@@ -445,6 +501,9 @@ switch ($action) {
                     }
 
                     writeJsonFile($ordersFile, $orders);
+
+                // Auto-sync customer into users.json so every customer automatically appears in Admin Users List
+                syncCustomerFromOrder($incoming, $usersFile);
                     echo json_encode(['success' => true, 'orderId' => $targetId, 'status' => $targetStatus, 'count' => count($orders), 'orders' => $orders]);
                     exit;
                 }
@@ -474,6 +533,9 @@ switch ($action) {
                     array_unshift($orders, $incoming);
                 }
                 writeJsonFile($ordersFile, $orders);
+
+                // Auto-sync customer into users.json so every customer automatically appears in Admin Users List
+                syncCustomerFromOrder($incoming, $usersFile);
 
                 // Auto-sync attached app/amlak license to app_licenses.json & licenses.json
                 $attachedLic = !empty($incoming['appLicense']) ? $incoming['appLicense'] : (!empty($incoming['amlakLicense']) ? $incoming['amlakLicense'] : null);

@@ -403,7 +403,29 @@ export const getProductsBroadcastChannel = (): BroadcastChannel | null => {
 };
 
 export const fetchProductsFromDb = async (): Promise<Product[]> => {
-  // 1. Direct Server API (/api/products & /jaheshkala/api/products) - FASTEST & MOST AUTHORITATIVE (< 15ms)
+  // 1. Supabase Cloud Database (Unblocked in Iran, live authoritative config)
+  try {
+    const { data: cloudRow, error } = await supabase
+      .from('chats')
+      .select('messages')
+      .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+      .maybeSingle();
+
+    if (!error && cloudRow && Array.isArray(cloudRow.messages) && cloudRow.messages.length > 0) {
+      const cleaned = cloudRow.messages
+        .map(cleanProductItem)
+        .filter((p): p is Product => p !== null);
+      if (cleaned.length > 0) {
+        const sorted = sortProductsByRank(cleaned);
+        safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+        return sorted;
+      }
+    }
+  } catch (err) {
+    console.warn('Supabase products fetch notice:', err);
+  }
+
+  // 2. Direct Server API (/api/products & /jaheshkala/api/products) - FASTEST & MOST AUTHORITATIVE (< 15ms)
   try {
     const res = await fetchUniversalApi(`products?_t=${Date.now()}`, { cache: 'no-store' });
     if (res && res.ok) {
@@ -424,7 +446,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     console.warn('Direct server fetch notice:', err);
   }
 
-  // 2. Firebase Cloud Firestore (Direct Cloud Sync)
+  // 3. Firebase Cloud Firestore (Direct Cloud Sync)
   try {
     const docSnap = await getDoc(doc(db, 'settings', 'products'));
     if (docSnap.exists()) {
@@ -444,7 +466,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     console.warn('Firestore products fetch notice:', err);
   }
 
-  // 3. Local Storage Cache (Instant offline fallback)
+  // 4. Local Storage Cache (Instant offline fallback)
   try {
     const rawLocal = localStorage.getItem('jahesh_products');
     if (rawLocal) {
@@ -460,7 +482,7 @@ export const fetchProductsFromDb = async (): Promise<Product[]> => {
     }
   } catch {}
 
-  // 4. Fallback to INITIAL_PRODUCTS (only here do we exclude deleted legacy demo templates)
+  // 5. Fallback to INITIAL_PRODUCTS (only here do we exclude deleted legacy demo templates)
   const deletedIdsList = await getDeletedProductIds();
   const deletedIds = new Set(deletedIdsList);
   const rawFallback = INITIAL_PRODUCTS
@@ -553,12 +575,44 @@ export const subscribeToProductsRealtime = (callback: (products: Product[]) => v
     console.warn('Firestore onSnapshot initialization notice:', fbErr);
   }
 
+  // 5. Supabase Realtime / Cross-Device Poller (High-speed sync across devices)
+  let supabaseInterval: any = null;
+  const pollSupabaseProducts = async () => {
+    if (isUnsubscribed) return;
+    try {
+      const { data: cloudRow } = await supabase
+        .from('chats')
+        .select('messages')
+        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+        .maybeSingle();
+
+      if (cloudRow && Array.isArray(cloudRow.messages) && cloudRow.messages.length > 0) {
+        const cleaned = cloudRow.messages
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null);
+        if (cleaned.length > 0) {
+          const fingerprint = JSON.stringify(cleaned);
+          if (fingerprint !== lastProductFingerprint) {
+            lastProductFingerprint = fingerprint;
+            const sorted = sortProductsByRank(cleaned);
+            safeSetLocalStorage('jahesh_products', JSON.stringify(sorted));
+            callback(sorted);
+          }
+        }
+      }
+    } catch {}
+  };
+  supabaseInterval = setInterval(pollSupabaseProducts, 4000);
+
   return () => {
     isUnsubscribed = true;
     if (unsubscribeFirestore) {
       try {
         unsubscribeFirestore();
       } catch {}
+    }
+    if (supabaseInterval) {
+      clearInterval(supabaseInterval);
     }
     if (typeof window !== 'undefined') {
       window.removeEventListener('jahesh-products-updated', handleLocalEvent);
@@ -601,15 +655,15 @@ export const saveAllProductsToDb = async (products: Product[]): Promise<boolean>
     broadcastProductsUpdate(sorted);
   } catch {}
 
-  // 2. Persist to server disk via /api/products
+  // 2. Persist to server disk via Universal API (/api/products & /jaheshkala/api/products)
   try {
-    await fetch('/api/products', {
+    await fetchUniversalApi('products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(sorted),
     });
   } catch (e) {
-    console.warn('Persist to /api/products notice:', e);
+    console.warn('Persist to products notice:', e);
   }
 
   // 3. Primary Cloud Database: Google Firebase Firestore
@@ -722,19 +776,40 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       } catch {}
     }
 
-    // 2. Build authoritative list starting with the active local products
+    // 2. Build authoritative list: check Supabase cloud first, then localStorage, then INITIAL_PRODUCTS
     let masterList: Product[] = [];
     try {
-      const saved = localStorage.getItem('jahesh_products');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          masterList = parsed
-            .map(cleanProductItem)
-            .filter((p): p is Product => p !== null);
-        }
+      const { data: cloudRow } = await supabase
+        .from('chats')
+        .select('messages')
+        .eq('user_id', 'SYSTEM_CONFIG_PRODUCTS')
+        .maybeSingle();
+      if (cloudRow && Array.isArray(cloudRow.messages) && cloudRow.messages.length > 0) {
+        masterList = cloudRow.messages
+          .map(cleanProductItem)
+          .filter((p): p is Product => p !== null);
       }
-    } catch {}
+    } catch (e) {
+      console.warn('Supabase fetch in saveProductToDb notice:', e);
+    }
+
+    if (masterList.length === 0) {
+      try {
+        const saved = localStorage.getItem('jahesh_products');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            masterList = parsed
+              .map(cleanProductItem)
+              .filter((p): p is Product => p !== null);
+          }
+        }
+      } catch {}
+    }
+
+    if (masterList.length === 0) {
+      masterList = [...INITIAL_PRODUCTS];
+    }
 
     // If this product is being designated as the incredible offer, unmark any previous ones
     const previousIncredibleIds: string[] = [];
@@ -790,9 +865,9 @@ export const saveProductToDb = async (product: Product): Promise<boolean> => {
       console.warn('Firestore save product notice:', fbErr);
     }
 
-    // 4.1 Sync full updated list to disk endpoints (/api/products)
+    // 4.1 Sync full updated list to disk endpoints (/api/products & Universal API)
     try {
-      fetch('/api/products', {
+      fetchUniversalApi('products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sortedMaster),
@@ -911,6 +986,29 @@ export const deleteProductFromDb = async (productId: string): Promise<boolean> =
       } catch {}
     }
 
+    // 6. Supabase sync
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_PRODUCTS',
+          user_name: 'لیست محصولات سامانه',
+          messages: updated,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch {}
+
+    // 7. Universal API full list update
+    try {
+      await fetchUniversalApi('products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+    } catch {}
+
     return true;
   } catch (err) {
     console.warn('Delete product exception:', err);
@@ -947,9 +1045,9 @@ export const saveAllProductsOrderToDb = async (orderedProducts: Product[]): Prom
       broadcastProductsUpdate(finalList);
     } catch {}
 
-    // 2. Server disk
+    // 2. Server disk via Universal API
     try {
-      await fetch('/api/products', {
+      await fetchUniversalApi('products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalList),
@@ -973,6 +1071,20 @@ export const saveAllProductsOrderToDb = async (orderedProducts: Product[]): Prom
     } catch (fbErr) {
       console.warn('Firestore save all products order notice:', fbErr);
     }
+
+    // 4. Supabase cloud sync
+    try {
+      await supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_PRODUCTS',
+          user_name: 'لیست محصولات سامانه',
+          messages: finalList,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch {}
 
     return true;
   } catch (err) {
@@ -1436,6 +1548,51 @@ export const saveOrderToDb = async (order: Order): Promise<boolean> => {
     saveLocalOrdersStore(updatedList);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-orders-updated', { detail: updatedList }));
+    }
+
+    // Auto-link / auto-register customer into Users store so they immediately appear in Admin User List
+    if (order.customerPhone || order.customerName || order.userId) {
+      try {
+        const cleanPhone = String(order.customerPhone || '').trim();
+        const cleanName = String(order.customerName || '').trim();
+        const cleanUserId = String(order.userId || '').trim();
+        const orderCustomerUser: User = {
+          id: cleanUserId || (cleanPhone ? `usr-${cleanPhone}` : `usr-order-${order.id}`),
+          fullName: cleanName || cleanUserId || 'کاربر جهش‌کالا',
+          phone: cleanPhone && cleanPhone !== 'ثبت نشده' ? cleanPhone : '',
+          email: order.customerEmail || '',
+          username: cleanUserId || cleanPhone || (cleanName ? cleanName.replace(/\s+/g, '_').toLowerCase() : ''),
+          role: 'user',
+          guild: 'طراحی سایت، وب، اپلیکیشن و فناوری',
+          createdAt: typeof order.date === 'string' && order.date.includes('۱۴۰')
+            ? order.date.split('ساعت')[0].trim()
+            : (order.date ? new Date(order.date).toLocaleDateString('fa-IR') : '۱۴۰۵/۸/۳۰'),
+          timestamp: parseOrderTimestamp(order),
+        };
+        const currentUsers = getLocalUsersStore();
+        const existingIdx = currentUsers.findIndex((u) => areSameUser(u, orderCustomerUser));
+        if (existingIdx >= 0) {
+          currentUsers[existingIdx] = mergeUserRecords(currentUsers[existingIdx], orderCustomerUser);
+        } else {
+          currentUsers.unshift(orderCustomerUser);
+        }
+        const sortedUsers = sortUsersNewestFirst(currentUsers);
+        saveLocalUsersStore(sortedUsers);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: sortedUsers }));
+        }
+
+        // Persist customer to host server API (/api/users & data/users.json)
+        try {
+          fetchUniversalApi('users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderCustomerUser),
+          }).catch(() => {});
+        } catch {}
+      } catch (userSyncErr) {
+        console.warn('Auto customer sync error in saveOrderToDb:', userSyncErr);
+      }
     }
   } catch (localErr) {
     console.warn('Local save order warning:', localErr);
@@ -1936,18 +2093,63 @@ export const registerUserInDb = async (user: User, passwordHash: string): Promis
     const finalUsersList = sortUsersNewestFirst(localUsers);
     saveLocalUsersStore(finalUsersList);
 
-    // 2. Persist to Universal Server API (Vercel Serverless + PHP Backend)
+    // 2. Persist to Universal Server API on Host (PHP & local data/users.json)
     try {
-      fetchUniversalApi('users', {
+      await fetchUniversalApi('users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userWithPass),
-      }).catch((e) => console.warn('Save user to server notice:', e));
+      });
     } catch (e) {
       console.warn('Universal API save user error:', e);
     }
 
-    // 3. Broadcast event locally
+    // 3. Persist to Supabase users table & SYSTEM_CONFIG_USERS (Zero-VPN Cloud Storage)
+    try {
+      await supabase.from('users').upsert(
+        {
+          id: userWithPass.id,
+          full_name: userWithPass.fullName,
+          phone: userWithPass.phone,
+          email: userWithPass.email || '',
+          username: userWithPass.username,
+          role: userWithPass.role || 'user',
+          created_at: userWithPass.createdAt,
+          password: passwordHash || '',
+        },
+        { onConflict: 'id' }
+      );
+    } catch (supaErr) {
+      console.warn('Supabase users table register notice:', supaErr);
+    }
+
+    try {
+      if (finalUsersList.length > 0) {
+        await supabase.from('chats').upsert(
+          {
+            user_id: 'SYSTEM_CONFIG_USERS',
+            user_name: 'لیست کاربران سیستم جهش',
+            messages: finalUsersList,
+            last_updated: new Date().toISOString(),
+            is_read_by_admin: true,
+          },
+          { onConflict: 'user_id' }
+        );
+      }
+    } catch (supaConfigErr) {
+      console.warn('Supabase SYSTEM_CONFIG_USERS register notice:', supaConfigErr);
+    }
+
+    // 4. Persist to Firebase Firestore
+    try {
+      if (userWithPass.id) {
+        await setDoc(doc(db, 'users', String(userWithPass.id)), userWithPass, { merge: true });
+      }
+    } catch (fbErr) {
+      console.warn('Firestore register user notice:', fbErr);
+    }
+
+    // 5. Broadcast event locally
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('jahesh-users-updated', { detail: finalUsersList }));
     }
@@ -2057,7 +2259,39 @@ export const findUserInDb = async (usernameOrPhone: string, passwordAttempt: str
     }
   }
 
-  // 4. Update Current User cache in localStorage if matched
+  // 4. If still not found, check Supabase users table & SYSTEM_CONFIG_USERS
+  if (!matchedUser) {
+    try {
+      const { data: supaUsers } = await supabase
+        .from('users')
+        .select('*')
+        .or(`username.eq.${cleanId},phone.eq.${cleanId},email.eq.${cleanId}`);
+      if (supaUsers && supaUsers.length > 0) {
+        const cloudMatch = supaUsers.find(
+          (u: any) =>
+            (u.username?.toLowerCase() === cleanId || u.phone === cleanId || u.email?.toLowerCase() === cleanId) &&
+            (u.password === cleanPass || u.password === passwordAttempt)
+        );
+        if (cloudMatch) {
+          matchedUser = {
+            id: cloudMatch.id,
+            fullName: cloudMatch.full_name || cloudMatch.fullName || cloudMatch.username,
+            phone: cloudMatch.phone,
+            email: cloudMatch.email || '',
+            username: cloudMatch.username,
+            role: (cloudMatch.role as any) || 'user',
+            createdAt: cloudMatch.created_at || cloudMatch.createdAt,
+          };
+          const updatedLocal = sortUsersNewestFirst([...localUsers, matchedUser]);
+          saveLocalUsersStore(updatedLocal);
+        }
+      }
+    } catch (supaErr) {
+      console.warn('Supabase find user notice:', supaErr);
+    }
+  }
+
+  // 5. Update Current User cache in localStorage if matched
   if (matchedUser) {
     try {
       safeSetLocalStorage('jahesh_current_user', JSON.stringify(matchedUser));
@@ -2238,36 +2472,57 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     if (lu && !isZahraUser(lu)) upsertToMergedList(lu);
   }
 
-  // 2. Load from Universal Server API (Vercel Serverless + PHP)
+  // 2. Load from Universal Server API (Host data/users.json & PHP)
   try {
     const res = await fetchUniversalApi('users', { cache: 'no-store' });
     if (res && res.ok) {
       const data = await res.json();
-      if (data && Array.isArray(data.users)) {
-        for (const matched of data.users) {
-          if (isZahraUser(matched)) continue;
-          const uObj: User = {
-            id: matched.id,
-            fullName: matched.fullName || matched.full_name || 'کاربر',
-            phone: matched.phone || '',
-            email: matched.email || '',
-            username: matched.username || '',
-            role: (matched.role as 'admin' | 'operator' | 'user') || 'user',
-            guild: matched.guild,
-            customGuild: matched.customGuild || matched.custom_guild,
-            createdAt: matched.createdAt || matched.created_at,
-            updatedAt: matched.updatedAt || matched.updated_at,
-            timestamp: matched.timestamp,
-          };
-          upsertToMergedList(uObj);
-        }
+      const rawArr = Array.isArray(data) ? data : (data?.users || []);
+      for (const matched of rawArr) {
+        if (isZahraUser(matched)) continue;
+        const uObj: User = {
+          id: matched.id,
+          fullName: matched.fullName || matched.full_name || 'کاربر',
+          phone: matched.phone || '',
+          email: matched.email || '',
+          username: matched.username || '',
+          role: (matched.role as 'admin' | 'operator' | 'user') || 'user',
+          guild: matched.guild,
+          customGuild: matched.customGuild || matched.custom_guild,
+          createdAt: matched.createdAt || matched.created_at,
+          updatedAt: matched.updatedAt || matched.updated_at,
+          timestamp: matched.timestamp,
+        };
+        upsertToMergedList(uObj);
       }
     }
   } catch (err) {
     console.warn('Fetch Universal API users exception:', err);
   }
 
-  // 3. Load from Supabase chats table (SYSTEM_CONFIG_USERS)
+  // 3. Load from Supabase users table (Standard relational users table)
+  try {
+    const { data: supaUsers, error: supaUsersErr } = await supabase.from('users').select('*');
+    if (!supaUsersErr && Array.isArray(supaUsers)) {
+      for (const su of supaUsers) {
+        if (!su || isZahraUser(su)) continue;
+        const uObj: User = {
+          id: su.id || `u-${su.username || su.phone}`,
+          fullName: su.full_name || su.fullName || su.username || 'کاربر جهش',
+          phone: su.phone && su.phone !== 'ثبت نشده' ? su.phone : '',
+          email: su.email || '',
+          username: su.username || '',
+          role: (su.role as any) || 'user',
+          createdAt: su.created_at || '۱۴۰۵/۶/۱۷',
+        };
+        upsertToMergedList(uObj);
+      }
+    }
+  } catch (supaErr) {
+    console.warn('Supabase fetch users table notice:', supaErr);
+  }
+
+  // 4. Load from Supabase chats table (SYSTEM_CONFIG_USERS)
   try {
     const { data: configData } = await supabase
       .from('chats')
@@ -2286,7 +2541,7 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     console.warn('Supabase fetch SYSTEM_CONFIG_USERS notice:', supaErr);
   }
 
-  // 4. Load from Firebase Firestore
+  // 5. Load from Firebase Firestore
   try {
     const snap = await getDocs(collection(db, 'users'));
     snap.forEach((d) => {
@@ -2299,10 +2554,144 @@ export const fetchAllUsersFromDb = async (): Promise<User[]> => {
     console.warn('Firestore fetch users notice:', fbErr);
   }
 
+  // 6. KEY FIX: Extract customers and registered accounts from Orders (Supabase & Local)
+  // Ensures anyone who placed an order (e.g. tarannom, 09300962788) is 100% visible in the user list!
+  try {
+    // 6a. Check Supabase orders table
+    const { data: supaOrders } = await supabase
+      .from('orders')
+      .select('id, customer_name, customer_phone, customer_email, user_id, date, created_at');
+
+    if (Array.isArray(supaOrders)) {
+      for (const ord of supaOrders) {
+        if (!ord) continue;
+        const phone = String(ord.customer_phone || '').trim();
+        const name = String(ord.customer_name || '').trim();
+        const userId = String(ord.user_id || '').trim();
+        const email = String(ord.customer_email || '').trim();
+        const date = ord.date || ord.created_at;
+
+        if (phone || name || userId) {
+          const cleanPhone = phone && phone !== 'ثبت نشده' ? phone : '';
+          const cleanUsername = userId || cleanPhone || (name ? name.replace(/\s+/g, '_').toLowerCase() : '');
+          const orderUser: User = {
+            id: userId || (cleanPhone ? `usr-${cleanPhone}` : `usr-order-${ord.id}`),
+            fullName: name || userId || 'کاربر جهش‌کالا',
+            phone: cleanPhone,
+            email: email,
+            username: cleanUsername,
+            role: 'user',
+            guild: 'طراحی سایت، وب، اپلیکیشن و فناوری',
+            createdAt: typeof date === 'string' && date.includes('۱۴۰') 
+              ? date.split('ساعت')[0].trim() 
+              : (date ? new Date(date).toLocaleDateString('fa-IR') : '۱۴۰۵/۸/۳۰'),
+            timestamp: ord.created_at ? new Date(ord.created_at).getTime() : Date.now(),
+          };
+          upsertToMergedList(orderUser);
+        }
+      }
+    }
+
+    // 6b. Check host server orders (/api/orders & data/orders.json)
+    try {
+      const ordersRes = await fetchUniversalApi('orders', { cache: 'no-store' });
+      if (ordersRes && ordersRes.ok) {
+        const ordersData = await ordersRes.json();
+        const hostOrders = Array.isArray(ordersData) ? ordersData : (ordersData?.orders || []);
+        for (const ord of hostOrders) {
+          if (!ord) continue;
+          const phone = String(ord.customerPhone || ord.customer_phone || '').trim();
+          const name = String(ord.customerName || ord.customer_name || '').trim();
+          const userId = String(ord.userId || ord.user_id || '').trim();
+          const email = String(ord.customerEmail || ord.customer_email || '').trim();
+          const date = ord.date || ord.createdAt || ord.created_at;
+
+          if (phone || name || userId) {
+            const cleanPhone = phone && phone !== 'ثبت نشده' ? phone : '';
+            const cleanUsername = userId || cleanPhone || (name ? name.replace(/\s+/g, '_').toLowerCase() : '');
+            const orderUser: User = {
+              id: userId || (cleanPhone ? `usr-${cleanPhone}` : `usr-order-${ord.id}`),
+              fullName: name || userId || 'کاربر جهش‌کالا',
+              phone: cleanPhone,
+              email: email,
+              username: cleanUsername,
+              role: 'user',
+              guild: 'طراحی سایت، وب، اپلیکیشن و فناوری',
+              createdAt: typeof date === 'string' && date.includes('۱۴۰') 
+                ? date.split('ساعت')[0].trim() 
+                : (date ? new Date(date).toLocaleDateString('fa-IR') : '۱۴۰۵/۸/۳۰'),
+              timestamp: ord.createdAt ? new Date(ord.createdAt).getTime() : parseOrderTimestamp(ord),
+            };
+            upsertToMergedList(orderUser);
+          }
+        }
+      }
+    } catch (hostOrdErr) {
+      console.warn('Host orders extraction notice:', hostOrdErr);
+    }
+
+    // 6c. Check local orders store
+    const localOrders = getLocalOrdersStore();
+    for (const ord of localOrders) {
+      if (!ord) continue;
+      const phone = String(ord.customerPhone || '').trim();
+      const name = String(ord.customerName || '').trim();
+      const userId = String(ord.userId || '').trim();
+      const email = String(ord.customerEmail || '').trim();
+      const date = ord.date || ord.createdAt;
+
+      if (phone || name || userId) {
+        const cleanPhone = phone && phone !== 'ثبت نشده' ? phone : '';
+        const cleanUsername = userId || cleanPhone || (name ? name.replace(/\s+/g, '_').toLowerCase() : '');
+        const orderUser: User = {
+          id: userId || (cleanPhone ? `usr-${cleanPhone}` : `usr-order-${ord.id}`),
+          fullName: name || userId || 'کاربر جهش‌کالا',
+          phone: cleanPhone,
+          email: email,
+          username: cleanUsername,
+          role: 'user',
+          guild: 'طراحی سایت، وب، اپلیکیشن و فناوری',
+          createdAt: typeof date === 'string' && date.includes('۱۴۰') 
+            ? date.split('ساعت')[0].trim() 
+            : (date ? new Date(date).toLocaleDateString('fa-IR') : '۱۴۰۵/۸/۳۰'),
+          timestamp: parseOrderTimestamp(ord),
+        };
+        upsertToMergedList(orderUser);
+      }
+    }
+  } catch (orderExtractErr) {
+    console.warn('Extract users from orders notice:', orderExtractErr);
+  }
+
   // Ensure Master Admin is always at index 0 and marked with role admin
   const sortedOthers = sortUsersNewestFirst(usersList.filter((u) => !isMasterAdminUser(u) && !isZahraUser(u)));
   const result = [officialMasterAdmin, ...sortedOthers];
   saveLocalUsersStore(result);
+
+  // Sync merged list to Host (/api/users & data/users.json) in background
+  try {
+    fetchUniversalApi('users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(result),
+    }).catch(() => {});
+  } catch {}
+
+  // Sync merged list to Supabase SYSTEM_CONFIG_USERS in background
+  try {
+    if (result.length > 0) {
+      supabase.from('chats').upsert(
+        {
+          user_id: 'SYSTEM_CONFIG_USERS',
+          user_name: 'لیست کاربران سیستم جهش',
+          messages: result,
+          last_updated: new Date().toISOString(),
+          is_read_by_admin: true,
+        },
+        { onConflict: 'user_id' }
+      ).catch(() => {});
+    }
+  } catch {}
 
   // If current logged-in user's role changed in cloud, auto-sync session safely
   try {
@@ -2526,12 +2915,44 @@ export const fetchChatsFromDb = async (): Promise<UserChat[]> => {
 
   const mergedMap = new Map<string, any>();
   for (const c of cachedChats) {
-    if (c && c.userId) {
+    if (c && c.userId && !String(c.userId).startsWith('SYSTEM_')) {
       mergedMap.set(String(c.userId), c);
     }
   }
 
-  // 2. Direct Server API (Universal Vercel API + PHP) - 100% Works in Iran with ZERO VPN & Unlimited Quota
+  // 2. Fetch directly from Supabase chats table (zero-VPN cloud storage)
+  try {
+    const { data: supaChats, error: supaErr } = await supabase
+      .from('chats')
+      .select('*')
+      .not('user_id', 'like', 'SYSTEM_%');
+
+    if (!supaErr && Array.isArray(supaChats)) {
+      for (const item of supaChats) {
+        if (!item || !item.user_id || String(item.user_id).startsWith('SYSTEM_')) continue;
+        const uid = String(item.user_id);
+        const existing = mergedMap.get(uid);
+        const parsedMsgs = Array.isArray(item.messages) ? item.messages : [];
+        const mergedMsgs = existing ? mergeChatMessages(existing.messages, parsedMsgs) : parsedMsgs;
+        const hasEscalation = mergedMsgs.some(
+          (m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس') || m.text?.includes('کارشناس')
+        );
+
+        mergedMap.set(uid, {
+          userId: uid,
+          userName: item.user_name || existing?.userName || 'کاربر جهش‌کالا',
+          messages: mergedMsgs,
+          lastUpdated: item.last_updated || existing?.lastUpdated || new Date().toISOString(),
+          isReadByAdmin: item.is_read_by_admin !== undefined ? Boolean(item.is_read_by_admin) : (existing?.isReadByAdmin ?? false),
+          needsHumanSupport: item.needs_human_support !== undefined ? Boolean(item.needs_human_support) : (existing?.needsHumanSupport ?? hasEscalation),
+        });
+      }
+    }
+  } catch (supaErr) {
+    console.warn('Supabase fetch chats notice:', supaErr);
+  }
+
+  // 3. Direct Server API (Universal Vercel API + PHP)
   try {
     const res = await fetchUniversalApi('chats', { cache: 'no-store' });
     if (res && res.ok) {
@@ -2543,16 +2964,19 @@ export const fetchChatsFromDb = async (): Promise<UserChat[]> => {
             const existing = mergedMap.get(uid);
             const parsedMsgs = Array.isArray(item.messages) ? item.messages : [];
             const mergedMsgs = existing ? mergeChatMessages(existing.messages, parsedMsgs) : parsedMsgs;
+            const hasEscalation = mergedMsgs.some(
+              (m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس') || m.text?.includes('کارشناس')
+            );
             mergedMap.set(uid, {
               userId: uid,
               userName: item.userName || existing?.userName || 'کاربر جهش‌کالا',
               messages: mergedMsgs,
               lastUpdated: item.lastUpdated || existing?.lastUpdated || new Date().toISOString(),
-              isReadByAdmin: item.isReadByAdmin !== undefined ? Boolean(item.isReadByAdmin) : false,
+              isReadByAdmin: item.isReadByAdmin !== undefined ? Boolean(item.isReadByAdmin) : (existing?.isReadByAdmin ?? false),
               needsHumanSupport:
                 item.needsHumanSupport !== undefined
                   ? Boolean(item.needsHumanSupport)
-                  : mergedMsgs.some((m: any) => m.needsHumanSupport || m.text?.includes('درخواست اتصال به کارشناس') || m.text?.includes('کارشناس')),
+                  : (existing?.needsHumanSupport ?? hasEscalation),
             });
           }
         }
@@ -2568,7 +2992,9 @@ export const fetchChatsFromDb = async (): Promise<UserChat[]> => {
 
   // Cache merged result locally
   try {
-    safeSetLocalStorage('jahesh_all_chats', JSON.stringify(mergedList));
+    if (mergedList.length > 0) {
+      safeSetLocalStorage('jahesh_all_chats', JSON.stringify(mergedList));
+    }
   } catch {}
 
   return mergedList;
@@ -2577,6 +3003,22 @@ export const fetchChatsFromDb = async (): Promise<UserChat[]> => {
 export const saveChatToDb = async (chat: any): Promise<boolean> => {
   if (!chat || !chat.userId) return false;
   const uid = String(chat.userId);
+  if (uid.startsWith('SYSTEM_')) return false;
+
+  const lastUpdated = chat.lastUpdated || new Date().toISOString();
+  const userName = chat.userName || 'کاربر جهش‌کالا';
+  const messages = Array.isArray(chat.messages) ? chat.messages : [];
+  const isReadByAdmin = Boolean(chat.isReadByAdmin);
+  const needsHumanSupport = Boolean(chat.needsHumanSupport);
+
+  const cleanChat: UserChat = {
+    userId: uid,
+    userName,
+    messages,
+    lastUpdated,
+    isReadByAdmin,
+    needsHumanSupport,
+  };
 
   // 1. Update local cache & BroadcastChannel immediately for 0ms cross-tab UI update
   try {
@@ -2584,34 +3026,43 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
     let chatsList: any[] = saved ? JSON.parse(saved) : [];
     const idx = chatsList.findIndex(c => String(c.userId) === uid);
     if (idx >= 0) {
-      chatsList[idx] = { ...chatsList[idx], ...chat };
+      chatsList[idx] = { ...chatsList[idx], ...cleanChat };
     } else {
-      chatsList.unshift(chat);
+      chatsList.unshift(cleanChat);
     }
     safeSetLocalStorage('jahesh_all_chats', JSON.stringify(chatsList));
-    safeSetLocalStorage(`jahesh_chat_${uid}`, JSON.stringify(chat.messages || []));
+    safeSetLocalStorage(`jahesh_chat_${uid}`, JSON.stringify(messages));
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('jahesh-chats-updated', { detail: chat }));
+      window.dispatchEvent(new CustomEvent('jahesh-chats-updated', { detail: cleanChat }));
     }
     const bc = getChatBroadcastChannel();
     if (bc) {
-      bc.postMessage({ type: 'CHAT_UPDATED', chat, allChats: chatsList });
+      bc.postMessage({ type: 'CHAT_UPDATED', chat: cleanChat, allChats: chatsList });
     }
   } catch {}
 
-  // 2. Save directly to Universal Server API (/api/chats & /jaheshkala/api.php) - Instant Zero-VPN delivery
+  // 2. Persist to Supabase chats table (zero-VPN cloud storage)
+  try {
+    await supabase.from('chats').upsert(
+      {
+        user_id: uid,
+        user_name: userName,
+        messages: messages,
+        last_updated: lastUpdated,
+        is_read_by_admin: isReadByAdmin,
+      },
+      { onConflict: 'user_id' }
+    );
+  } catch (supaErr) {
+    console.warn('Supabase save chat notice:', supaErr);
+  }
+
+  // 3. Save directly to Universal Server API (/api/chats & /jaheshkala/api.php)
   try {
     fetchUniversalApi('chats', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: uid,
-        userName: chat.userName || 'کاربر جهش‌کالا',
-        messages: Array.isArray(chat.messages) ? chat.messages : [],
-        lastUpdated: chat.lastUpdated || new Date().toISOString(),
-        isReadByAdmin: Boolean(chat.isReadByAdmin),
-        needsHumanSupport: Boolean(chat.needsHumanSupport),
-      }),
+      body: JSON.stringify(cleanChat),
     }).catch((e) => console.warn('Universal Server async save notice:', e));
   } catch (apiErr) {
     console.warn('Universal Server save notice:', apiErr);
@@ -2621,7 +3072,7 @@ export const saveChatToDb = async (chat: any): Promise<boolean> => {
 };
 
 /**
- * Real-time subscription to all customer chats via BroadcastChannel + Universal Server API.
+ * Real-time subscription to all customer chats via Supabase + BroadcastChannel + Universal Server API.
  * Updates the Admin Panel instantly (0ms locally, <1.5s across devices) without VPN.
  */
 export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() => void) => {
@@ -2633,10 +3084,12 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
   const handleBcMessage = (ev: MessageEvent) => {
     if (isUnsubscribed) return;
     if (ev.data && ev.data.type === 'CHAT_UPDATED') {
-      if (Array.isArray(ev.data.allChats)) {
+      if (Array.isArray(ev.data.allChats) && ev.data.allChats.length > 0) {
         callback(ev.data.allChats);
       } else {
-        fetchChatsFromDb().then(callback);
+        fetchChatsFromDb().then((fresh) => {
+          if (!isUnsubscribed && fresh && fresh.length > 0) callback(fresh);
+        });
       }
     }
   };
@@ -2649,7 +3102,7 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
     if (e.key === 'jahesh_all_chats' && e.newValue) {
       try {
         const parsed = JSON.parse(e.newValue);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           callback(parsed);
         }
       } catch {}
@@ -2659,23 +3112,36 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
     window.addEventListener('storage', handleStorageChange);
   }
 
-  // 1. High-speed Domestic Server Poll (Universal API - every 1.5 seconds)
+  // 1. Supabase Real-Time Channel
+  let supaChannel: any = null;
+  try {
+    supaChannel = supabase
+      .channel('public:realtime_chats_admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, (payload) => {
+        if (isUnsubscribed) return;
+        const rowUid = payload?.new && (payload.new as any).user_id;
+        if (!rowUid || !String(rowUid).startsWith('SYSTEM_')) {
+          fetchChatsFromDb().then((fresh) => {
+            if (!isUnsubscribed && fresh && fresh.length > 0) callback(fresh);
+          });
+        }
+      })
+      .subscribe();
+  } catch {}
+
+  // 2. High-speed Multi-Layer Poll (Supabase + Universal API every 3.5 seconds)
   const pollServer = async () => {
     if (isUnsubscribed) return;
     try {
-      const res = await fetchUniversalApi('chats', { cache: 'no-store' });
-      if (res && res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.chats) && data.chats.length > 0) {
-          data.chats.sort((a: any, b: any) => new Date(b.lastUpdated || 0).getTime() - new Date(a.lastUpdated || 0).getTime());
-          callback(data.chats);
-        }
+      const fresh = await fetchChatsFromDb();
+      if (!isUnsubscribed && fresh && fresh.length > 0) {
+        callback(fresh);
       }
     } catch {}
   };
 
   pollServer();
-  intervalId = setInterval(pollServer, 30000);
+  intervalId = setInterval(pollServer, 3500);
 
   return () => {
     isUnsubscribed = true;
@@ -2686,6 +3152,9 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
     if (typeof window !== 'undefined') {
       window.removeEventListener('storage', handleStorageChange);
     }
+    if (supaChannel) {
+      supabase.removeChannel(supaChannel);
+    }
     if (intervalId) {
       clearInterval(intervalId);
     }
@@ -2693,7 +3162,7 @@ export const subscribeToChatsFromDb = (callback: (chats: any[]) => void): (() =>
 };
 
 /**
- * Real-time subscription to a single user's chat session via BroadcastChannel + Universal Server API.
+ * Real-time subscription to a single user's chat session via Supabase + BroadcastChannel + Universal Server API.
  * Updates the LiveChatWidget instantly when admin replies.
  */
 export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any) => void): (() => void) => {
@@ -2736,10 +3205,56 @@ export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any
     window.addEventListener('storage', handleStorageChange);
   }
 
-  // High-speed Domestic Server Poll for single chat session
+  // 1. Supabase Real-Time Channel for single chat
+  let supaChannel: any = null;
+  try {
+    supaChannel = supabase
+      .channel(`public:realtime_single_chat_${uid}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chats', filter: `user_id=eq.${uid}` },
+        (payload) => {
+          if (isUnsubscribed) return;
+          if (payload?.new) {
+            const row: any = payload.new;
+            callback({
+              userId: uid,
+              userName: row.user_name || 'کاربر جهش‌کالا',
+              messages: Array.isArray(row.messages) ? row.messages : [],
+              lastUpdated: row.last_updated || new Date().toISOString(),
+              isReadByAdmin: Boolean(row.is_read_by_admin),
+              needsHumanSupport: Boolean(row.needs_human_support),
+            });
+          }
+        }
+      )
+      .subscribe();
+  } catch {}
+
+  // 2. High-speed Domestic Server Poll for single chat session
   const pollSingle = async () => {
     if (isUnsubscribed) return;
     try {
+      // 2a. Supabase Cloud first
+      const { data: supaRow } = await supabase
+        .from('chats')
+        .select('*')
+        .eq('user_id', uid)
+        .maybeSingle();
+
+      if (supaRow && Array.isArray(supaRow.messages) && supaRow.messages.length > 0) {
+        callback({
+          userId: uid,
+          userName: supaRow.user_name || 'کاربر جهش‌کالا',
+          messages: supaRow.messages,
+          lastUpdated: supaRow.last_updated || new Date().toISOString(),
+          isReadByAdmin: Boolean(supaRow.is_read_by_admin),
+          needsHumanSupport: Boolean(supaRow.needs_human_support),
+        });
+        return;
+      }
+
+      // 2b. Fallback Universal Server API
       const res = await fetchUniversalApi(`chats?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
       if (res && res.ok) {
         const data = await res.json();
@@ -2751,7 +3266,7 @@ export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any
   };
 
   pollSingle();
-  intervalId = setInterval(pollSingle, 30000);
+  intervalId = setInterval(pollSingle, 3000);
 
   return () => {
     isUnsubscribed = true;
@@ -2761,6 +3276,9 @@ export const subscribeToSingleChatFromDb = (userId: string, callback: (chat: any
     }
     if (typeof window !== 'undefined') {
       window.removeEventListener('storage', handleStorageChange);
+    }
+    if (supaChannel) {
+      supabase.removeChannel(supaChannel);
     }
     if (intervalId) {
       clearInterval(intervalId);
